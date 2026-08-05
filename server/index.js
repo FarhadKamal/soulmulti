@@ -7,6 +7,7 @@ import { createGame } from './engine/state.js';
 import {
   getUsableActions, executeAction, isValidTarget, markCharacterActed,
 } from './engine/turnEngine.js';
+import { CHARACTERS } from './data/characters.js';
 import { chooseBotMove, chooseBotJesterBallMove, chooseSoulSwapWrathTarget } from './engine/botPlayer.js';
 import { settleToNextDecision, finishJesterBall } from './gameFlow.js';
 import {
@@ -40,14 +41,30 @@ function broadcastRoom(room, type, payload = {}) {
   }
 }
 
+// Sends a per-recipient payload built from buildPayload(recipientSessionId)
+// to every human seat, instead of one shared broadcast object - needed
+// wherever the payload must say "which seat is YOU" (a plain broadcast
+// object is inherently the same for every recipient, and the client can't
+// safely infer its own seat from anything else in the lobby view).
+function broadcastPersonalized(room, type, buildPayload) {
+  for (const seat of room.seats) {
+    if (seat.kind === 'human' && seat.playerId) {
+      const ws = sessions.get(seat.playerId);
+      if (ws) send(ws, type, buildPayload(seat.playerId));
+    }
+  }
+}
+
 // ---- Lobby snapshot sent to every client whenever room membership/picks change ----
-function lobbyView(room) {
+function lobbyView(room, recipientSessionId) {
   const shape = roomShapeFor(room.roomType);
   return {
     code: room.code,
     roomType: room.roomType,
     picksPerSeat: shape.picksPerSeat,
     ownerId: room.ownerId,
+    youAreOwner: room.ownerId === recipientSessionId,
+    mySeatIndex: room.seats.find((s) => s.playerId === recipientSessionId)?.index ?? null,
     phase: room.phase,
     seats: room.seats.map((s) => ({
       index: s.index,
@@ -55,13 +72,14 @@ function lobbyView(room) {
       name: s.name,
       characterIds: s.characterIds,
       isOwner: s.playerId === room.ownerId,
+      isMe: s.playerId === recipientSessionId,
     })),
     availableCharacterIds: availableCharacterIds(room),
   };
 }
 
 function broadcastLobby(room) {
-  broadcastRoom(room, 'lobby-update', { room: lobbyView(room) });
+  broadcastPersonalized(room, 'lobby-update', (recipientSessionId) => ({ room: lobbyView(room, recipientSessionId) }));
 }
 
 // ---- Game state snapshot. Hidden info (Akyros's unrevealed marks) is
@@ -90,6 +108,28 @@ function sanitizeGameForBroadcast(game) {
   return clone;
 }
 
+// Serializable summary of what the acting character can legally do right
+// now - the client renders buttons/targets off this instead of
+// reimplementing isLegal()/isValidTarget() itself, which would duplicate
+// the whole ability rules system client-side and open a mismatch/cheating
+// surface (a client that computes its own legality could offer illegal
+// moves; the server would still reject them via handleAction's own checks,
+// but the UI would be misleading). getLegalActions()'s raw entries include
+// an `execute` function that can't survive JSON - only the safe fields are
+// picked out here.
+function usableActionsFor(game, characterId) {
+  const character = game.characters[characterId];
+  if (!character) return [];
+  return getUsableActions(character, game).map((a) => ({
+    actionId: a.actionId,
+    label: a.label,
+    needsTarget: a.needsTarget,
+    validTargetIds: a.needsTarget
+      ? Object.keys(game.characters).filter((tid) => isValidTarget(game, characterId, a.actionId, tid))
+      : [],
+  }));
+}
+
 function broadcastGameState(room) {
   const acting = settleToNextDecision(room.game);
   if (room.game.phase === 'game-over') {
@@ -101,6 +141,7 @@ function broadcastGameState(room) {
   broadcastRoom(room, 'game-state', {
     game: sanitizeGameForBroadcast(room.game),
     actingCharacterId: acting,
+    usableActions: acting ? usableActionsFor(room.game, acting) : [],
   });
 }
 
@@ -274,7 +315,13 @@ function handleAction(room, sessionId, { characterId, actionId, targetId }) {
     // client's zerathysSoulSwapFollowUpPending flow. Broadcast the
     // intermediate state (swap already applied) so clients show it, then
     // wait for a soulSwapWrath action message from this same player.
-    broadcastRoom(room, 'game-state', { game: sanitizeGameForBroadcast(room.game), actingCharacterId: characterId, awaitingSoulSwapWrath: true });
+    const soulSwapWrathTargets = Object.keys(room.game.characters).filter((tid) => isValidTarget(room.game, characterId, 'soulSwapWrath', tid));
+    broadcastRoom(room, 'game-state', {
+      game: sanitizeGameForBroadcast(room.game),
+      actingCharacterId: characterId,
+      awaitingSoulSwapWrath: true,
+      usableActions: [{ actionId: 'soulSwapWrath', label: 'Thunder Wrath (free, from Soul Swap)', needsTarget: true, validTargetIds: soulSwapWrathTargets }],
+    });
     return;
   }
   markCharacterActed(room.game, characterId);
