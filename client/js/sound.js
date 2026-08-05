@@ -19,12 +19,18 @@ const BATTLE_TRACKS = ['bgm-battle.mp3', 'bgm-battle-2.mp3', 'bgm-battle-3.mp3']
 const MENU_TRACKS = ['bgm-menu.mp3', 'bgm-menu-2.mp3', 'bgm-menu-3.mp3'];
 
 // Browsers block audio autoplay until the user has interacted with the
-// page - the very first call to startMenuMusic() happens on initial page
-// load, before any click/tap. Some browsers reject the play() promise
-// (caught in startMusic below); others silently leave the element paused
-// with no rejection at all - so this also arms an unconditional "on any
-// interaction, make sure music is actually playing" listener, which
-// self-heals either failure mode.
+// page. Two distinct failure modes seen in practice: (1) a play() call
+// made asynchronously (e.g. from a WebSocket message handler, not
+// synchronously inside a click handler) can be blocked even after an
+// earlier gesture already unblocked a DIFFERENT audio element - switching
+// from menu music to a freshly-created battle-track Audio node hit this in
+// testing: menu music played fine (its play() happened to line up with an
+// early interaction), but the battle track silently stayed paused with no
+// rejection once startBattleMusic() fired from the game-state handler.
+// (2) some browsers just leave the element paused with no promise
+// rejection at all regardless of timing. Both are self-healed by
+// unconditionally re-checking (not just once, on every interaction) rather
+// than trusting either the initial play() call or a single retry.
 function ensureMusicPlaying() {
   if (musicAudio && musicAudio.paused) {
     musicAudio.play().catch(() => {});
@@ -33,6 +39,13 @@ function ensureMusicPlaying() {
 if (typeof document !== 'undefined') {
   document.addEventListener('pointerdown', ensureMusicPlaying);
   document.addEventListener('keydown', ensureMusicPlaying);
+  // Belt-and-suspenders: also poll periodically, since a click landing on
+  // an element with its own handler can still fire pointerdown/keydown but
+  // in some browsers doesn't count as a "sticky activation" gesture for a
+  // brand new Audio element created moments earlier - a short interval
+  // catches it within a second or two regardless of exactly which click
+  // qualifies.
+  setInterval(ensureMusicPlaying, 1000);
 }
 
 function startMusic(track, file, volume) {
