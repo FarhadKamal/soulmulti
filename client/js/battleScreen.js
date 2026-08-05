@@ -1,5 +1,6 @@
 import { CHARACTERS } from './characters.js';
 import { send } from './net.js';
+import { renderChatPanel } from './chatPanel.js';
 
 // Functional-first battle screen: no portrait art/animation yet (see
 // characterCard.js in the main game for that system) - just hearts,
@@ -53,6 +54,7 @@ export function renderBattle(root, state) {
   }
 
   wrap.appendChild(renderLog(game.log));
+  wrap.appendChild(renderChatPanel());
 
   root.appendChild(wrap);
 }

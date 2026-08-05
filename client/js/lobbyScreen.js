@@ -1,5 +1,6 @@
 import { CHARACTERS } from './characters.js';
 import { send } from './net.js';
+import { renderChatPanel } from './chatPanel.js';
 
 // Renders the pre-match lobby: room type choice -> create/join -> seat
 // list + character picking -> start. `room` is null until a create-room or
@@ -37,7 +38,7 @@ function renderEntryForm() {
   form.className = 'entry-form';
 
   const nameLabel = document.createElement('label');
-  nameLabel.textContent = 'Your name';
+  nameLabel.textContent = 'Your name (required)';
   const nameInput = document.createElement('input');
   nameInput.type = 'text';
   nameInput.maxLength = 20;
@@ -45,12 +46,23 @@ function renderEntryForm() {
   nameInput.value = sessionStorage.getItem('soulclash-name') || '';
   form.appendChild(nameLabel);
   form.appendChild(nameInput);
+  const nameHint = document.createElement('div');
+  nameHint.className = 'name-hint';
+  nameHint.textContent = 'Enter a name to create or join a room.';
+  form.appendChild(nameHint);
 
   function currentName() {
-    const name = nameInput.value.trim() || 'Player';
-    sessionStorage.setItem('soulclash-name', name);
-    return name;
+    return nameInput.value.trim();
   }
+
+  function updateNameValidity() {
+    const hasName = currentName().length > 0;
+    nameInput.classList.toggle('input--invalid', !hasName);
+    nameHint.style.display = hasName ? 'none' : 'block';
+    if (hasName) sessionStorage.setItem('soulclash-name', currentName());
+    [btn4p, btn2p, joinBtn].forEach((btn) => { btn.disabled = !hasName; });
+  }
+  nameInput.addEventListener('input', updateNameValidity);
 
   const createSection = document.createElement('div');
   createSection.className = 'create-section';
@@ -93,6 +105,7 @@ function renderEntryForm() {
   joinSection.appendChild(joinBtn);
   form.appendChild(joinSection);
 
+  updateNameValidity();
   return form;
 }
 
@@ -171,6 +184,8 @@ function renderRoomLobby(room) {
     waiting.textContent = 'Waiting for the room owner to start the match...';
     wrap.appendChild(waiting);
   }
+
+  wrap.appendChild(renderChatPanel());
 
   return wrap;
 }

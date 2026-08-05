@@ -211,7 +211,13 @@ function runBotTurnsIfAny(room) {
 }
 
 // ---- Room/lobby message handlers ----
+function sanitizeName(name) {
+  return typeof name === 'string' ? name.trim().slice(0, 20) : '';
+}
+
 function handleCreateRoom(ws, sessionId, { roomType, name }) {
+  const cleanName = sanitizeName(name);
+  if (!cleanName) return send(ws, 'error', { message: 'A name is required.' });
   if (!roomShapeFor(roomType)) {
     return send(ws, 'error', { message: 'Invalid room type.' });
   }
@@ -219,13 +225,15 @@ function handleCreateRoom(ws, sessionId, { roomType, name }) {
   const seat = room.seats[0];
   seat.kind = 'human';
   seat.playerId = sessionId;
-  seat.name = name;
+  seat.name = cleanName;
   room.ownerId = sessionId;
   send(ws, 'room-created', { code: room.code });
   broadcastLobby(room);
 }
 
 function handleJoinRoom(ws, sessionId, { code, name }) {
+  const cleanName = sanitizeName(name);
+  if (!cleanName) return send(ws, 'error', { message: 'A name is required.' });
   const room = getRoom(code);
   if (!room) return send(ws, 'error', { message: 'Room not found.' });
   if (room.phase !== 'lobby') return send(ws, 'error', { message: 'Match already started.' });
@@ -233,7 +241,7 @@ function handleJoinRoom(ws, sessionId, { code, name }) {
   if (!seat) return send(ws, 'error', { message: 'Room is full.' });
   seat.kind = 'human';
   seat.playerId = sessionId;
-  seat.name = name;
+  seat.name = cleanName;
   send(ws, 'room-joined', { code: room.code });
   broadcastLobby(room);
 }
@@ -356,6 +364,18 @@ function isJesterBallPassTarget(game, holderId, targetId) {
   return true;
 }
 
+// In-match/lobby text chat - relayed to everyone currently in the room, no
+// history kept beyond what's already in each client's own chat panel (a
+// player joining mid-lobby or reconnecting after a crash just doesn't see
+// earlier messages, same "no persistence" tradeoff as everything else here).
+function handleChatMessage(room, sessionId, { text }) {
+  const seat = room.seats.find((s) => s.playerId === sessionId);
+  if (!seat) return;
+  const clean = typeof text === 'string' ? text.trim().slice(0, 300) : '';
+  if (!clean) return;
+  broadcastRoom(room, 'chat-message', { name: seat.name, text: clean, at: Date.now() });
+}
+
 // ---- Connection handling ----
 wss.on('connection', (ws) => {
   const sessionId = randomUUID();
@@ -381,6 +401,7 @@ wss.on('connection', (ws) => {
       case 'action': return handleAction(room, sessionId, payload);
       case 'soul-swap-wrath': return handleSoulSwapWrath(room, sessionId, payload);
       case 'jester-ball-choice': return handleJesterBallChoice(room, sessionId, payload);
+      case 'chat-message': return handleChatMessage(room, sessionId, payload);
       default: return;
     }
   });

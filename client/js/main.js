@@ -1,6 +1,7 @@
 import { connect, onMessage } from './net.js';
 import { renderLobby } from './lobbyScreen.js';
 import { renderBattle } from './battleScreen.js';
+import { addChatMessage } from './chatPanel.js';
 
 const root = document.getElementById('app');
 
@@ -67,6 +68,10 @@ onMessage((msg) => {
       break;
     case 'connection-closed':
       state.error = 'Connection lost. Please refresh to reconnect.';
+      rerender();
+      break;
+    case 'chat-message':
+      addChatMessage(msg);
       rerender();
       break;
     default:
