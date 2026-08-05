@@ -365,6 +365,22 @@ function handleReturnToLobby(room, sessionId) {
   broadcastLobby(room);
 }
 
+// "Exit Game" mid-match (solo owner vs bots only, per humanCount<=1 gating
+// on the client) - immediately scraps the in-progress match with no winner
+// declared and resets straight to a fresh lobby, same room code. Distinct
+// from return-to-lobby (which only fires once a match has already ended
+// naturally) and from leave-room (which removes the player from the room
+// entirely) - this is "abandon what I'm playing, but stay in this room and
+// pick again," owner-only for the same reason every other room-lifecycle
+// action is.
+function handleAbandonMatch(room, sessionId) {
+  if (sessionId !== room.ownerId) return;
+  if (room.phase !== 'in-match') return;
+  clearTurnTimer(room);
+  resetRoomToLobby(room);
+  broadcastLobby(room);
+}
+
 // Shared by both an explicit "Exit Room" click (leave-room message) and a
 // real socket disconnect (ws.on('close')) - same cleanup either way, since
 // a deliberate exit and an abrupt disconnect should behave identically
@@ -521,6 +537,7 @@ wss.on('connection', (ws) => {
       case 'remove-bot': return handleRemoveBot(room, sessionId, payload);
       case 'start-match': return handleStartMatch(room, sessionId);
       case 'return-to-lobby': return handleReturnToLobby(room, sessionId);
+      case 'abandon-match': return handleAbandonMatch(room, sessionId);
       case 'action': return handleAction(room, sessionId, payload);
       case 'soul-swap-wrath': return handleSoulSwapWrath(room, sessionId, payload);
       case 'jester-ball-choice': return handleJesterBallChoice(room, sessionId, payload);

@@ -53,10 +53,12 @@ export function renderBattle(root, state) {
     const exitBtn = document.createElement('button');
     exitBtn.className = 'exit-btn';
     exitBtn.textContent = 'Exit Game';
-    // Leaving mid-match hands your seat to a bot permanently, same as a
-    // timed-out turn or a disconnect - there's no "pause" state, so this is
-    // a real commitment, not just a menu back-out.
-    exitBtn.onclick = () => { if (confirm('Leave this match? Your character(s) will be taken over by a bot.')) send('leave-room'); };
+    // Abandons the current match and returns to THIS room's character-pick
+    // lobby (same room code), NOT the same as Exit Room in the pre-match
+    // lobby - that removes you from the room entirely. Exit Game just
+    // scraps the in-progress match so you can pick fresh characters and
+    // start again, staying in the same room.
+    exitBtn.onclick = () => { if (confirm('Abandon this match and return to the lobby?')) send('abandon-match'); };
     wrap.appendChild(exitBtn);
   }
 

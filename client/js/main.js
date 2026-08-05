@@ -57,10 +57,11 @@ onMessage((msg) => {
       state.room = msg.room;
       state.error = null;
       // A lobby-update while the room's phase is back to 'lobby' means the
-      // owner sent return-to-lobby after a match ended (or this is the
-      // normal pre-match flow) - either way, the battle screen should stop
-      // showing (it has no way to update itself once the server's game
-      // object is gone / a new match hasn't started yet).
+      // owner sent return-to-lobby (after a match ended) or abandon-match
+      // (mid-match), or this is just the normal pre-match flow - either
+      // way, the battle screen should stop showing (it has no way to
+      // update itself once the server's game object is gone / a new match
+      // hasn't started yet).
       if (msg.room.phase === 'lobby') state.screen = 'lobby';
       rerender();
       break;
