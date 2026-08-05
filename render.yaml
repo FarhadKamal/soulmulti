@@ -1,0 +1,8 @@
+services:
+  - type: web
+    name: soulclash-multiplayer
+    runtime: node
+    rootDir: server
+    buildCommand: npm install
+    startCommand: npm start
+    plan: free

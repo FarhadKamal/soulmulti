@@ -124,16 +124,28 @@ export function handleLogEntryForFlash(entry, game) {
     if (entry.targetCharacterId !== lastJesterBallThrowerId) handleLaughing(entry, game);
     return;
   }
+  if (entry.type === 'hidden-mark') {
+    // Akyros's own ability logs a dedicated 'hidden-mark' entry (never
+    // 'attack'/'special'/'setup') rather than folding into the generic
+    // switch below - matches the main game, which fires this flash
+    // straight off the executed actionId rather than a log-entry type.
+    if (!isKO(entry.characterId)) setFlash(entry.characterId, 'assets/images/akyros_hidden.jpg');
+    return;
+  }
+  if (entry.type === 'curse') {
+    // Athena's Curse Strike also logs its own dedicated type (never
+    // 'attack'/'special'/'setup') - same reasoning as hidden-mark above.
+    if (!isKO(entry.characterId)) setFlash(entry.characterId, 'assets/images/athena_curse.jpg');
+    return;
+  }
 
-  if (entry.type !== 'attack' && entry.type !== 'special') return;
+  if (entry.type !== 'attack' && entry.type !== 'special' && entry.type !== 'setup') return;
   const { characterId, actionId, dodged, amountDealt } = entry;
   if (isKO(characterId)) return;
 
   switch (actionId) {
     case 'divineRestore':
       setFlash(characterId, 'assets/images/athena_heal.jpg'); break;
-    case 'curseStrike':
-      setFlash(characterId, 'assets/images/athena_curse.jpg'); break;
     case 'glorySmash':
       setFlash(characterId, 'assets/images/tharox_glory.jpg'); break;
     case 'titanToss':
@@ -153,8 +165,6 @@ export function handleLogEntryForFlash(entry, game) {
     case 'cyclonePunch':
       if (!dodged) setFlash(characterId, 'assets/images/chronox_cyclone.jpg');
       break;
-    case 'hiddenMark':
-      setFlash(characterId, 'assets/images/akyros_hidden.jpg'); break;
     case 'shadowExecution':
       if (!dodged && amountDealt > 0) setFlash(characterId, 'assets/images/akyros_shadow.jpg');
       break;
@@ -170,9 +180,14 @@ export function handleLogEntryForFlash(entry, game) {
       if (!dodged && amountDealt > 0) setFlash(characterId, 'assets/images/blade_strike.jpg');
       break;
     case 'chaosGamble':
-      if (!dodged) {
+      // 'lose' always flashes the miss portrait regardless of dodged (a
+      // 0-damage roll can still report dodged:true against Akyros's first
+      // hit) - matches the main game, which has no dodge guard on this
+      // branch. 'win'/'draw' stay dodge-gated since those rolls deal real
+      // damage that Akyros can actually dodge.
+      if (entry.outcome === 'lose') setFlash(characterId, 'assets/images/boingo_miss.jpg');
+      else if (!dodged) {
         if (entry.outcome === 'win') setFlash(characterId, 'assets/images/boingo_hardpunch.jpg');
-        else if (entry.outcome === 'lose') setFlash(characterId, 'assets/images/boingo_miss.jpg');
         else if (entry.outcome === 'draw') setFlash(characterId, 'assets/images/boingo_normalpunch.jpg');
       }
       break;

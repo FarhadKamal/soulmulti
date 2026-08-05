@@ -1,14 +1,22 @@
 import { applyDamage, applyHeal } from '../engine/damagePipeline.js';
+import { rollChaosGamble } from '../engine/random.js';
 
 export const actions = {
   chaosGamble: {
     label: 'Chaos Gamble',
     needsTarget: true,
-    // Players physically play Rock-Paper-Scissors at the table; the
-    // moderator reports the outcome rather than the app randomizing it.
-    needsModeratorOutcome: true,
     isLegal: () => true,
-    execute(character, targetId, game, log, outcome) {
+    // Pure probability roll, same as cyclonePunch's flipCoin - rolled here
+    // server-side rather than accepted as a client-supplied outcome (a
+    // client "reporting" its own roll would be an exploit vector, and the
+    // server is the sole authority on random outcomes). Previously this
+    // expected an `outcome` argument nobody ever passed - executeAction()
+    // is always called with 4 args from index.js (both the human action
+    // handler and the paced bot-turn stepper), so outcome was always
+    // undefined, amount was always 0, and Chaos Gamble silently always
+    // missed for everyone, human or bot.
+    execute(character, targetId, game, log) {
+      const outcome = rollChaosGamble();
       let amount = 0;
       if (outcome === 'win') amount = 3;
       else if (outcome === 'draw') amount = 1;

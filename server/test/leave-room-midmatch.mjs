@@ -98,4 +98,4 @@ observer.on('message', (raw) => {
 setTimeout(() => {
   console.log('TIMEOUT', { leftDuringMatch, gotConfirmation, observerSawMatchEnd });
   process.exit(1);
-}, 20000);
+}, 60000);

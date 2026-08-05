@@ -95,4 +95,4 @@ ws.on('message', (raw) => {
 setTimeout(() => {
   console.log('TIMEOUT - match never finished');
   process.exit(1);
-}, 20000);
+}, 60000);

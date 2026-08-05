@@ -3,6 +3,7 @@ import { send } from './net.js';
 import { renderChatPanel } from './chatPanel.js';
 import { playUiClick } from './sound.js';
 import { getFlashSrc, getPersistentPortrait } from './portraitFlash.js';
+import { getActiveEffects, getClawCount } from './actionEffects.js';
 
 // Functional-first battle screen: no portrait art/animation yet (see
 // characterCard.js in the main game for that system) - just hearts,
@@ -34,7 +35,22 @@ export function renderBattle(root, state) {
 
   if (game.phase === 'game-over') {
     stopTurnTimer();
-    wrap.appendChild(renderGameOver(game, state.room?.youAreOwner));
+    // Staged reveal (see main.js's startGameOverSequence): 'freeze' keeps
+    // showing the live board so the winning action's own flash/shake/
+    // portrait effect is actually seen instead of being cut away from the
+    // instant game-over arrives (this is the actual fix for "we're missing
+    // the last action" - the board below renders exactly like a normal
+    // in-match frame), 'victory' swaps the winning side's OWN tiles to
+    // their victory art in place (see renderFrozenBoard's isVictorious),
+    // rather than showing a separate floating portrait disconnected from
+    // the board, and only 'banner' (~5s later) swaps to the actual Match
+    // Over screen with its Play Again / Exit controls.
+    if (state.gameOverStage === 'banner') {
+      wrap.appendChild(renderGameOver(game, state.room?.youAreOwner));
+      root.appendChild(wrap);
+      return;
+    }
+    wrap.appendChild(renderFrozenBoard(game, { showVictorious: state.gameOverStage === 'victory' }));
     root.appendChild(wrap);
     return;
   }
@@ -63,12 +79,26 @@ export function renderBattle(root, state) {
 
   const board = document.createElement('div');
   board.className = 'board';
+  const ballHolderId = game.jesterBall ? game.jesterBall.holderCharacterId : null;
+  // Who's cursed / genuinely still frozen right now - same helpers'
+  // reasoning as the main game's characterCard.js cursedCharacterId/
+  // frozenCharacterId: frozen is driven off Chronox's ongoing freezeActive
+  // state, NOT the target's skipNextTurn flag, which flickers back to false
+  // the instant a frozen turn is actually skipped even though the freeze is
+  // still conceptually active until Chronox's own next turn resolves it.
+  const athena = Object.values(game.characters).find((c) => c.id === 'athena');
+  const cursedId = athena ? athena.special.curseTargetCharacterId : null;
+  const chronox = Object.values(game.characters).find((c) => c.id === 'chronox');
+  const frozenId = chronox && chronox.special.freezeActive ? chronox.special.freezeTargetId : null;
   Object.values(game.characters).forEach((character) => {
     board.appendChild(renderCharacterTile(character, {
       isActing: character.id === actingCharacterId,
       isMine: mySeatCharacterIds.includes(character.id),
       isTargetable: !!armedAction && armedAction.validTargetIds.includes(character.id),
       onTargetClick: () => onTargetPicked(character.id, state),
+      isHoldingBall: character.id === ballHolderId,
+      isCursed: character.id === cursedId,
+      isFrozenVisual: character.id === frozenId,
     }));
   });
   wrap.appendChild(board);
@@ -177,29 +207,146 @@ function renderTurnTimer(deadline, actingCharacterId, isMyTurn) {
   return badge;
 }
 
-function renderCharacterTile(character, { isActing, isMine, isTargetable, onTargetClick }) {
+// Game-over 'freeze'/'victory' stages: same board as a normal in-match
+// frame, minus turn-timer/targetable/acting state (nobody's acting
+// anymore) - this is what actually lets the winning action's own flash/
+// shake/portrait effect (still running on its own timer in
+// actionEffects.js/portraitFlash.js) be seen, instead of the screen
+// cutting straight to the Match Over banner the instant game-over arrives.
+function renderFrozenBoard(game, { showVictorious = false } = {}) {
+  const board = document.createElement('div');
+  board.className = 'board';
+  const ballHolderId = game.jesterBall ? game.jesterBall.holderCharacterId : null;
+  const athena = Object.values(game.characters).find((c) => c.id === 'athena');
+  const cursedId = athena ? athena.special.curseTargetCharacterId : null;
+  const chronox = Object.values(game.characters).find((c) => c.id === 'chronox');
+  const frozenId = chronox && chronox.special.freezeActive ? chronox.special.freezeTargetId : null;
+  // Only meaningful during the 'victory' stage AND once a winner actually
+  // exists (a draw has no winnerPlayerId, nothing to highlight) - the
+  // winning side's own surviving characters get the victory-art swap and
+  // glow directly in their own tile.
+  const winner = showVictorious && game.winnerPlayerId
+    ? game.players.find((p) => p.id === game.winnerPlayerId)
+    : null;
+  Object.values(game.characters).forEach((character) => {
+    board.appendChild(renderCharacterTile(character, {
+      isActing: false,
+      isMine: false,
+      isTargetable: false,
+      onTargetClick: () => {},
+      isHoldingBall: character.id === ballHolderId,
+      isCursed: character.id === cursedId,
+      isFrozenVisual: character.id === frozenId,
+      isVictorious: !!winner && winner.characterIds.includes(character.id) && !character.isKO,
+    }));
+  });
+  return board;
+}
+
+// Extracted from renderGameOver so the 'victory' stage can show the
+// winning side's art on top of the still-live board before the full
+// banner (with its Play Again / Exit controls) takes over.
+function renderVictoryPortraits(game) {
+  const container = document.createElement('div');
+  if (!game.winnerPlayerId) return container;
+  const winner = game.players.find((p) => p.id === game.winnerPlayerId);
+  const winningCharacterIds = (winner?.characterIds || []).filter((id) => !game.characters[id]?.isKO);
+  if (winningCharacterIds.length === 0) return container;
+  const portraitsRow = document.createElement('div');
+  portraitsRow.className = 'victory-portraits' + (winningCharacterIds.length === 1 ? ' victory-portraits--single' : '');
+  winningCharacterIds.forEach((id) => {
+    const box = document.createElement('div');
+    box.className = 'victory-portrait-box';
+    const img = document.createElement('img');
+    img.src = `assets/victory/${id}.jpg`;
+    img.alt = CHARACTERS[id]?.name || id;
+    box.appendChild(img);
+    const label = document.createElement('div');
+    label.className = 'victory-portrait-label';
+    label.textContent = CHARACTERS[id]?.name || id;
+    box.appendChild(label);
+    portraitsRow.appendChild(box);
+  });
+  container.appendChild(portraitsRow);
+  return container;
+}
+
+function renderCharacterTile(character, { isActing, isMine, isTargetable, onTargetClick, isHoldingBall, isCursed, isFrozenVisual, isVictorious }) {
   const def = CHARACTERS[character.id];
   const tile = document.createElement('div');
   tile.className = 'char-tile';
   if (isActing) tile.classList.add('char-tile--acting');
   if (isMine) tile.classList.add('char-tile--mine');
   if (character.isKO) tile.classList.add('char-tile--ko');
+  if (isCursed && !character.isKO) tile.classList.add('cursed-mark');
+  if (isFrozenVisual && !character.isKO) tile.classList.add('ice-frozen');
+  // Winning side's tile grows and glows gold during the 'victory' game-over
+  // stage - swaps the victory art INTO this same tile rather than showing a
+  // separate floating portrait below the board, so it reads as "this
+  // character's card is celebrating" instead of a disconnected duplicate.
+  if (isVictorious) tile.classList.add('char-tile--victorious');
   if (isTargetable) {
     tile.classList.add('char-tile--targetable');
     tile.onclick = onTargetClick;
   }
   tile.style.borderColor = def.color;
 
+  // One-shot reactive tile animations (hit-flash, shake, dodge-skew,
+  // divine glow, revive burst) - see actionEffects.js for trigger
+  // conditions, ported 1:1 from the main game's characterCard.js.
+  const effects = getActiveEffects(character.id);
+  // hit-flash gets no isKO render guard here, matching the main game's
+  // characterCard.js exactly (a killing blow still flashes) - every other
+  // effect DOES carry the guard there, since it can otherwise still be
+  // mid-animation from an earlier action when a later, unrelated hit KOs
+  // the character before the timer expires.
+  if (effects.has('hit')) tile.classList.add('char-tile--hit');
+  if (effects.has('shake') && !character.isKO) tile.classList.add('char-tile--shake');
+  if (effects.has('dodge') && !character.isKO) tile.classList.add('char-tile--dodge');
+  if (effects.has('divine') && !character.isKO) tile.classList.add('char-tile--divine');
+  if (effects.has('revive') && !character.isKO) tile.classList.add('char-tile--revive');
+  if (effects.has('claw') && !character.isKO) {
+    const claw = document.createElement('div');
+    claw.className = 'claw-scratch';
+    const count = Math.max(1, Math.min(getClawCount(character.id), 6));
+    claw.innerHTML = Array.from({ length: count }, (_, i) =>
+      `<span style="left:${(100 / (count + 1)) * (i + 1)}%; animation-delay:${i * 0.08}s"></span>`
+    ).join('');
+    tile.appendChild(claw);
+  }
+  if (effects.has('smoke') && !character.isKO) {
+    const smoke = document.createElement('div');
+    smoke.className = 'smoke-burst';
+    smoke.innerHTML = '<span></span><span></span><span></span><span></span>';
+    tile.appendChild(smoke);
+  }
+
+  if (isHoldingBall && !character.isKO) {
+    // Persistent (not timed) icon on whoever currently holds the Jester
+    // Ball, matching the main game's characterCard.js - purely
+    // informational here since renderJesterBallPrompt's Return/Take/Pass
+    // buttons already cover the interaction, unlike the main game's
+    // drag-and-drop-onto-the-icon flow.
+    const ball = document.createElement('div');
+    ball.className = 'jesterball-holding-icon';
+    ball.textContent = '💣';
+    ball.title = 'Holding the Jester Ball';
+    tile.appendChild(ball);
+  }
+
   const portrait = document.createElement('img');
   portrait.className = 'char-portrait';
-  // Same priority as the main game's characterCard.js: timed action-flash
-  // (Athena's kiss, Zerathys's glass, dodge, etc.) beats persistent state
-  // (Velorya hidden/Blade alive) beats KO beats injured beats default.
-  // Victory art doesn't apply here - game-over routes to renderGameOver()
-  // above, the board is never shown once the match has actually ended.
+  // Same priority as the main game's characterCard.js: victory art (once
+  // the match has actually ended and this character's side won) beats
+  // everything else, including timed action-flash - there's nothing left
+  // to react to once the game is over, so the celebratory art should show
+  // unconditionally rather than getting preempted by e.g. a flash still
+  // mid-animation from the winning hit.
   const flashSrc = getFlashSrc(character.id);
   const persistentSrc = getPersistentPortrait(character);
-  if (flashSrc) {
+  if (isVictorious) {
+    portrait.src = `assets/victory/${character.id}.jpg`;
+  } else if (flashSrc) {
     portrait.src = flashSrc;
   } else if (persistentSrc) {
     portrait.src = persistentSrc;
@@ -238,7 +385,14 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
   if (character.shield > 0) {
     const shield = document.createElement('div');
     shield.className = 'char-shield';
-    shield.textContent = `Shield: ${character.shield}`;
+    const icon = document.createElement('span');
+    icon.className = 'char-shield-icon';
+    icon.textContent = '🛡';
+    shield.appendChild(icon);
+    const count = document.createElement('span');
+    count.className = 'char-shield-count';
+    count.textContent = character.shield;
+    shield.appendChild(count);
     tile.appendChild(shield);
   }
 
@@ -246,13 +400,6 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
     const flag = document.createElement('div');
     flag.className = 'char-flag';
     flag.textContent = 'Untargetable';
-    tile.appendChild(flag);
-  }
-
-  if (character.skipNextTurn) {
-    const flag = document.createElement('div');
-    flag.className = 'char-flag';
-    flag.textContent = 'Frozen';
     tile.appendChild(flag);
   }
 
@@ -361,7 +508,18 @@ function renderJesterBallPrompt(game, characterId, armedAction, state) {
   if (jb.canPass) {
     const passBtn = document.createElement('button');
     passBtn.textContent = 'Pass to another player';
-    const validTargetIds = Object.keys(game.characters).filter((id) => id !== characterId && !game.characters[id].isKO);
+    // Boingo is excluded here - giving it back to him is always "Return to
+    // Boingo" above (heals him), never a Pass. Teammates are excluded too,
+    // same as every other targeted action - passing to your own ally
+    // doesn't make sense strategically. Matches the main game's
+    // isValidBallDropTarget exactly.
+    const holder = game.characters[characterId];
+    const validTargetIds = Object.keys(game.characters).filter((id) =>
+      id !== characterId
+      && id !== jb.thrownByCharacterId
+      && !game.characters[id].isKO
+      && game.characters[id].ownerId !== holder.ownerId
+    );
     passBtn.onclick = () => {
       state.armedAction = { actionId: '__jesterBallPass', label: 'Pass the Jester Ball', needsTarget: true, validTargetIds };
       state.rerender();
@@ -390,6 +548,73 @@ function renderLog(log) {
     panel.appendChild(line);
   });
   return panel;
+}
+
+// Full, uncapped match log for the game-over screen (unlike renderLog's
+// live 20-line window during play) - the whole point here is a permanent
+// record of exactly what happened, in the order it happened, that the
+// winner/loser can copy out and keep or share.
+function renderFullLogWithCopy(log) {
+  const lines = log.map((entry) => describeLogEntry(entry)).filter(Boolean);
+  const wrap = document.createElement('div');
+  wrap.className = 'final-log-panel';
+
+  const header = document.createElement('div');
+  header.className = 'final-log-header';
+  const title = document.createElement('span');
+  title.textContent = 'Match log';
+  header.appendChild(title);
+
+  const copyBtn = document.createElement('button');
+  copyBtn.className = 'final-log-copy-btn';
+  copyBtn.textContent = 'Copy';
+  copyBtn.onclick = () => {
+    const text = lines.join('\n');
+    // navigator.clipboard requires a secure context (https, or localhost) -
+    // falls back to a hidden textarea + execCommand for plain-http LAN play
+    // (e.g. a friend joining over http://<lan-ip>:8765), where
+    // clipboard.writeText silently rejects.
+    const done = () => {
+      copyBtn.textContent = 'Copied!';
+      setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1500);
+    };
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+    } else {
+      fallbackCopy(text, done);
+    }
+  };
+  header.appendChild(copyBtn);
+  wrap.appendChild(header);
+
+  const body = document.createElement('div');
+  body.className = 'final-log-body';
+  lines.forEach((text) => {
+    const line = document.createElement('div');
+    line.className = 'log-line';
+    line.textContent = text;
+    body.appendChild(line);
+  });
+  wrap.appendChild(body);
+
+  return wrap;
+}
+
+function fallbackCopy(text, onDone) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try {
+    document.execCommand('copy');
+    onDone();
+  } catch {
+    // Clipboard access denied/unsupported - nothing more to do, the button
+    // just silently stays "Copy" rather than throwing.
+  }
+  document.body.removeChild(ta);
 }
 
 // Mirrors each ability's `label` field server-side (abilities/*.js) - kept
@@ -457,30 +682,9 @@ function renderGameOver(game, youAreOwner) {
     const sub = document.createElement('div');
     sub.textContent = `Winner: ${winner?.name || game.winnerPlayerId}`;
     wrap.appendChild(sub);
-
-    // Winning character(s) - victory art (already copied into
-    // assets/victory/) for each surviving character on the winning side,
-    // same asset set the main game uses on its own victory screen.
-    const winningCharacterIds = (winner?.characterIds || []).filter((id) => !game.characters[id]?.isKO);
-    if (winningCharacterIds.length > 0) {
-      const portraitsRow = document.createElement('div');
-      portraitsRow.className = 'victory-portraits' + (winningCharacterIds.length === 1 ? ' victory-portraits--single' : '');
-      winningCharacterIds.forEach((id) => {
-        const box = document.createElement('div');
-        box.className = 'victory-portrait-box';
-        const img = document.createElement('img');
-        img.src = `assets/victory/${id}.jpg`;
-        img.alt = CHARACTERS[id]?.name || id;
-        box.appendChild(img);
-        const label = document.createElement('div');
-        label.className = 'victory-portrait-label';
-        label.textContent = CHARACTERS[id]?.name || id;
-        box.appendChild(label);
-        portraitsRow.appendChild(box);
-      });
-      wrap.appendChild(portraitsRow);
-    }
+    wrap.appendChild(renderVictoryPortraits(game));
   }
+  wrap.appendChild(renderFullLogWithCopy(game.log));
   const btnRow = document.createElement('div');
   btnRow.className = 'game-over-actions';
 

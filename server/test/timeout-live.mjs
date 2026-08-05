@@ -56,4 +56,4 @@ ws.on('message', (raw) => {
 setTimeout(() => {
   console.log('TIMEOUT (test)', { sawTimeoutLog, sawSeatBecomeBot });
   process.exit(sawTimeoutLog && sawSeatBecomeBot ? 0 : 1);
-}, 45000);
+}, 90000);

@@ -9,6 +9,18 @@ import { send } from './net.js';
 const MAX_VISIBLE = 10;
 const messages = [];
 
+// The battle/lobby screens both do a full DOM teardown+rebuild on every
+// server broadcast (root.innerHTML = '', then re-render everything) -
+// during someone else's turn, bot moves broadcast every few seconds (see
+// BOT_ACTION_DELAY_MS in the server), which was silently recreating this
+// panel's <input> from scratch each time: whatever you were mid-typing got
+// wiped, and focus was lost even if you'd just clicked into the box.
+// Persisting the draft text and whether the input was focused here (module
+// state survives across renders, unlike the DOM node itself) lets
+// renderChatPanel restore both after rebuilding.
+let draftText = '';
+let wasFocused = false;
+
 export function addChatMessage(msg) {
   messages.push(msg);
   if (messages.length > MAX_VISIBLE) messages.shift();
@@ -49,6 +61,12 @@ export function renderChatPanel() {
   input.type = 'text';
   input.maxLength = 60;
   input.placeholder = 'Type a message...';
+  // Restore whatever was mid-typing (and refocus) across this rebuild - see
+  // draftText/wasFocused above for why this is necessary at all.
+  input.value = draftText;
+  input.addEventListener('input', () => { draftText = input.value; });
+  input.addEventListener('focus', () => { wasFocused = true; });
+  input.addEventListener('blur', () => { wasFocused = false; });
   const sendBtn = document.createElement('button');
   sendBtn.textContent = 'Send';
   function submit() {
@@ -56,12 +74,28 @@ export function renderChatPanel() {
     if (!text) return;
     send('chat-message', { text });
     input.value = '';
+    draftText = '';
   }
   sendBtn.onclick = submit;
   input.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
   form.appendChild(input);
   form.appendChild(sendBtn);
   wrap.appendChild(form);
+
+  if (wasFocused) {
+    // Re-focus on the NEXT frame, not synchronously - the freshly created
+    // input isn't attached to the document yet at this point (the caller
+    // still needs to append this whole wrap into root), and .focus() on a
+    // detached element is a silent no-op.
+    requestAnimationFrame(() => {
+      input.focus();
+      // Restore the caret to the end rather than letting focus() jump it
+      // to position 0, which would otherwise make continued typing insert
+      // backwards through the restored draft text.
+      const pos = input.value.length;
+      input.setSelectionRange(pos, pos);
+    });
+  }
 
   return wrap;
 }

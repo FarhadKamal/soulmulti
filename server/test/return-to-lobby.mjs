@@ -75,4 +75,4 @@ ws.on('message', (raw) => {
   }
 });
 
-setTimeout(() => { console.log('TIMEOUT'); process.exit(1); }, 30000);
+setTimeout(() => { console.log('TIMEOUT'); process.exit(1); }, 90000);

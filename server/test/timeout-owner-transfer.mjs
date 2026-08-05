@@ -100,4 +100,4 @@ other.on('message', (raw) => {
   }
 });
 
-setTimeout(() => { console.log('TIMEOUT', { transferConfirmed }); process.exit(1); }, 45000);
+setTimeout(() => { console.log('TIMEOUT', { transferConfirmed }); process.exit(1); }, 75000);

@@ -4,9 +4,10 @@ import { renderBattle } from './battleScreen.js';
 import { addChatMessage } from './chatPanel.js';
 import {
   startMenuMusic, startBattleMusic, stopMusic,
-  playActionSound, playKO, playVictory, playDodge, playRebirth,
+  playActionSound, playSound, playKO, playVictory, playDodge, playRebirth, playCoin,
 } from './sound.js';
 import { handleLogEntryForFlash, handleDodgeForFlash, checkIdlePortrait, registerFlashRerender } from './portraitFlash.js';
+import { handleLogEntryForEffects, registerEffectRerender } from './actionEffects.js';
 
 const root = document.getElementById('app');
 
@@ -23,6 +24,12 @@ const state = {
   confirmingExit: false,
   turnDeadline: null,
   humanCount: null,
+  // Staged game-over transition, mirroring the main game's own
+  // gameOverBannerShown/showVictoryArt sequence: 'freeze' (board stays up
+  // so the winning action's flash/shake/portrait is actually seen, not cut
+  // away from instantly) -> 'victory' (winning character(s) art) ->
+  // 'banner' (the actual Match Over screen). null while not in game-over.
+  gameOverStage: null,
   rerender,
 };
 
@@ -34,26 +41,115 @@ const state = {
 let lastLogLength = 0;
 let previousActingCharacterId = null;
 
+// Guards the game-over timer chain (see startGameOverSequence below) so a
+// repeat game-state broadcast or an unrelated rerender (e.g. a chat
+// message arriving) while already mid-sequence doesn't stack a second,
+// independent set of setTimeouts on top of the first one.
+let gameOverSequenceStarted = false;
+
+// Same staged reveal as the main game's dashboardScreen.js render(): freeze
+// on the live board first (so the winning action's own flash/shake/
+// portrait effect is actually seen, matching actionEffects.js's own
+// 1600ms-ish timers rather than being cut away from instantly), then show
+// victory art, then finally the Match Over banner. ~1.2s + ~3.8s, same
+// total as the main game's own two-stage delay.
+function startGameOverSequence() {
+  if (gameOverSequenceStarted) return;
+  gameOverSequenceStarted = true;
+  state.gameOverStage = 'freeze';
+  setTimeout(() => {
+    if (state.screen !== 'battle') return; // torn down (left the room) mid-sequence
+    state.gameOverStage = 'victory';
+    rerender();
+    setTimeout(() => {
+      if (state.screen !== 'battle') return;
+      state.gameOverStage = 'banner';
+      playVictory();
+      rerender();
+    }, 3800);
+  }, 1200);
+}
+
 function processNewLogEntries(game) {
   const newEntries = game.log.slice(lastLogLength);
   lastLogLength = game.log.length;
   for (const entry of newEntries) {
-    if (entry.type === 'attack' || entry.type === 'special') {
-      playActionSound(entry.actionId);
-      if (entry.koTriggered) setTimeout(() => playKO(), 200);
-    } else if (entry.type === 'dodge') {
-      playDodge();
-    } else if (entry.type === 'rebirth') {
-      playRebirth();
-    } else if (entry.type === 'curse-mirror' && entry.koTriggered) {
-      setTimeout(() => playKO(), 200);
-    } else if (entry.type === 'jester-ball-take') {
-      playActionSound('jesterBall');
-      if (entry.koTriggered) setTimeout(() => playKO(), 200);
-    }
+    playLogEntrySound(entry);
     handleLogEntryForFlash(entry, game);
     handleDodgeForFlash(entry, game);
+    handleLogEntryForEffects(entry, game);
   }
+}
+
+// Mirrors the main game's playPostActionSounds/finishJesterBall sound
+// dispatch exactly - same priority order (rebirth beats dodge beats the
+// normal action sound, since an ability that revives or gets dodged never
+// also plays its own hit sound on top), same per-actionId special cases
+// (Cyclone Punch's extra coin-flip sound, Chaos Gamble's distinct miss
+// sound on a losing roll), and the same four distinct Jester Ball
+// resolution sounds (throw/pass/take-explode-or-revive/return) instead of
+// reusing one sound for all of them.
+function playLogEntrySound(entry) {
+  if (entry.type === 'dodge') {
+    playDodge();
+    return;
+  }
+  if (entry.type === 'rebirth') {
+    playRebirth();
+    return;
+  }
+  if (entry.type === 'curse-mirror') {
+    if (entry.koTriggered) setTimeout(() => playKO(), 200);
+    return;
+  }
+  if (entry.type === 'jester-ball-pass') {
+    playSound('kick');
+    return;
+  }
+  if (entry.type === 'jester-ball-return') {
+    playSound('magic');
+    return;
+  }
+  if (entry.type === 'jester-ball-take') {
+    // Explodes on the holder (smash) UNLESS it triggered Blade's Rebirth
+    // instead - that case gets its own dedicated 'rebirth' entry right
+    // after this one (handled above), so skip the explosion sound here to
+    // avoid playing both for the same event.
+    if (!entry.revived) {
+      playSound('smash');
+      if (entry.koTriggered) setTimeout(() => playKO(), 200);
+    }
+    return;
+  }
+  // Curse Strike ('curse') and Hidden Mark ('hidden-mark') each log their
+  // own dedicated type rather than 'attack'/'special'/'setup' - same
+  // reasoning as portraitFlash.js's equivalent branches - so they need
+  // their own actionId here too, since the generic dispatch below only
+  // ever sees 'attack'/'special'/'setup' entries.
+  if (entry.type === 'curse') {
+    playActionSound('curseStrike');
+    return;
+  }
+  if (entry.type === 'hidden-mark') {
+    playActionSound('hiddenMark');
+    return;
+  }
+  if (entry.type !== 'attack' && entry.type !== 'special' && entry.type !== 'setup') return;
+
+  // A dodged hit already got its own 'dodge' log entry (and playDodge()
+  // above) - the ability's own attack/special entry still gets pushed
+  // alongside it (with dodged:true, amountDealt 0), but per the main
+  // game's playPostActionSounds, dodge and the normal action sound are
+  // mutually exclusive, not layered.
+  if (entry.dodged) return;
+
+  if (entry.actionId === 'cyclonePunch') playCoin();
+  if (entry.actionId === 'chaosGamble' && entry.outcome === 'lose') {
+    playSound('miss');
+    return;
+  }
+  playActionSound(entry.actionId);
+  if (entry.koTriggered) setTimeout(() => playKO(), 200);
 }
 
 function mySeatCharacterIds() {
@@ -103,11 +199,23 @@ onMessage((msg) => {
         state.screen = 'lobby';
         lastLogLength = 0; // next match starts a fresh game.log from []
         previousActingCharacterId = null;
+        gameOverSequenceStarted = false; // next match gets its own fresh sequence
+        state.gameOverStage = null;
+      } else if (msg.room.phase === 'in-match' && state.screen !== 'battle') {
+        // lobbyScreen.js's onEnterMatch flips state.screen to 'battle' the
+        // instant it sees room.phase 'in-match' here, BEFORE the first
+        // game-state broadcast for the new match arrives - so the
+        // `state.screen !== 'battle'` check that used to gate
+        // startBattleMusic() inside the 'game-state' case below was always
+        // false by the time that broadcast landed (screen had already
+        // flipped here), and battle music never started, leaving menu
+        // music playing through the whole match. Start it here instead, at
+        // the actual moment the screen transition happens.
+        startBattleMusic();
       }
       rerender();
       break;
     case 'game-state':
-      if (state.screen !== 'battle') startBattleMusic();
       state.screen = 'battle';
       state.game = msg.game;
       state.actingCharacterId = msg.actingCharacterId;
@@ -127,7 +235,7 @@ onMessage((msg) => {
         if (character) checkIdlePortrait(character);
       }
       previousActingCharacterId = msg.actingCharacterId;
-      if (msg.game.phase === 'game-over') playVictory();
+      if (msg.game.phase === 'game-over') startGameOverSequence();
       rerender();
       break;
     case 'error':
@@ -162,6 +270,7 @@ onMessage((msg) => {
 });
 
 registerFlashRerender(() => { if (state.screen === 'battle') rerender(); });
+registerEffectRerender(() => { if (state.screen === 'battle') rerender(); });
 connect();
 rerender();
 startMenuMusic();

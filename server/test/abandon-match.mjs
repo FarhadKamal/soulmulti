@@ -44,4 +44,4 @@ ws.on('message', (raw) => {
   }
 });
 
-setTimeout(() => { console.log('TIMEOUT', { abandoned }); process.exit(1); }, 8000);
+setTimeout(() => { console.log('TIMEOUT', { abandoned }); process.exit(1); }, 15000);

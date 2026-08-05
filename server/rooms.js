@@ -63,6 +63,7 @@ export function createRoom(roomType) {
     phase: 'lobby', // 'lobby' | 'in-match' | 'finished'
     game: null, // populated by engine createGame() once match starts
     turnTimer: null,
+    botSequenceActive: false, // guards against overlapping paced bot-turn sequences
     createdAt: Date.now(),
   };
   rooms.set(code, room);
@@ -132,6 +133,13 @@ export function seatIsReady(room, seat) {
 export function resetRoomToLobby(room) {
   room.phase = 'lobby';
   room.game = null;
+  // A paced bot-turn sequence (see stepBotTurn in index.js) may still have
+  // a setTimeout pending for this room when this reset happens (Exit Game
+  // mid-match) - its own !room.game guard prevents it from crashing, but
+  // clear the flag here too so a legitimate runBotTurnsIfAny call for the
+  // NEXT match started in this room isn't blocked by a stale true left
+  // over from the abandoned one.
+  room.botSequenceActive = false;
   for (const seat of room.seats) {
     seat.characterIds = [];
     if (seat.kind === 'bot') {

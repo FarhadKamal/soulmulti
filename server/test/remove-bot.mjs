@@ -48,4 +48,4 @@ owner.on('message', (raw) => {
   }
 });
 
-setTimeout(() => { console.log('TIMEOUT'); process.exit(1); }, 8000);
+setTimeout(() => { console.log('TIMEOUT'); process.exit(1); }, 15000);

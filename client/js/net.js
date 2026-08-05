@@ -9,23 +9,29 @@ let listener = null;
 let sessionId = null;
 let queuedBeforeOpen = [];
 
-// Same-origin in production (client and server served together), but
-// during local dev the client is opened directly as a file/static server
-// while the game server runs separately - override via ?server= query
-// param or fall back to localhost.
+// In production (Render, or any deploy where server/index.js serves the
+// client's own static files - see serveStaticFile there), the page is
+// already loaded from the SAME origin the WebSocket server listens on, so
+// same-origin is correct and required (Render assigns an arbitrary PORT
+// env var - there is no fixed port to hardcode). During local dev,
+// dev_server.py serves the client separately on its own fixed :8765 while
+// index.js listens on :3001 - two genuinely different processes/ports on
+// purpose, so THAT specific case (port 8765, or no server-served page at
+// all i.e. file://) still needs the :3001 override. Override via ?server=
+// query param for anything else (e.g. testing against a different
+// deployment). Previously this always appended ':3001' unconditionally,
+// which broke same-origin production deploys where the server's real port
+// is whatever Render assigned, not 3001.
 function resolveServerUrl() {
   const params = new URLSearchParams(window.location.search);
   const override = params.get('server');
   if (override) return override;
-  // Local dev: the client's static file server (e.g. dev_server.py on
-  // :8765) and the game server (:3001) are always two separate processes,
-  // never the same origin - file:// and localhost/127.0.0.1 both fall back
-  // to the game server's default port rather than trying same-origin.
-  const { protocol, hostname } = window.location;
-  if (protocol === 'file:' || hostname === 'localhost' || hostname === '127.0.0.1') {
-    return 'ws://localhost:3001';
-  }
+  const { protocol, hostname, port } = window.location;
   const proto = protocol === 'https:' ? 'wss:' : 'ws:';
+  if (protocol === 'file:' || port === '8765') {
+    const host = protocol === 'file:' ? 'localhost' : hostname;
+    return `${proto}//${host}:3001`;
+  }
   return `${proto}//${window.location.host}`;
 }
 

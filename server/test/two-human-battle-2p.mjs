@@ -104,4 +104,4 @@ p2.on('message', (raw) => {
   }
 });
 
-setTimeout(() => { console.log('TIMEOUT'); process.exit(1); }, 25000);
+setTimeout(() => { console.log('TIMEOUT'); process.exit(1); }, 60000);
