@@ -457,6 +457,29 @@ function renderGameOver(game, youAreOwner) {
     const sub = document.createElement('div');
     sub.textContent = `Winner: ${winner?.name || game.winnerPlayerId}`;
     wrap.appendChild(sub);
+
+    // Winning character(s) - victory art (already copied into
+    // assets/victory/) for each surviving character on the winning side,
+    // same asset set the main game uses on its own victory screen.
+    const winningCharacterIds = (winner?.characterIds || []).filter((id) => !game.characters[id]?.isKO);
+    if (winningCharacterIds.length > 0) {
+      const portraitsRow = document.createElement('div');
+      portraitsRow.className = 'victory-portraits' + (winningCharacterIds.length === 1 ? ' victory-portraits--single' : '');
+      winningCharacterIds.forEach((id) => {
+        const box = document.createElement('div');
+        box.className = 'victory-portrait-box';
+        const img = document.createElement('img');
+        img.src = `assets/victory/${id}.jpg`;
+        img.alt = CHARACTERS[id]?.name || id;
+        box.appendChild(img);
+        const label = document.createElement('div');
+        label.className = 'victory-portrait-label';
+        label.textContent = CHARACTERS[id]?.name || id;
+        box.appendChild(label);
+        portraitsRow.appendChild(box);
+      });
+      wrap.appendChild(portraitsRow);
+    }
   }
   const btnRow = document.createElement('div');
   btnRow.className = 'game-over-actions';
