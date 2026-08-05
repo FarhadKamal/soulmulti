@@ -283,6 +283,22 @@ function handleFillBot(room, sessionId, { seatIndex }) {
   broadcastLobby(room);
 }
 
+// Owner can undo a bot-fill back to an empty seat (e.g. they meant to
+// leave it open for a friend to join) - only while still in the lobby, a
+// bot seat mid/post-match can't un-fill since it's already playing a role
+// in that match (or was, before return-to-lobby resets it back to empty
+// automatically anyway - see resetRoomToLobby).
+function handleRemoveBot(room, sessionId, { seatIndex }) {
+  if (sessionId !== room.ownerId) return;
+  if (room.phase !== 'lobby') return;
+  const seat = room.seats[seatIndex];
+  if (!seat || seat.kind !== 'bot') return;
+  seat.kind = 'empty';
+  seat.name = null;
+  seat.characterIds = [];
+  broadcastLobby(room);
+}
+
 function handleStartMatch(room, sessionId) {
   if (sessionId !== room.ownerId) return;
   // Every human-claimed seat must have finished picking before starting;
@@ -408,6 +424,7 @@ wss.on('connection', (ws) => {
       case 'pick-character': return handlePickCharacter(room, sessionId, payload);
       case 'unpick-character': return handleUnpickCharacter(room, sessionId, payload);
       case 'fill-bot': return handleFillBot(room, sessionId, payload);
+      case 'remove-bot': return handleRemoveBot(room, sessionId, payload);
       case 'start-match': return handleStartMatch(room, sessionId);
       case 'return-to-lobby': return handleReturnToLobby(room, sessionId);
       case 'action': return handleAction(room, sessionId, payload);

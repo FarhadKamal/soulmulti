@@ -162,6 +162,12 @@ function renderRoomLobby(room) {
       botBtn.onclick = () => send('fill-bot', { seatIndex: seat.index });
       row.appendChild(botBtn);
     }
+    if (seat.kind === 'bot' && room.youAreOwner) {
+      const removeBtn = document.createElement('button');
+      removeBtn.textContent = 'Remove Bot';
+      removeBtn.onclick = () => send('remove-bot', { seatIndex: seat.index });
+      row.appendChild(removeBtn);
+    }
 
     seatList.appendChild(row);
   });
