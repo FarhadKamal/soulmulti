@@ -1,6 +1,7 @@
 import { CHARACTERS } from './characters.js';
 import { send } from './net.js';
 import { renderChatPanel } from './chatPanel.js';
+import { playUiClick } from './sound.js';
 
 // Functional-first battle screen: no portrait art/animation yet (see
 // characterCard.js in the main game for that system) - just hearts,
@@ -188,6 +189,21 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
   }
   tile.style.borderColor = def.color;
 
+  const portrait = document.createElement('img');
+  portrait.className = 'char-portrait';
+  // Same priority as the main game's characterCard.js (KO -> injured ->
+  // default), minus the ~25 per-character action-flash overrides - those
+  // are a later pass, this is just the base portrait states.
+  if (character.isKO) {
+    portrait.src = `assets/koed/${character.id}.jpg`;
+  } else if (character.hearts <= character.maxHearts / 2) {
+    portrait.src = `assets/images/injured/${character.id}.jpg`;
+  } else {
+    portrait.src = `assets/portraits/${character.id}.jpg`;
+  }
+  portrait.alt = def.name;
+  tile.appendChild(portrait);
+
   const name = document.createElement('div');
   name.className = 'char-name';
   name.textContent = def.name;
@@ -253,6 +269,7 @@ function renderActionPanel(characterId, usableActions, armedAction, state) {
     const btn = document.createElement('button');
     btn.textContent = action.label;
     btn.onclick = () => {
+      playUiClick();
       if (!action.needsTarget) {
         submitAction(characterId, action, null, state);
       } else {

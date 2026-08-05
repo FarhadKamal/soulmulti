@@ -94,6 +94,10 @@ input {
 .char-tile--mine { background: #22283a; }
 .char-tile--ko { opacity: 0.4; }
 .char-tile--targetable { cursor: pointer; box-shadow: 0 0 0 3px #ff5e5e; }
+.char-portrait {
+  width: 100%; aspect-ratio: 1 / 1; object-fit: cover; border-radius: 6px;
+  margin-bottom: 6px; display: block; background: #0d0d14;
+}
 .char-name { font-weight: 700; }
 .char-hearts { font-size: 0.9em; }
 .char-shield, .char-flag { font-size: 0.8em; opacity: 0.8; }

@@ -2,6 +2,10 @@ import { connect, onMessage } from './net.js';
 import { renderLobby } from './lobbyScreen.js';
 import { renderBattle } from './battleScreen.js';
 import { addChatMessage } from './chatPanel.js';
+import {
+  startMenuMusic, startBattleMusic, stopMusic,
+  playActionSound, playKO, playVictory, playDodge, playRebirth,
+} from './sound.js';
 
 const root = document.getElementById('app');
 
@@ -20,6 +24,31 @@ const state = {
   humanCount: null,
   rerender,
 };
+
+// Tracks how much of game.log has already been "heard" so incoming
+// game-state broadcasts only play sounds for genuinely NEW entries, not
+// the whole log again on every update.
+let lastLogLength = 0;
+
+function playSoundsForNewLogEntries(log) {
+  const newEntries = log.slice(lastLogLength);
+  lastLogLength = log.length;
+  for (const entry of newEntries) {
+    if (entry.type === 'attack' || entry.type === 'special') {
+      playActionSound(entry.actionId);
+      if (entry.koTriggered) setTimeout(() => playKO(), 200);
+    } else if (entry.type === 'dodge') {
+      playDodge();
+    } else if (entry.type === 'rebirth') {
+      playRebirth();
+    } else if (entry.type === 'curse-mirror' && entry.koTriggered) {
+      setTimeout(() => playKO(), 200);
+    } else if (entry.type === 'jester-ball-take') {
+      playActionSound('jesterBall');
+      if (entry.koTriggered) setTimeout(() => playKO(), 200);
+    }
+  }
+}
 
 function mySeatCharacterIds() {
   if (!state.room || state.room.mySeatIndex === null) return [];
@@ -63,10 +92,15 @@ onMessage((msg) => {
       // way, the battle screen should stop showing (it has no way to
       // update itself once the server's game object is gone / a new match
       // hasn't started yet).
-      if (msg.room.phase === 'lobby') state.screen = 'lobby';
+      if (msg.room.phase === 'lobby') {
+        if (state.screen !== 'lobby') startMenuMusic();
+        state.screen = 'lobby';
+        lastLogLength = 0; // next match starts a fresh game.log from []
+      }
       rerender();
       break;
     case 'game-state':
+      if (state.screen !== 'battle') startBattleMusic();
       state.screen = 'battle';
       state.game = msg.game;
       state.actingCharacterId = msg.actingCharacterId;
@@ -76,6 +110,8 @@ onMessage((msg) => {
       state.confirmingExit = false;
       state.turnDeadline = msg.turnDeadline || null;
       state.humanCount = msg.humanCount ?? null;
+      playSoundsForNewLogEntries(msg.game.log);
+      if (msg.game.phase === 'game-over') playVictory();
       rerender();
       break;
     case 'error':
@@ -85,6 +121,7 @@ onMessage((msg) => {
     case 'connection-closed':
       state.error = 'Connection lost.';
       state.connectionLost = true;
+      stopMusic();
       rerender();
       break;
     case 'left-room':
@@ -94,6 +131,8 @@ onMessage((msg) => {
       state.room = null;
       state.game = null;
       state.error = null;
+      lastLogLength = 0;
+      startMenuMusic();
       rerender();
       break;
     case 'chat-message':
@@ -107,3 +146,4 @@ onMessage((msg) => {
 
 connect();
 rerender();
+startMenuMusic();
