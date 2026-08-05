@@ -1,0 +1,667 @@
+import { getUsableActions, isValidTarget } from './turnEngine.js';
+
+// Pure decision logic for PC-controlled characters - no DOM, no side
+// effects. Given a character whose turn it is, returns the action+target
+// the bot wants to use. The caller (dashboardScreen.js) feeds this straight
+// into the same onActionChosen() path a human click would use, so bots and
+// humans always resolve identically once a choice is made.
+
+function livingEnemies(game, character) {
+  return Object.values(game.characters).filter(
+    (c) => c.ownerId !== character.ownerId && !c.isKO && !c.untargetable
+  );
+}
+
+function validTargetsFor(game, character, actionId) {
+  return Object.keys(game.characters).filter((tid) => isValidTarget(game, character.id, actionId, tid));
+}
+
+// Picks a uniformly random element - used to break ties between equally
+// good targets instead of always favoring whichever one happens to appear
+// first in iteration order. game.characters is a plain object built by
+// inserting each player's character in seat order, so Object.keys() (and
+// any find()/reduce() over it) always lists Player 1's character first -
+// a naive tie-break would silently and consistently favor attacking
+// Player 1 above everyone else on any full-health/equal-score comparison,
+// which is exactly what happened before this fix (confirmed via a 500-
+// match simulation: Player 1 won ~6% of the time vs. Player 4's ~53%).
+function pickRandom(ids) {
+  return ids[Math.floor(Math.random() * ids.length)];
+}
+
+// Prefers whichever legal target has the fewest hearts left (closest to a
+// kill) - a simple but effective default "focus the weakest enemy" rule
+// used as a fallback whenever a character has no more specific priority.
+// Ties (e.g. everyone at full health) are broken randomly, not by seat order.
+function lowestHeartsTarget(game, targetIds) {
+  if (targetIds.length === 0) return null;
+  const minHearts = Math.min(...targetIds.map((tid) => game.characters[tid].hearts));
+  const tied = targetIds.filter((tid) => game.characters[tid].hearts === minHearts);
+  return pickRandom(tied);
+}
+
+// How much recent damage each living enemy has dealt to this character,
+// read from the match log - used to identify "who's been attacking me
+// most" for defensive/retaliation decisions. Looks at the last 30 log
+// entries, which comfortably covers a couple of full rounds.
+function threatByAttacker(game, character) {
+  const tally = {};
+  const recent = game.log.slice(-30);
+  for (const entry of recent) {
+    if (entry.targetCharacterId !== character.id && entry.targetId !== character.id) continue;
+    const attackerId = entry.characterId || entry.sourceCharacterId;
+    if (!attackerId || attackerId === character.id) continue;
+    const dmg = entry.amountDealt || 0;
+    if (dmg > 0) tally[attackerId] = (tally[attackerId] || 0) + dmg;
+  }
+  return tally;
+}
+
+function biggestThreatTarget(game, character, targetIds) {
+  if (targetIds.length === 0) return null;
+  const tally = threatByAttacker(game, character);
+  const scored = targetIds.map((tid) => ({ tid, score: tally[tid] || 0 }));
+  const bestScore = Math.max(...scored.map((s) => s.score));
+  if (bestScore <= 0) return null;
+  const tied = scored.filter((s) => s.score === bestScore).map((s) => s.tid);
+  return pickRandom(tied);
+}
+
+// True if this character is currently the cursed target of a live Athena -
+// used to steer bots away from attacking Athena while cursed, since that
+// damage mirrors straight back onto them.
+function isCursedByLiveAthena(game, character) {
+  const athena = Object.values(game.characters).find(
+    (c) => c.id === 'athena' && !c.isKO && c.special.curseTargetCharacterId === character.id
+  );
+  return !!athena;
+}
+
+const LOW_HEARTS_THRESHOLD = 3;
+
+// Focus-fire: prefer whichever legal target is already the MOST hurt
+// relative to their own max hearts (i.e. closest to dying), so independent
+// bots naturally converge on finishing someone off instead of each
+// spreading damage across different targets every turn. Only kicks in once
+// a target has actually taken damage (missingHearts > 0) - otherwise it's
+// equivalent to "attack whoever's weakest" even at full health, which
+// isn't really "focus fire," just a baseline preference.
+// Only treats a wounded target as a focus-fire opportunity once they're
+// actually close to dying (at or below the same low-hearts threshold used
+// elsewhere) - otherwise a target that's taken a single stray point of
+// damage would outrank someone who's been repeatedly, heavily attacking
+// this character but happens to still be at full health. Confirmed via a
+// real match: two characters kept trading blows with each other purely
+// because they'd landed a hit on each other first, while a third player at
+// full health kept freely attacking both of them unchallenged the whole
+// game and mopped up the survivor.
+function focusFireTarget(game, targetIds) {
+  const wounded = targetIds.filter((tid) => {
+    const t = game.characters[tid];
+    return t.hearts < t.maxHearts && t.hearts <= LOW_HEARTS_THRESHOLD;
+  });
+  if (wounded.length === 0) return null;
+  const maxMissing = Math.max(...wounded.map((tid) => {
+    const t = game.characters[tid];
+    return t.maxHearts - t.hearts;
+  }));
+  const tied = wounded.filter((tid) => {
+    const t = game.characters[tid];
+    return t.maxHearts - t.hearts === maxMissing;
+  });
+  return pickRandom(tied);
+}
+
+// True if Athena is alive, currently cursing someone OTHER than this
+// attacker, and a legal target - meaning a hit on Athena deals damage to
+// BOTH her and the cursed target (her own hit, plus the mirror) instead of
+// just one character taking it. Strictly better value than hitting the
+// cursed target directly for the same single action, as long as it isn't
+// this attacker being cursed (handled separately, since that mirror comes
+// back at them instead of being a bonus).
+function athenaDoubleDipTarget(game, character, targets) {
+  if (!targets.includes('athena')) return null;
+  const athena = game.characters['athena'];
+  const cursedId = athena?.special?.curseTargetCharacterId;
+  if (!cursedId || cursedId === character.id) return null;
+  const cursedTarget = game.characters[cursedId];
+  if (!cursedTarget || cursedTarget.isKO) return null;
+  return 'athena';
+}
+
+// minDamage: when the caller knows the exact (or minimum) damage the chosen
+// action will deal and the hit isn't shield-ignoring, a target whose shield
+// would fully absorb it nets zero effect - avoid wasting the action on them
+// when an unarmored alternative exists. Optional: omitted by callers whose
+// damage varies too unpredictably to check safely (coin flips, moderator
+// outcomes), in which case shield isn't considered at all.
+function pickDefaultTarget(game, character, actionId, minDamage = null) {
+  const targets = validTargetsFor(game, character, actionId);
+  if (targets.length === 0) return null;
+  // Avoid hitting Athena while self-cursed unless she's the only option or
+  // it would finish her off (worth eating the mirror for a kill).
+  const nonAthenaSafe = targets.filter((tid) => {
+    const t = game.characters[tid];
+    if (t.id !== 'athena' || !isCursedByLiveAthena(game, character)) return true;
+    return false;
+  });
+  let pool = nonAthenaSafe.length > 0 ? nonAthenaSafe : targets;
+  if (minDamage !== null) {
+    const unarmored = pool.filter((tid) => game.characters[tid].shield < minDamage);
+    if (unarmored.length > 0) pool = unarmored;
+  }
+  // Hitting Athena while she's cursing someone else lands damage on both of
+  // them for the price of one action - take that free value over any other
+  // priority whenever it's available and safe.
+  const doubleDip = athenaDoubleDipTarget(game, character, pool);
+  if (doubleDip) return doubleDip;
+  // Priority: secure a kill on whoever's already most wounded (focus fire)
+  // over just retaliating against the most recent attacker - finishing a
+  // target off is worth more than spreading damage around.
+  return focusFireTarget(game, pool) || biggestThreatTarget(game, character, pool) || lowestHeartsTarget(game, pool);
+}
+
+// ---- Per-character move selection ----
+// Each function returns { actionId, targetId } or null if it has nothing
+// usable (shouldn't normally happen - getUsableActions always offers
+// something when the character can act at all).
+
+function chooseTharoxMove(character, game, usable) {
+  const byId = Object.fromEntries(usable.map((a) => [a.actionId, a]));
+  // Mandatory cash-in already narrows usable to just Titan Smash/Glory
+  // Smash while charged - prefer Glory Smash (heal+shield bonus) whenever
+  // it's available, otherwise Titan Smash.
+  if (byId.glorySmash) {
+    return { actionId: 'glorySmash', targetId: pickDefaultTarget(game, character, 'glorySmash', 2) };
+  }
+  if (byId.titanSmash) {
+    return { actionId: 'titanSmash', targetId: pickDefaultTarget(game, character, 'titanSmash', 3) };
+  }
+  // Uncharged: Smash (flat -1, no shield ignore) secures an immediate kill
+  // on anyone already at 1 heart with no shield - don't pass that up just
+  // to build a charge for later, since the target won't be around later.
+  if (byId.smash) {
+    const smashTargets = validTargetsFor(game, character, 'smash');
+    const securesKill = smashTargets.find((tid) => {
+      const t = game.characters[tid];
+      return t.hearts <= Math.max(0, 1 - t.shield);
+    });
+    if (securesKill) {
+      return { actionId: 'smash', targetId: securesKill };
+    }
+  }
+  // Otherwise, Toss to build a charge for the much bigger Titan Smash later.
+  if (byId.titanToss) {
+    return { actionId: 'titanToss', targetId: null };
+  }
+  return { actionId: 'smash', targetId: pickDefaultTarget(game, character, 'smash') };
+}
+
+function chooseZerathysMove(character, game, usable) {
+  const byId = Object.fromEntries(usable.map((a) => [a.actionId, a]));
+  const chargeCount = character.special.chargeCount;
+  const wrathDamage = [1, 2, 3][chargeCount];
+  // Thunder Wrath at CURRENT charge secures an immediate kill - don't pass
+  // that up to sit and charge further, since the target won't be around
+  // later. Shield absorbs first, so it must be low enough to still die
+  // after that.
+  if (byId.thunderWrath) {
+    const wrathTargets = validTargetsFor(game, character, 'thunderWrath');
+    const killableTargets = wrathTargets.filter((tid) => {
+      const t = game.characters[tid];
+      return t.hearts <= Math.max(0, wrathDamage - t.shield);
+    });
+    if (killableTargets.length > 0) {
+      // When multiple targets are all killable this turn, prefer one that
+      // doesn't also kill Zerathys himself via Athena's curse mirror -
+      // killing self-cursing Athena is only worth it when it's the ONLY
+      // kill on offer (or part of the deliberate mutual-kill logic below);
+      // if a completely safe kill exists elsewhere, take that instead.
+      // Confirmed via a real match: the bot killed a self-cursing Athena
+      // while an equally-killable, non-mirroring Chronox was also
+      // available - the mirror finished Zerathys off for no reason, when
+      // killing Chronox would have won the kill with zero downside.
+      const selfCursing = isCursedByLiveAthena(game, character);
+      const safeKills = selfCursing
+        ? killableTargets.filter((tid) => tid !== 'athena')
+        : killableTargets;
+      const securesKill = safeKills[0] ?? killableTargets[0];
+      return { actionId: 'thunderWrath', targetId: securesKill };
+    }
+  }
+  // Soul Swap is strongest when the target has meaningfully more hearts
+  // than Zerathys - stealing their pool and dumping his lower total onto
+  // them. Use it opportunistically once available.
+  if (byId.soulSwap) {
+    const targets = validTargetsFor(game, character, 'soulSwap');
+    const maxHearts = Math.max(...targets.map((tid) => game.characters[tid].hearts));
+    const tiedBest = targets.filter((tid) => game.characters[tid].hearts === maxHearts);
+    const best = pickRandom(tiedBest);
+    if (best && game.characters[best].hearts > character.hearts + 1) {
+      return { actionId: 'soulSwap', targetId: best };
+    }
+  }
+  // Self-curse-mirror handling: if Zerathys is cursed and his only legal
+  // Thunder Wrath target is Athena herself (no safe alternative exists),
+  // landing that hit mirrors the SAME damage back onto him.
+  const wrathTargetsNow = validTargetsFor(game, character, 'thunderWrath');
+  const onlyTargetIsCursingAthena = wrathTargetsNow.length === 1
+    && wrathTargetsNow[0] === 'athena'
+    && isCursedByLiveAthena(game, character);
+  if (onlyTargetIsCursingAthena) {
+    const athena = game.characters['athena'];
+    const maxChargeDamage = 3;
+    const mirrorSurvivableNow = character.hearts > wrathDamage;
+    const wouldKillAthenaNow = athena.hearts <= Math.max(0, wrathDamage - athena.shield);
+    // Checked FIRST, regardless of whether the current hit happens to be
+    // survivable: if Zerathys can never actually WIN this 1v1 by trading
+    // small safe hits (he'll always be behind since he's taking equal
+    // mirror damage each time, same as Athena, but she gets to heal/keep
+    // cursing for free), the only way to come out ahead is a mutual kill -
+    // charge all the way to max and cash in for a hit that finishes them
+    // both off, if Athena's hearts make that reachable. Charging itself
+    // costs nothing here (Curse Strike doesn't damage him), so this is
+    // always worth pursuing over a smaller poke that doesn't progress
+    // toward a win, unless the current charge already secures an outright
+    // kill on its own (handled above) or charging further would leave
+    // Athena still alive and unkillable even at max charge.
+    const canForceMutualKillAtMax = !wouldKillAthenaNow
+      && athena.hearts <= Math.max(0, maxChargeDamage - athena.shield);
+    if (canForceMutualKillAtMax) {
+      if (chargeCount < 2 && byId.chargeUp) {
+        return { actionId: 'chargeUp', targetId: null };
+      }
+      return { actionId: 'thunderWrath', targetId: 'athena' };
+    }
+    if (!mirrorSurvivableNow) {
+      // No mutual kill reachable and the current hit would kill him for
+      // nothing - nothing better to do than attack now, so fall through.
+    } else if (!wouldKillAthenaNow && chargeCount < 2) {
+      const nextChargeDamage = wrathDamage + 1;
+      const mirrorSurvivableIfCharged = character.hearts > nextChargeDamage;
+      if (!mirrorSurvivableIfCharged) {
+        // Charging further would push the eventual mirror past what's
+        // survivable, but cashing in at the CURRENT charge is still safe -
+        // take the smaller, safe hit now instead of risking it later.
+        return { actionId: 'thunderWrath', targetId: 'athena' };
+      }
+    }
+  }
+  // At max charge, always cash in - no reason to hold at the cap.
+  if (chargeCount >= 2) {
+    return { actionId: 'thunderWrath', targetId: pickDefaultTarget(game, character, 'thunderWrath', wrathDamage) };
+  }
+  // Low hearts: normally don't sit around charging, take the guaranteed hit
+  // now - but only when there's an actual reason to rush (a live cursing
+  // Athena punishes every turn spent charging via the mirror). Charging
+  // itself never costs Zerathys anything defensively against a non-mirror
+  // opponent - the enemy gets their turn regardless of which Zerathys move
+  // is chosen - so cashing in early just for being low on hearts throws
+  // away a bigger, more decisive hit for no protective benefit. Confirmed
+  // via a real match: cashing in a weak 1-damage hit at 1 heart left a
+  // 2-heart Akyros alive for one more turn, which then landed the killing
+  // blow - charging once first would have secured the kill instead.
+  if (character.hearts <= LOW_HEARTS_THRESHOLD && isCursedByLiveAthena(game, character)) {
+    return { actionId: 'thunderWrath', targetId: pickDefaultTarget(game, character, 'thunderWrath', wrathDamage) };
+  }
+  if (byId.chargeUp) {
+    return { actionId: 'chargeUp', targetId: null };
+  }
+  return { actionId: 'thunderWrath', targetId: pickDefaultTarget(game, character, 'thunderWrath', wrathDamage) };
+}
+
+// Target for the free Thunder Wrath that fires immediately after Soul Swap
+// (chargeCount is always 0 at that point, dealing 1 damage). Reuses the same
+// kill-securing/shield-aware/double-dip/self-curse-safety logic as a normal
+// Thunder Wrath choice, rather than a plain random pick - confirmed via a
+// real match where a fully random follow-up wasted the free hit on a
+// shielded target (0 damage through the shield) instead of an unshielded
+// one that would have landed real damage.
+export function chooseSoulSwapWrathTarget(character, game) {
+  const targets = validTargetsFor(game, character, 'soulSwapWrath');
+  if (targets.length === 0) return null;
+  const securesKill = targets.find((tid) => {
+    const t = game.characters[tid];
+    return t.hearts <= Math.max(0, 1 - t.shield);
+  });
+  if (securesKill) return securesKill;
+  // Prefer an unshielded target so the hit actually lands instead of being
+  // fully absorbed for zero effect.
+  const unshielded = targets.filter((tid) => game.characters[tid].shield <= 0);
+  const pool = unshielded.length > 0 ? unshielded : targets;
+  const doubleDip = athenaDoubleDipTarget(game, character, pool);
+  if (doubleDip) return doubleDip;
+  return focusFireTarget(game, pool) || biggestThreatTarget(game, character, pool) || lowestHeartsTarget(game, pool);
+}
+
+function chooseChronoxMove(character, game, usable) {
+  const byId = Object.fromEntries(usable.map((a) => [a.actionId, a]));
+  // Time Freeze is best spent either defensively (Chronox himself is low
+  // and needs to lock down whoever's been hurting him) or offensively on
+  // the biggest live threat once available - it denies 2 of their turns.
+  if (byId.timeFreeze) {
+    const targets = validTargetsFor(game, character, 'timeFreeze');
+    const threatId = biggestThreatTarget(game, character, targets) || lowestHeartsTarget(game, targets);
+    if (threatId && (character.hearts <= LOW_HEARTS_THRESHOLD || targets.length > 0)) {
+      return { actionId: 'timeFreeze', targetId: threatId };
+    }
+  }
+  return { actionId: 'cyclonePunch', targetId: pickDefaultTarget(game, character, 'cyclonePunch') };
+}
+
+function chooseAkyrosMove(character, game, usable) {
+  const byId = Object.fromEntries(usable.map((a) => [a.actionId, a]));
+  const markedTargets = validTargetsFor(game, character, 'shadowExecution');
+
+  const fatalTargets = validTargetsFor(game, character, 'fatalSlash');
+  // Self-curse-mirror handling: while Athena is cursing Akyros, every point
+  // of damage he lands on her mirrors straight back onto him (the mirror
+  // still passes through his shield normally, unlike Shadow Execution's own
+  // shield-ignoring hit). If she's marked, she'd normally be the preferred
+  // attack target below - avoid that unless she's the only living enemy, it
+  // secures an outright kill, or there's truly no safer move available.
+  const athenaIsCursingRisk = character.special.marks.has('athena')
+    && isCursedByLiveAthena(game, character)
+    && fatalTargets.includes('athena');
+  if (athenaIsCursingRisk) {
+    const athena = game.characters['athena'];
+    const shadowLegal = !!byId.shadowExecution && markedTargets.includes('athena');
+    const bestDamage = shadowLegal ? 3 : 2; // marked Fatal Slash is 2
+    const wouldKillAthenaNow = athena.hearts <= Math.max(0, bestDamage - (shadowLegal ? 0 : athena.shield));
+    const mirrorSurvivableNow = character.hearts > bestDamage;
+    const otherTargets = fatalTargets.filter((tid) => tid !== 'athena');
+    if (wouldKillAthenaNow) {
+      if (shadowLegal) return { actionId: 'shadowExecution', targetId: 'athena' };
+      return { actionId: 'fatalSlash', targetId: 'athena' };
+    }
+    if (otherTargets.length > 0) {
+      // A different living enemy exists - attack or mark them instead of
+      // risking the cursed trade with Athena at all.
+      const markedOther = otherTargets.find((tid) => character.special.marks.has(tid));
+      if (markedOther) return { actionId: 'fatalSlash', targetId: markedOther };
+      if (byId.hiddenMark) {
+        const markTargets = validTargetsFor(game, character, 'hiddenMark').filter((tid) => tid !== 'athena');
+        if (markTargets.length > 0) {
+          const targetId = biggestThreatTarget(game, character, markTargets) || lowestHeartsTarget(game, markTargets);
+          if (targetId) return { actionId: 'hiddenMark', targetId };
+        }
+      }
+      return { actionId: 'fatalSlash', targetId: pickRandom(otherTargets) };
+    }
+    // Athena's the only living enemy - if the trade would be self-lethal
+    // for no gain, there's nothing safer to do (Hidden Mark on her again
+    // isn't legal, she's already marked), so fall through and attack anyway
+    // since it's the only legal move left regardless of outcome.
+    if (!mirrorSurvivableNow) {
+      // Nothing better available - fall through to normal attack logic.
+    }
+  }
+
+  // Shadow Execution secures a kill/heavy hit on an already-marked, weak
+  // enemy - use it once one is low enough that -3 ignoring shields matters.
+  // Also worth using early against a currently-shielded marked target,
+  // since Fatal Slash's marked bonus gets mostly negated by any shield
+  // while Shadow Execution ignores it entirely - no point chipping away at
+  // a shield with Fatal Slash when the guaranteed-through hit is available.
+  if (byId.shadowExecution) {
+    // When more than one marked target would actually die to the 3-damage
+    // ignore-shield hit, prefer whichever is the bigger active threat over
+    // just whoever has the fewest hearts - a kill's a kill either way, so
+    // take out whoever's more dangerous first rather than defaulting to the
+    // easiest one. Confirmed via a real match: killing an already-doomed
+    // 1-heart target instead of a 3-heart target that was actively about to
+    // land the finishing blow cost the match - the real threat survived and
+    // got the next hit in first.
+    const killableMarked = markedTargets.filter((tid) => {
+      const t = game.characters[tid];
+      return t.hearts <= Math.max(0, 3 - t.shield);
+    });
+    if (killableMarked.length > 0) {
+      const target = biggestThreatTarget(game, character, killableMarked) || lowestHeartsTarget(game, killableMarked);
+      return { actionId: 'shadowExecution', targetId: target };
+    }
+    const weakest = lowestHeartsTarget(game, markedTargets);
+    const shieldedTarget = markedTargets.find((tid) => game.characters[tid].shield > 0);
+    if (weakest && game.characters[weakest].hearts <= 3) {
+      return { actionId: 'shadowExecution', targetId: weakest };
+    }
+    if (shieldedTarget) {
+      return { actionId: 'shadowExecution', targetId: shieldedTarget };
+    }
+  }
+  // Prefer Fatal Slash on an already-marked target for the bonus damage.
+  const markedFatalTarget = fatalTargets.find((tid) => character.special.marks.has(tid));
+  if (markedFatalTarget) {
+    return { actionId: 'fatalSlash', targetId: markedFatalTarget };
+  }
+  // Otherwise, place a Hidden Mark on an unmarked enemy when one's
+  // available (sets up future bonus damage / Shadow Execution), else just
+  // Fatal Slash the biggest threat.
+  if (byId.hiddenMark) {
+    const markTargets = validTargetsFor(game, character, 'hiddenMark');
+    const targetId = biggestThreatTarget(game, character, markTargets) || lowestHeartsTarget(game, markTargets);
+    if (targetId) return { actionId: 'hiddenMark', targetId };
+  }
+  return { actionId: 'fatalSlash', targetId: pickDefaultTarget(game, character, 'fatalSlash') };
+}
+
+function chooseVeloryaMove(character, game, usable) {
+  const byId = Object.fromEntries(usable.map((a) => [a.actionId, a]));
+  // Eclipse is a defensive panic button - use it when low on hearts to buy
+  // 3 safe attacks, rather than burning it early/randomly.
+  if (byId.lunarEclipse && character.hearts <= LOW_HEARTS_THRESHOLD) {
+    return { actionId: 'lunarEclipse', targetId: null };
+  }
+  if (byId.moonstep) {
+    const targets = validTargetsFor(game, character, 'moonstep');
+    // Hitting a live Athena while she's cursing someone else lands damage
+    // on both of them for one action - worth more than the plain
+    // different-target bonus alone, so check it first.
+    const doubleDip = athenaDoubleDipTarget(game, character, targets);
+    // Moonstep's -2 bonus requires a DIFFERENT target than her last attack -
+    // prefer whichever valid target isn't lastTargetId to get the bonus.
+    const differentTarget = targets.find((tid) => tid !== character.special.lastTargetId);
+    const targetId = doubleDip || differentTarget || biggestThreatTarget(game, character, targets) || lowestHeartsTarget(game, targets);
+    if (targetId) {
+      // If the only target is a live cursing Athena, every point of damage
+      // she deals mirrors straight back onto her (both attacks ignore
+      // shield, so there's no absorption to soften it either). Once she's
+      // low enough that the bigger Moonstep hit (2, from switching targets)
+      // would be fatal via the mirror but the smaller flat Lunar Strike (1)
+      // would not, take the smaller guaranteed-safe hit instead of risking
+      // herself for the marginal extra damage.
+      if (targetId === 'athena' && isCursedByLiveAthena(game, character)) {
+        const isNewTarget = character.special.lastTargetId !== null && character.special.lastTargetId !== targetId;
+        const moonstepDamage = isNewTarget ? 2 : 1;
+        if (character.hearts <= moonstepDamage && character.hearts > 1) {
+          return { actionId: 'lunarStrike', targetId };
+        }
+      }
+      return { actionId: 'moonstep', targetId };
+    }
+  }
+  return { actionId: 'lunarStrike', targetId: pickDefaultTarget(game, character, 'lunarStrike') };
+}
+
+function chooseBladeMove(character, game, usable) {
+  // Only one real action - the decision is entirely about target. Staying
+  // on the same streak target keeps compounding damage; only switch if
+  // that target is no longer valid or a clean kill is available elsewhere.
+  const targets = validTargetsFor(game, character, 'bloodHunt');
+  if (targets.length === 0) return { actionId: 'bloodHunt', targetId: null };
+  const streakTarget = character.special.streakTargetId;
+  if (streakTarget && targets.includes(streakTarget)) {
+    return { actionId: 'bloodHunt', targetId: streakTarget };
+  }
+  return { actionId: 'bloodHunt', targetId: pickDefaultTarget(game, character, 'bloodHunt') };
+}
+
+function chooseAthenaMove(character, game, usable) {
+  const byId = Object.fromEntries(usable.map((a) => [a.actionId, a]));
+  if (byId.divineRestore && character.hearts <= LOW_HEARTS_THRESHOLD) {
+    return { actionId: 'divineRestore', targetId: null };
+  }
+  // Curse Strike may not actually be usable right now (no valid target -
+  // e.g. everyone else is KO'd or the only remaining enemy is untargetable),
+  // in which case fall back to Divine Restore if it's still available
+  // rather than firing a curse with no legal target.
+  if (byId.curseStrike) {
+    const targets = validTargetsFor(game, character, 'curseStrike');
+    // Keep the curse on whoever's already cursed if they're still a legal
+    // target - re-picking a new target every turn for no reason just makes
+    // the mirror unpredictable and wastes the fact the curse never expires
+    // on its own. Only switch when forced (current target invalid/dead) or
+    // when a clearly healthier/more dangerous target exists to curse
+    // instead - a target with more hearts left can keep attacking Athena
+    // for longer, making the eventual mirror damage add up more.
+    const currentCursed = character.special.curseTargetCharacterId;
+    if (currentCursed && targets.includes(currentCursed)) {
+      const healthierOptions = targets.filter((tid) =>
+        game.characters[tid].hearts > game.characters[currentCursed].hearts + 2
+      );
+      return { actionId: 'curseStrike', targetId: pickRandom(healthierOptions) || currentCursed };
+    }
+    const maxHearts = Math.max(...targets.map((tid) => game.characters[tid].hearts));
+    const tiedBest = targets.filter((tid) => game.characters[tid].hearts === maxHearts);
+    const targetId = pickRandom(tiedBest);
+    if (targetId) return { actionId: 'curseStrike', targetId };
+  }
+  if (byId.divineRestore) {
+    return { actionId: 'divineRestore', targetId: null };
+  }
+  return null;
+}
+
+function chooseBoingoMove(character, game, usable) {
+  const byId = Object.fromEntries(usable.map((a) => [a.actionId, a]));
+  // Jester Ball is a coin-flip-shaped social weapon - throw it at the
+  // biggest threat so either outcome (they eat -4, or they pass/return it
+  // and burn a turn deciding) works in Boingo's favor.
+  if (byId.jesterBall) {
+    const targets = validTargetsFor(game, character, 'jesterBall');
+    const targetId = biggestThreatTarget(game, character, targets) || lowestHeartsTarget(game, targets);
+    if (targetId) return { actionId: 'jesterBall', targetId };
+  }
+  return { actionId: 'chaosGamble', targetId: pickDefaultTarget(game, character, 'chaosGamble') };
+}
+
+const MOVE_CHOOSERS = {
+  tharox: chooseTharoxMove,
+  zerathys: chooseZerathysMove,
+  chronox: chooseChronoxMove,
+  akyros: chooseAkyrosMove,
+  velorya: chooseVeloryaMove,
+  blade: chooseBladeMove,
+  athena: chooseAthenaMove,
+  boingo: chooseBoingoMove,
+};
+
+// Fallback for characters without bot logic yet: picks a random usable
+// action and a sensible (lowest-hearts) target rather than a fully random
+// target, so early testing isn't dragged down by nonsensical fallback play.
+function chooseFallbackMove(character, game, usable) {
+  const action = usable[Math.floor(Math.random() * usable.length)];
+  if (!action.needsTarget) return { actionId: action.actionId, targetId: null };
+  return { actionId: action.actionId, targetId: pickDefaultTarget(game, character, action.actionId) };
+}
+
+export function chooseBotMove(character, game) {
+  const usable = getUsableActions(character, game);
+  if (usable.length === 0) return null;
+  const chooser = MOVE_CHOOSERS[character.id] || chooseFallbackMove;
+  const move = chooser(character, game, usable);
+  if (!move) return chooseFallbackMove(character, game, usable);
+  // Safety net: a per-character chooser can return an action that isn't
+  // actually in `usable` (e.g. it always falls back to a specific action
+  // without checking whether that action currently has a valid target -
+  // this has happened for real, producing a "Curse Strike on null" or
+  // "Thunder Wrath on null" move). Re-route through the generic fallback
+  // whenever that happens, rather than letting an illegal move through.
+  const usableEntry = usable.find((a) => a.actionId === move.actionId);
+  if (!usableEntry) {
+    return chooseFallbackMove(character, game, usable);
+  }
+  if (move.targetId === null && usableEntry.needsTarget) {
+    return { actionId: move.actionId, targetId: pickDefaultTarget(game, character, move.actionId) };
+  }
+  return move;
+}
+
+// True if Zerathys, after eating the Jester Ball's -4 damage, would have a
+// live enemy Soul Swap target with meaningfully more hearts than his
+// post-damage total - i.e. deliberately Taking the ball sets up a
+// Take-then-Soul-Swap combo: the -4 gets erased (and then some) by
+// immediately swapping his low hearts for the target's high pool, leaving
+// the target crippled instead. Only worth it if Soul Swap is still
+// available at all (isLegal already checks !usedSpecial elsewhere, but this
+// runs before any action is chosen, so check the flag directly here).
+function zerathysBallComboTarget(character, game) {
+  if (character.id !== 'zerathys' || character.usedSpecial) return null;
+  const heartsAfterTake = Math.max(0, character.hearts - 4);
+  if (heartsAfterTake <= 0) return null; // Take would KO him - no combo to set up
+  const targets = Object.keys(game.characters).filter((tid) => isValidTarget(game, character.id, 'soulSwap', tid));
+  const maxHearts = targets.length > 0 ? Math.max(...targets.map((tid) => game.characters[tid].hearts)) : 0;
+  const tiedBest = targets.filter((tid) => game.characters[tid].hearts === maxHearts);
+  const best = pickRandom(tiedBest);
+  if (best && game.characters[best].hearts > heartsAfterTake + 1) {
+    return best;
+  }
+  return null;
+}
+
+// Jester Ball resolution for a PC holder. Returns 'return_' | 'pass' | 'take'
+// and, for 'pass', the chosen new holder's character id.
+export function chooseBotJesterBallMove(character, game) {
+  const jb = game.jesterBall;
+  const boingo = game.characters[jb.thrownByCharacterId];
+  // Zerathys-specific: deliberately Take the ball to set up an immediate
+  // Soul Swap combo (see zerathysBallComboTarget) - this is a bigger tempo
+  // swing than relocating the ball via Pass, so it takes priority whenever
+  // available. The actual Soul Swap itself isn't chosen here (Take doesn't
+  // consume his turn action - he still gets his normal action right after,
+  // where chooseZerathysMove's existing Soul Swap logic picks up the same
+  // now-even-more-favorable target on its own).
+  if (zerathysBallComboTarget(character, game)) {
+    return { choice: 'take' };
+  }
+  // Passing it onto an enemy is the best outcome when available - it moves
+  // the eventual -4 (or the whole decision) onto whoever's the biggest
+  // threat instead of eating it themselves.
+  if (jb.canPass) {
+    // Passing back to Boingo (the original thrower) makes no sense - that's
+    // what Return is for, and it always heals him regardless of who does it.
+    const candidates = livingEnemies(game, character)
+      .filter((c) => c.id !== character.id && c.id !== jb.thrownByCharacterId);
+    if (candidates.length > 0) {
+      const targetId = biggestThreatTarget(game, character, candidates.map((c) => c.id))
+        || lowestHeartsTarget(game, candidates.map((c) => c.id));
+      if (targetId) return { choice: 'pass', targetId };
+    }
+  }
+  // Return is always free for the holder (no self-damage) - the only
+  // downside is that it always heals Boingo +4, which is bad when he's an
+  // enemy. When he's a living teammate (or this character IS Boingo), that
+  // downside doesn't exist, so Return is a clear win. There's no one to heal
+  // if he's already KO'd, in which case Return isn't a real choice - it just
+  // wastes the turn for nothing (same as Take, but Take at least still costs
+  // him nothing more than -4, so both are equivalent there; fall through to
+  // Take for consistency).
+  if (boingo && !boingo.isKO && boingo.ownerId === character.ownerId) {
+    return { choice: 'return_' };
+  }
+  // Boingo's an enemy (FFA, or 2v2 opposing team) - Return heals him for
+  // free, Take costs the holder -4. Confirmed via a real match: the bot
+  // never once chose Return here because of a since-fixed bug (it only
+  // considered Return for a same-owner Boingo), even when Take would have
+  // been fatal. Now weigh them: only when Take would actually KO the holder
+  // is eating the free heal on an enemy Boingo worth it - staying alive
+  // matters more than denying one heal. Any survivable Take, even down to 1
+  // heart, still denies the enemy that heal, which is usually worth more
+  // than the holder's own comfort - so Return is purely a last resort here,
+  // not a general low-health caution.
+  if (boingo && !boingo.isKO && character.hearts <= 4) {
+    return { choice: 'return_' };
+  }
+  // Otherwise Take is the only sensible remaining option.
+  return { choice: 'take' };
+}
