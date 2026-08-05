@@ -1,13 +1,17 @@
 // End-to-end smoke test: connects as the room owner, bot-fills the other
 // seat(s), picks character(s) for itself, starts the match, then plays its
-// own turns using the same bot decision logic as a stand-in (so the whole
-// match auto-completes without a real human) - just to prove the full
-// create->join->pick->start->play->game-over pipeline works over real
-// WebSocket messages end to end.
-//
-// Usage: node test/e2e.mjs [4p|2p]
+// own turns by picking randomly from the server's OWN usableActions/
+// validTargetIds summary - exactly what a real client does (see
+// battleScreen.js) - rather than calling engine bot-decision functions
+// directly against the sanitized wire format. (An earlier version of this
+// test called chooseBotMove()/chooseSoulSwapWrathTarget() on the
+// JSON-broadcast game snapshot directly, which crashes for Akyros since
+// those functions expect real Set objects for special.marks etc., and the
+// broadcast format intentionally strips/flattens that - see
+// sanitizeGameForBroadcast in index.js. That was a test bug, not a server
+// bug: a real client never touches engine internals, it only ever acts on
+// the usableActions summary, so the test should too.)
 import WebSocket from 'ws';
-import { chooseBotMove, chooseBotJesterBallMove, chooseSoulSwapWrathTarget } from '../engine/botPlayer.js';
 
 const roomType = process.argv[2] === '2p' ? '2p' : '4p';
 const ws = new WebSocket('ws://localhost:3001');
@@ -16,6 +20,10 @@ let gameOverSeen = false;
 
 function send(type, payload = {}) {
   ws.send(JSON.stringify({ type, ...payload }));
+}
+
+function pickRandom(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
 }
 
 ws.on('open', () => console.log('connected, roomType=', roomType));
@@ -53,22 +61,31 @@ ws.on('message', (raw) => {
     }
     if (!myCharacterIds.includes(msg.actingCharacterId)) return; // a bot seat's turn - server handles it
     const myCharacterId = msg.actingCharacterId;
-    if (msg.awaitingSoulSwapWrath) {
-      const character = msg.game.characters[myCharacterId];
-      const target = chooseSoulSwapWrathTarget(character, msg.game) || Object.keys(msg.game.characters).find((id) => id !== myCharacterId && !msg.game.characters[id].isKO);
-      send('soul-swap-wrath', { characterId: myCharacterId, targetId: target });
-      return;
-    }
+
     const jb = msg.game.jesterBall;
-    const character = msg.game.characters[myCharacterId];
     if (jb && jb.holderCharacterId === myCharacterId) {
-      const move = chooseBotJesterBallMove(character, msg.game);
-      send('jester-ball-choice', { characterId: myCharacterId, choice: move.choice, targetId: move.targetId });
+      // Same random choice a client would offer: return, take, or pass to
+      // a random living enemy if passing is still available.
+      const choices = ['return_', 'take'];
+      if (jb.canPass) choices.push('pass');
+      const choice = pickRandom(choices);
+      let targetId;
+      if (choice === 'pass') {
+        const candidates = Object.keys(msg.game.characters).filter((id) => id !== myCharacterId && !msg.game.characters[id].isKO);
+        targetId = pickRandom(candidates);
+      }
+      send('jester-ball-choice', { characterId: myCharacterId, choice, targetId });
       return;
     }
-    const move = chooseBotMove(character, msg.game);
-    if (move) {
-      send('action', { characterId: myCharacterId, actionId: move.actionId, targetId: move.targetId });
+
+    const usable = msg.usableActions || [];
+    if (usable.length === 0) return; // nothing to do (shouldn't normally happen while acting)
+    const action = pickRandom(usable);
+    const targetId = action.needsTarget ? pickRandom(action.validTargetIds) : null;
+    if (msg.awaitingSoulSwapWrath) {
+      send('soul-swap-wrath', { characterId: myCharacterId, targetId });
+    } else {
+      send('action', { characterId: myCharacterId, actionId: action.actionId, targetId });
     }
   } else if (msg.type === 'error') {
     console.log('ERROR:', msg.message);

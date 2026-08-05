@@ -173,9 +173,16 @@ function renderRoomLobby(room) {
   }
 
   if (room.youAreOwner) {
+    // Mirrors the server's own seatIsReady() check (handleStartMatch) -
+    // every human-claimed seat must have finished picking; empty seats are
+    // fine (bot-filled automatically on start). Without this, clicking
+    // Start while someone's still picking silently does nothing server-side
+    // (the server just no-ops), which reads as the button being broken.
+    const allHumansReady = room.seats.every((s) => s.kind !== 'human' || s.characterIds.length === room.picksPerSeat);
     const startBtn = document.createElement('button');
     startBtn.className = 'start-btn';
-    startBtn.textContent = 'Start Match';
+    startBtn.textContent = allHumansReady ? 'Start Match' : 'Waiting for players to pick...';
+    startBtn.disabled = !allHumansReady;
     startBtn.onclick = () => send('start-match');
     wrap.appendChild(startBtn);
   } else {
