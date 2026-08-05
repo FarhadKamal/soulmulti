@@ -42,11 +42,14 @@ export function renderBattle(root, state) {
   roundInfo.textContent = `Round ${game.round}`;
   wrap.appendChild(roundInfo);
 
-  // Only offered when playing solo against bots (humanCount <= 1) - with
-  // real opponents/teammates still in the match, leaving mid-game abandons
-  // them, which isn't something to one-click out of. Solo-vs-bots is the
-  // "I want out of this, nobody's affected" case this button is for.
-  if (state.humanCount !== null && state.humanCount <= 1) {
+  // Only offered when playing solo against bots (humanCount <= 1) AND to
+  // the room owner - with real opponents/teammates still in the match,
+  // leaving mid-game abandons them, which isn't something to one-click out
+  // of. Solo-vs-bots is the "I want out of this, nobody's affected" case
+  // this button is for (in that case the lone human is necessarily the
+  // owner, but checking youAreOwner directly is more explicit/robust than
+  // relying on that inference).
+  if (state.humanCount !== null && state.humanCount <= 1 && state.room?.youAreOwner) {
     const exitBtn = document.createElement('button');
     exitBtn.className = 'exit-btn';
     exitBtn.textContent = 'Exit Game';

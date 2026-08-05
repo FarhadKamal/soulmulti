@@ -162,11 +162,13 @@ function renderRoomLobby(room) {
   codeRow.appendChild(copyBtn);
   wrap.appendChild(codeRow);
 
-  const exitBtn = document.createElement('button');
-  exitBtn.className = 'exit-btn';
-  exitBtn.textContent = 'Exit Room';
-  exitBtn.onclick = () => send('leave-room');
-  wrap.appendChild(exitBtn);
+  if (room.youAreOwner) {
+    const exitBtn = document.createElement('button');
+    exitBtn.className = 'exit-btn';
+    exitBtn.textContent = 'Exit Room';
+    exitBtn.onclick = () => send('leave-room');
+    wrap.appendChild(exitBtn);
+  }
 
   const seatList = document.createElement('div');
   seatList.className = 'seat-list';
