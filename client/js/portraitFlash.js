@@ -75,6 +75,20 @@ export function checkIdlePortrait(character) {
   if (character.isKO) return;
   const lastHearts = heartsAtLastTurnStart.has(character.id) ? heartsAtLastTurnStart.get(character.id) : null;
   const wasUntouched = lastHearts === null || character.hearts >= lastHearts;
+  // Don't stomp a more specific flash that was JUST set for this same
+  // broadcast (e.g. Akyros dodging the hit that ended up rotating turn
+  // order straight to him - handleDodgeForFlash's akyros_dodge flash and
+  // this idle-rose check both fire from the same game-state message, and
+  // without this guard the idle check (called second, from main.js) would
+  // silently overwrite the dodge portrait before it was ever rendered,
+  // in the same synchronous tick). The main game avoids this entirely by
+  // using separate boolean flags with dodge checked ahead of idle in its
+  // own if/else chain - this activeFlash map has no such built-in
+  // priority, so it has to be enforced here instead.
+  if (activeFlash.has(character.id)) {
+    heartsAtLastTurnStart.set(character.id, character.hearts);
+    return;
+  }
   if (wasUntouched && character.hearts > character.maxHearts / 2) {
     const src = IDLE_IMAGE[character.id];
     if (src) setFlash(character.id, src);
