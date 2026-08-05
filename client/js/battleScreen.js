@@ -2,6 +2,7 @@ import { CHARACTERS } from './characters.js';
 import { send } from './net.js';
 import { renderChatPanel } from './chatPanel.js';
 import { playUiClick } from './sound.js';
+import { getFlashSrc, getPersistentPortrait } from './portraitFlash.js';
 
 // Functional-first battle screen: no portrait art/animation yet (see
 // characterCard.js in the main game for that system) - just hearts,
@@ -191,10 +192,18 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
 
   const portrait = document.createElement('img');
   portrait.className = 'char-portrait';
-  // Same priority as the main game's characterCard.js (KO -> injured ->
-  // default), minus the ~25 per-character action-flash overrides - those
-  // are a later pass, this is just the base portrait states.
-  if (character.isKO) {
+  // Same priority as the main game's characterCard.js: timed action-flash
+  // (Athena's kiss, Zerathys's glass, dodge, etc.) beats persistent state
+  // (Velorya hidden/Blade alive) beats KO beats injured beats default.
+  // Victory art doesn't apply here - game-over routes to renderGameOver()
+  // above, the board is never shown once the match has actually ended.
+  const flashSrc = getFlashSrc(character.id);
+  const persistentSrc = getPersistentPortrait(character);
+  if (flashSrc) {
+    portrait.src = flashSrc;
+  } else if (persistentSrc) {
+    portrait.src = persistentSrc;
+  } else if (character.isKO) {
     portrait.src = `assets/koed/${character.id}.jpg`;
   } else if (character.hearts <= character.maxHearts / 2) {
     portrait.src = `assets/images/injured/${character.id}.jpg`;

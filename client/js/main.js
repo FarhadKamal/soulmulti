@@ -6,6 +6,7 @@ import {
   startMenuMusic, startBattleMusic, stopMusic,
   playActionSound, playKO, playVictory, playDodge, playRebirth,
 } from './sound.js';
+import { handleLogEntryForFlash, handleDodgeForFlash, checkIdlePortrait, registerFlashRerender } from './portraitFlash.js';
 
 const root = document.getElementById('app');
 
@@ -26,13 +27,16 @@ const state = {
 };
 
 // Tracks how much of game.log has already been "heard" so incoming
-// game-state broadcasts only play sounds for genuinely NEW entries, not
-// the whole log again on every update.
+// game-state broadcasts only react to genuinely NEW entries, not the whole
+// log again on every update. Also tracks the previously-acting character
+// to detect "a new character's turn just started" for the idle-portrait
+// check (see portraitFlash.js's checkIdlePortrait).
 let lastLogLength = 0;
+let previousActingCharacterId = null;
 
-function playSoundsForNewLogEntries(log) {
-  const newEntries = log.slice(lastLogLength);
-  lastLogLength = log.length;
+function processNewLogEntries(game) {
+  const newEntries = game.log.slice(lastLogLength);
+  lastLogLength = game.log.length;
   for (const entry of newEntries) {
     if (entry.type === 'attack' || entry.type === 'special') {
       playActionSound(entry.actionId);
@@ -47,6 +51,8 @@ function playSoundsForNewLogEntries(log) {
       playActionSound('jesterBall');
       if (entry.koTriggered) setTimeout(() => playKO(), 200);
     }
+    handleLogEntryForFlash(entry, game);
+    handleDodgeForFlash(entry, game);
   }
 }
 
@@ -96,6 +102,7 @@ onMessage((msg) => {
         if (state.screen !== 'lobby') startMenuMusic();
         state.screen = 'lobby';
         lastLogLength = 0; // next match starts a fresh game.log from []
+        previousActingCharacterId = null;
       }
       rerender();
       break;
@@ -110,7 +117,16 @@ onMessage((msg) => {
       state.confirmingExit = false;
       state.turnDeadline = msg.turnDeadline || null;
       state.humanCount = msg.humanCount ?? null;
-      playSoundsForNewLogEntries(msg.game.log);
+      processNewLogEntries(msg.game);
+      // A fresh turn just started for whoever's now acting (different from
+      // who was acting on the previous broadcast) - check their idle
+      // portrait (Athena's apple, Velorya's dance, etc.) the same moment
+      // the main game's beginCharacterTurn hook does.
+      if (msg.actingCharacterId && msg.actingCharacterId !== previousActingCharacterId) {
+        const character = msg.game.characters[msg.actingCharacterId];
+        if (character) checkIdlePortrait(character);
+      }
+      previousActingCharacterId = msg.actingCharacterId;
       if (msg.game.phase === 'game-over') playVictory();
       rerender();
       break;
@@ -132,6 +148,7 @@ onMessage((msg) => {
       state.game = null;
       state.error = null;
       lastLogLength = 0;
+      previousActingCharacterId = null;
       startMenuMusic();
       rerender();
       break;
@@ -144,6 +161,7 @@ onMessage((msg) => {
   }
 });
 
+registerFlashRerender(() => { if (state.screen === 'battle') rerender(); });
 connect();
 rerender();
 startMenuMusic();
