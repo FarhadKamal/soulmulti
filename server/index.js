@@ -507,7 +507,9 @@ function handleChatMessage(room, sessionId, { text }) {
   // findRoomBySessionId for the same reasoning).
   const seat = room.seats.find((s) => s.spectatorId === sessionId);
   if (!seat) return;
-  const clean = typeof text === 'string' ? text.trim().slice(0, 300) : '';
+  // Short-sentence cap, not a full message board - keeps the compact chat
+  // panel readable rather than needing to render long paragraphs.
+  const clean = typeof text === 'string' ? text.trim().slice(0, 60) : '';
   if (!clean) return;
   broadcastRoom(room, 'chat-message', { name: seat.name, text: clean, at: Date.now() });
 }

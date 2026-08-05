@@ -2,12 +2,16 @@ import { send } from './net.js';
 
 // Shared chat panel used by both the lobby and battle screens - messages
 // live only in this module's in-memory array for the current tab session
-// (no persistence, matches the server's no-history relay).
+// (no persistence, matches the server's no-history relay). Kept to short
+// callouts only, not a scrollback log - only the most recent MAX_VISIBLE
+// messages are ever kept at all (older ones are dropped, not just
+// scrolled past), matching the server's 60-char per-message cap.
+const MAX_VISIBLE = 10;
 const messages = [];
 
 export function addChatMessage(msg) {
   messages.push(msg);
-  if (messages.length > 200) messages.shift();
+  if (messages.length > MAX_VISIBLE) messages.shift();
 }
 
 export function renderChatPanel() {
@@ -39,7 +43,7 @@ export function renderChatPanel() {
   form.className = 'chat-form';
   const input = document.createElement('input');
   input.type = 'text';
-  input.maxLength = 300;
+  input.maxLength = 60;
   input.placeholder = 'Type a message...';
   const sendBtn = document.createElement('button');
   sendBtn.textContent = 'Send';
