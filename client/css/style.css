@@ -31,7 +31,11 @@ input {
 /* ---- Lobby ---- */
 .lobby { max-width: 480px; margin: 0 auto; padding: 20px 16px 60px; }
 .lobby h1 { text-align: center; font-size: 1.6em; }
-.error-banner { background: #5c1a1a; color: #ffb3b3; padding: 10px; border-radius: 8px; margin-bottom: 12px; }
+.error-banner {
+  background: #5c1a1a; color: #ffb3b3; padding: 10px 12px; border-radius: 8px; margin-bottom: 12px;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+}
+.refresh-btn { background: #ffb3b3; color: #5c1a1a; border-color: #ffb3b3; font-weight: 600; white-space: nowrap; }
 .entry-form { display: flex; flex-direction: column; gap: 20px; }
 .entry-form label { font-size: 0.85em; opacity: 0.8; }
 .entry-form input { width: 100%; margin-top: 4px; }

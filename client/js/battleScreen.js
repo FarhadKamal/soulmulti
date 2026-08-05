@@ -13,6 +13,22 @@ export function renderBattle(root, state) {
   const wrap = document.createElement('div');
   wrap.className = 'battle';
 
+  if (state.connectionLost) {
+    const err = document.createElement('div');
+    err.className = 'error-banner';
+    const text = document.createElement('span');
+    text.textContent = 'Connection lost.';
+    err.appendChild(text);
+    const refreshBtn = document.createElement('button');
+    refreshBtn.className = 'refresh-btn';
+    refreshBtn.textContent = 'Refresh';
+    refreshBtn.onclick = () => window.location.reload();
+    err.appendChild(refreshBtn);
+    wrap.appendChild(err);
+    root.appendChild(wrap);
+    return;
+  }
+
   if (game.phase === 'game-over') {
     wrap.appendChild(renderGameOver(game, state.room?.youAreOwner));
     root.appendChild(wrap);

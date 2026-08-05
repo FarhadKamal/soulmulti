@@ -9,6 +9,7 @@ const state = {
   screen: 'lobby', // 'lobby' | 'battle'
   room: null,
   error: null,
+  connectionLost: false,
   game: null,
   actingCharacterId: null,
   usableActions: [],
@@ -24,7 +25,7 @@ function mySeatCharacterIds() {
 
 function rerender() {
   if (state.screen === 'lobby') {
-    renderLobby(root, { room: state.room, error: state.error }, {
+    renderLobby(root, { room: state.room, error: state.error, connectionLost: state.connectionLost }, {
       onEnterMatch: () => { state.screen = 'battle'; rerender(); },
     });
   } else {
@@ -75,7 +76,8 @@ onMessage((msg) => {
       rerender();
       break;
     case 'connection-closed':
-      state.error = 'Connection lost. Please refresh to reconnect.';
+      state.error = 'Connection lost.';
+      state.connectionLost = true;
       rerender();
       break;
     case 'chat-message':

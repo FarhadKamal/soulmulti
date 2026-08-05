@@ -5,7 +5,7 @@ import { renderChatPanel } from './chatPanel.js';
 // Renders the pre-match lobby: room type choice -> create/join -> seat
 // list + character picking -> start. `room` is null until a create-room or
 // join-room response/lobby-update has arrived at least once.
-export function renderLobby(root, { room, error }, { onEnterMatch }) {
+export function renderLobby(root, { room, error, connectionLost }, { onEnterMatch }) {
   root.innerHTML = '';
   const wrap = document.createElement('div');
   wrap.className = 'lobby';
@@ -17,8 +17,27 @@ export function renderLobby(root, { room, error }, { onEnterMatch }) {
   if (error) {
     const err = document.createElement('div');
     err.className = 'error-banner';
-    err.textContent = error;
+    const text = document.createElement('span');
+    text.textContent = error;
+    err.appendChild(text);
+    if (connectionLost) {
+      const refreshBtn = document.createElement('button');
+      refreshBtn.className = 'refresh-btn';
+      refreshBtn.textContent = 'Refresh';
+      // A plain reload is correct here (unlike return-to-lobby's dedicated
+      // message) - the socket is already dead with nothing salvageable, so
+      // starting a completely fresh session is the actual recovery path.
+      refreshBtn.onclick = () => window.location.reload();
+      err.appendChild(refreshBtn);
+    }
     wrap.appendChild(err);
+  }
+
+  if (connectionLost) {
+    // Nothing else on this screen can do anything useful anymore - every
+    // button here would just try to send over a dead socket.
+    root.appendChild(wrap);
+    return;
   }
 
   if (!room) {
