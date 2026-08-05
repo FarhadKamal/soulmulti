@@ -7,12 +7,11 @@ import { createGame } from './engine/state.js';
 import {
   getUsableActions, executeAction, isValidTarget, markCharacterActed,
 } from './engine/turnEngine.js';
-import { CHARACTERS } from './data/characters.js';
 import { chooseBotMove, chooseBotJesterBallMove, chooseSoulSwapWrathTarget } from './engine/botPlayer.js';
 import { settleToNextDecision, finishJesterBall } from './gameFlow.js';
 import {
   createRoom, getRoom, deleteRoom, findRoomBySessionId, roomShapeFor,
-  availableSeats, availableCharacterIds, seatIsReady, TURN_TIMER_DURATION_MS,
+  availableSeats, availableCharacterIds, seatIsReady, resetRoomToLobby, TURN_TIMER_DURATION_MS,
 } from './rooms.js';
 
 const PORT = process.env.PORT || 3001;
@@ -304,6 +303,18 @@ function handleStartMatch(room, sessionId) {
   runBotTurnsIfAny(room);
 }
 
+// "Back to menu" after a match ends returns everyone to THIS room's lobby
+// (same code) rather than dropping the connection/room entirely - owner-only
+// so one player can't yank the group back mid-celebration, and only valid
+// once the match has actually finished.
+function handleReturnToLobby(room, sessionId) {
+  if (sessionId !== room.ownerId) return;
+  if (room.phase !== 'finished') return;
+  clearTurnTimer(room);
+  resetRoomToLobby(room);
+  broadcastLobby(room);
+}
+
 function handleAction(room, sessionId, { characterId, actionId, targetId }) {
   if (room.phase !== 'in-match' || !room.game) return;
   const seat = seatForCharacter(room, characterId);
@@ -398,6 +409,7 @@ wss.on('connection', (ws) => {
       case 'unpick-character': return handleUnpickCharacter(room, sessionId, payload);
       case 'fill-bot': return handleFillBot(room, sessionId, payload);
       case 'start-match': return handleStartMatch(room, sessionId);
+      case 'return-to-lobby': return handleReturnToLobby(room, sessionId);
       case 'action': return handleAction(room, sessionId, payload);
       case 'soul-swap-wrath': return handleSoulSwapWrath(room, sessionId, payload);
       case 'jester-ball-choice': return handleJesterBallChoice(room, sessionId, payload);

@@ -102,4 +102,32 @@ export function seatIsReady(room, seat) {
   return seat.characterIds.length === shape.picksPerSeat;
 }
 
+// Sends everyone back to this same room's lobby after a match ends, so
+// players don't have to re-share the room code to play again together.
+// Human seats/names are kept as they were, just with picks cleared so they
+// choose again. Bot seats are reverted all the way to 'empty' rather than
+// staying 'bot' with cleared picks - handleStartMatch only ever re-fills
+// seats whose kind is 'empty' (see fillSeatWithBot's call site), so a
+// left-as-'bot' seat with no characters would sit there with an empty
+// characterIds array forever. That's not just a display bug: the engine
+// creates one "player" per seat regardless of character count, and a
+// player with zero characters is vacuously "never eliminated"
+// ([].every(...) === true in JS) while also never getting an actual turn -
+// settleToNextDecision's turn-advance loop can then spin forever trying to
+// find a real decision that never comes, which is exactly what happened
+// (confirmed via a reproduction: createGame with one empty-roster player
+// hangs and OOMs). Reverting to 'empty' guarantees every seat either has a
+// real human re-picking or gets properly re-rolled by fillSeatWithBot.
+export function resetRoomToLobby(room) {
+  room.phase = 'lobby';
+  room.game = null;
+  for (const seat of room.seats) {
+    seat.characterIds = [];
+    if (seat.kind === 'bot') {
+      seat.kind = 'empty';
+      seat.name = null;
+    }
+  }
+}
+
 export const TURN_TIMER_DURATION_MS = TURN_TIMER_MS;

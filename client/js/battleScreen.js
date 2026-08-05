@@ -14,7 +14,7 @@ export function renderBattle(root, state) {
   wrap.className = 'battle';
 
   if (game.phase === 'game-over') {
-    wrap.appendChild(renderGameOver(game));
+    wrap.appendChild(renderGameOver(game, state.room?.youAreOwner));
     root.appendChild(wrap);
     return;
   }
@@ -292,7 +292,7 @@ function describeLogEntry(entry) {
   }
 }
 
-function renderGameOver(game) {
+function renderGameOver(game, youAreOwner) {
   const wrap = document.createElement('div');
   wrap.className = 'game-over';
   const title = document.createElement('h2');
@@ -304,9 +304,20 @@ function renderGameOver(game) {
     sub.textContent = `Winner: ${winner?.name || game.winnerPlayerId}`;
     wrap.appendChild(sub);
   }
-  const homeBtn = document.createElement('button');
-  homeBtn.textContent = 'Back to menu';
-  homeBtn.onclick = () => window.location.reload();
-  wrap.appendChild(homeBtn);
+  if (youAreOwner) {
+    const homeBtn = document.createElement('button');
+    homeBtn.textContent = 'Back to menu';
+    // Returns everyone in this room to the SAME room's lobby (same code) so
+    // the group can pick again and play another match without re-sharing a
+    // code - a plain page reload would instead drop the WebSocket entirely
+    // and start a brand new, unrelated session.
+    homeBtn.onclick = () => send('return-to-lobby');
+    wrap.appendChild(homeBtn);
+  } else {
+    const waiting = document.createElement('div');
+    waiting.className = 'waiting-note';
+    waiting.textContent = 'Waiting for the room owner to return to the lobby...';
+    wrap.appendChild(waiting);
+  }
   return wrap;
 }

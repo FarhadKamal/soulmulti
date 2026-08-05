@@ -62,8 +62,28 @@ export function finishJesterBall(game, choice, targetId) {
 // decision is needed or the game is over. Call this after every state
 // mutation (action executed, ball resolved, turn ended) to settle the game
 // back into "waiting on characterId" before broadcasting to clients.
+//
+// Bounded defensively: a player with an empty characterIds array (should
+// never happen via normal play - createGame always assigns at least one
+// character per seat - but DID happen for real via a room-management bug
+// where a bot seat kept an empty roster across a "return to lobby" reset)
+// is vacuously "never eliminated" ([].every(...) === true in JS) while also
+// never producing a real decision, so this loop would spin calling endTurn
+// forever - confirmed via reproduction, it OOM-crashed the whole server
+// process, not just that one room/match. MAX_ITERATIONS is generous (a real
+// match settles in well under 1000 endTurn calls) - hitting it means
+// something is genuinely stuck, so force the match to a safe end instead of
+// taking the process down with it.
+const MAX_SETTLE_ITERATIONS = 5000;
 export function settleToNextDecision(game) {
+  let iterations = 0;
   while (game.phase !== 'game-over') {
+    if (++iterations > MAX_SETTLE_ITERATIONS) {
+      game.phase = 'game-over';
+      game.winnerPlayerId = null;
+      game.log.push({ type: 'passive', text: 'Match ended unexpectedly (internal error) - treated as a draw.' });
+      return null;
+    }
     const characterId = getActingCharacterId(game);
     if (characterId) return characterId;
     endTurn(game);
