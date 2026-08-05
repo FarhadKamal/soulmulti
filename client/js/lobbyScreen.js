@@ -1,6 +1,8 @@
 import { CHARACTERS } from './characters.js';
 import { send } from './net.js';
 import { renderChatPanel } from './chatPanel.js';
+import { renderRulesModal } from './rulesScreen.js';
+import { playUiClick } from './sound.js';
 
 // Renders the pre-match lobby: room type choice -> create/join -> seat
 // list + character picking -> start. `room` is null until a create-room or
@@ -9,10 +11,20 @@ export function renderLobby(root, { room, error, connectionLost }, { onEnterMatc
   root.innerHTML = '';
   const wrap = document.createElement('div');
   wrap.className = 'lobby';
+  wrap.style.position = 'relative';
 
   const title = document.createElement('h1');
   title.textContent = 'Soul Clash Online';
   wrap.appendChild(title);
+
+  const rulesBtn = document.createElement('button');
+  rulesBtn.className = 'how-to-play-btn';
+  rulesBtn.textContent = 'How to Play';
+  rulesBtn.onclick = () => {
+    playUiClick();
+    renderRulesModal(document.body);
+  };
+  wrap.appendChild(rulesBtn);
 
   if (error) {
     const err = document.createElement('div');
