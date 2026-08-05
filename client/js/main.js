@@ -28,15 +28,17 @@ function rerender() {
       onEnterMatch: () => { state.screen = 'battle'; rerender(); },
     });
   } else {
-    renderBattle(root, {
-      game: state.game,
-      actingCharacterId: state.actingCharacterId,
-      usableActions: state.usableActions,
-      awaitingSoulSwapWrath: state.awaitingSoulSwapWrath,
-      armedAction: state.armedAction,
-      mySeatCharacterIds: mySeatCharacterIds(),
-      rerender,
-    });
+    // Pass the REAL state object through (not a fresh literal) - battleScreen
+    // mutates state.armedAction directly (e.g. arming a targeted action, or
+    // Jester Ball's Pass target-pick mode) and expects that mutation to
+    // stick across the next rerender(). An earlier version built a new
+    // object literal here each call, which meant those mutations landed on
+    // a throwaway copy and got silently discarded - clicking any action
+    // that needs a target (i.e. everything except Charge Up) appeared to do
+    // nothing, since armedAction always reset back to whatever main.js's
+    // real state had, never what the click just set.
+    state.mySeatCharacterIds = mySeatCharacterIds();
+    renderBattle(root, state);
   }
 }
 

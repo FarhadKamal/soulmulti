@@ -222,23 +222,49 @@ function renderJesterBallPrompt(game, characterId, armedAction, state) {
 function renderLog(log) {
   const panel = document.createElement('div');
   panel.className = 'log-panel';
-  const recent = log.slice(-20).reverse();
-  recent.forEach((entry) => {
+  // end-action is a pure bookkeeping marker (round/hearts snapshot pushed
+  // after every single action, always) rather than a human-readable event -
+  // describeLogEntry correctly has no text for it, but rendering an empty
+  // .log-line per entry anyway left visible blank gaps in the panel. Filter
+  // to only entries with real text, then take the most recent 20 of those.
+  const described = log.map((entry) => ({ entry, text: describeLogEntry(entry) })).filter((e) => e.text);
+  const recent = described.slice(-20).reverse();
+  recent.forEach(({ text }) => {
     const line = document.createElement('div');
     line.className = 'log-line';
-    line.textContent = describeLogEntry(entry);
+    line.textContent = text;
     panel.appendChild(line);
   });
   return panel;
+}
+
+// Mirrors each ability's `label` field server-side (abilities/*.js) - kept
+// as a client-side lookup rather than plumbed through every log entry,
+// since action ids are stable, non-secret game data.
+const ACTION_LABELS = {
+  cyclonePunch: 'Cyclone Punch', timeFreeze: 'Time Freeze',
+  smash: 'Smash', titanToss: 'Titan Toss', titanSmash: 'Titan Smash', glorySmash: 'Glory Smash',
+  chargeUp: 'Charge Up', thunderWrath: 'Thunder Wrath', soulSwap: 'Soul Swap', soulSwapWrath: 'Thunder Wrath (free)',
+  hiddenMark: 'Hidden Mark', fatalSlash: 'Fatal Slash', shadowExecution: 'Shadow Execution',
+  lunarStrike: 'Lunar Strike', moonstep: 'Moonstep', lunarEclipse: 'Lunar Eclipse',
+  chaosGamble: 'Chaos Gamble', jesterBall: 'Jester Ball', bloodHunt: 'Blood Hunt',
+  curseStrike: 'Curse Strike', divineRestore: 'Divine Restore',
+};
+function actionLabel(actionId) {
+  return ACTION_LABELS[actionId] || actionId;
 }
 
 function describeLogEntry(entry) {
   const name = (id) => CHARACTERS[id]?.name || id;
   switch (entry.type) {
     case 'attack':
-      return `${name(entry.characterId)} used ${entry.actionId} on ${name(entry.targetId)}${entry.amountDealt != null ? ` - ${entry.amountDealt} damage` : ''}${entry.koTriggered ? ' - KO!' : ''}`;
+      return `${name(entry.characterId)} used ${actionLabel(entry.actionId)} on ${name(entry.targetId)}${entry.amountDealt != null ? ` - ${entry.amountDealt} damage` : ''}${entry.koTriggered ? ' - KO!' : ''}`;
     case 'special':
-      return `${name(entry.characterId)} used their SPECIAL: ${entry.actionId}${entry.targetId ? ` on ${name(entry.targetId)}` : ''}`;
+      return `${name(entry.characterId)} used their SPECIAL: ${actionLabel(entry.actionId)}${entry.targetId ? ` on ${name(entry.targetId)}` : ''}`;
+    case 'setup':
+      return `${name(entry.characterId)} used ${actionLabel(entry.actionId)}${entry.chargeCount ? ` (${entry.chargeCount}/2)` : ''}`;
+    case 'hidden-mark':
+      return `${name(entry.characterId)} placed a Hidden Mark`;
     case 'curse':
       return `${name(entry.characterId)} cast Curse Strike on ${name(entry.targetId)}`;
     case 'curse-mirror':
@@ -251,6 +277,8 @@ function describeLogEntry(entry) {
       return `Time Freeze continues on ${name(entry.targetCharacterId)}`;
     case 'freeze-end':
       return `Time Freeze ends on ${name(entry.targetCharacterId)}`;
+    case 'eclipse-end':
+      return `${name(entry.characterId)}'s Lunar Eclipse ends`;
     case 'jester-ball-take':
       return `${name(entry.targetCharacterId)} took the Jester Ball${entry.amountDealt != null ? ` - -${entry.amountDealt} hearts` : ''}`;
     case 'jester-ball-pass':
