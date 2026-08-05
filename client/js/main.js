@@ -15,6 +15,7 @@ const state = {
   usableActions: [],
   awaitingSoulSwapWrath: false,
   armedAction: null,
+  turnDeadline: null,
   rerender,
 };
 
@@ -69,6 +70,7 @@ onMessage((msg) => {
       state.usableActions = msg.usableActions || [];
       state.awaitingSoulSwapWrath = !!msg.awaitingSoulSwapWrath;
       state.armedAction = null;
+      state.turnDeadline = msg.turnDeadline || null;
       rerender();
       break;
     case 'error':

@@ -14,6 +14,7 @@ export function renderBattle(root, state) {
   wrap.className = 'battle';
 
   if (state.connectionLost) {
+    stopTurnTimer();
     const err = document.createElement('div');
     err.className = 'error-banner';
     const text = document.createElement('span');
@@ -30,6 +31,7 @@ export function renderBattle(root, state) {
   }
 
   if (game.phase === 'game-over') {
+    stopTurnTimer();
     wrap.appendChild(renderGameOver(game, state.room?.youAreOwner));
     root.appendChild(wrap);
     return;
@@ -39,6 +41,12 @@ export function renderBattle(root, state) {
   roundInfo.className = 'round-info';
   roundInfo.textContent = `Round ${game.round}`;
   wrap.appendChild(roundInfo);
+
+  if (state.turnDeadline) {
+    wrap.appendChild(renderTurnTimer(state.turnDeadline, actingCharacterId, mySeatCharacterIds.includes(actingCharacterId)));
+  } else {
+    stopTurnTimer();
+  }
 
   const board = document.createElement('div');
   board.className = 'board';
@@ -73,6 +81,43 @@ export function renderBattle(root, state) {
   wrap.appendChild(renderChatPanel());
 
   root.appendChild(wrap);
+}
+
+// Ticks a countdown to the server's turn-decision deadline (see
+// armTurnTimer/broadcastGameState in index.js - the server is the sole
+// authority on when a turn actually times out; this is purely a display of
+// that same deadline, not an independent timer). Self-updates via its own
+// setInterval rather than triggering a full renderBattle() every second,
+// since a full re-render would blow away in-progress interactions (like an
+// armed action waiting on a target click). Only one interval is ever live
+// at a time - each call clears whatever the previous rendered timer had
+// running, so repeated renderBattle() calls (e.g. a chat message arriving)
+// don't stack multiple ticking intervals against the same deadline.
+let turnTimerInterval = null;
+function stopTurnTimer() {
+  if (turnTimerInterval) {
+    clearInterval(turnTimerInterval);
+    turnTimerInterval = null;
+  }
+}
+function renderTurnTimer(deadline, actingCharacterId, isMyTurn) {
+  stopTurnTimer();
+
+  const badge = document.createElement('div');
+  badge.className = 'turn-timer';
+
+  function update() {
+    const secondsLeft = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+    badge.textContent = isMyTurn
+      ? `Your turn - ${secondsLeft}s left`
+      : `${CHARACTERS[actingCharacterId]?.name || 'Player'}'s turn - ${secondsLeft}s left`;
+    badge.classList.toggle('turn-timer--urgent', secondsLeft <= 10);
+    if (secondsLeft <= 0) clearInterval(turnTimerInterval);
+  }
+  update();
+  turnTimerInterval = setInterval(update, 1000);
+
+  return badge;
 }
 
 function renderCharacterTile(character, { isActing, isMine, isTargetable, onTargetClick }) {

@@ -141,6 +141,11 @@ function broadcastGameState(room) {
     game: sanitizeGameForBroadcast(room.game),
     actingCharacterId: acting,
     usableActions: acting ? usableActionsFor(room.game, acting) : [],
+    // Absolute timestamp (ms since epoch) the current turn's 30s timer
+    // expires at - lets clients render a live countdown without their own
+    // clock/timer bookkeeping, just `deadline - Date.now()` ticked locally.
+    // null while no timer is armed (e.g. game just ended).
+    turnDeadline: room.turnTimer ? room.turnDeadline : null,
   });
 }
 
@@ -154,6 +159,7 @@ function clearTurnTimer(room) {
   if (room.turnTimer) {
     clearTimeout(room.turnTimer);
     room.turnTimer = null;
+    room.turnDeadline = null;
   }
 }
 
@@ -164,6 +170,7 @@ function seatForCharacter(room, characterId) {
 function armTurnTimer(room, characterId) {
   clearTurnTimer(room);
   if (!characterId) return;
+  room.turnDeadline = Date.now() + TURN_TIMER_DURATION_MS;
   room.turnTimer = setTimeout(() => {
     const seat = seatForCharacter(room, characterId);
     if (seat && seat.kind === 'human') {
