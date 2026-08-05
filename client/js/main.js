@@ -16,6 +16,7 @@ const state = {
   awaitingSoulSwapWrath: false,
   armedAction: null,
   turnDeadline: null,
+  humanCount: null,
   rerender,
 };
 
@@ -71,6 +72,7 @@ onMessage((msg) => {
       state.awaitingSoulSwapWrath = !!msg.awaitingSoulSwapWrath;
       state.armedAction = null;
       state.turnDeadline = msg.turnDeadline || null;
+      state.humanCount = msg.humanCount ?? null;
       rerender();
       break;
     case 'error':

@@ -155,6 +155,12 @@ function broadcastGameState(room) {
     // clock/timer bookkeeping, just `deadline - Date.now()` ticked locally.
     // null while no timer is armed (e.g. game just ended).
     turnDeadline: room.turnTimer ? room.turnDeadline : null,
+    // Lets the client tell "solo vs bots" apart from "real opponents still
+    // playing" - e.g. only offering a one-click Exit Game during a match
+    // when there's nobody else around to leave hanging. state.room (the
+    // last lobby-update) is stale mid-match under normal play, so this is
+    // computed fresh here rather than relying on the client's old snapshot.
+    humanCount: room.seats.filter((s) => s.kind === 'human').length,
   });
 }
 

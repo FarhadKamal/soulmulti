@@ -42,14 +42,20 @@ export function renderBattle(root, state) {
   roundInfo.textContent = `Round ${game.round}`;
   wrap.appendChild(roundInfo);
 
-  const exitBtn = document.createElement('button');
-  exitBtn.className = 'exit-btn';
-  exitBtn.textContent = 'Exit Room';
-  // Leaving mid-match hands your seat to a bot permanently, same as a
-  // timed-out turn or a disconnect - there's no "pause" state, so this is
-  // a real commitment, not just a menu back-out.
-  exitBtn.onclick = () => { if (confirm('Leave this match? Your character(s) will be taken over by a bot.')) send('leave-room'); };
-  wrap.appendChild(exitBtn);
+  // Only offered when playing solo against bots (humanCount <= 1) - with
+  // real opponents/teammates still in the match, leaving mid-game abandons
+  // them, which isn't something to one-click out of. Solo-vs-bots is the
+  // "I want out of this, nobody's affected" case this button is for.
+  if (state.humanCount !== null && state.humanCount <= 1) {
+    const exitBtn = document.createElement('button');
+    exitBtn.className = 'exit-btn';
+    exitBtn.textContent = 'Exit Game';
+    // Leaving mid-match hands your seat to a bot permanently, same as a
+    // timed-out turn or a disconnect - there's no "pause" state, so this is
+    // a real commitment, not just a menu back-out.
+    exitBtn.onclick = () => { if (confirm('Leave this match? Your character(s) will be taken over by a bot.')) send('leave-room'); };
+    wrap.appendChild(exitBtn);
+  }
 
   if (state.turnDeadline) {
     wrap.appendChild(renderTurnTimer(state.turnDeadline, actingCharacterId, mySeatCharacterIds.includes(actingCharacterId)));
