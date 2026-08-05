@@ -137,6 +137,12 @@ function renderRoomLobby(room) {
   codeDisplay.textContent = `Room code: ${room.code}`;
   wrap.appendChild(codeDisplay);
 
+  const exitBtn = document.createElement('button');
+  exitBtn.className = 'exit-btn';
+  exitBtn.textContent = 'Exit Room';
+  exitBtn.onclick = () => send('leave-room');
+  wrap.appendChild(exitBtn);
+
   const seatList = document.createElement('div');
   seatList.className = 'seat-list';
 

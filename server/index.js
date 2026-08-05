@@ -359,6 +359,62 @@ function handleReturnToLobby(room, sessionId) {
   broadcastLobby(room);
 }
 
+// Shared by both an explicit "Exit Room" click (leave-room message) and a
+// real socket disconnect (ws.on('close')) - same cleanup either way, since
+// a deliberate exit and an abrupt disconnect should behave identically
+// from the room's perspective. Unlike a timeout (which keeps spectatorId
+// so the player keeps watching), leaving is a deliberate full exit - both
+// playerId AND spectatorId are cleared, so this session stops receiving
+// broadcasts for a room it explicitly left.
+function leaveRoom(sessionId, ws) {
+  const room = findRoomBySessionId(sessionId);
+  if (!room) return;
+  const seat = room.seats.find((s) => s.spectatorId === sessionId);
+  if (!seat) return;
+  // Confirm directly to the leaving client (not a room broadcast - they're
+  // about to stop being part of the room) so it knows to switch back to
+  // the entry screen rather than waiting on a lobby-update that will never
+  // arrive for them again. Sent before the cleanup below in case ws is
+  // already gone (a real disconnect calls this with no ws at all).
+  if (ws) send(ws, 'left-room', {});
+
+  if (room.phase === 'lobby') {
+    // Nothing committed yet - just free the seat.
+    seat.kind = 'empty';
+    seat.playerId = null;
+    seat.spectatorId = null;
+    seat.name = null;
+    seat.characterIds = [];
+    if (room.ownerId === sessionId) {
+      const nextHuman = room.seats.find((s) => s.kind === 'human');
+      room.ownerId = nextHuman ? nextHuman.playerId : null;
+      if (!room.ownerId) return deleteRoom(room.code);
+    }
+    broadcastLobby(room);
+    return;
+  }
+
+  // Mid-match (or finished, waiting on return-to-lobby): leaving = permanent
+  // bot takeover, same as a timed-out turn - but this session is fully done
+  // with the room (spectatorId cleared too), unlike a timeout.
+  const wasHuman = seat.kind === 'human';
+  seat.kind = 'bot';
+  seat.playerId = null;
+  seat.spectatorId = null;
+  if (room.ownerId === sessionId) {
+    const nextHuman = room.seats.find((s) => s.kind === 'human');
+    room.ownerId = nextHuman ? nextHuman.playerId : null;
+  }
+  const anyHumanLeft = room.seats.some((s) => s.kind === 'human');
+  if (!anyHumanLeft) {
+    clearTurnTimer(room);
+    deleteRoom(room.code);
+    return;
+  }
+  broadcastLobby(room);
+  if (wasHuman && room.phase === 'in-match') runBotTurnsIfAny(room);
+}
+
 function handleAction(room, sessionId, { characterId, actionId, targetId }) {
   if (room.phase !== 'in-match' || !room.game) return;
   const seat = seatForCharacter(room, characterId);
@@ -447,6 +503,7 @@ wss.on('connection', (ws) => {
 
     if (type === 'create-room') return handleCreateRoom(ws, sessionId, payload);
     if (type === 'join-room') return handleJoinRoom(ws, sessionId, payload);
+    if (type === 'leave-room') return leaveRoom(sessionId, ws);
 
     const room = findRoomBySessionId(sessionId);
     if (!room) return;
@@ -468,41 +525,7 @@ wss.on('connection', (ws) => {
 
   ws.on('close', () => {
     sessions.delete(sessionId);
-    const room = findRoomBySessionId(sessionId);
-    if (!room) return;
-    const seat = room.seats.find((s) => s.playerId === sessionId);
-    if (!seat) return;
-
-    if (room.phase === 'lobby') {
-      // Nothing committed yet - just free the seat.
-      seat.kind = 'empty';
-      seat.playerId = null;
-      seat.name = null;
-      seat.characterIds = [];
-      if (room.ownerId === sessionId) {
-        const nextHuman = room.seats.find((s) => s.kind === 'human');
-        room.ownerId = nextHuman ? nextHuman.playerId : null;
-        if (!room.ownerId) return deleteRoom(room.code);
-      }
-      broadcastLobby(room);
-      return;
-    }
-
-    // Mid-match: leaving = permanent bot takeover (same as a timed-out turn).
-    seat.kind = 'bot';
-    seat.playerId = null;
-    if (room.ownerId === sessionId) {
-      const nextHuman = room.seats.find((s) => s.kind === 'human');
-      room.ownerId = nextHuman ? nextHuman.playerId : null;
-    }
-    const anyHumanLeft = room.seats.some((s) => s.kind === 'human');
-    if (!anyHumanLeft) {
-      clearTurnTimer(room);
-      deleteRoom(room.code);
-      return;
-    }
-    broadcastLobby(room);
-    runBotTurnsIfAny(room);
+    leaveRoom(sessionId);
   });
 });
 

@@ -82,6 +82,15 @@ onMessage((msg) => {
       state.connectionLost = true;
       rerender();
       break;
+    case 'left-room':
+      // Confirmation that leave-room was processed - reset back to the
+      // entry screen (create/join), same connection stays open.
+      state.screen = 'lobby';
+      state.room = null;
+      state.game = null;
+      state.error = null;
+      rerender();
+      break;
     case 'chat-message':
       addChatMessage(msg);
       rerender();
