@@ -420,20 +420,34 @@ function renderGameOver(game, youAreOwner) {
     sub.textContent = `Winner: ${winner?.name || game.winnerPlayerId}`;
     wrap.appendChild(sub);
   }
+  const btnRow = document.createElement('div');
+  btnRow.className = 'game-over-actions';
+
   if (youAreOwner) {
     const homeBtn = document.createElement('button');
-    homeBtn.textContent = 'Back to menu';
+    homeBtn.textContent = 'Play Again (same room)';
     // Returns everyone in this room to the SAME room's lobby (same code) so
     // the group can pick again and play another match without re-sharing a
     // code - a plain page reload would instead drop the WebSocket entirely
     // and start a brand new, unrelated session.
     homeBtn.onclick = () => send('return-to-lobby');
-    wrap.appendChild(homeBtn);
+    btnRow.appendChild(homeBtn);
   } else {
     const waiting = document.createElement('div');
     waiting.className = 'waiting-note';
     waiting.textContent = 'Waiting for the room owner to return to the lobby...';
-    wrap.appendChild(waiting);
+    btnRow.appendChild(waiting);
   }
+
+  // Available to anyone regardless of ownership - a full exit back to the
+  // create/join entry screen, distinct from "Play Again" above (which only
+  // the owner can trigger and keeps everyone in the same room/code).
+  const exitBtn = document.createElement('button');
+  exitBtn.className = 'exit-btn';
+  exitBtn.textContent = 'Exit to Main Menu';
+  exitBtn.onclick = () => send('leave-room');
+  btnRow.appendChild(exitBtn);
+
+  wrap.appendChild(btnRow);
   return wrap;
 }
