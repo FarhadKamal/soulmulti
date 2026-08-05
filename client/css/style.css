@@ -99,7 +99,10 @@ input {
   margin-bottom: 6px; display: block; background: #0d0d14;
 }
 .char-name { font-weight: 700; }
-.char-hearts { font-size: 0.9em; }
+.char-hearts { font-size: 0.9em; display: flex; flex-wrap: wrap; gap: 2px; }
+.heart-icon { font-size: 1.1em; line-height: 1; }
+.heart-icon--full { color: #ff5e7a; }
+.heart-icon--empty { color: #3a3a48; }
 .char-shield, .char-flag { font-size: 0.8em; opacity: 0.8; }
 
 .action-panel { background: #1c1c2c; border-radius: 10px; padding: 14px; margin-bottom: 16px; }

@@ -220,7 +220,19 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
 
   const hearts = document.createElement('div');
   hearts.className = 'char-hearts';
-  hearts.textContent = character.isKO ? 'KO' : `${character.hearts}/${character.maxHearts} hearts`;
+  if (character.isKO) {
+    hearts.textContent = 'KO';
+  } else {
+    // Filled heart glyphs for current hearts, dimmed hollow ones for the
+    // rest of maxHearts - text glyphs rather than image assets, styled via
+    // CSS, so no new asset files needed for this.
+    for (let i = 0; i < character.maxHearts; i++) {
+      const heart = document.createElement('span');
+      heart.className = i < character.hearts ? 'heart-icon heart-icon--full' : 'heart-icon heart-icon--empty';
+      heart.textContent = '♥';
+      hearts.appendChild(heart);
+    }
+  }
   tile.appendChild(hearts);
 
   if (character.shield > 0) {
