@@ -511,7 +511,10 @@ function handleChatMessage(room, sessionId, { text }) {
   // panel readable rather than needing to render long paragraphs.
   const clean = typeof text === 'string' ? text.trim().slice(0, 60) : '';
   if (!clean) return;
-  broadcastRoom(room, 'chat-message', { name: seat.name, text: clean, at: Date.now() });
+  // seatIndex (not just name) so the client can label messages "P1: name"
+  // etc. - two players can pick the same display name, and even without a
+  // clash it's a quick way to tell who's who against the seat list.
+  broadcastRoom(room, 'chat-message', { name: seat.name, seatIndex: seat.index, text: clean, at: Date.now() });
 }
 
 // ---- Connection handling ----

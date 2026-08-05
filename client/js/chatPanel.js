@@ -30,7 +30,11 @@ export function renderChatPanel() {
     line.className = 'chat-line';
     const name = document.createElement('span');
     name.className = 'chat-name';
-    name.textContent = `${m.name}: `;
+    // Seat number prefix (P1, P2, ...) disambiguates two players who
+    // picked the same display name, and doubles as a quick cross-reference
+    // to the seat list either way.
+    const seatLabel = m.seatIndex != null ? `P${m.seatIndex + 1}: ` : '';
+    name.textContent = `${seatLabel}${m.name}: `;
     line.appendChild(name);
     line.appendChild(document.createTextNode(m.text));
     list.appendChild(line);
