@@ -3,7 +3,12 @@ import WebSocket from 'ws';
 const a = new WebSocket('ws://localhost:3001');
 const b = new WebSocket('ws://localhost:3001');
 let code = null;
+let bReady = false;
 let received = false;
+
+function tryJoin() {
+  if (code && bReady) b.send(JSON.stringify({ type: 'join-room', code, name: 'Bob' }));
+}
 
 a.on('message', (raw) => {
   const msg = JSON.parse(raw.toString());
@@ -11,13 +16,16 @@ a.on('message', (raw) => {
     a.send(JSON.stringify({ type: 'create-room', roomType: '4p', name: 'Alice' }));
   } else if (msg.type === 'room-created') {
     code = msg.code;
-    b.send(JSON.stringify({ type: 'join-room', code, name: 'Bob' }));
+    tryJoin();
   }
 });
 
 b.on('message', (raw) => {
   const msg = JSON.parse(raw.toString());
-  if (msg.type === 'room-joined') {
+  if (msg.type === 'session') {
+    bReady = true;
+    tryJoin();
+  } else if (msg.type === 'room-joined') {
     a.send(JSON.stringify({ type: 'chat-message', text: 'hello from Alice' }));
   } else if (msg.type === 'chat-message') {
     received = true;

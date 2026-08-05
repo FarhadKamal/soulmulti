@@ -7,8 +7,13 @@ import WebSocket from 'ws';
 const owner = new WebSocket('ws://localhost:3001');
 const joiner = new WebSocket('ws://localhost:3001');
 let roomCode = null;
+let joinerReady = false;
 let ownerView = null;
 let joinerView = null;
+
+function tryJoin() {
+  if (roomCode && joinerReady) joiner.send(JSON.stringify({ type: 'join-room', code: roomCode, name: 'Joiner' }));
+}
 
 function checkDone() {
   if (!ownerView || !joinerView) return;
@@ -35,7 +40,7 @@ owner.on('message', (raw) => {
     owner.send(JSON.stringify({ type: 'create-room', roomType: '4p', name: 'Owner' }));
   } else if (msg.type === 'room-created') {
     roomCode = msg.code;
-    joiner.send(JSON.stringify({ type: 'join-room', code: roomCode, name: 'Joiner' }));
+    tryJoin();
   } else if (msg.type === 'lobby-update') {
     ownerView = msg.room;
     checkDone();
@@ -44,7 +49,10 @@ owner.on('message', (raw) => {
 
 joiner.on('message', (raw) => {
   const msg = JSON.parse(raw.toString());
-  if (msg.type === 'lobby-update') {
+  if (msg.type === 'session') {
+    joinerReady = true;
+    tryJoin();
+  } else if (msg.type === 'lobby-update') {
     joinerView = msg.room;
     checkDone();
   }

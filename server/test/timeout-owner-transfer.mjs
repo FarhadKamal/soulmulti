@@ -9,6 +9,7 @@ import WebSocket from 'ws';
 const owner = new WebSocket('ws://localhost:3001');
 const other = new WebSocket('ws://localhost:3001');
 let roomCode = null;
+let otherReady = false;
 let ownerCharacterIds = [];
 let otherCharacterIds = [];
 let transferConfirmed = false;
@@ -16,13 +17,25 @@ let transferConfirmed = false;
 function send(ws, type, payload = {}) { ws.send(JSON.stringify({ type, ...payload })); }
 function pickRandom(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
+function tryJoin() {
+  if (roomCode && otherReady) send(other, 'join-room', { code: roomCode, name: 'Other' });
+}
+
+other.on('message', (raw) => {
+  const msg = JSON.parse(raw.toString());
+  if (msg.type === 'session') {
+    otherReady = true;
+    tryJoin();
+  }
+});
+
 owner.on('message', (raw) => {
   const msg = JSON.parse(raw.toString());
   if (msg.type === 'session') {
     send(owner, 'create-room', { roomType: '4p', name: 'Owner' });
   } else if (msg.type === 'room-created') {
     roomCode = msg.code;
-    send(other, 'join-room', { code: roomCode, name: 'Other' });
+    tryJoin();
   } else if (msg.type === 'lobby-update') {
     const room = msg.room;
     if (room.phase !== 'lobby') return;

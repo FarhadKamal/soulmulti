@@ -9,6 +9,7 @@ import WebSocket from 'ws';
 const leaver = new WebSocket('ws://localhost:3001');
 const observer = new WebSocket('ws://localhost:3001');
 let roomCode = null;
+let observerReady = false;
 let leaverCharacterIds = [];
 let observerCharacterIds = [];
 let leftDuringMatch = false;
@@ -18,13 +19,25 @@ let observerSawMatchEnd = false;
 function send(ws, type, payload = {}) { ws.send(JSON.stringify({ type, ...payload })); }
 function pickRandom(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
+function tryJoin() {
+  if (roomCode && observerReady) send(observer, 'join-room', { code: roomCode, name: 'Observer' });
+}
+
+observer.on('message', (raw) => {
+  const msg = JSON.parse(raw.toString());
+  if (msg.type === 'session') {
+    observerReady = true;
+    tryJoin();
+  }
+});
+
 leaver.on('message', (raw) => {
   const msg = JSON.parse(raw.toString());
   if (msg.type === 'session') {
     send(leaver, 'create-room', { roomType: '4p', name: 'Leaver' });
   } else if (msg.type === 'room-created') {
     roomCode = msg.code;
-    send(observer, 'join-room', { code: roomCode, name: 'Observer' });
+    tryJoin();
   } else if (msg.type === 'lobby-update') {
     const room = msg.room;
     if (room.phase !== 'lobby') return;

@@ -280,6 +280,7 @@ function handleJoinRoom(ws, sessionId, { code, name }) {
 }
 
 function handlePickCharacter(room, sessionId, { characterId }) {
+  if (room.phase !== 'lobby') return; // picks are frozen once a match has actually started
   if (!CHARACTER_IDS.includes(characterId)) return;
   const seat = room.seats.find((s) => s.playerId === sessionId);
   if (!seat) return;
@@ -292,6 +293,7 @@ function handlePickCharacter(room, sessionId, { characterId }) {
 }
 
 function handleUnpickCharacter(room, sessionId, { characterId }) {
+  if (room.phase !== 'lobby') return; // can't un-pick out from under an already-started/finished match
   const seat = room.seats.find((s) => s.playerId === sessionId);
   if (!seat) return;
   seat.characterIds = seat.characterIds.filter((id) => id !== characterId);

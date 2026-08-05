@@ -4,7 +4,14 @@ import WebSocket from 'ws';
 const owner = new WebSocket('ws://localhost:3001');
 const other = new WebSocket('ws://localhost:3001');
 let roomCode = null;
+let otherReady = false;
 const longText = 'x'.repeat(120);
+
+function tryJoin() {
+  if (roomCode && otherReady) {
+    other.send(JSON.stringify({ type: 'join-room', code: roomCode, name: 'Other' }));
+  }
+}
 
 owner.on('message', (raw) => {
   const msg = JSON.parse(raw.toString());
@@ -12,7 +19,15 @@ owner.on('message', (raw) => {
     owner.send(JSON.stringify({ type: 'create-room', roomType: '4p', name: 'Owner' }));
   } else if (msg.type === 'room-created') {
     roomCode = msg.code;
-    other.send(JSON.stringify({ type: 'join-room', code: roomCode, name: 'Other' }));
+    tryJoin();
+  }
+});
+
+other.on('message', (raw) => {
+  const msg = JSON.parse(raw.toString());
+  if (msg.type === 'session') {
+    otherReady = true;
+    tryJoin();
   }
 });
 

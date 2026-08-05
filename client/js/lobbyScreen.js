@@ -208,25 +208,47 @@ function renderRoomLobby(room) {
 
   const mySeat = room.mySeatIndex !== null ? room.seats[room.mySeatIndex] : null;
 
-  if (mySeat && mySeat.characterIds.length < room.picksPerSeat) {
+  // Kept visible even once fully picked (not gated on < picksPerSeat) so a
+  // player can change their mind before the match starts - clicking one of
+  // their own picked characters below removes it, freeing a slot to pick a
+  // different one instead of being locked in.
+  if (mySeat) {
     const pickSection = document.createElement('div');
     pickSection.className = 'pick-section';
     const pickTitle = document.createElement('h3');
-    pickTitle.textContent = `Pick your character${room.picksPerSeat > 1 ? 's' : ''} (${mySeat.characterIds.length}/${room.picksPerSeat})`;
+    pickTitle.textContent = `Your character${room.picksPerSeat > 1 ? 's' : ''} (${mySeat.characterIds.length}/${room.picksPerSeat})`;
     pickSection.appendChild(pickTitle);
 
-    const grid = document.createElement('div');
-    grid.className = 'character-grid';
-    Object.values(CHARACTERS).forEach((def) => {
-      const available = room.availableCharacterIds.includes(def.id);
-      const btn = document.createElement('button');
-      btn.textContent = def.name;
-      btn.disabled = !available;
-      btn.style.borderColor = def.color;
-      btn.onclick = () => send('pick-character', { characterId: def.id });
-      grid.appendChild(btn);
-    });
-    pickSection.appendChild(grid);
+    if (mySeat.characterIds.length > 0) {
+      const pickedRow = document.createElement('div');
+      pickedRow.className = 'picked-row';
+      mySeat.characterIds.forEach((id) => {
+        const def = CHARACTERS[id];
+        const chip = document.createElement('button');
+        chip.className = 'picked-chip';
+        chip.style.borderColor = def.color;
+        chip.textContent = `${def.name} ×`;
+        chip.title = 'Click to unpick';
+        chip.onclick = () => send('unpick-character', { characterId: id });
+        pickedRow.appendChild(chip);
+      });
+      pickSection.appendChild(pickedRow);
+    }
+
+    if (mySeat.characterIds.length < room.picksPerSeat) {
+      const grid = document.createElement('div');
+      grid.className = 'character-grid';
+      Object.values(CHARACTERS).forEach((def) => {
+        const available = room.availableCharacterIds.includes(def.id);
+        const btn = document.createElement('button');
+        btn.textContent = def.name;
+        btn.disabled = !available;
+        btn.style.borderColor = def.color;
+        btn.onclick = () => send('pick-character', { characterId: def.id });
+        grid.appendChild(btn);
+      });
+      pickSection.appendChild(grid);
+    }
     wrap.appendChild(pickSection);
   }
 
