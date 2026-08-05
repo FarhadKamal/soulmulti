@@ -45,7 +45,9 @@ input {
 .join-section { display: flex; flex-direction: column; gap: 10px; }
 .code-input { text-align: center; letter-spacing: 4px; font-size: 1.2em; }
 
-.room-code { text-align: center; font-size: 1.3em; letter-spacing: 3px; margin: 10px 0 20px; }
+.room-code-row { display: flex; align-items: center; justify-content: center; gap: 12px; margin: 10px 0 20px; }
+.room-code { text-align: center; font-size: 1.3em; letter-spacing: 3px; }
+.copy-code-btn { font-size: 0.8em; padding: 6px 12px; }
 .seat-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
 .seat-row {
   display: flex; justify-content: space-between; align-items: center; gap: 8px;

@@ -132,10 +132,35 @@ function renderRoomLobby(room) {
   const wrap = document.createElement('div');
   wrap.className = 'room-lobby';
 
+  const codeRow = document.createElement('div');
+  codeRow.className = 'room-code-row';
   const codeDisplay = document.createElement('div');
   codeDisplay.className = 'room-code';
   codeDisplay.textContent = `Room code: ${room.code}`;
-  wrap.appendChild(codeDisplay);
+  codeRow.appendChild(codeDisplay);
+
+  const copyBtn = document.createElement('button');
+  copyBtn.className = 'copy-code-btn';
+  copyBtn.textContent = 'Copy';
+  copyBtn.onclick = async () => {
+    try {
+      await navigator.clipboard.writeText(room.code);
+    } catch {
+      // Clipboard API unavailable (e.g. insecure context) - fall back to a
+      // manual select+copy via a temporary input, which document.execCommand
+      // can still handle in more contexts than the async Clipboard API.
+      const temp = document.createElement('input');
+      temp.value = room.code;
+      document.body.appendChild(temp);
+      temp.select();
+      try { document.execCommand('copy'); } catch { /* give up silently */ }
+      document.body.removeChild(temp);
+    }
+    copyBtn.textContent = 'Copied!';
+    setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1500);
+  };
+  codeRow.appendChild(copyBtn);
+  wrap.appendChild(codeRow);
 
   const exitBtn = document.createElement('button');
   exitBtn.className = 'exit-btn';
