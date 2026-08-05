@@ -184,7 +184,17 @@ function armTurnTimer(room, characterId) {
     const seat = seatForCharacter(room, characterId);
     if (seat && seat.kind === 'human') {
       seat.kind = 'bot';
+      const timedOutSessionId = seat.playerId;
       seat.playerId = null;
+      // Same ownership-transfer rule as a player disconnecting (ws.on
+      // 'close') - the owner timing out is functionally the same as the
+      // owner leaving, so it shouldn't leave the room ownerless/stuck with
+      // an owner who can no longer act on anything (return-to-lobby,
+      // fill-bot, remove-bot, start-match are all owner-gated).
+      if (room.ownerId === timedOutSessionId) {
+        const nextHuman = room.seats.find((s) => s.kind === 'human');
+        room.ownerId = nextHuman ? nextHuman.playerId : null;
+      }
       broadcastLobby(room);
       room.game.log.push({ type: 'passive', characterId, text: 'Turn timed out - a bot takes over.' });
     }
