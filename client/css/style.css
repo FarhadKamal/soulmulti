@@ -125,6 +125,16 @@ input {
 .char-shield-icon { font-size: 1.15em; filter: drop-shadow(0 0 3px rgba(120, 190, 255, 0.9)); }
 .char-shield-count { font-weight: 700; font-size: 0.9em; color: #bfe0ff; }
 
+/* Persistent per-character status badges (Zerathys's charge count, Tharox's
+   Charge ready, Blade's streak, Special used) - ported from the main
+   game's .badge styling. */
+.status-badge-row { margin-top: 4px; }
+.status-badge {
+  display: inline-block; font-size: 0.7em; padding: 2px 8px; border-radius: 999px;
+  background: #1c1c2c; border: 1px solid #444; color: #9a9aa8; margin: 2px 4px 0 0;
+}
+.status-badge--warn { border-color: #ffd75e; color: #ffd75e; }
+
 /* Reactive one-shot tile animations - ported from the main game's
    dashboard.css (same keyframes/timings), driven by actionEffects.js
    against the multiplayer server's action log instead of live client-side

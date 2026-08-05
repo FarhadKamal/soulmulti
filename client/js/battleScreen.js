@@ -403,7 +403,42 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
     tile.appendChild(flag);
   }
 
+  const badges = statusBadges(character);
+  if (badges.length > 0) {
+    const badgeRow = document.createElement('div');
+    badgeRow.className = 'status-badge-row';
+    badges.forEach(({ text, cls }) => {
+      const badge = document.createElement('span');
+      badge.className = 'status-badge' + (cls ? ` status-badge--${cls}` : '');
+      badge.textContent = text;
+      badgeRow.appendChild(badge);
+    });
+    tile.appendChild(badgeRow);
+  }
+
   return tile;
+}
+
+// Per-character persistent status badges - ported from the main game's
+// characterCard.js statusBadges exactly (same conditions, same text).
+// These are ongoing state (Zerathys's charge count in particular has no
+// other visible indicator once the one-shot Charge Up flash expires),
+// unlike the timed action-flash portraits/tile effects above.
+function statusBadges(character) {
+  const badges = [];
+  if (character.usedSpecial) badges.push({ text: 'Special used', cls: 'warn' });
+  switch (character.id) {
+    case 'tharox':
+      if (character.special.hasCharge) badges.push({ text: 'Charge ready', cls: 'warn' });
+      break;
+    case 'zerathys':
+      badges.push({ text: `Charge: ${character.special.chargeCount}/2` });
+      break;
+    case 'blade':
+      if (character.special.streakCount > 0) badges.push({ text: `Streak x${character.special.streakCount}`, cls: 'warn' });
+      break;
+  }
+  return badges;
 }
 
 function renderActionPanel(characterId, usableActions, armedAction, state) {
