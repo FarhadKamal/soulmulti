@@ -31,25 +31,34 @@ function send(ws, type, payload = {}) {
   if (ws.readyState === ws.OPEN) ws.send(JSON.stringify({ type, ...payload }));
 }
 
+// Broadcasts to every seat that's EVER been human-occupied (spectatorId),
+// not just currently-in-control ones (playerId) - a seat that timed out
+// and got handed to a bot should still keep its original player watching
+// the match live as a spectator, not go dark on them (see the "keep
+// sending updates after timeout" design decision - confirmed via a real
+// bug where the client's screen just froze forever after a timeout, since
+// the old playerId-only broadcast silently stopped reaching that tab the
+// instant the seat converted to a bot).
 function broadcastRoom(room, type, payload = {}) {
   for (const seat of room.seats) {
-    if (seat.kind === 'human' && seat.playerId) {
-      const ws = sessions.get(seat.playerId);
+    if (seat.spectatorId) {
+      const ws = sessions.get(seat.spectatorId);
       if (ws) send(ws, type, payload);
     }
   }
 }
 
 // Sends a per-recipient payload built from buildPayload(recipientSessionId)
-// to every human seat, instead of one shared broadcast object - needed
-// wherever the payload must say "which seat is YOU" (a plain broadcast
-// object is inherently the same for every recipient, and the client can't
-// safely infer its own seat from anything else in the lobby view).
+// to every ever-human seat (see broadcastRoom above for why spectatorId,
+// not playerId), instead of one shared broadcast object - needed wherever
+// the payload must say "which seat is YOU" (a plain broadcast object is
+// inherently the same for every recipient, and the client can't safely
+// infer its own seat from anything else in the lobby view).
 function broadcastPersonalized(room, type, buildPayload) {
   for (const seat of room.seats) {
-    if (seat.kind === 'human' && seat.playerId) {
-      const ws = sessions.get(seat.playerId);
-      if (ws) send(ws, type, buildPayload(seat.playerId));
+    if (seat.spectatorId) {
+      const ws = sessions.get(seat.spectatorId);
+      if (ws) send(ws, type, buildPayload(seat.spectatorId));
     }
   }
 }
@@ -231,6 +240,7 @@ function handleCreateRoom(ws, sessionId, { roomType, name }) {
   const seat = room.seats[0];
   seat.kind = 'human';
   seat.playerId = sessionId;
+  seat.spectatorId = sessionId;
   seat.name = cleanName;
   room.ownerId = sessionId;
   send(ws, 'room-created', { code: room.code });
@@ -247,6 +257,7 @@ function handleJoinRoom(ws, sessionId, { code, name }) {
   if (!seat) return send(ws, 'error', { message: 'Room is full.' });
   seat.kind = 'human';
   seat.playerId = sessionId;
+  seat.spectatorId = sessionId;
   seat.name = cleanName;
   send(ws, 'room-joined', { code: room.code });
   broadcastLobby(room);
@@ -403,7 +414,10 @@ function isJesterBallPassTarget(game, holderId, targetId) {
 // player joining mid-lobby or reconnecting after a crash just doesn't see
 // earlier messages, same "no persistence" tradeoff as everything else here).
 function handleChatMessage(room, sessionId, { text }) {
-  const seat = room.seats.find((s) => s.playerId === sessionId);
+  // spectatorId, not playerId - a timed-out/bot-taken-over player should
+  // still be able to chat even though they can no longer act (see
+  // findRoomBySessionId for the same reasoning).
+  const seat = room.seats.find((s) => s.spectatorId === sessionId);
   if (!seat) return;
   const clean = typeof text === 'string' ? text.trim().slice(0, 300) : '';
   if (!clean) return;

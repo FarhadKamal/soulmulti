@@ -38,7 +38,13 @@ function createSeat(index) {
   return {
     index,
     kind: 'empty', // 'empty' | 'human' | 'bot'
-    playerId: null, // ws-session id, only for kind === 'human'
+    playerId: null, // ws-session id, only for kind === 'human' - who's currently IN CONTROL
+    // Once a human ever occupies this seat, their session id is remembered
+    // here permanently (even after a timeout/leave hands control to a bot)
+    // purely so broadcasts keep reaching their tab - they should still be
+    // able to watch the match live as a spectator, just not act anymore.
+    // Unlike playerId, this is never cleared back to null.
+    spectatorId: null,
     name: null,
     characterIds: [], // length grows up to picksPerSeat as picks are made
   };
@@ -73,9 +79,14 @@ export function deleteRoom(code) {
   rooms.delete(code);
 }
 
+// Used to route every incoming message from a session to its room -
+// spectatorId, not playerId, since a timed-out/bot-taken-over player
+// should still be able to send chat messages (and simply have their
+// actual game actions rejected by the per-handler playerId===sessionId
+// checks, same as anyone trying to act on a seat that isn't theirs).
 export function findRoomBySessionId(sessionId) {
   for (const room of rooms.values()) {
-    if (room.seats.some((s) => s.playerId === sessionId)) return room;
+    if (room.seats.some((s) => s.spectatorId === sessionId)) return room;
   }
   return null;
 }
@@ -126,6 +137,7 @@ export function resetRoomToLobby(room) {
     if (seat.kind === 'bot') {
       seat.kind = 'empty';
       seat.name = null;
+      seat.spectatorId = null;
     }
   }
 }
