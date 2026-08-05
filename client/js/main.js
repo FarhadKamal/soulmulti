@@ -15,6 +15,7 @@ const state = {
   usableActions: [],
   awaitingSoulSwapWrath: false,
   armedAction: null,
+  confirmingExit: false,
   turnDeadline: null,
   humanCount: null,
   rerender,
@@ -72,6 +73,7 @@ onMessage((msg) => {
       state.usableActions = msg.usableActions || [];
       state.awaitingSoulSwapWrath = !!msg.awaitingSoulSwapWrath;
       state.armedAction = null;
+      state.confirmingExit = false;
       state.turnDeadline = msg.turnDeadline || null;
       state.humanCount = msg.humanCount ?? null;
       rerender();

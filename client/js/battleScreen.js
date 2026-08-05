@@ -50,16 +50,7 @@ export function renderBattle(root, state) {
   // owner, but checking youAreOwner directly is more explicit/robust than
   // relying on that inference).
   if (state.humanCount !== null && state.humanCount <= 1 && state.room?.youAreOwner) {
-    const exitBtn = document.createElement('button');
-    exitBtn.className = 'exit-btn';
-    exitBtn.textContent = 'Exit Game';
-    // Abandons the current match and returns to THIS room's character-pick
-    // lobby (same room code), NOT the same as Exit Room in the pre-match
-    // lobby - that removes you from the room entirely. Exit Game just
-    // scraps the in-progress match so you can pick fresh characters and
-    // start again, staying in the same room.
-    exitBtn.onclick = () => { if (confirm('Abandon this match and return to the lobby?')) send('abandon-match'); };
-    wrap.appendChild(exitBtn);
+    wrap.appendChild(renderExitGameControl(state));
   }
 
   if (state.turnDeadline) {
@@ -101,6 +92,50 @@ export function renderBattle(root, state) {
   wrap.appendChild(renderChatPanel());
 
   root.appendChild(wrap);
+}
+
+// Inline confirm, not a blocking window.confirm() popup - a native dialog
+// freezes the whole page (nothing else can update while it's open) and on
+// mobile a mistimed tap can land on either "OK" or "Cancel" before the
+// dialog has visually settled. Clicking "Exit Game" swaps the button for a
+// same-panel "Abandon this match? Yes / No" row instead, which is always
+// visible and impossible to mis-tap into by mistake since it takes a
+// second deliberate click.
+function renderExitGameControl(state) {
+  const wrap = document.createElement('div');
+  wrap.className = 'exit-control';
+
+  if (state.confirmingExit) {
+    const prompt = document.createElement('span');
+    prompt.className = 'exit-confirm-prompt';
+    prompt.textContent = 'Abandon this match?';
+    wrap.appendChild(prompt);
+
+    const yesBtn = document.createElement('button');
+    yesBtn.className = 'exit-confirm-yes';
+    yesBtn.textContent = 'Yes, exit';
+    yesBtn.onclick = () => send('abandon-match');
+    wrap.appendChild(yesBtn);
+
+    const noBtn = document.createElement('button');
+    noBtn.className = 'exit-confirm-no';
+    noBtn.textContent = 'No';
+    noBtn.onclick = () => { state.confirmingExit = false; state.rerender(); };
+    wrap.appendChild(noBtn);
+  } else {
+    const exitBtn = document.createElement('button');
+    exitBtn.className = 'exit-btn';
+    exitBtn.textContent = 'Exit Game';
+    // Abandons the current match and returns to THIS room's character-pick
+    // lobby (same room code), NOT the same as Exit Room in the pre-match
+    // lobby - that removes you from the room entirely. Exit Game just
+    // scraps the in-progress match so you can pick fresh characters and
+    // start again, staying in the same room.
+    exitBtn.onclick = () => { state.confirmingExit = true; state.rerender(); };
+    wrap.appendChild(exitBtn);
+  }
+
+  return wrap;
 }
 
 // Ticks a countdown to the server's turn-decision deadline (see
