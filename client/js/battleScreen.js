@@ -117,11 +117,23 @@ export function renderBattle(root, state) {
   const cursedId = athena ? athena.special.curseTargetCharacterId : null;
   const chronox = Object.values(game.characters).find((c) => c.id === 'chronox');
   const frozenId = chronox && chronox.special.freezeActive ? chronox.special.freezeTargetId : null;
+  // In a tutorial, a tile that's a normally-legal target for the armed
+  // action but ISN'T the scripted next target (e.g. Velorya's 1v2 fight,
+  // where Lunar Strike can legally hit either Boingo or Athena, but only
+  // one of them is the actual scripted move) must not be clickable at all
+  // - the server silently rejects a mismatched target with no error/
+  // rebroadcast (see handleAction's tutorial gate in index.js), and the
+  // client had already optimistically cleared armedAction on click, so the
+  // player was left stuck on a stale panel with no feedback until they hit
+  // Cancel. Restricting clickability client-side to the exact scripted
+  // target prevents ever sending that dead-end request in the first place.
+  const tutorialTargetLock = state.tutorialRequiredActionId ? state.tutorialRequiredTargetId : null;
   Object.values(game.characters).forEach((character) => {
     board.appendChild(renderCharacterTile(character, {
       isActing: character.id === actingCharacterId,
       isMine: mySeatCharacterIds.includes(character.id),
-      isTargetable: !!armedAction && armedAction.validTargetIds.includes(character.id),
+      isTargetable: !!armedAction && armedAction.validTargetIds.includes(character.id)
+        && (tutorialTargetLock === null || character.id === tutorialTargetLock),
       onTargetClick: () => onTargetPicked(character.id, state),
       isHoldingBall: character.id === ballHolderId,
       isCursed: character.id === cursedId,
