@@ -830,8 +830,10 @@ function renderGameOver(game, youAreOwner) {
   // handleCreateTutorialRoom - it skips straight from creation to
   // in-match) - "Play Again" doesn't apply, only Exit below does. Picking
   // a fresh (or the same) character from the entry screen is how you
-  // replay a tutorial.
-  if (game.mode !== 'tutorial') {
+  // replay a tutorial. Two room modes count as "tutorial" here: 'tutorial'
+  // (every 1v1 character) and 'tutorial3' (Velorya's 1v2 fight against
+  // Boingo and Athena - same one-shot, no-lobby-to-return-to shape).
+  if (game.mode !== 'tutorial' && game.mode !== 'tutorial3') {
     if (youAreOwner) {
       const homeBtn = document.createElement('button');
       homeBtn.className = 'game-over-pill';
