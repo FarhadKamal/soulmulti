@@ -29,6 +29,12 @@ export function isValidTarget(game, characterId, actionId, targetId) {
   if (!target || target.isKO) return false;
   const character = game.characters[characterId];
   if (target.ownerId === character.ownerId) return false;
+  // tutorial3 (Velorya's 1v2) is the one room where two DIFFERENT players
+  // are both bots on the same side (Boingo and Athena, both opposing
+  // Velorya) - the engine's ally check is otherwise purely ownerId-based
+  // (one player = one side), so without this they'd wrongly see each other
+  // as legal targets.
+  if (game.mode === 'tutorial3' && characterId !== 'velorya' && targetId !== 'velorya') return false;
   if (target.untargetable) return false;
   if (actionId === 'shadowExecution') return character.special.marks.has(targetId);
   if (actionId === 'hiddenMark') return !character.special.everMarkedIds.has(targetId);

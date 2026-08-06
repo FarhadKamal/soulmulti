@@ -1,5 +1,6 @@
 import { applyDamage, applyHeal } from '../engine/damagePipeline.js';
 import { rollChaosGamble } from '../engine/random.js';
+import { isTutorialMode } from '../engine/state.js';
 
 export const actions = {
   chaosGamble: {
@@ -24,7 +25,7 @@ export const actions = {
       // roll completely untouched.
       let outcome;
       let amount;
-      if (game.mode === 'tutorial' && extra?.forcedAmount != null) {
+      if (isTutorialMode(game) && extra?.forcedAmount != null) {
         amount = extra.forcedAmount;
         outcome = amount === 3 ? 'win' : amount === 1 ? 'draw' : 'lose';
       } else {
@@ -42,7 +43,7 @@ export const actions = {
         // resetting to 1 shield every one of ITS OWN turns, which would
         // otherwise silently discount the forced amount and break the
         // tutorial's exact heart math). Non-tutorial calls are unaffected.
-        ignoresShield: game.mode === 'tutorial' && extra?.forcedAmount != null,
+        ignoresShield: isTutorialMode(game) && extra?.forcedAmount != null,
       });
       log.push({ type: 'attack', characterId: character.id, actionId: 'chaosGamble', targetId, outcome, ...result });
       return result;
@@ -100,7 +101,7 @@ export const jesterBallResolution = {
       // server/data/tutorialSequences.js's boingo sequence. Every
       // non-tutorial call passes no `extra`, leaving the normal flat-4,
       // shield-absorbing Take completely untouched.
-      const forced = game.mode === 'tutorial' ? extra : null;
+      const forced = isTutorialMode(game) ? extra : null;
       const result = applyDamage(game, log, {
         sourceCharacterId: game.jesterBall.thrownByCharacterId,
         targetCharacterId: holderId,

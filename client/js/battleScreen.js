@@ -107,6 +107,10 @@ export function renderBattle(root, state) {
       isHoldingBall: character.id === ballHolderId,
       isCursed: character.id === cursedId,
       isFrozenVisual: character.id === frozenId,
+      // Only meaningful once >1 legal target can exist (Velorya's 1v2
+      // tutorial) - every other tutorial has exactly one enemy, so this is
+      // never ambiguous there, but still harmless to set generally.
+      isTutorialRequiredTarget: !!state.tutorialRequiredActionId && character.id === state.tutorialRequiredTargetId,
     }));
   });
   wrap.appendChild(board);
@@ -279,7 +283,7 @@ function renderVictoryPortraits(game) {
   return container;
 }
 
-function renderCharacterTile(character, { isActing, isMine, isTargetable, onTargetClick, isHoldingBall, isCursed, isFrozenVisual, isVictorious }) {
+function renderCharacterTile(character, { isActing, isMine, isTargetable, onTargetClick, isHoldingBall, isCursed, isFrozenVisual, isVictorious, isTutorialRequiredTarget }) {
   const def = CHARACTERS[character.id];
   const tile = document.createElement('div');
   tile.className = 'char-tile';
@@ -293,6 +297,13 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
   // separate floating portrait below the board, so it reads as "this
   // character's card is celebrating" instead of a disconnected duplicate.
   if (isVictorious) tile.classList.add('char-tile--victorious');
+  // Marks which enemy tile is the tutorial's scripted target this turn -
+  // without this, a tutorial with more than one legal target (Velorya's
+  // 1v2 fight) would leave the player guessing which tile to click, since
+  // both are otherwise equally "clickable" once the required action is
+  // armed. Every other tutorial has exactly one enemy, where this is
+  // harmless/redundant with isTargetable but never actively needed.
+  if (isTutorialRequiredTarget && !character.isKO) tile.classList.add('char-tile--tutorial-target');
   if (isTargetable) {
     tile.classList.add('char-tile--targetable');
     tile.onclick = onTargetClick;
@@ -472,7 +483,7 @@ function renderActionPanel(characterId, usableActions, armedAction, state) {
   const title = document.createElement('div');
   title.className = 'action-panel-title';
   if (state.tutorialRequiredActionId) {
-    title.textContent = tutorialNarrationFor(characterId, state.tutorialRequiredActionId);
+    title.textContent = tutorialNarrationFor(characterId, state.tutorialRequiredActionId, state.tutorialRequiredTargetId, state.game?.characters[characterId]);
   } else {
     title.textContent = state.awaitingSoulSwapWrath ? 'Soul Swap landed - choose your free Thunder Wrath target' : 'Your turn - choose an action';
   }

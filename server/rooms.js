@@ -15,10 +15,15 @@ const TURN_TIMER_MS = 30_000;
 // - '4p'  ("4 player" FFA): 4 seats, each seat picks 1 character.
 // - 'tutorial': 1 human seat vs 1 scripted bot seat, 1 character each - see
 //   server/data/tutorialSequences.js for the scripted move sequence.
+// - 'tutorial3': 1 human seat vs 2 scripted bot seats - used only by
+//   Velorya's tutorial, which needs a genuine second enemy to demonstrate
+//   Moonstep's real "-2 for switching targets" bonus (impossible to show
+//   honestly in a strict 1v1, where only one legal target ever exists).
 const ROOM_SHAPES = {
   '2p': { seatCount: 2, picksPerSeat: 2 },
   '4p': { seatCount: 4, picksPerSeat: 1 },
   tutorial: { seatCount: 2, picksPerSeat: 1 },
+  tutorial3: { seatCount: 3, picksPerSeat: 1 },
 };
 
 export function roomShapeFor(roomType) {

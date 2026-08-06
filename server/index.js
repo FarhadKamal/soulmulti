@@ -16,7 +16,7 @@ import {
   createRoom, getRoom, deleteRoom, findRoomBySessionId, roomShapeFor,
   availableSeats, availableCharacterIds, seatIsReady, resetRoomToLobby, TURN_TIMER_DURATION_MS,
 } from './rooms.js';
-import { TUTORIAL_SEQUENCES, tutorialBotCharacterId } from './data/tutorialSequences.js';
+import { TUTORIAL_SEQUENCES, TUTORIAL_SEQUENCES_1V2, tutorialBotCharacterId } from './data/tutorialSequences.js';
 
 const PORT = process.env.PORT || 3001;
 
@@ -203,7 +203,7 @@ function broadcastGameState(room) {
   if (room.game.phase === 'game-over') {
     room.phase = 'finished';
     clearTurnTimer(room);
-  } else if (isBotControlled(room, acting) || room.roomType === 'tutorial') {
+  } else if (isBotControlled(room, acting) || isTutorialRoom(room)) {
     // Bots never time out (they always act on their own within
     // BOT_ACTION_DELAY_MS, see runBotTurnsIfAny) - arming the 30s human
     // timer for them is pure waste, and with paced bot turns now spending
@@ -224,7 +224,7 @@ function broadcastGameState(room) {
   // getUsableActions()-derived list for tutorial rooms as for every other
   // room type. tutorialRequiredActionId/TargetId (below) is the separate
   // field the client uses purely for its own disabling logic.
-  const tutorialStep = room.roomType === 'tutorial' && acting === room.tutorial?.humanCharacterId
+  const tutorialStep = isTutorialRoom(room) && acting === room.tutorial?.humanCharacterId
     ? currentTutorialStep(room)
     : null;
   broadcastRoom(room, 'game-state', {
@@ -341,7 +341,7 @@ function stepBotTurn(room) {
     return;
   }
 
-  if (room.roomType === 'tutorial') {
+  if (isTutorialRoom(room)) {
     // Bypass chooseBotMove/chooseBotJesterBallMove entirely - the bot's
     // heuristics are irrelevant here (it only ever has one legal move for
     // its fixed character anyway), and the tutorial needs a fully
@@ -350,8 +350,10 @@ function stepBotTurn(room) {
     // handled inside executeTutorialStep itself (via the synthetic
     // 'jesterBallTake' actionId), not here, so no isBallHolder branch is
     // needed - the scripted step data already knows exactly what to do.
+    // `step.actor !== 'human'` (not `=== 'bot'`) so this also covers
+    // tutorial3's literal-bot-id actor values (e.g. 'boingo', 'athena').
     const step = currentTutorialStep(room);
-    if (step && step.actor === 'bot') {
+    if (step && step.actor !== 'human') {
       executeTutorialStep(room, step);
     }
   } else {
@@ -385,24 +387,41 @@ function stepBotTurn(room) {
   setTimeout(() => stepBotTurn(room), BOT_ACTION_DELAY_MS);
 }
 
-// ---- Tutorial mode: a scripted 1-human-vs-1-bot sequence (see
+// ---- Tutorial mode: a scripted human-vs-bot(s) sequence (see
 // server/data/tutorialSequences.js) where the bot's moves AND their
 // damage, and the human's own next-allowed move, are both fully
 // predetermined rather than driven by chooseBotMove/normal legality
 // alone. room.tutorial lives alongside room.game (not part of the engine's
 // own game object) and is the single source of truth for "what happens
 // next" - stepIndex walks through the interleaved human+bot step list in
-// order. ----
+// order. Two room types: 'tutorial' (strict 1v1, every character except
+// Velorya) and 'tutorial3' (1v2, Velorya only - needs a genuine second
+// enemy to demonstrate Moonstep's real target-switch bonus). ----
+function isTutorialRoom(room) {
+  return room.roomType === 'tutorial' || room.roomType === 'tutorial3';
+}
 
-// `targetId: 'opponent'` in the sequence data resolves to whichever of the
-// two characters in this 1v1 room ISN'T the acting side's own character -
-// trivial here since every targeted tutorial action only ever has one
-// legal target anyway.
+// A step's `actor` field is either 'human', the legacy 1v1 sentinel 'bot'
+// (resolves to the single room.tutorial.botCharacterId, for every existing
+// strict-1v1 tutorial's sequence data - left unchanged rather than mass-
+// edited to literal ids), or - for a multi-bot room like Velorya's 1v2 -
+// a LITERAL bot character id (e.g. 'boingo', 'athena'), which is already
+// exactly the character id and needs no lookup at all.
+function resolveTutorialActor(room, step) {
+  if (step.actor === 'human') return room.tutorial.humanCharacterId;
+  if (step.actor === 'bot') return room.tutorial.botCharacterId;
+  return step.actor;
+}
+
+// `targetId: 'opponent'` resolves to "the one enemy" - only valid in a
+// strict 1v1 room (every tutorial except Velorya's 1v2). Multi-bot
+// sequences must always use a literal target id instead (never 'opponent',
+// which would be ambiguous with 2 possible enemies) - already true of
+// every step in the velorya1v2 sequence.
 function resolveTutorialTarget(room, step) {
   if (step.targetId !== 'opponent') return step.targetId;
-  const { humanCharacterId, botCharacterId } = room.tutorial;
-  const actingIsHuman = step.actor === 'human';
-  return actingIsHuman ? botCharacterId : humanCharacterId;
+  const actingCharacterId = resolveTutorialActor(room, step);
+  return actingCharacterId === room.tutorial.humanCharacterId ? room.tutorial.botCharacterId : room.tutorial.humanCharacterId;
 }
 
 function currentTutorialStep(room) {
@@ -419,7 +438,7 @@ function currentTutorialStep(room) {
 function executeTutorialStep(room, step) {
   const targetId = resolveTutorialTarget(room, step);
   const extra = step.forcedAmount != null ? { forcedAmount: step.forcedAmount, ignoresShield: step.ignoresShield } : undefined;
-  const actingCharacterId = step.actor === 'human' ? room.tutorial.humanCharacterId : room.tutorial.botCharacterId;
+  const actingCharacterId = resolveTutorialActor(room, step);
 
   if (step.actionId === 'jesterBallTake') {
     // Synthetic marker (see tutorialSequences.js) - routed to
@@ -479,13 +498,19 @@ function handleJoinRoom(ws, sessionId, { code, name }) {
 
 // One-click tutorial room: unlike a normal room, this skips the whole
 // pick-character -> fill-bot -> start-match lobby flow entirely - the
-// human's one character pick arrives in this same message, the opponent
-// is derived automatically (see tutorialBotCharacterId), and the match
-// starts immediately.
+// human's one character pick arrives in this same message, the opponent(s)
+// are derived automatically, and the match starts immediately. Velorya is
+// the one special case - she needs a genuine second enemy (a 'tutorial3'
+// room, 1v2) to demonstrate Moonstep's real target-switch bonus, which is
+// structurally impossible to show honestly in a strict 1v1. Every other
+// character uses the normal 1v1 'tutorial' room.
 function handleCreateTutorialRoom(ws, sessionId, { name, characterId }) {
   const cleanName = sanitizeName(name);
   if (!cleanName) return send(ws, 'error', { message: 'A name is required.' });
   if (!CHARACTER_IDS.includes(characterId)) return send(ws, 'error', { message: 'Invalid character.' });
+
+  if (characterId === 'velorya') return createVeloryaTutorialRoom(ws, sessionId, cleanName);
+
   const room = createRoom('tutorial');
   const humanSeat = room.seats[0];
   humanSeat.kind = 'human';
@@ -519,6 +544,49 @@ function handleCreateTutorialRoom(ws, sessionId, { name, characterId }) {
   // Human always goes first in a tutorial (see tutorialSequences.js) - no
   // runBotTurnsIfAny() kickoff needed here, unlike a normal match's
   // handleStartMatch, which may need the bot to move first.
+  broadcastGameState(room);
+}
+
+// Velorya's 1v2 tutorial: seat 0 = human, seat 1 = Boingo (bot), seat 2 =
+// Athena (bot, custom 2 max hearts - deliberately fragile, per design).
+// Turn order is fixed by seat index (Velorya -> Boingo -> Athena -> repeat,
+// confirmed generic in the engine), so no special turn-order logic is
+// needed beyond creating the seats in the right order.
+function createVeloryaTutorialRoom(ws, sessionId, cleanName) {
+  const room = createRoom('tutorial3');
+  const humanSeat = room.seats[0];
+  humanSeat.kind = 'human';
+  humanSeat.playerId = sessionId;
+  humanSeat.spectatorId = sessionId;
+  humanSeat.name = cleanName;
+  humanSeat.characterIds = ['velorya'];
+  room.ownerId = sessionId;
+
+  fillSeatWithTutorialBot(room.seats[1], 'boingo');
+  fillSeatWithTutorialBot(room.seats[2], 'athena');
+
+  room.tutorial = {
+    humanCharacterId: 'velorya',
+    sequence: TUTORIAL_SEQUENCES_1V2.velorya,
+    stepIndex: 0,
+  };
+
+  const playerPicks = room.seats.map((s) => ({
+    id: s.playerId || `bot-${s.index}`,
+    name: s.name,
+    characterIds: s.characterIds,
+    isPC: s.kind === 'bot',
+  }));
+  room.game = createGame('tutorial3', playerPicks);
+  // Athena's custom 2-max-hearts override for this tutorial only - applied
+  // directly on the created character rather than threading a per-seat
+  // hearts override through createCharacter/createGame's general-purpose
+  // signature, which every other room type also calls.
+  room.game.characters.athena.hearts = 2;
+  room.game.characters.athena.maxHearts = 2;
+  room.phase = 'in-match';
+  send(ws, 'room-created', { code: room.code });
+  broadcastLobby(room);
   broadcastGameState(room);
 }
 
@@ -717,7 +785,7 @@ function handleAction(room, sessionId, { characterId, actionId, targetId }) {
   // them), as a consistency safeguard: every scripted step was designed to
   // also be a genuinely legal move, so both checks passing is expected,
   // not redundant.
-  if (room.roomType === 'tutorial') {
+  if (isTutorialRoom(room)) {
     const step = currentTutorialStep(room);
     if (!step || step.actor !== 'human' || step.actionId !== actionId) return;
     if (resolveTutorialTarget(room, step) !== (targetId ?? null)) return;
@@ -775,7 +843,7 @@ function handleSoulSwapWrath(room, sessionId, { characterId, targetId }) {
   // handler is a completely separate function from handleAction (a human's
   // Soul Swap doesn't auto-fire its own follow-up, unlike a bot's), so it
   // needs its own tutorial gate too, not just handleAction's.
-  if (room.roomType === 'tutorial') {
+  if (isTutorialRoom(room)) {
     const step = currentTutorialStep(room);
     if (!step || step.actor !== 'human' || step.actionId !== 'soulSwapWrath') return;
     if (resolveTutorialTarget(room, step) !== targetId) return;

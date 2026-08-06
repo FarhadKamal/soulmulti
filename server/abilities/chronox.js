@@ -1,5 +1,6 @@
 import { applyDamage } from '../engine/damagePipeline.js';
 import { flipCoin } from '../engine/random.js';
+import { isTutorialMode } from '../engine/state.js';
 
 export function onTurnStart(character, game, log) {
   // Chrono Guard: shield RESETS to exactly 1 each turn - does not stack.
@@ -36,10 +37,10 @@ export const actions = {
       // server/data/tutorialSequences.js and its forcedAmount field. Every
       // non-tutorial call passes no `extra`, leaving the normal random
       // roll completely untouched.
-      const flip = game.mode === 'tutorial' && extra?.forcedAmount != null
+      const flip = isTutorialMode(game) && extra?.forcedAmount != null
         ? (extra.forcedAmount === 2 ? 'heads' : 'tails')
         : flipCoin();
-      const isTutorialForced = game.mode === 'tutorial' && extra?.forcedAmount != null;
+      const isTutorialForced = isTutorialMode(game) && extra?.forcedAmount != null;
       const amount = isTutorialForced ? extra.forcedAmount : (flip === 'heads' ? 2 : 1);
       const result = applyDamage(game, log, {
         sourceCharacterId: character.id,

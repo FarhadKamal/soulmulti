@@ -111,33 +111,10 @@ export const TUTORIAL_SEQUENCES = {
     { actor: 'human', actionId: 'fatalSlash', targetId: 'opponent' },
     // Bot KO'd.
   ],
-  velorya: [
-    // Opens with Lunar Eclipse (satisfies the turn-1 restriction, and
-    // demonstrates it immediately) - becomes untargetable for her next 3
-    // attacks. While untargetable, the bot doesn't merely deal 0 damage -
-    // getActingCharacterId (gameFlow.js) sees the bot has ZERO valid
-    // targets (Velorya is its only enemy) and skips its turn ENTIRELY,
-    // same as any character with nothing legal to do - there is no bot
-    // step at all during these 3 rounds, not even a whiffed one. The bot
-    // only gets a real turn again once eclipse ends (partway through
-    // resolving her 3rd attack).
-    { actor: 'human', actionId: 'lunarEclipse', targetId: null },
-    // No bot step - untargetable, bot has no legal target and is skipped.
-    { actor: 'human', actionId: 'lunarStrike', targetId: 'opponent' }, // eclipse 1/3
-    // No bot step - still untargetable.
-    { actor: 'human', actionId: 'lunarStrike', targetId: 'opponent' }, // eclipse 2/3
-    // No bot step - still untargetable.
-    { actor: 'human', actionId: 'lunarStrike', targetId: 'opponent' }, // eclipse 3/3, ends this hit
-    BOT_GAMBLE, // lands for real now - eclipse has ended
-    { actor: 'human', actionId: 'moonstep', targetId: 'opponent' }, // exposes the button
-    BOT_GAMBLE,
-    { actor: 'human', actionId: 'lunarStrike', targetId: 'opponent' },
-    BOT_GAMBLE,
-    { actor: 'human', actionId: 'lunarStrike', targetId: 'opponent' },
-    BOT_GAMBLE,
-    { actor: 'human', actionId: 'lunarStrike', targetId: 'opponent' },
-    // Bot KO'd. (1+1+1 eclipsed hits, +1 moonstep, +3 more strikes = 7 exact)
-  ],
+  // Velorya lives in TUTORIAL_SEQUENCES_1V2 below, not here - she needs a
+  // genuine second enemy (a 'tutorial3' room) to demonstrate Moonstep's
+  // real target-switch bonus, which no strict 1v1 sequence can show
+  // honestly (only one legal target ever exists).
   boingo: [
     // Bot: Tharox, not Chronox - Tharox has no passive shield at all, so
     // both his forced Jester Ball Take AND his own basic attack land at
@@ -167,23 +144,42 @@ export const TUTORIAL_SEQUENCES = {
     // Blade's own Rebirth trigger for real (Boingo dealing 1 flat damage a
     // turn never threatens Blade's 7 hearts fast enough within a safe
     // sequence length, so Rebirth never had anything to revive HIM from).
-    // Human goes first each round, so Blade's very first Blood Hunt lands
-    // before Athena has cursed him yet (no mirror that hit) - once she
-    // curses him on her first turn, every LATER Blood Hunt hit Blade lands
-    // on her also mirrors that same amount back onto Blade himself (see
-    // damagePipeline.js's curse-mirror block). Streak 2+3+4 mirrored
-    // (2+3+4=9) exceeds Blade's remaining hearts after the streak-1 hit
-    // (7-1=6), triggering his Rebirth automatically on the streak-4 hit -
-    // the same action that also finishes Athena off (her total damage
-    // taken: 1+2+3+4=10, well past her own 7).
+    //
+    // Athena opens with Divine Restore (NOT Curse Strike) - this is the
+    // "clue" beat: her heal caps out (6->7, only +1 real gain since she's
+    // already near full from Blade's own first hit), but the +2 decaying
+    // shield fully absorbs his very next Blood Hunt hit (streak 2 = amount
+    // 2, shield 2 -> amountDealt 0), so that attack visibly connects but
+    // deals NO damage and mirrors NOTHING - a clear signal something
+    // changed, before the curse even exists yet.
+    //
+    // Curse only goes live on Athena's 2nd turn (after the shield has
+    // already decayed to 0 at the start of that turn). From there, every
+    // Blood Hunt hit Blade lands on her mirrors that same amount back onto
+    // himself. Streak 3+4 mirrored (3+4=7) exceeds his remaining hearts
+    // after the streak-1 hit (7-1=6), triggering Rebirth automatically on
+    // the streak-4 hit - the same action that also finishes Athena off
+    // (her total damage taken: 2(shielded,0 net)+3+4=7, minus the 1 real
+    // point of Divine Restore healing = exactly enough to KO her at 0).
+    //
+    // IMPORTANT: do not reorder Divine Restore to later in the sequence -
+    // Rebirth clears the curse when it fires, and if the curse were
+    // already live with a prior mirror hit landed, a LATER Divine Restore
+    // would let Athena's next curseStrike re-establish the curse on a
+    // Blade whose rebirthUsed flag is already true, meaning a second
+    // lethal mirror would no longer be intercepted (a real KO, ending the
+    // match in a draw). This exact ordering (heal/shield BEFORE the curse
+    // ever exists) is the only one verified safe - see the design plan doc
+    // for the full hand-traced proof.
+    { actor: 'human', actionId: 'bloodHunt', targetId: 'opponent' },
+    { actor: 'bot', actionId: 'divineRestore', targetId: null },
+    { actor: 'human', actionId: 'bloodHunt', targetId: 'opponent' }, // the "clue" turn - fully shielded, 0 net damage
+    { actor: 'bot', actionId: 'curseStrike', targetId: 'opponent' }, // curse live for the first time
     { actor: 'human', actionId: 'bloodHunt', targetId: 'opponent' },
     { actor: 'bot', actionId: 'curseStrike', targetId: 'opponent' },
     { actor: 'human', actionId: 'bloodHunt', targetId: 'opponent' },
-    { actor: 'bot', actionId: 'curseStrike', targetId: 'opponent' },
-    { actor: 'human', actionId: 'bloodHunt', targetId: 'opponent' },
-    { actor: 'bot', actionId: 'curseStrike', targetId: 'opponent' },
-    { actor: 'human', actionId: 'bloodHunt', targetId: 'opponent' },
-    // Athena KO'd via the mirror; Blade's Rebirth fires the same action.
+    // Athena KO'd via the mirror; Blade's Rebirth fires the same action -
+    // THE REBIRTH MOMENT.
   ],
   athena: [
     { actor: 'human', actionId: 'curseStrike', targetId: 'opponent' },
@@ -203,5 +199,63 @@ export const TUTORIAL_SEQUENCES = {
     { actor: 'human', actionId: 'curseStrike', targetId: 'opponent' },
     BOT_GAMBLE,
     // Bot KO'd via the final mirror.
+  ],
+};
+
+// Velorya's 1v2 tutorial (room type 'tutorial3') - the one tutorial that
+// isn't a strict 1v1. Opponents: Boingo (7 hearts, normal) and Athena (2
+// hearts, deliberately fragile - her only purpose is being a genuine
+// SECOND target so Moonstep's real "-2 for switching targets" bonus can be
+// demonstrated honestly, which is structurally impossible with only one
+// enemy). Turn order is fixed by seat index: Velorya (seat 0) -> Boingo
+// (seat 1) -> Athena (seat 2) -> repeat.
+//
+// Mirror direction: Athena can never curse Boingo (curseStrike rejects
+// same-owner/ally targets - they're both bots on the same side here), so
+// her only legal curse target is Velorya herself. Whenever VELORYA's own
+// attacks land on Athena, that damage mirrors back onto Velorya - this is
+// a real, load-bearing threat path budgeted for exactly in the heart math
+// below, not a side effect to ignore.
+//
+// `actor` here is always either 'human' or a LITERAL bot character id
+// ('boingo' | 'athena') - never the legacy 1v1 'bot' sentinel, since there
+// are two bots to disambiguate between. `targetId` is likewise always a
+// literal id ('velorya' | 'boingo' | 'athena'), never the 'opponent'
+// sentinel (which only makes sense with exactly one enemy).
+export const TUTORIAL_SEQUENCES_1V2 = {
+  velorya: [
+    // Opens with Lunar Eclipse (turn-1 restriction satisfied) - becomes
+    // untargetable for her next 3 attacks. Both bots' entire turns are
+    // SKIPPED while she's untargetable (zero legal targets, not merely 0
+    // damage - see gameFlow.js's getActingCharacterId), so this whole
+    // opening is free.
+    { actor: 'human', actionId: 'lunarEclipse', targetId: null },
+    // boingo SKIPPED - Velorya untargetable, zero legal targets. Athena is
+    // NOT skipped here even though Velorya is untargetable too - her Divine
+    // Restore is self-targeted (needsTarget: false) and legal once per
+    // match regardless of enemy targetability, so the engine always hands
+    // her a real first turn. Harmless: both of Velorya's attacks
+    // (lunarStrike, moonstep) set ignoresShield:true, so Athena's shield
+    // from this never blocks any of the scripted damage below.
+    { actor: 'athena', actionId: 'divineRestore', targetId: null },
+    // boingo SKIPPED
+    { actor: 'human', actionId: 'lunarStrike', targetId: 'boingo' }, // 1 dmg. B 7->6. eclipse 1/3
+    // boingo, athena SKIPPED
+    { actor: 'human', actionId: 'lunarStrike', targetId: 'athena' }, // 1 dmg. A 2->1. Uncursed yet -> NO mirror. eclipse 2/3
+    // boingo, athena SKIPPED
+    { actor: 'human', actionId: 'moonstep', targetId: 'boingo' }, // switch(athena->boingo) = 2 dmg. B 6->4. eclipse 3/3 -> ENDS
+    { actor: 'boingo', actionId: 'chaosGamble', targetId: 'velorya', forcedAmount: 1, ignoresShield: true },
+    { actor: 'athena', actionId: 'curseStrike', targetId: 'velorya' }, // curse live for the first time
+    { actor: 'human', actionId: 'lunarStrike', targetId: 'athena' }, // switch(boingo->athena), flat 1. A 1->0 KO. mirrors 1->Velorya
+    { actor: 'boingo', actionId: 'chaosGamble', targetId: 'velorya', forcedAmount: 1, ignoresShield: true },
+    // athena SKIPPED - KO'd, seat eliminated from here on
+    { actor: 'human', actionId: 'moonstep', targetId: 'boingo' }, // switch(athena->boingo) = 2 dmg. B 4->2
+    { actor: 'boingo', actionId: 'chaosGamble', targetId: 'velorya', forcedAmount: 1, ignoresShield: true },
+    { actor: 'human', actionId: 'moonstep', targetId: 'boingo' }, // same-target = 1 dmg (the -1 case). B 2->1
+    { actor: 'boingo', actionId: 'chaosGamble', targetId: 'velorya', forcedAmount: 1, ignoresShield: true },
+    { actor: 'human', actionId: 'moonstep', targetId: 'boingo' }, // same-target = 1 dmg. B 1->0 KO. MATCH OVER.
+    // Boingo damage sum: 1+2+1+1+1=7 exact. Athena damage sum: 1+1=2
+    // exact. Velorya hearts trace: 7,7,7,6,6,6,5,4,4,3,3,2,2 - minimum 2,
+    // reached only after Boingo is already dead.
   ],
 };

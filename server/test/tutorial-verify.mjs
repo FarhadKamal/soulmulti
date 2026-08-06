@@ -10,13 +10,16 @@ const CHARACTERS = ['chronox', 'tharox', 'zerathys', 'akyros', 'velorya', 'boing
 // (Chronox->Velorya, Boingo->Tharox, Blade->Athena - see
 // tutorialSequences.js's TUTORIAL_BOT_BY_HUMAN for why). Blade's 2 is his
 // post-Rebirth revival total, not a "took less damage" number - his
-// Rebirth is expected to fire mid-sequence.
+// Rebirth is expected to fire mid-sequence. Velorya's is now a 1v2 fight
+// (TUTORIAL_SEQUENCES_1V2, room type 'tutorial3') against Boingo AND
+// Athena - re-derive her number from a real run rather than trusting the
+// hand-traced plan doc if they ever disagree.
 const EXPECTED = {
   chronox: { finalHearts: 5 },
   tharox: { finalHearts: 5 },
   zerathys: { finalHearts: 4 },
   akyros: { finalHearts: 5 },
-  velorya: { finalHearts: 3 },
+  velorya: { finalHearts: 2 },
   boingo: { finalHearts: 6 },
   blade: { finalHearts: 2 },
   athena: { finalHearts: 3 },
@@ -58,12 +61,15 @@ function playOne(characterId) {
           gameOverSeen = true;
           clearTimeout(timeout);
           const human = msg.game.characters[humanCharacterId];
+          const enemyIds = Object.keys(msg.game.characters).filter((id) => id !== humanCharacterId);
+          const allEnemiesKO = enemyIds.every((id) => msg.game.characters[id].isKO);
           resolve({
             characterId,
             winnerIsHuman: !!msg.game.winnerPlayerId,
             draw: !msg.game.winnerPlayerId,
             humanFinalHearts: human ? human.hearts : null,
             humanKO: human ? human.isKO : null,
+            allEnemiesKO,
             humanTurnsTaken,
             logLength: msg.game.log.length,
           });
@@ -100,10 +106,10 @@ async function main() {
       const result = await playOne(characterId);
       results.push(result);
       const expected = EXPECTED[characterId];
-      const pass = result.winnerIsHuman && !result.draw && !result.humanKO && result.humanFinalHearts === expected.finalHearts;
+      const pass = result.winnerIsHuman && !result.draw && !result.humanKO && result.allEnemiesKO && result.humanFinalHearts === expected.finalHearts;
       console.log(
         `${pass ? 'PASS' : 'FAIL'} ${characterId}: winnerIsHuman=${result.winnerIsHuman} draw=${result.draw} ` +
-        `finalHearts=${result.humanFinalHearts} (expected ${expected.finalHearts}) humanKO=${result.humanKO} humanTurns=${result.humanTurnsTaken} logLen=${result.logLength}`
+        `finalHearts=${result.humanFinalHearts} (expected ${expected.finalHearts}) humanKO=${result.humanKO} allEnemiesKO=${result.allEnemiesKO} humanTurns=${result.humanTurnsTaken} logLen=${result.logLength}`
       );
     } catch (e) {
       console.log(`FAIL ${characterId}: ${e.message}`);

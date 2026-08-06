@@ -1,8 +1,11 @@
 // Per-step guidance copy shown in the action panel's title during a
-// tutorial match, keyed by [humanCharacterId][actionId]. Falls back to a
-// generic "use X" line built from the action's own label if no specific
-// copy is written for that step - every step should still read sensibly
-// even before flavor text is added for it.
+// tutorial match. Resolution order: target-aware override (Velorya's 1v2
+// fight, where the same action means different things depending on WHICH
+// enemy it targets) -> character-state-aware override (Blade's Rebirth
+// moment, detected off his own live streakCount/hearts rather than a step
+// index) -> generic per-[humanCharacterId][actionId] copy -> a fallback
+// "Use X to continue" built from the action's own label, so every step
+// still reads sensibly even before flavor text is written for it.
 const NARRATION = {
   chronox: {
     timeFreeze: "Lock them down first - use Time Freeze to make them skip two turns.",
@@ -27,7 +30,7 @@ const NARRATION = {
   velorya: {
     lunarEclipse: 'Open with your special, Lunar Eclipse - you become untargetable for your next 3 attacks!',
     lunarStrike: 'Lunar Strike ignores shields entirely.',
-    moonstep: 'Moonstep deals more damage when you switch targets between hits (only one target here, so it matches Lunar Strike this time).',
+    moonstep: 'Moonstep deals more damage when you switch targets between hits.',
   },
   boingo: {
     jesterBall: 'Use your special, Jester Ball - throw it at your opponent and see what they do with it!',
@@ -53,7 +56,48 @@ const ACTION_LABELS = {
   curseStrike: 'Curse Strike', divineRestore: 'Divine Restore',
 };
 
-export function tutorialNarrationFor(humanCharacterId, requiredActionId) {
+// Velorya's 1v2 fight: the same actionId targets different enemies at
+// different points, and the actually-useful teaching moment is almost
+// always about the target switch itself, not the action name. Keyed by
+// `${actionId}->${targetId}` against the CURRENT target and (for Moonstep
+// specifically) whether it's a same-target or switch-target hit, inferred
+// from the character's own live lastTargetId - see the velorya1v2
+// sequence in tutorialSequences.js for the exact step order this narrates.
+function veloryaNarration(actionId, targetId, character) {
+  if (actionId === 'lunarStrike' && targetId === 'boingo') return 'Lunar Strike hits Boingo for a flat 1, ignoring his shield.';
+  if (actionId === 'lunarStrike' && targetId === 'athena') return "Switch to Athena with Lunar Strike - she's fragile, this should finish her.";
+  if (actionId === 'moonstep') {
+    const lastTargetId = character?.special?.lastTargetId ?? null;
+    const isSwitch = lastTargetId !== null && lastTargetId !== targetId;
+    return isSwitch
+      ? `Moonstep on ${targetId === 'boingo' ? 'Boingo' : 'Athena'} - you just switched targets, so this hits for -2 instead of -1!`
+      : `Moonstep on ${targetId === 'boingo' ? 'Boingo' : 'Athena'} again - same target as last time, so this is the normal -1 hit.`;
+  }
+  return null;
+}
+
+// Blade's Rebirth moment is detected off his own live streakCount (already
+// at 3 going into this click means the NEXT hit will be streak 4, the
+// lethal mirror hit) rather than a hardcoded step index, so it still reads
+// correctly even if the sequence's exact turn count ever changes.
+function bladeNarration(actionId, character) {
+  if (actionId !== 'bloodHunt') return null;
+  const streak = character?.special?.streakCount ?? 0;
+  if (streak === 0) return 'Open with Blood Hunt - the streak starts at 1 and climbs every consecutive hit on the same target.';
+  if (streak === 1) return "Athena just shielded herself - hit again and watch what happens to the damage number.";
+  if (streak >= 3) return "This hit's streak damage mirrors back onto Athena's curse target... which is YOU. Brace yourself.";
+  return 'Keep the streak going - hit the same target again with Blood Hunt.';
+}
+
+export function tutorialNarrationFor(humanCharacterId, requiredActionId, requiredTargetId, character) {
+  if (humanCharacterId === 'velorya') {
+    const veloryaSpecific = veloryaNarration(requiredActionId, requiredTargetId, character);
+    if (veloryaSpecific) return veloryaSpecific;
+  }
+  if (humanCharacterId === 'blade') {
+    const bladeSpecific = bladeNarration(requiredActionId, character);
+    if (bladeSpecific) return bladeSpecific;
+  }
   const specific = NARRATION[humanCharacterId]?.[requiredActionId];
   if (specific) return specific;
   const label = ACTION_LABELS[requiredActionId] || requiredActionId;
