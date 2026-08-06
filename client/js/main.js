@@ -30,6 +30,11 @@ const state = {
   // away from instantly) -> 'victory' (winning character(s) art) ->
   // 'banner' (the actual Match Over screen). null while not in game-over.
   gameOverStage: null,
+  // Set from the game-state broadcast's tutorialRequiredActionId/
+  // TargetId fields (null for non-tutorial rooms) - battleScreen.js uses
+  // this to disable every action button except the one scripted next move.
+  tutorialRequiredActionId: null,
+  tutorialRequiredTargetId: null,
   rerender,
 };
 
@@ -225,6 +230,8 @@ onMessage((msg) => {
       state.confirmingExit = false;
       state.turnDeadline = msg.turnDeadline || null;
       state.humanCount = msg.humanCount ?? null;
+      state.tutorialRequiredActionId = msg.tutorialRequiredActionId ?? null;
+      state.tutorialRequiredTargetId = msg.tutorialRequiredTargetId ?? null;
       processNewLogEntries(msg.game);
       // A fresh turn just started for whoever's now acting (different from
       // who was acting on the previous broadcast) - check their idle

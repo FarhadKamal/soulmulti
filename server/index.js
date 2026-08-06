@@ -16,6 +16,7 @@ import {
   createRoom, getRoom, deleteRoom, findRoomBySessionId, roomShapeFor,
   availableSeats, availableCharacterIds, seatIsReady, resetRoomToLobby, TURN_TIMER_DURATION_MS,
 } from './rooms.js';
+import { TUTORIAL_SEQUENCES, tutorialBotCharacterId } from './data/tutorialSequences.js';
 
 const PORT = process.env.PORT || 3001;
 
@@ -202,16 +203,30 @@ function broadcastGameState(room) {
   if (room.game.phase === 'game-over') {
     room.phase = 'finished';
     clearTurnTimer(room);
-  } else if (isBotControlled(room, acting)) {
+  } else if (isBotControlled(room, acting) || room.roomType === 'tutorial') {
     // Bots never time out (they always act on their own within
     // BOT_ACTION_DELAY_MS, see runBotTurnsIfAny) - arming the 30s human
     // timer for them is pure waste, and with paced bot turns now spending
     // real wall-clock time "between actions", skip it rather than
-    // needlessly re-arm/clear every ~1.2s.
+    // needlessly re-arm/clear every ~1.2s. Tutorial rooms ALSO never arm
+    // the timer even for the human's own turn - a tutorial has no failure
+    // state to auto-resolve into (there's no "wrong" auto-pick, only the
+    // one scripted next move), and a timeout converting the human's seat
+    // to 'bot' would corrupt the whole scripted sequence (the tutorial bot
+    // step data is for the OPPONENT, not the human's own character).
     clearTurnTimer(room);
   } else {
     armTurnTimer(room, acting);
   }
+  // The client needs to see the FULL normal usableActions list (so it can
+  // render every button and grey out all but the one required this step),
+  // not a server-filtered single-option list - so this stays the same
+  // getUsableActions()-derived list for tutorial rooms as for every other
+  // room type. tutorialRequiredActionId/TargetId (below) is the separate
+  // field the client uses purely for its own disabling logic.
+  const tutorialStep = room.roomType === 'tutorial' && acting === room.tutorial?.humanCharacterId
+    ? currentTutorialStep(room)
+    : null;
   broadcastRoom(room, 'game-state', {
     game: sanitizeGameForBroadcast(room.game),
     actingCharacterId: acting,
@@ -227,6 +242,8 @@ function broadcastGameState(room) {
     // last lobby-update) is stale mid-match under normal play, so this is
     // computed fresh here rather than relying on the client's old snapshot.
     humanCount: room.seats.filter((s) => s.kind === 'human').length,
+    tutorialRequiredActionId: tutorialStep?.actionId ?? null,
+    tutorialRequiredTargetId: tutorialStep ? resolveTutorialTarget(room, tutorialStep) : null,
   });
 }
 
@@ -324,21 +341,36 @@ function stepBotTurn(room) {
     return;
   }
 
-  const character = room.game.characters[acting];
-  const isBallHolder = room.game.jesterBall && room.game.jesterBall.holderCharacterId === acting;
-  if (isBallHolder) {
-    const move = chooseBotJesterBallMove(character, room.game);
-    finishJesterBall(room.game, move.choice, move.targetId);
-  } else {
-    const move = chooseBotMove(character, room.game);
-    if (move) {
-      executeAction(room.game, acting, move.actionId, move.targetId);
-      if (move.actionId === 'soulSwap') {
-        const wrathTarget = chooseSoulSwapWrathTarget(character, room.game);
-        if (wrathTarget) executeAction(room.game, acting, 'soulSwapWrath', wrathTarget);
-      }
+  if (room.roomType === 'tutorial') {
+    // Bypass chooseBotMove/chooseBotJesterBallMove entirely - the bot's
+    // heuristics are irrelevant here (it only ever has one legal move for
+    // its fixed character anyway), and the tutorial needs a fully
+    // deterministic, pre-scripted move+damage, not the bot's normal
+    // decision logic. The Boingo sequence's forced Jester Ball Take is
+    // handled inside executeTutorialStep itself (via the synthetic
+    // 'jesterBallTake' actionId), not here, so no isBallHolder branch is
+    // needed - the scripted step data already knows exactly what to do.
+    const step = currentTutorialStep(room);
+    if (step && step.actor === 'bot') {
+      executeTutorialStep(room, step);
     }
-    markCharacterActed(room.game, acting);
+  } else {
+    const character = room.game.characters[acting];
+    const isBallHolder = room.game.jesterBall && room.game.jesterBall.holderCharacterId === acting;
+    if (isBallHolder) {
+      const move = chooseBotJesterBallMove(character, room.game);
+      finishJesterBall(room.game, move.choice, move.targetId);
+    } else {
+      const move = chooseBotMove(character, room.game);
+      if (move) {
+        executeAction(room.game, acting, move.actionId, move.targetId);
+        if (move.actionId === 'soulSwap') {
+          const wrathTarget = chooseSoulSwapWrathTarget(character, room.game);
+          if (wrathTarget) executeAction(room.game, acting, 'soulSwapWrath', wrathTarget);
+        }
+      }
+      markCharacterActed(room.game, acting);
+    }
   }
 
   // Broadcast this single bot action right away, then pause before the
@@ -351,6 +383,60 @@ function stepBotTurn(room) {
     return;
   }
   setTimeout(() => stepBotTurn(room), BOT_ACTION_DELAY_MS);
+}
+
+// ---- Tutorial mode: a scripted 1-human-vs-1-bot sequence (see
+// server/data/tutorialSequences.js) where the bot's moves AND their
+// damage, and the human's own next-allowed move, are both fully
+// predetermined rather than driven by chooseBotMove/normal legality
+// alone. room.tutorial lives alongside room.game (not part of the engine's
+// own game object) and is the single source of truth for "what happens
+// next" - stepIndex walks through the interleaved human+bot step list in
+// order. ----
+
+// `targetId: 'opponent'` in the sequence data resolves to whichever of the
+// two characters in this 1v1 room ISN'T the acting side's own character -
+// trivial here since every targeted tutorial action only ever has one
+// legal target anyway.
+function resolveTutorialTarget(room, step) {
+  if (step.targetId !== 'opponent') return step.targetId;
+  const { humanCharacterId, botCharacterId } = room.tutorial;
+  const actingIsHuman = step.actor === 'human';
+  return actingIsHuman ? botCharacterId : humanCharacterId;
+}
+
+function currentTutorialStep(room) {
+  return room.tutorial.sequence[room.tutorial.stepIndex] ?? null;
+}
+
+// Executes the CURRENT scripted step for whichever side (human or bot) it
+// belongs to, then advances stepIndex. Called from handleAction/
+// handleSoulSwapWrath (human steps, after their own gate confirms the
+// incoming action matches) and from stepBotTurn's tutorial branch (bot
+// steps). Centralizing the actual execution here (rather than duplicating
+// it at each call site) keeps the forced-amount/ignoresShield wiring and
+// the stepIndex advancement in one place.
+function executeTutorialStep(room, step) {
+  const targetId = resolveTutorialTarget(room, step);
+  const extra = step.forcedAmount != null ? { forcedAmount: step.forcedAmount, ignoresShield: step.ignoresShield } : undefined;
+  const actingCharacterId = step.actor === 'human' ? room.tutorial.humanCharacterId : room.tutorial.botCharacterId;
+
+  if (step.actionId === 'jesterBallTake') {
+    // Synthetic marker (see tutorialSequences.js) - routed to
+    // finishJesterBall directly rather than executeAction/the ability map,
+    // matching how Take is actually resolved for a real Jester Ball holder.
+    finishJesterBall(room.game, 'take', extra);
+  } else {
+    executeAction(room.game, actingCharacterId, step.actionId, targetId, extra);
+    // Soul Swap doesn't mark the character acted yet - same as the real
+    // human action handler (handleAction), it still owes the separate
+    // soulSwapWrath step before its turn is actually over. Every other
+    // step marks acted normally.
+    if (step.actionId !== 'soulSwap') {
+      markCharacterActed(room.game, actingCharacterId);
+    }
+  }
+  room.tutorial.stepIndex += 1;
 }
 
 // ---- Room/lobby message handlers ----
@@ -389,6 +475,59 @@ function handleJoinRoom(ws, sessionId, { code, name }) {
   seat.name = cleanName;
   send(ws, 'room-joined', { code: room.code });
   broadcastLobby(room);
+}
+
+// One-click tutorial room: unlike a normal room, this skips the whole
+// pick-character -> fill-bot -> start-match lobby flow entirely - the
+// human's one character pick arrives in this same message, the opponent
+// is derived automatically (see tutorialBotCharacterId), and the match
+// starts immediately.
+function handleCreateTutorialRoom(ws, sessionId, { name, characterId }) {
+  const cleanName = sanitizeName(name);
+  if (!cleanName) return send(ws, 'error', { message: 'A name is required.' });
+  if (!CHARACTER_IDS.includes(characterId)) return send(ws, 'error', { message: 'Invalid character.' });
+  const room = createRoom('tutorial');
+  const humanSeat = room.seats[0];
+  humanSeat.kind = 'human';
+  humanSeat.playerId = sessionId;
+  humanSeat.spectatorId = sessionId;
+  humanSeat.name = cleanName;
+  humanSeat.characterIds = [characterId];
+  room.ownerId = sessionId;
+
+  const botCharacterId = tutorialBotCharacterId(characterId);
+  const botSeat = room.seats[1];
+  fillSeatWithTutorialBot(botSeat, botCharacterId);
+
+  room.tutorial = {
+    humanCharacterId: characterId,
+    botCharacterId,
+    sequence: TUTORIAL_SEQUENCES[characterId],
+    stepIndex: 0,
+  };
+
+  const playerPicks = room.seats.map((s) => ({
+    id: s.playerId || `bot-${s.index}`,
+    name: s.name,
+    characterIds: s.characterIds,
+    isPC: s.kind === 'bot',
+  }));
+  room.game = createGame('tutorial', playerPicks);
+  room.phase = 'in-match';
+  send(ws, 'room-created', { code: room.code });
+  broadcastLobby(room);
+  // Human always goes first in a tutorial (see tutorialSequences.js) - no
+  // runBotTurnsIfAny() kickoff needed here, unlike a normal match's
+  // handleStartMatch, which may need the bot to move first.
+  broadcastGameState(room);
+}
+
+// Parallel to fillSeatWithBot, but deterministic - a tutorial's opponent is
+// always exactly one fixed character, never randomly drawn from the pool.
+function fillSeatWithTutorialBot(seat, characterId) {
+  seat.kind = 'bot';
+  seat.name = 'Bot';
+  seat.characterIds = [characterId];
 }
 
 function handlePickCharacter(room, sessionId, { characterId }) {
@@ -573,6 +712,32 @@ function handleAction(room, sessionId, { characterId, actionId, targetId }) {
   const actionDef = usable.find((a) => a.actionId === actionId);
   if (!actionDef) return;
   if (actionDef.needsTarget && !isValidTarget(room.game, characterId, actionId, targetId)) return;
+  // Tutorial rooms only ever accept the one scripted next step - this runs
+  // IN ADDITION TO the normal legality checks above (never instead of
+  // them), as a consistency safeguard: every scripted step was designed to
+  // also be a genuinely legal move, so both checks passing is expected,
+  // not redundant.
+  if (room.roomType === 'tutorial') {
+    const step = currentTutorialStep(room);
+    if (!step || step.actor !== 'human' || step.actionId !== actionId) return;
+    if (resolveTutorialTarget(room, step) !== (targetId ?? null)) return;
+    executeTutorialStep(room, step);
+    if (actionId === 'soulSwap') {
+      const nextStep = currentTutorialStep(room);
+      broadcastRoom(room, 'game-state', {
+        game: sanitizeGameForBroadcast(room.game),
+        actingCharacterId: characterId,
+        awaitingSoulSwapWrath: true,
+        usableActions: [{ actionId: 'soulSwapWrath', label: 'Thunder Wrath (free, from Soul Swap)', needsTarget: true, validTargetIds: [resolveTutorialTarget(room, nextStep)] }],
+        tutorialRequiredActionId: nextStep?.actionId ?? null,
+        tutorialRequiredTargetId: nextStep ? resolveTutorialTarget(room, nextStep) : null,
+      });
+      return;
+    }
+    broadcastGameState(room);
+    runBotTurnsIfAny(room);
+    return;
+  }
 
   executeAction(room.game, characterId, actionId, targetId);
 
@@ -606,6 +771,19 @@ function handleSoulSwapWrath(room, sessionId, { characterId, targetId }) {
   const seat = seatForCharacter(room, characterId);
   if (!seat || seat.playerId !== sessionId) return;
   if (!isValidTarget(room.game, characterId, 'soulSwapWrath', targetId)) return;
+  // Zerathys's tutorial sequence has a scripted soulSwapWrath step - this
+  // handler is a completely separate function from handleAction (a human's
+  // Soul Swap doesn't auto-fire its own follow-up, unlike a bot's), so it
+  // needs its own tutorial gate too, not just handleAction's.
+  if (room.roomType === 'tutorial') {
+    const step = currentTutorialStep(room);
+    if (!step || step.actor !== 'human' || step.actionId !== 'soulSwapWrath') return;
+    if (resolveTutorialTarget(room, step) !== targetId) return;
+    executeTutorialStep(room, step);
+    broadcastGameState(room);
+    runBotTurnsIfAny(room);
+    return;
+  }
   executeAction(room.game, characterId, 'soulSwapWrath', targetId);
   markCharacterActed(room.game, characterId);
   broadcastGameState(room);
@@ -670,6 +848,7 @@ wss.on('connection', (ws) => {
     const { type, ...payload } = msg;
 
     if (type === 'create-room') return handleCreateRoom(ws, sessionId, payload);
+    if (type === 'create-tutorial-room') return handleCreateTutorialRoom(ws, sessionId, payload);
     if (type === 'join-room') return handleJoinRoom(ws, sessionId, payload);
     if (type === 'leave-room') return leaveRoom(sessionId, ws);
 

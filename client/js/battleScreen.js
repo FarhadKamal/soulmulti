@@ -6,6 +6,7 @@ import { getFlashSrc, getPersistentPortrait } from './portraitFlash.js';
 import { getActiveEffects, getClawCount } from './actionEffects.js';
 import { renderRulesModal } from './rulesScreen.js';
 import { renderFullscreenButton } from './fullscreen.js';
+import { tutorialNarrationFor } from './tutorialNarration.js';
 
 // Functional-first battle screen: no portrait art/animation yet (see
 // characterCard.js in the main game for that system) - just hearts,
@@ -479,7 +480,11 @@ function renderActionPanel(characterId, usableActions, armedAction, state) {
 
   const title = document.createElement('div');
   title.className = 'action-panel-title';
-  title.textContent = state.awaitingSoulSwapWrath ? 'Soul Swap landed - choose your free Thunder Wrath target' : 'Your turn - choose an action';
+  if (state.tutorialRequiredActionId) {
+    title.textContent = tutorialNarrationFor(characterId, state.tutorialRequiredActionId);
+  } else {
+    title.textContent = state.awaitingSoulSwapWrath ? 'Soul Swap landed - choose your free Thunder Wrath target' : 'Your turn - choose an action';
+  }
   panel.appendChild(title);
 
   const btnRow = document.createElement('div');
@@ -487,7 +492,14 @@ function renderActionPanel(characterId, usableActions, armedAction, state) {
   usableActions.forEach((action) => {
     const btn = document.createElement('button');
     btn.textContent = action.label;
+    // In a tutorial, every button still renders (so the player can see
+    // their full real kit), but only the one scripted next move is
+    // actually clickable - mirrors the disabled-button precedent already
+    // used for lobbyScreen.js's character-pick grid.
+    const isTutorialLocked = state.tutorialRequiredActionId && action.actionId !== state.tutorialRequiredActionId;
+    btn.disabled = !!isTutorialLocked;
     btn.onclick = () => {
+      if (isTutorialLocked) return;
       playUiClick();
       if (!action.needsTarget) {
         submitAction(characterId, action, null, state);
@@ -739,20 +751,27 @@ function renderGameOver(game, youAreOwner) {
   const btnRow = document.createElement('div');
   btnRow.className = 'game-over-actions';
 
-  if (youAreOwner) {
-    const homeBtn = document.createElement('button');
-    homeBtn.textContent = 'Play Again (same room)';
-    // Returns everyone in this room to the SAME room's lobby (same code) so
-    // the group can pick again and play another match without re-sharing a
-    // code - a plain page reload would instead drop the WebSocket entirely
-    // and start a brand new, unrelated session.
-    homeBtn.onclick = () => send('return-to-lobby');
-    btnRow.appendChild(homeBtn);
-  } else {
-    const waiting = document.createElement('div');
-    waiting.className = 'waiting-note';
-    waiting.textContent = 'Waiting for the room owner to return to the lobby...';
-    btnRow.appendChild(waiting);
+  // A tutorial room has no lobby/re-pick flow to return to (see
+  // handleCreateTutorialRoom - it skips straight from creation to
+  // in-match) - "Play Again" doesn't apply, only Exit below does. Picking
+  // a fresh (or the same) character from the entry screen is how you
+  // replay a tutorial.
+  if (game.mode !== 'tutorial') {
+    if (youAreOwner) {
+      const homeBtn = document.createElement('button');
+      homeBtn.textContent = 'Play Again (same room)';
+      // Returns everyone in this room to the SAME room's lobby (same code) so
+      // the group can pick again and play another match without re-sharing a
+      // code - a plain page reload would instead drop the WebSocket entirely
+      // and start a brand new, unrelated session.
+      homeBtn.onclick = () => send('return-to-lobby');
+      btnRow.appendChild(homeBtn);
+    } else {
+      const waiting = document.createElement('div');
+      waiting.className = 'waiting-note';
+      waiting.textContent = 'Waiting for the room owner to return to the lobby...';
+      btnRow.appendChild(waiting);
+    }
   }
 
   // Available to anyone regardless of ownership - a full exit back to the

@@ -13,9 +13,12 @@ const TURN_TIMER_MS = 30_000;
 //   It's called 2v2 because each SIDE fields 2 characters, not because 2
 //   separate humans share one side.
 // - '4p'  ("4 player" FFA): 4 seats, each seat picks 1 character.
+// - 'tutorial': 1 human seat vs 1 scripted bot seat, 1 character each - see
+//   server/data/tutorialSequences.js for the scripted move sequence.
 const ROOM_SHAPES = {
   '2p': { seatCount: 2, picksPerSeat: 2 },
   '4p': { seatCount: 4, picksPerSeat: 1 },
+  tutorial: { seatCount: 2, picksPerSeat: 1 },
 };
 
 export function roomShapeFor(roomType) {

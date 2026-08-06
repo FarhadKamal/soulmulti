@@ -15,15 +15,34 @@ export const actions = {
     // handler and the paced bot-turn stepper), so outcome was always
     // undefined, amount was always 0, and Chaos Gamble silently always
     // missed for everyone, human or bot.
-    execute(character, targetId, game, log) {
-      const outcome = rollChaosGamble();
-      let amount = 0;
-      if (outcome === 'win') amount = 3;
-      else if (outcome === 'draw') amount = 1;
+    execute(character, targetId, game, log, extra) {
+      // Tutorial mode forces a deterministic outcome (the bot always deals
+      // flat 1; the human's own scripted sequence forces a specific
+      // win/draw/lose result per step) instead of the real roll - see
+      // server/data/tutorialSequences.js's forcedAmount field. Every
+      // non-tutorial call passes no `extra`, leaving the normal random
+      // roll completely untouched.
+      let outcome;
+      let amount;
+      if (game.mode === 'tutorial' && extra?.forcedAmount != null) {
+        amount = extra.forcedAmount;
+        outcome = amount === 3 ? 'win' : amount === 1 ? 'draw' : 'lose';
+      } else {
+        outcome = rollChaosGamble();
+        amount = 0;
+        if (outcome === 'win') amount = 3;
+        else if (outcome === 'draw') amount = 1;
+      }
       const result = applyDamage(game, log, {
         sourceCharacterId: character.id,
         targetCharacterId: targetId,
         amount,
+        // Tutorial-forced hits ignore shield in both directions (whichever
+        // side - human or bot - is playing Chronox has Chrono Guard
+        // resetting to 1 shield every one of ITS OWN turns, which would
+        // otherwise silently discount the forced amount and break the
+        // tutorial's exact heart math). Non-tutorial calls are unaffected.
+        ignoresShield: game.mode === 'tutorial' && extra?.forcedAmount != null,
       });
       log.push({ type: 'attack', characterId: character.id, actionId: 'chaosGamble', targetId, outcome, ...result });
       return result;
@@ -73,12 +92,20 @@ export const jesterBallResolution = {
   },
   take: {
     label: 'Take it',
-    execute(game, log) {
+    execute(game, log, extra) {
       const holderId = game.jesterBall.holderCharacterId;
+      // Tutorial mode can force a flat amount with shield ignored (so a
+      // Chronox-bot holder's persistent Chrono Guard shield can't
+      // unpredictably discount the demo hit) - see
+      // server/data/tutorialSequences.js's boingo sequence. Every
+      // non-tutorial call passes no `extra`, leaving the normal flat-4,
+      // shield-absorbing Take completely untouched.
+      const forced = game.mode === 'tutorial' ? extra : null;
       const result = applyDamage(game, log, {
         sourceCharacterId: game.jesterBall.thrownByCharacterId,
         targetCharacterId: holderId,
-        amount: 4,
+        amount: forced?.forcedAmount ?? 4,
+        ignoresShield: forced?.ignoresShield ?? false,
       });
       log.push({ type: 'jester-ball-take', targetCharacterId: holderId, ...result });
       game.jesterBall = null;

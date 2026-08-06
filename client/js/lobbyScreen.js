@@ -91,12 +91,13 @@ function renderEntryForm() {
     return nameInput.value.trim();
   }
 
+  const tutorialButtons = [];
   function updateNameValidity() {
     const hasName = currentName().length > 0;
     nameInput.classList.toggle('input--invalid', !hasName);
     nameHint.style.display = hasName ? 'none' : 'block';
     if (hasName) sessionStorage.setItem('soulclash-name', currentName());
-    [btn4p, btn2p, joinBtn].forEach((btn) => { btn.disabled = !hasName; });
+    [btn4p, btn2p, joinBtn, ...tutorialButtons].forEach((btn) => { btn.disabled = !hasName; });
   }
   nameInput.addEventListener('input', updateNameValidity);
 
@@ -140,6 +141,29 @@ function renderEntryForm() {
   joinSection.appendChild(codeInput);
   joinSection.appendChild(joinBtn);
   form.appendChild(joinSection);
+
+  const tutorialSection = document.createElement('div');
+  tutorialSection.className = 'tutorial-section';
+  const tutorialTitle = document.createElement('h2');
+  tutorialTitle.textContent = 'Learn to play (Tutorial)';
+  tutorialSection.appendChild(tutorialTitle);
+  const tutorialHint = document.createElement('div');
+  tutorialHint.className = 'name-hint';
+  tutorialHint.textContent = 'Pick a character - a guided 1v1 walks you through their moves.';
+  tutorialSection.appendChild(tutorialHint);
+
+  const tutorialGrid = document.createElement('div');
+  tutorialGrid.className = 'character-grid';
+  Object.values(CHARACTERS).forEach((def) => {
+    const btn = document.createElement('button');
+    btn.textContent = def.name;
+    btn.style.borderColor = def.color;
+    btn.onclick = () => send('create-tutorial-room', { name: currentName(), characterId: def.id });
+    tutorialButtons.push(btn);
+    tutorialGrid.appendChild(btn);
+  });
+  tutorialSection.appendChild(tutorialGrid);
+  form.appendChild(tutorialSection);
 
   updateNameValidity();
   return form;

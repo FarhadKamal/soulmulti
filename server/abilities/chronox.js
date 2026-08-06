@@ -29,13 +29,30 @@ export const actions = {
     label: 'Cyclone Punch',
     needsTarget: true,
     isLegal: () => true,
-    execute(character, targetId, game, log) {
-      const flip = flipCoin();
-      const amount = flip === 'heads' ? 2 : 1;
+    execute(character, targetId, game, log, extra) {
+      // Tutorial mode forces a deterministic outcome (the bot always deals
+      // flat 1; the human's own scripted sequence forces specific
+      // heads/tails per step) instead of the real coin flip - see
+      // server/data/tutorialSequences.js and its forcedAmount field. Every
+      // non-tutorial call passes no `extra`, leaving the normal random
+      // roll completely untouched.
+      const flip = game.mode === 'tutorial' && extra?.forcedAmount != null
+        ? (extra.forcedAmount === 2 ? 'heads' : 'tails')
+        : flipCoin();
+      const isTutorialForced = game.mode === 'tutorial' && extra?.forcedAmount != null;
+      const amount = isTutorialForced ? extra.forcedAmount : (flip === 'heads' ? 2 : 1);
       const result = applyDamage(game, log, {
         sourceCharacterId: character.id,
         targetCharacterId: targetId,
         amount,
+        // Tutorial-forced hits ignore shield in both directions (this
+        // character's own attack forced by the tutorial, OR the tutorial
+        // bot's forced attack when it's playing Chronox) - a shielded
+        // target (either side's own Chrono Guard, if THEY'RE the one
+        // playing Chronox) would otherwise silently discount the forced
+        // amount and break the tutorial's exact heart math. Non-tutorial
+        // calls are unaffected.
+        ignoresShield: isTutorialForced,
       });
       log.push({ type: 'attack', characterId: character.id, actionId: 'cyclonePunch', targetId, flip, ...result });
       return result;
