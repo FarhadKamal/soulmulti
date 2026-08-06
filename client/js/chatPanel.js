@@ -12,31 +12,63 @@ const messages = [];
 // The battle/lobby screens both do a full DOM teardown+rebuild on every
 // server broadcast (root.innerHTML = '', then re-render everything) -
 // during someone else's turn, bot moves broadcast every few seconds (see
-// BOT_ACTION_DELAY_MS in the server), which was silently recreating this
-// panel's <input> from scratch each time: whatever you were mid-typing got
-// wiped, and focus was lost even if you'd just clicked into the box.
-// Persisting the draft text and whether the input was focused here (module
-// state survives across renders, unlike the DOM node itself) lets
-// renderChatPanel restore both after rebuilding.
-let draftText = '';
+// BOT_ACTION_DELAY_MS in the server), which was recreating this panel's
+// <input> from scratch each time. An earlier fix tried to paper over that
+// by persisting draftText/focus state and restoring them onto a BRAND NEW
+// <input> node after every rebuild - inherently racy against the user's
+// own keystrokes landing in between rebuilds, which read as chat being
+// unreliable specifically during opponent turns (the only time broadcasts
+// arrive automatically; your own turn waits on you, so nothing ever
+// interrupts typing then).
+//
+// The real fix: this module builds its own <input>/<button>/message-list
+// ONCE, the moment this file first loads, and every call to
+// renderChatPanel() re-appends that SAME persistent node (instead of
+// creating a fresh tree) - root.innerHTML = '' still DETACHES it from the
+// document each time (that's unavoidable given how battleScreen.js/
+// lobbyScreen.js rebuild), which still blurs the input and drops its
+// draft value in some browsers, but re-appending the SAME real node here
+// (not a fresh one) means there's no more races to fight: the value is
+// simply still there on the node, and just needs its focus restored - one
+// synchronous, always-correct read of "was this focused a moment ago" via
+// wasFocused, not a value/caret round-trip through module state.
 let wasFocused = false;
+const panel = document.createElement('div');
+panel.className = 'chat-panel';
 
-export function addChatMessage(msg) {
-  messages.push(msg);
-  if (messages.length > MAX_VISIBLE) messages.shift();
+const title = document.createElement('div');
+title.className = 'chat-title';
+title.textContent = 'Chat';
+panel.appendChild(title);
+
+const list = document.createElement('div');
+list.className = 'chat-messages';
+panel.appendChild(list);
+
+const form = document.createElement('div');
+form.className = 'chat-form';
+const input = document.createElement('input');
+input.type = 'text';
+input.maxLength = 60;
+input.placeholder = 'Type a message...';
+input.addEventListener('focus', () => { wasFocused = true; });
+input.addEventListener('blur', () => { wasFocused = false; });
+const sendBtn = document.createElement('button');
+sendBtn.textContent = 'Send';
+function submit() {
+  const text = input.value.trim();
+  if (!text) return;
+  send('chat-message', { text });
+  input.value = '';
 }
+sendBtn.onclick = submit;
+input.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
+form.appendChild(input);
+form.appendChild(sendBtn);
+panel.appendChild(form);
 
-export function renderChatPanel() {
-  const wrap = document.createElement('div');
-  wrap.className = 'chat-panel';
-
-  const title = document.createElement('div');
-  title.className = 'chat-title';
-  title.textContent = 'Chat';
-  wrap.appendChild(title);
-
-  const list = document.createElement('div');
-  list.className = 'chat-messages';
+function renderMessages() {
+  list.innerHTML = '';
   messages.forEach((m) => {
     const line = document.createElement('div');
     line.className = 'chat-line';
@@ -51,51 +83,37 @@ export function renderChatPanel() {
     line.appendChild(document.createTextNode(m.text));
     list.appendChild(line);
   });
-  wrap.appendChild(list);
-  // Auto-scroll to the latest message.
-  requestAnimationFrame(() => { list.scrollTop = list.scrollHeight; });
+  list.scrollTop = list.scrollHeight;
+}
+renderMessages();
 
-  const form = document.createElement('div');
-  form.className = 'chat-form';
-  const input = document.createElement('input');
-  input.type = 'text';
-  input.maxLength = 60;
-  input.placeholder = 'Type a message...';
-  // Restore whatever was mid-typing (and refocus) across this rebuild - see
-  // draftText/wasFocused above for why this is necessary at all.
-  input.value = draftText;
-  input.addEventListener('input', () => { draftText = input.value; });
-  input.addEventListener('focus', () => { wasFocused = true; });
-  input.addEventListener('blur', () => { wasFocused = false; });
-  const sendBtn = document.createElement('button');
-  sendBtn.textContent = 'Send';
-  function submit() {
-    const text = input.value.trim();
-    if (!text) return;
-    send('chat-message', { text });
-    input.value = '';
-    draftText = '';
-  }
-  sendBtn.onclick = submit;
-  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
-  form.appendChild(input);
-  form.appendChild(sendBtn);
-  wrap.appendChild(form);
+export function addChatMessage(msg) {
+  messages.push(msg);
+  if (messages.length > MAX_VISIBLE) messages.shift();
+  // A new message can arrive at any time (including mid-typing, from
+  // another player) - re-render the list immediately rather than waiting
+  // for the next renderChatPanel() call, same as the old behavior.
+  renderMessages();
+}
 
+// Returns the SAME persistent <div class="chat-panel"> node every call -
+// callers just re-append it wherever it belongs in that render pass (a
+// node can only have one parent at a time in the DOM, so appendChild here
+// implicitly moves it out of wherever it was before). The node's own
+// value/caret position survive that move automatically since it's the
+// same real <input> element throughout, never recreated - only focus
+// itself needs an explicit restore, since detaching a focused element
+// from the document (root.innerHTML = '' upstream) blurs it even though
+// the element object stays alive.
+export function renderChatPanel() {
   if (wasFocused) {
-    // Re-focus on the NEXT frame, not synchronously - the freshly created
-    // input isn't attached to the document yet at this point (the caller
-    // still needs to append this whole wrap into root), and .focus() on a
-    // detached element is a silent no-op.
+    // Next frame, not synchronous - the caller still needs to actually
+    // append `panel` into the new tree (and that tree into `root`) after
+    // this function returns; focusing before it's attached to the
+    // document again is a silent no-op.
     requestAnimationFrame(() => {
-      input.focus();
-      // Restore the caret to the end rather than letting focus() jump it
-      // to position 0, which would otherwise make continued typing insert
-      // backwards through the restored draft text.
-      const pos = input.value.length;
-      input.setSelectionRange(pos, pos);
+      if (document.activeElement !== input) input.focus();
     });
   }
-
-  return wrap;
+  return panel;
 }
