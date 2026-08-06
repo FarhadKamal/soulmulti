@@ -7,6 +7,15 @@ import { getActiveEffects, getClawCount } from './actionEffects.js';
 import { renderFullscreenButton } from './fullscreen.js';
 import { tutorialNarrationFor } from './tutorialNarration.js';
 
+// Whether the log/chat drawer is open - module state (not part of `state`
+// in main.js), same reasoning as chatPanel.js's draftText: this whole
+// screen tears down and rebuilds on every server broadcast, so a plain
+// local variable here is what actually survives across those rebuilds.
+// Starts closed - the board/action buttons get first claim on the fixed
+// viewport shell's space (see .battle/.battle-scroll in style.css); the
+// drawer only takes up room once the player deliberately opens it.
+let drawerOpen = false;
+
 // Functional-first battle screen: no portrait art/animation yet (see
 // characterCard.js in the main game for that system) - just hearts,
 // shield, status, and clickable action/target buttons driven entirely by
@@ -85,6 +94,9 @@ export function renderBattle(root, state) {
     stopTurnTimer();
   }
 
+  const scroll = document.createElement('div');
+  scroll.className = 'battle-scroll';
+
   const board = document.createElement('div');
   board.className = 'board';
   const ballHolderId = game.jesterBall ? game.jesterBall.holderCharacterId : null;
@@ -113,29 +125,68 @@ export function renderBattle(root, state) {
       isTutorialRequiredTarget: !!state.tutorialRequiredActionId && character.id === state.tutorialRequiredTargetId,
     }));
   });
-  wrap.appendChild(board);
+  scroll.appendChild(board);
 
   const isMyTurn = mySeatCharacterIds.includes(actingCharacterId);
   const jb = game.jesterBall;
   const isMyBallDecision = isMyTurn && jb && jb.holderCharacterId === actingCharacterId;
 
   if (isMyBallDecision) {
-    wrap.appendChild(renderJesterBallPrompt(game, actingCharacterId, armedAction, state));
+    scroll.appendChild(renderJesterBallPrompt(game, actingCharacterId, armedAction, state));
   } else if (isMyTurn) {
-    wrap.appendChild(renderActionPanel(actingCharacterId, usableActions, armedAction, state));
+    scroll.appendChild(renderActionPanel(actingCharacterId, usableActions, armedAction, state));
   } else {
     const waiting = document.createElement('div');
     waiting.className = 'waiting-note';
     waiting.textContent = actingCharacterId
       ? `Waiting for ${CHARACTERS[actingCharacterId].name}'s turn...`
       : 'Waiting...';
-    wrap.appendChild(waiting);
+    scroll.appendChild(waiting);
   }
 
-  wrap.appendChild(renderLog(game.log));
-  wrap.appendChild(renderChatPanel());
+  wrap.appendChild(scroll);
+  wrap.appendChild(renderLogChatDrawer(game.log, state.rerender));
 
   root.appendChild(wrap);
+}
+
+// Collapsed by default (see module-level `drawerOpen` above) so the log/
+// chat never take space away from the board/action buttons unless the
+// player deliberately asks for them - this is what actually fixes "always
+// have to scroll to reach the action buttons", not just compacting the
+// board itself.
+function renderLogChatDrawer(log, rerender) {
+  const wrap = document.createElement('div');
+  wrap.className = 'log-chat-drawer';
+
+  const toggle = document.createElement('button');
+  toggle.className = 'drawer-toggle' + (drawerOpen ? ' drawer-toggle--open' : '');
+  const label = document.createElement('span');
+  label.textContent = drawerOpen ? 'Hide log & chat' : 'Show log & chat';
+  const caret = document.createElement('span');
+  caret.className = 'drawer-toggle-caret';
+  caret.textContent = '▲'; // up-pointing triangle, flips via CSS rotate when open
+  toggle.appendChild(label);
+  toggle.appendChild(caret);
+  toggle.onclick = () => {
+    drawerOpen = !drawerOpen;
+    playUiClick();
+    // Local re-render only (no server round trip needed) - re-invokes
+    // renderBattle with the current state, which reads the now-flipped
+    // module-level drawerOpen.
+    rerender();
+  };
+  wrap.appendChild(toggle);
+
+  if (drawerOpen) {
+    const panel = document.createElement('div');
+    panel.className = 'drawer-panel';
+    panel.appendChild(renderLog(log));
+    panel.appendChild(renderChatPanel());
+    wrap.appendChild(panel);
+  }
+
+  return wrap;
 }
 
 // Inline confirm, not a blocking window.confirm() popup - a native dialog

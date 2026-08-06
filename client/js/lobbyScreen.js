@@ -47,15 +47,25 @@ export function renderLobby(root, { room, error, connectionLost }, { onEnterMatc
     return;
   }
 
+  // Everything below (entry form or room lobby, including the character
+  // grids and chat panel) lives inside its own scroll region, not the page
+  // itself - the title/top-controls above stay a fixed header, matching
+  // battleScreen.js's .battle-scroll shell. Without this, the entry form's
+  // 3 stacked sections (create/join/tutorial, the tutorial one alone has an
+  // 8-button character grid) routinely ran taller than a phone screen.
+  const scroll = document.createElement('div');
+  scroll.className = 'lobby-scroll';
+
   if (!room) {
-    wrap.appendChild(renderEntryForm());
+    scroll.appendChild(renderEntryForm());
   } else if (room.phase === 'in-match') {
     onEnterMatch();
     return;
   } else {
-    wrap.appendChild(renderRoomLobby(room));
+    scroll.appendChild(renderRoomLobby(room));
   }
 
+  wrap.appendChild(scroll);
   root.appendChild(wrap);
 }
 

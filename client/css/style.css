@@ -1,11 +1,20 @@
 * { box-sizing: border-box; }
-body {
+html, body {
   margin: 0;
   font-family: system-ui, sans-serif;
   background: #14141c;
   color: #f0f0f5;
-  min-height: 100vh;
+  /* Locked to the viewport, not just min-height: 100vh - the whole app is a
+     fixed-height shell (see .lobby/.battle below) so nothing has to scroll
+     the PAGE itself; each screen manages its own internal scroll region
+     instead. 100dvh (dynamic viewport height) accounts for mobile browser
+     chrome (address bar) showing/hiding - 100vh alone is taller than the
+     visible area on many phones, which would itself force a scrollbar. */
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
 }
+#app { height: 100%; }
 button {
   font: inherit;
   padding: 10px 16px;
@@ -29,8 +38,17 @@ input {
 .name-hint { font-size: 0.8em; color: #d9534f; margin-top: 4px; }
 
 /* ---- Lobby ---- */
-.lobby { max-width: 480px; margin: 0 auto; padding: 20px 16px 60px; }
-.lobby h1 { text-align: center; font-size: 1.6em; }
+/* Fixed-height flex shell: fills the viewport (see html/body/#app above)
+   instead of growing taller than it and scrolling the whole page. h1/
+   top-controls/errors stay a fixed-size header; .lobby-scroll is the ONE
+   place that scrolls internally when content (character grid, seat list,
+   etc.) doesn't fit - the page itself never does. */
+.lobby {
+  max-width: 480px; margin: 0 auto; padding: 12px 16px;
+  height: 100%; display: flex; flex-direction: column; min-height: 0;
+}
+.lobby h1 { text-align: center; font-size: 1.4em; margin: 4px 0 8px; flex: 0 0 auto; }
+.lobby-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding-bottom: 8px; }
 .error-banner {
   background: #5c1a1a; color: #ffb3b3; padding: 10px 12px; border-radius: 8px; margin-bottom: 12px;
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
@@ -70,11 +88,22 @@ input {
 .waiting-note { text-align: center; opacity: 0.7; margin-top: 16px; }
 
 /* ---- Battle ---- */
-.battle { max-width: 720px; margin: 0 auto; padding: 16px; }
-.round-info { text-align: center; opacity: 0.7; margin-bottom: 10px; }
+/* Same fixed-height shell as .lobby: round-info/controls/timer are a fixed
+   header, .battle-scroll holds the board + action panel (the ONE thing
+   that scrolls internally if a 4-player board + full action list is
+   genuinely too tall for a short viewport), and the log/chat move out of
+   normal flow entirely into a collapsible bottom drawer (see
+   .log-chat-drawer below) instead of pushing the action buttons down the
+   page - the actual cause of "always have to scroll to act". */
+.battle {
+  max-width: 720px; margin: 0 auto; padding: 10px 16px;
+  height: 100%; display: flex; flex-direction: column; min-height: 0;
+}
+.battle-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.round-info { text-align: center; opacity: 0.7; margin-bottom: 6px; flex: 0 0 auto; }
 .turn-timer {
   text-align: center; font-size: 0.9em; font-weight: 600; padding: 6px 10px;
-  border-radius: 8px; background: #1c1c2c; margin-bottom: 10px;
+  border-radius: 8px; background: #1c1c2c; margin-bottom: 8px; flex: 0 0 auto;
 }
 .turn-timer--urgent { background: #5c1a1a; color: #ffb3b3; }
 .board {
@@ -346,7 +375,33 @@ input {
 .chat-form { display: flex; gap: 8px; }
 .chat-form input { flex: 1; min-width: 0; }
 
-.game-over { text-align: center; padding: 40px 16px; }
+/* Bottom drawer: houses the match log + chat, collapsed by default so they
+   never push the board/action buttons off-screen (that was the actual
+   "always have to scroll" problem - not the board itself, which usually
+   fits, but the log+chat stacked below it always added enough height to
+   force page scrolling on anything shorter than a large monitor). The
+   toggle bar is always visible at the very bottom of the fixed .battle
+   shell (flex: 0 0 auto, outside .battle-scroll); the panel itself only
+   takes up space, sliding up from the bottom, while it's open. */
+.log-chat-drawer { flex: 0 0 auto; }
+.drawer-toggle {
+  width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px;
+  background: #1c1c2c; border: 1px solid #2a2a3a; border-radius: 8px;
+  padding: 8px; font-size: 0.85em; opacity: 0.85; margin-top: 6px;
+}
+.drawer-toggle-caret { transition: transform 0.2s ease; }
+.drawer-toggle--open .drawer-toggle-caret { transform: rotate(180deg); }
+.drawer-panel {
+  max-height: 42vh; overflow-y: auto; margin-top: 8px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.drawer-panel .log-panel { max-height: none; }
+.drawer-panel .chat-panel { margin-top: 0; }
+
+.game-over {
+  text-align: center; padding: 24px 16px; overflow-y: auto;
+  flex: 1 1 auto; min-height: 0;
+}
 .victory-portraits {
   display: flex; flex-wrap: wrap; justify-content: center; gap: 16px; margin: 20px 0;
 }
@@ -366,9 +421,29 @@ input {
   display: flex; align-items: center; justify-content: center;
 }
 
-/* Mobile: single-column board, roomier tap targets */
+/* Mobile: 2-column board, roomier tap targets, denser spacing so the fixed
+   shell (see .lobby/.battle above) has the best shot at fitting everything
+   important above the drawer without its own internal scroll kicking in. */
 @media (max-width: 480px) {
-  .board { grid-template-columns: 1fr 1fr; }
-  button { padding: 12px 16px; }
+  .board { grid-template-columns: 1fr 1fr; gap: 6px; }
+  .char-tile { padding: 6px; }
+  button { padding: 10px 14px; }
   .fullscreen-btn { padding: 0; }
+  .lobby h1 { font-size: 1.2em; margin: 2px 0 6px; }
+  .entry-form { gap: 12px; }
+  .character-grid { gap: 6px; }
+  .action-panel { padding: 10px; }
+  .drawer-panel { max-height: 50vh; }
+}
+
+/* Short viewports (landscape phones, small laptops with the window not
+   maximized) - height is the scarce dimension here, not width, so trim
+   vertical spacing regardless of how wide the screen is. */
+@media (max-height: 620px) {
+  .round-info { margin-bottom: 2px; font-size: 0.85em; }
+  .turn-timer { padding: 4px 8px; margin-bottom: 4px; }
+  .board { gap: 6px; margin-bottom: 8px; }
+  .char-tile { padding: 6px; }
+  .action-panel { padding: 8px; margin-bottom: 8px; }
+  .drawer-panel { max-height: 34vh; }
 }
