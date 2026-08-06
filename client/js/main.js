@@ -8,6 +8,7 @@ import {
 } from './sound.js';
 import { handleLogEntryForFlash, handleDodgeForFlash, checkIdlePortrait, registerFlashRerender } from './portraitFlash.js';
 import { handleLogEntryForEffects, registerEffectRerender } from './actionEffects.js';
+import { preloadBattleImages } from './imagePreload.js';
 
 const root = document.getElementById('app');
 
@@ -282,6 +283,12 @@ registerEffectRerender(() => { if (state.screen === 'battle') rerender(); });
 // exited via Escape (or any OS-level gesture) rather than the button
 // itself - document.fullscreenElement changes without any click of ours.
 document.addEventListener('fullscreenchange', rerender);
+// Fire-and-forget: warms the browser's cache for every battle portrait/
+// flash image before the player even reaches a match, so mid-fight
+// portrait.src swaps hit cache instead of a first-time network fetch (see
+// imagePreload.js). Never awaited - it doesn't block connecting to the
+// server or anything else on the page.
+preloadBattleImages();
 connect();
 rerender();
 startMenuMusic();
