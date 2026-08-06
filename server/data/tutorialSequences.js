@@ -156,11 +156,27 @@ export const TUTORIAL_SEQUENCES = {
     // Curse only goes live on Athena's 2nd turn (after the shield has
     // already decayed to 0 at the start of that turn). From there, every
     // Blood Hunt hit Blade lands on her mirrors that same amount back onto
-    // himself. Streak 3+4 mirrored (3+4=7) exceeds his remaining hearts
-    // after the streak-1 hit (7-1=6), triggering Rebirth automatically on
-    // the streak-4 hit - the same action that also finishes Athena off
-    // (her total damage taken: 2(shielded,0 net)+3+4=7, minus the 1 real
-    // point of Divine Restore healing = exactly enough to KO her at 0).
+    // himself.
+    //
+    // Athena is set to 8 max hearts for THIS tutorial only (see
+    // handleCreateTutorialRoom in index.js) - 1 more than her normal 7 -
+    // specifically so Rebirth and her own KO land on two SEPARATE hits
+    // instead of the same one. With both at an equal 7, the mirror (an
+    // exact 1:1 echo of her own damage taken) would always cross Blade's
+    // remaining hearts on the identical hit that finishes her - Rebirth
+    // would fire in the same instant the match ends, giving the player no
+    // beat to actually witness it before the win screen. With her at 8:
+    // streak-3 (3 dmg, curse live) leaves her at 5, mirrors 3 to Blade
+    // (7->4). Streak-4 (4 dmg) drops her to 1 - NOT a kill - and mirrors 4
+    // to Blade (4->0), triggering REBIRTH (revives to 2, streak resets to
+    // 0). THE REBIRTH MOMENT, with Athena still standing. Her next turn is
+    // a harmless curse re-affirm (a natural pause beat). Blade's next hit
+    // is a fresh streak-1 (only 1 damage, since streak reset) - lands on
+    // her last 1 heart for the actual, separate finishing blow, mirroring
+    // only 1 back to the freshly-revived Blade (2->1, safely nonlethal -
+    // rebirthUsed is already true, so a bigger mirror here would be a real,
+    // unintercepted KO and a draw - this is why the streak reset after
+    // Rebirth matters, not just the heart totals).
     //
     // IMPORTANT: do not reorder Divine Restore to later in the sequence -
     // Rebirth clears the curse when it fires, and if the curse were
@@ -178,8 +194,12 @@ export const TUTORIAL_SEQUENCES = {
     { actor: 'human', actionId: 'bloodHunt', targetId: 'opponent' },
     { actor: 'bot', actionId: 'curseStrike', targetId: 'opponent' },
     { actor: 'human', actionId: 'bloodHunt', targetId: 'opponent' },
-    // Athena KO'd via the mirror; Blade's Rebirth fires the same action -
-    // THE REBIRTH MOMENT.
+    // THE REBIRTH MOMENT - Blade "dies" and revives to 2 hearts. Athena
+    // survives at 1 heart - the match does NOT end here.
+    { actor: 'bot', actionId: 'curseStrike', targetId: 'opponent' }, // re-affirm; a natural pause after Rebirth
+    { actor: 'human', actionId: 'bloodHunt', targetId: 'opponent' },
+    // Fresh post-Rebirth streak (reset to 0) lands for only 1 - finishes
+    // Athena's last heart. Separate beat from the Rebirth moment above.
   ],
   athena: [
     { actor: 'human', actionId: 'curseStrike', targetId: 'opponent' },

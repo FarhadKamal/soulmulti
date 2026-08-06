@@ -538,6 +538,23 @@ function handleCreateTutorialRoom(ws, sessionId, { name, characterId }) {
     isPC: s.kind === 'bot',
   }));
   room.game = createGame('tutorial', playerPicks);
+  if (characterId === 'blade') {
+    // Athena needs slightly MORE than her normal 7 hearts here (not less) -
+    // Blade's Rebirth and Athena's own KO are driven by the exact same
+    // cumulative mirror-damage sequence once her curse is live (a 1:1
+    // mirror of whatever she takes), so with both starting at 7 they always
+    // hit 0 on the identical hit - Rebirth would fire in the SAME instant
+    // the match ends, giving the player no beat to actually see it before
+    // the win screen takes over. Bumping her to 8 makes Rebirth land one
+    // hit early (turn 4, Blade 4->0->revived to 2, Athena left at 1) with
+    // the kill happening on a separate later hit (turn 5, post-rebirth
+    // streak reset to a safe 1 damage) - two distinct beats instead of one.
+    // Hand-verified: this is the smallest change that decouples them while
+    // keeping Blade safely above 0 on the finishing hit (revived to 2,
+    // streak resets to 0 after Rebirth so the next hit is only 1 damage).
+    room.game.characters.athena.hearts = 8;
+    room.game.characters.athena.maxHearts = 8;
+  }
   room.phase = 'in-match';
   send(ws, 'room-created', { code: room.code });
   broadcastLobby(room);

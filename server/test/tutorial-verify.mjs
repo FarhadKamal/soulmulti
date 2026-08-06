@@ -8,9 +8,12 @@ import WebSocket from 'ws';
 const CHARACTERS = ['chronox', 'tharox', 'zerathys', 'akyros', 'velorya', 'boingo', 'blade', 'athena'];
 // Locked in from a verified real-engine run after the bot-swap redesign
 // (Chronox->Velorya, Boingo->Tharox, Blade->Athena - see
-// tutorialSequences.js's TUTORIAL_BOT_BY_HUMAN for why). Blade's 2 is his
-// post-Rebirth revival total, not a "took less damage" number - his
-// Rebirth is expected to fire mid-sequence. Velorya's is now a 1v2 fight
+// tutorialSequences.js's TUTORIAL_BOT_BY_HUMAN for why). Blade's 1 is what's
+// left after his post-Rebirth revival (2 hearts) absorbs one more real hit
+// on the deliberately separate finishing blow - Rebirth and Athena's own KO
+// are scripted to land on two DIFFERENT hits (not the same one) so the
+// player gets an actual beat to see Rebirth before the win screen, rather
+// than both happening in the same instant. Velorya's is now a 1v2 fight
 // (TUTORIAL_SEQUENCES_1V2, room type 'tutorial3') against Boingo AND
 // Athena - re-derive her number from a real run rather than trusting the
 // hand-traced plan doc if they ever disagree.
@@ -21,7 +24,7 @@ const EXPECTED = {
   akyros: { finalHearts: 5 },
   velorya: { finalHearts: 2 },
   boingo: { finalHearts: 6 },
-  blade: { finalHearts: 2 },
+  blade: { finalHearts: 1 },
   athena: { finalHearts: 3 },
 };
 
