@@ -14,20 +14,50 @@
 // strict 1v1 where every targeted action only ever has one legal target
 // anyway.
 
-// The tutorial bot is always Boingo (no passive shield, so every
-// non-shield-ignoring hit in these sequences lands at its full listed
-// value with no hidden discount from Chrono Guard) - except when the
-// human's own pick IS Boingo, where the bot is forced to Chronox instead
-// (unavoidable, exclusivity).
+// Bot opponent per human pick. Boingo is the default (no passive shield,
+// so every non-shield-ignoring hit lands at its full listed value with no
+// hidden discount from Chrono Guard) - with three deliberate exceptions:
+// - Chronox (human) -> Velorya: NOT Boingo. Boingo's Chaos Gamble against
+//   a Chronox HUMAN needed a forced/shield-ignored hit to land honestly
+//   (his own Chrono Guard would otherwise silently eat 1 of it) - using a
+//   forced override there risked reading as "this attack somehow bypasses
+//   shields," which is misleading for a brand-new player. Velorya's
+//   Lunar Strike genuinely, always ignores shield by its own real rules
+//   (ignoresShield: true baked into velorya.js, no coin flip, no
+//   tutorial-only override needed) - a completely honest flat-1 hit.
+// - Boingo (human) -> Tharox: same reasoning in the other direction -
+//   Tharox's own Smash is a genuinely un-shielded flat-1 hit against
+//   Boingo (who has no shield to begin with), so nothing needs forcing or
+//   overriding to look honest. (Boingo can't fight himself, but the
+//   replacement opponent is chosen for the same "no misleading forced
+//   discount" reason as Chronox's, not merely because Boingo-as-bot was
+//   unavailable.)
+// - Blade (human) -> Athena: not for a shield reason at all - Athena's
+//   curse-mirror is what actually lets Blade's OWN Rebirth trigger for
+//   real (see the blade sequence below for the full mechanic).
+const TUTORIAL_BOT_BY_HUMAN = {
+  boingo: 'tharox',
+  chronox: 'velorya',
+  blade: 'athena',
+};
 export function tutorialBotCharacterId(humanCharacterId) {
-  return humanCharacterId === 'boingo' ? 'chronox' : 'boingo';
+  return TUTORIAL_BOT_BY_HUMAN[humanCharacterId] ?? 'boingo';
 }
 
-const BOT_CYCLONE = { actor: 'bot', actionId: 'cyclonePunch', targetId: 'opponent', forcedAmount: 1 };
 const BOT_GAMBLE = { actor: 'bot', actionId: 'chaosGamble', targetId: 'opponent', forcedAmount: 1 };
+// Velorya's Lunar Strike is never forced - it's always a genuine flat-1,
+// shield-ignoring hit by its own real ability rules (see velorya.js), so
+// no forcedAmount/ignoresShield override is needed or wanted here.
+const BOT_LUNAR_STRIKE = { actor: 'bot', actionId: 'lunarStrike', targetId: 'opponent' };
+// Tharox's Smash is likewise never forced - it's a genuine flat-1 hit
+// against Boingo, who has no passive shield to interfere with it.
+const BOT_SMASH = { actor: 'bot', actionId: 'smash', targetId: 'opponent' };
 
 export const TUTORIAL_SEQUENCES = {
   chronox: [
+    // Bot: Velorya, not Boingo - her Lunar Strike is a genuinely
+    // shield-ignoring flat-1 hit by its own real rules (see
+    // TUTORIAL_BOT_BY_HUMAN above for why this matters).
     { actor: 'human', actionId: 'timeFreeze', targetId: 'opponent' },
     // Bot is frozen for its next 2 turns (see chronox.js's onTurnStart
     // freeze-continue logic) - no bot step here, its turn is skipped
@@ -35,9 +65,9 @@ export const TUTORIAL_SEQUENCES = {
     { actor: 'human', actionId: 'cyclonePunch', targetId: 'opponent', forcedAmount: 2 },
     // Bot's second frozen turn is also skipped - still no bot step here.
     { actor: 'human', actionId: 'cyclonePunch', targetId: 'opponent', forcedAmount: 2 },
-    BOT_GAMBLE,
+    BOT_LUNAR_STRIKE,
     { actor: 'human', actionId: 'cyclonePunch', targetId: 'opponent', forcedAmount: 2 },
-    BOT_GAMBLE,
+    BOT_LUNAR_STRIKE,
     { actor: 'human', actionId: 'cyclonePunch', targetId: 'opponent', forcedAmount: 1 },
     // Bot KO'd - match ends, no further bot step.
   ],
@@ -82,45 +112,78 @@ export const TUTORIAL_SEQUENCES = {
     // Bot KO'd.
   ],
   velorya: [
-    { actor: 'human', actionId: 'lunarStrike', targetId: 'opponent' },
+    // Opens with Lunar Eclipse (satisfies the turn-1 restriction, and
+    // demonstrates it immediately) - becomes untargetable for her next 3
+    // attacks. While untargetable, the bot doesn't merely deal 0 damage -
+    // getActingCharacterId (gameFlow.js) sees the bot has ZERO valid
+    // targets (Velorya is its only enemy) and skips its turn ENTIRELY,
+    // same as any character with nothing legal to do - there is no bot
+    // step at all during these 3 rounds, not even a whiffed one. The bot
+    // only gets a real turn again once eclipse ends (partway through
+    // resolving her 3rd attack).
+    { actor: 'human', actionId: 'lunarEclipse', targetId: null },
+    // No bot step - untargetable, bot has no legal target and is skipped.
+    { actor: 'human', actionId: 'lunarStrike', targetId: 'opponent' }, // eclipse 1/3
+    // No bot step - still untargetable.
+    { actor: 'human', actionId: 'lunarStrike', targetId: 'opponent' }, // eclipse 2/3
+    // No bot step - still untargetable.
+    { actor: 'human', actionId: 'lunarStrike', targetId: 'opponent' }, // eclipse 3/3, ends this hit
+    BOT_GAMBLE, // lands for real now - eclipse has ended
+    { actor: 'human', actionId: 'moonstep', targetId: 'opponent' }, // exposes the button
     BOT_GAMBLE,
     { actor: 'human', actionId: 'lunarStrike', targetId: 'opponent' },
     BOT_GAMBLE,
-    { actor: 'human', actionId: 'moonstep', targetId: 'opponent' },
-    BOT_GAMBLE,
     { actor: 'human', actionId: 'lunarStrike', targetId: 'opponent' },
     BOT_GAMBLE,
     { actor: 'human', actionId: 'lunarStrike', targetId: 'opponent' },
-    BOT_GAMBLE,
-    { actor: 'human', actionId: 'lunarStrike', targetId: 'opponent' },
-    BOT_GAMBLE,
-    { actor: 'human', actionId: 'lunarStrike', targetId: 'opponent' },
-    // Bot KO'd.
+    // Bot KO'd. (1+1+1 eclipsed hits, +1 moonstep, +3 more strikes = 7 exact)
   ],
   boingo: [
+    // Bot: Tharox, not Chronox - Tharox has no passive shield at all, so
+    // both his forced Jester Ball Take AND his own basic attack land at
+    // their genuine, un-discounted values with nothing needing a
+    // shield-ignoring override (unlike the original Chronox-bot version,
+    // where Take needed forcedAmount+ignoresShield specifically to work
+    // around Chrono Guard - exactly the kind of "this attack somehow
+    // bypasses shields" behavior that reads as misleading to a new
+    // player).
     { actor: 'human', actionId: 'jesterBall', targetId: 'opponent' },
-    // Bot is forced to Take (flat 4, shield ignored so Chrono Guard can't
-    // discount it) - Take doesn't consume the bot's own turn action (see
-    // finishJesterBall in gameFlow.js), so the bot ALSO gets its normal
-    // forced attack the same turn - two bot steps here, both consumed
-    // before the human's next turn. 'jesterBallTake' is a synthetic
-    // actionId understood only by index.js's tutorial bot-turn stepper
-    // (routed to finishJesterBall(game, 'take', extra), NOT through the
-    // normal executeAction/ability-map path) - it is never a real ability.
-    { actor: 'bot', actionId: 'jesterBallTake', targetId: null, forcedAmount: 4, ignoresShield: true },
-    { actor: 'bot', actionId: 'cyclonePunch', targetId: 'opponent', forcedAmount: 1 },
+    // Take doesn't consume the bot's own turn action (see finishJesterBall
+    // in gameFlow.js), so the bot ALSO gets its normal attack the same
+    // turn - two bot steps here, both consumed before the human's next
+    // turn. 'jesterBallTake' is a synthetic actionId understood only by
+    // index.js's tutorial bot-turn stepper (routed to
+    // finishJesterBall(game, 'take', extra), NOT through the normal
+    // executeAction/ability-map path) - it is never a real ability. No
+    // forcedAmount/ignoresShield here - Tharox has no shield, so the
+    // natural flat-4 Take lands honestly on its own.
+    { actor: 'bot', actionId: 'jesterBallTake', targetId: null },
+    BOT_SMASH,
     { actor: 'human', actionId: 'chaosGamble', targetId: 'opponent', forcedAmount: 3 },
     // Bot KO'd.
   ],
   blade: [
+    // Bot: Athena, not Boingo - her curse-mirror is what actually lets
+    // Blade's own Rebirth trigger for real (Boingo dealing 1 flat damage a
+    // turn never threatens Blade's 7 hearts fast enough within a safe
+    // sequence length, so Rebirth never had anything to revive HIM from).
+    // Human goes first each round, so Blade's very first Blood Hunt lands
+    // before Athena has cursed him yet (no mirror that hit) - once she
+    // curses him on her first turn, every LATER Blood Hunt hit Blade lands
+    // on her also mirrors that same amount back onto Blade himself (see
+    // damagePipeline.js's curse-mirror block). Streak 2+3+4 mirrored
+    // (2+3+4=9) exceeds Blade's remaining hearts after the streak-1 hit
+    // (7-1=6), triggering his Rebirth automatically on the streak-4 hit -
+    // the same action that also finishes Athena off (her total damage
+    // taken: 1+2+3+4=10, well past her own 7).
     { actor: 'human', actionId: 'bloodHunt', targetId: 'opponent' },
-    BOT_GAMBLE,
+    { actor: 'bot', actionId: 'curseStrike', targetId: 'opponent' },
     { actor: 'human', actionId: 'bloodHunt', targetId: 'opponent' },
-    BOT_GAMBLE,
+    { actor: 'bot', actionId: 'curseStrike', targetId: 'opponent' },
     { actor: 'human', actionId: 'bloodHunt', targetId: 'opponent' },
-    BOT_GAMBLE,
+    { actor: 'bot', actionId: 'curseStrike', targetId: 'opponent' },
     { actor: 'human', actionId: 'bloodHunt', targetId: 'opponent' },
-    // Bot KO'd.
+    // Athena KO'd via the mirror; Blade's Rebirth fires the same action.
   ],
   athena: [
     { actor: 'human', actionId: 'curseStrike', targetId: 'opponent' },

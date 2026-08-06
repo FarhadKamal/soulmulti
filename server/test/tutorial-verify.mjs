@@ -6,15 +6,20 @@
 import WebSocket from 'ws';
 
 const CHARACTERS = ['chronox', 'tharox', 'zerathys', 'akyros', 'velorya', 'boingo', 'blade', 'athena'];
+// Locked in from a verified real-engine run after the bot-swap redesign
+// (Chronox->Velorya, Boingo->Tharox, Blade->Athena - see
+// tutorialSequences.js's TUTORIAL_BOT_BY_HUMAN for why). Blade's 2 is his
+// post-Rebirth revival total, not a "took less damage" number - his
+// Rebirth is expected to fire mid-sequence.
 const EXPECTED = {
-  chronox: { humanTurns: 5, finalHearts: 5 },
-  tharox: { humanTurns: 5, finalHearts: 5 },
-  zerathys: { humanTurns: 6, finalHearts: 4 },
-  akyros: { humanTurns: 4, finalHearts: 5 },
-  velorya: { humanTurns: 7, finalHearts: 1 },
-  boingo: { humanTurns: 2, finalHearts: 6 },
-  blade: { humanTurns: 4, finalHearts: 4 },
-  athena: { humanTurns: 8, finalHearts: 3 },
+  chronox: { finalHearts: 5 },
+  tharox: { finalHearts: 5 },
+  zerathys: { finalHearts: 4 },
+  akyros: { finalHearts: 5 },
+  velorya: { finalHearts: 3 },
+  boingo: { finalHearts: 6 },
+  blade: { finalHearts: 2 },
+  athena: { finalHearts: 3 },
 };
 
 function playOne(characterId) {
@@ -95,10 +100,10 @@ async function main() {
       const result = await playOne(characterId);
       results.push(result);
       const expected = EXPECTED[characterId];
-      const pass = result.winnerIsHuman && !result.draw && result.humanFinalHearts === expected.finalHearts;
+      const pass = result.winnerIsHuman && !result.draw && !result.humanKO && result.humanFinalHearts === expected.finalHearts;
       console.log(
         `${pass ? 'PASS' : 'FAIL'} ${characterId}: winnerIsHuman=${result.winnerIsHuman} draw=${result.draw} ` +
-        `finalHearts=${result.humanFinalHearts} (expected ${expected.finalHearts}) humanKO=${result.humanKO} logLen=${result.logLength}`
+        `finalHearts=${result.humanFinalHearts} (expected ${expected.finalHearts}) humanKO=${result.humanKO} humanTurns=${result.humanTurnsTaken} logLen=${result.logLength}`
       );
     } catch (e) {
       console.log(`FAIL ${characterId}: ${e.message}`);
@@ -109,5 +114,3 @@ async function main() {
 }
 
 main();
-
-// Debug: run once for chronox alone and print full log

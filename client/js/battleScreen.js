@@ -4,7 +4,6 @@ import { renderChatPanel } from './chatPanel.js';
 import { playUiClick } from './sound.js';
 import { getFlashSrc, getPersistentPortrait } from './portraitFlash.js';
 import { getActiveEffects, getClawCount } from './actionEffects.js';
-import { renderRulesModal } from './rulesScreen.js';
 import { renderFullscreenButton } from './fullscreen.js';
 import { tutorialNarrationFor } from './tutorialNarration.js';
 
@@ -66,14 +65,6 @@ export function renderBattle(root, state) {
 
   const topControls = document.createElement('div');
   topControls.className = 'top-right-controls';
-  const rulesBtn = document.createElement('button');
-  rulesBtn.className = 'how-to-play-btn';
-  rulesBtn.textContent = 'How to Play';
-  rulesBtn.onclick = () => {
-    playUiClick();
-    renderRulesModal(document.body);
-  };
-  topControls.appendChild(rulesBtn);
   topControls.appendChild(renderFullscreenButton());
   wrap.appendChild(topControls);
 

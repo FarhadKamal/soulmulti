@@ -1,9 +1,7 @@
 import { CHARACTERS } from './characters.js';
 import { send } from './net.js';
 import { renderChatPanel } from './chatPanel.js';
-import { renderRulesModal } from './rulesScreen.js';
 import { renderFullscreenButton } from './fullscreen.js';
-import { playUiClick } from './sound.js';
 
 // Renders the pre-match lobby: room type choice -> create/join -> seat
 // list + character picking -> start. `room` is null until a create-room or
@@ -20,14 +18,6 @@ export function renderLobby(root, { room, error, connectionLost }, { onEnterMatc
 
   const topControls = document.createElement('div');
   topControls.className = 'top-right-controls';
-  const rulesBtn = document.createElement('button');
-  rulesBtn.className = 'how-to-play-btn';
-  rulesBtn.textContent = 'How to Play';
-  rulesBtn.onclick = () => {
-    playUiClick();
-    renderRulesModal(document.body);
-  };
-  topControls.appendChild(rulesBtn);
   topControls.appendChild(renderFullscreenButton());
   wrap.appendChild(topControls);
 

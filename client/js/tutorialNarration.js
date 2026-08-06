@@ -25,7 +25,8 @@ const NARRATION = {
     fatalSlash: 'Fatal Slash deals bonus damage against a marked target.',
   },
   velorya: {
-    lunarStrike: 'Open with Lunar Strike - it ignores shields entirely.',
+    lunarEclipse: 'Open with your special, Lunar Eclipse - you become untargetable for your next 3 attacks!',
+    lunarStrike: 'Lunar Strike ignores shields entirely.',
     moonstep: 'Moonstep deals more damage when you switch targets between hits (only one target here, so it matches Lunar Strike this time).',
   },
   boingo: {
