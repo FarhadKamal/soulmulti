@@ -62,7 +62,11 @@ export function renderLobby(root, { room, error, connectionLost }, { onEnterMatc
     onEnterMatch();
     return;
   } else {
-    scroll.appendChild(renderRoomLobby(room));
+    // Exit Room needs to land in topControls (already appended above,
+    // next to the fullscreen button) rather than its own row inside the
+    // room lobby - passed down so renderRoomLobby can push its icon button
+    // into that same shared top-right cluster.
+    scroll.appendChild(renderRoomLobby(room, topControls));
   }
 
   wrap.appendChild(scroll);
@@ -169,7 +173,7 @@ function renderEntryForm() {
   return form;
 }
 
-function renderRoomLobby(room) {
+function renderRoomLobby(room, topControls) {
   const wrap = document.createElement('div');
   wrap.className = 'room-lobby';
 
@@ -203,12 +207,17 @@ function renderRoomLobby(room) {
   codeRow.appendChild(copyBtn);
   wrap.appendChild(codeRow);
 
+  // Icon button in the shared top-right cluster (next to fullscreen),
+  // not its own full-width row between the code and seat list - same
+  // "compact corner control, not a standalone banner" fix already applied
+  // to the in-match Exit Game button (see battleScreen.js).
   if (room.youAreOwner) {
     const exitBtn = document.createElement('button');
-    exitBtn.className = 'exit-btn';
-    exitBtn.textContent = 'Exit Room';
+    exitBtn.className = 'exit-icon-btn';
+    exitBtn.title = 'Exit Room';
+    exitBtn.textContent = '🚪';
     exitBtn.onclick = () => send('leave-room');
-    wrap.appendChild(exitBtn);
+    topControls.appendChild(exitBtn);
   }
 
   const seatList = document.createElement('div');

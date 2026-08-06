@@ -54,7 +54,6 @@ input {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
 }
 .refresh-btn { background: #ffb3b3; color: #5c1a1a; border-color: #ffb3b3; font-weight: 600; white-space: nowrap; }
-.exit-btn { display: block; margin: 0 0 14px auto; background: #3a1c1c; border-color: #7a3a3a; color: #ffb3b3; font-size: 0.85em; }
 .exit-control { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-bottom: 14px; }
 .exit-confirm-prompt { font-size: 0.85em; opacity: 0.85; }
 .exit-confirm-yes { background: #5c1a1a; border-color: #7a3a3a; color: #ffb3b3; font-size: 0.85em; font-weight: 600; }
