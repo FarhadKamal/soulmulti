@@ -331,6 +331,21 @@ function runBotTurnsIfAny(room) {
   // second one stacked on top of it - the already-running sequence will
   // naturally pick up wherever the game state ends up.
   if (room.botSequenceActive) return;
+  // Nothing to do if it's already a human's decision - every caller here
+  // invokes this unconditionally after its own action (see handleAction
+  // etc.), regardless of whether any bot actually needs to act. Scheduling
+  // the BOT_ACTION_DELAY_MS timeout below anyway used to cause a
+  // completely redundant broadcastGameState 3s later purely confirming
+  // nothing had changed (stepBotTurn's own early-exit branch) - if that
+  // landed while the human had just armed an action client-side
+  // (battleScreen.js's armedAction, e.g. picked Cyclone Punch and was
+  // about to pick a target), the resulting game-state broadcast reset
+  // armedAction back to null (see main.js's game-state handler), silently
+  // un-arming the action and dropping the player back to the button list -
+  // reported as "clicking fast" reproducing it, which lines up exactly:
+  // slow play lets this stray timeout fire and resolve long before the
+  // player's next click, fast play means it can land mid-interaction.
+  if (!room.game || !isBotControlled(room, settleToNextDecision(room.game))) return;
   room.botSequenceActive = true;
   // The FIRST bot step also waits BOT_ACTION_DELAY_MS before acting, same
   // as every step after it - calling stepBotTurn() synchronously here would
@@ -395,7 +410,17 @@ function stepBotTurn(room) {
   // of a burst.
   broadcastGameState(room);
 
-  if (room.game.phase === 'game-over') {
+  // Only schedule another step if it's ACTUALLY still a bot's turn next -
+  // otherwise this fires BOT_ACTION_DELAY_MS later purely to discover
+  // that (the early-return branch above), re-broadcasting a game-state
+  // that already went out unchanged. If the human had armed an action in
+  // the meantime (battleScreen.js's armedAction, picked an ability and was
+  // about to pick a target), that stray broadcast reset it back to null
+  // client-side (main.js's game-state handler) - silently un-arming the
+  // action right as they were about to pick a target. This is what made
+  // "click fast right as your turn starts" reproduce it, and playing slow
+  // avoid it (the stray timer had long since fired and settled by then).
+  if (room.game.phase === 'game-over' || !isBotControlled(room, settleToNextDecision(room.game))) {
     room.botSequenceActive = false;
     return;
   }
