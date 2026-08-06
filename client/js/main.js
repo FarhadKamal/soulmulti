@@ -271,6 +271,10 @@ onMessage((msg) => {
 
 registerFlashRerender(() => { if (state.screen === 'battle') rerender(); });
 registerEffectRerender(() => { if (state.screen === 'battle') rerender(); });
+// Keeps the fullscreen button's icon/title correct even when fullscreen is
+// exited via Escape (or any OS-level gesture) rather than the button
+// itself - document.fullscreenElement changes without any click of ours.
+document.addEventListener('fullscreenchange', rerender);
 connect();
 rerender();
 startMenuMusic();

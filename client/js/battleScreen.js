@@ -5,6 +5,7 @@ import { playUiClick } from './sound.js';
 import { getFlashSrc, getPersistentPortrait } from './portraitFlash.js';
 import { getActiveEffects, getClawCount } from './actionEffects.js';
 import { renderRulesModal } from './rulesScreen.js';
+import { renderFullscreenButton } from './fullscreen.js';
 
 // Functional-first battle screen: no portrait art/animation yet (see
 // characterCard.js in the main game for that system) - just hearts,
@@ -62,6 +63,8 @@ export function renderBattle(root, state) {
   roundInfo.textContent = `Round ${game.round}`;
   wrap.appendChild(roundInfo);
 
+  const topControls = document.createElement('div');
+  topControls.className = 'top-right-controls';
   const rulesBtn = document.createElement('button');
   rulesBtn.className = 'how-to-play-btn';
   rulesBtn.textContent = 'How to Play';
@@ -69,7 +72,9 @@ export function renderBattle(root, state) {
     playUiClick();
     renderRulesModal(document.body);
   };
-  wrap.appendChild(rulesBtn);
+  topControls.appendChild(rulesBtn);
+  topControls.appendChild(renderFullscreenButton());
+  wrap.appendChild(topControls);
 
   // Only offered when playing solo against bots (humanCount <= 1) AND to
   // the room owner - with real opponents/teammates still in the match,
