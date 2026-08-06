@@ -417,8 +417,19 @@ input {
   box-shadow: 0 0 0 3px #ffd75e, 0 0 20px 4px #ffd75e55;
 }
 .victory-portrait-label { margin-top: 8px; font-weight: 700; }
-.game-over-actions { display: flex; flex-direction: column; align-items: center; gap: 12px; margin-top: 20px; }
-.game-over-actions .exit-btn { margin: 0; }
+/* Compact icon+label pills right under the title (see renderGameOver) -
+   replaces two stacked full-width buttons that used to sit all the way at
+   the bottom, below the entire match log, so they're reachable without
+   scrolling and read as a small deliberate control cluster rather than a
+   separate banner-like section of the page. */
+.game-over-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; margin: 10px 0 16px; }
+.game-over-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 14px; font-size: 0.9em; font-weight: 600;
+  background: #22283a; border-color: #444;
+}
+.game-over-pill span { font-size: 1.1em; line-height: 1; }
+.game-over-pill--exit { background: #3a1c1c; border-color: #7a3a3a; color: #ffb3b3; }
 
 .top-right-controls { position: absolute; top: 0; right: 0; display: flex; gap: 8px; align-items: center; }
 .fullscreen-btn, .exit-icon-btn {

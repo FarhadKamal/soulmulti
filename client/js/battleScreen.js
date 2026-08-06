@@ -806,14 +806,11 @@ function renderGameOver(game, youAreOwner) {
   const title = document.createElement('h2');
   title.textContent = game.winnerPlayerId ? 'Match over!' : 'Draw!';
   wrap.appendChild(title);
-  if (game.winnerPlayerId) {
-    const winner = game.players.find((p) => p.id === game.winnerPlayerId);
-    const sub = document.createElement('div');
-    sub.textContent = `Winner: ${winner?.name || game.winnerPlayerId}`;
-    wrap.appendChild(sub);
-    wrap.appendChild(renderVictoryPortraits(game));
-  }
-  wrap.appendChild(renderFullLogWithCopy(game.log));
+
+  // Compact icon+label pills right under the title, not stranded at the
+  // bottom below the full match log - these are the two actions someone
+  // actually wants right after seeing who won, so they shouldn't require
+  // scrolling past the whole log to reach.
   const btnRow = document.createElement('div');
   btnRow.className = 'game-over-actions';
 
@@ -825,7 +822,9 @@ function renderGameOver(game, youAreOwner) {
   if (game.mode !== 'tutorial') {
     if (youAreOwner) {
       const homeBtn = document.createElement('button');
-      homeBtn.textContent = 'Play Again (same room)';
+      homeBtn.className = 'game-over-pill';
+      homeBtn.innerHTML = '<span>🔁</span> Play Again';
+      homeBtn.title = 'Play Again (same room)';
       // Returns everyone in this room to the SAME room's lobby (same code) so
       // the group can pick again and play another match without re-sharing a
       // code - a plain page reload would instead drop the WebSocket entirely
@@ -844,11 +843,22 @@ function renderGameOver(game, youAreOwner) {
   // create/join entry screen, distinct from "Play Again" above (which only
   // the owner can trigger and keeps everyone in the same room/code).
   const exitBtn = document.createElement('button');
-  exitBtn.className = 'exit-btn';
-  exitBtn.textContent = 'Exit to Main Menu';
+  exitBtn.className = 'game-over-pill game-over-pill--exit';
+  exitBtn.innerHTML = '<span>🚪</span> Exit';
+  exitBtn.title = 'Exit to Main Menu';
   exitBtn.onclick = () => send('leave-room');
   btnRow.appendChild(exitBtn);
 
   wrap.appendChild(btnRow);
+
+  if (game.winnerPlayerId) {
+    const winner = game.players.find((p) => p.id === game.winnerPlayerId);
+    const sub = document.createElement('div');
+    sub.textContent = `Winner: ${winner?.name || game.winnerPlayerId}`;
+    wrap.appendChild(sub);
+    wrap.appendChild(renderVictoryPortraits(game));
+  }
+  wrap.appendChild(renderFullLogWithCopy(game.log));
+
   return wrap;
 }
