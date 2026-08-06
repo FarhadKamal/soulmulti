@@ -67,8 +67,23 @@ async function serveStaticFile(req, res) {
       return serveStaticFile({ ...req, url: join(relativePath, 'index.html') }, res);
     }
     const data = await readFile(filePath);
-    const contentType = MIME_TYPES[extname(filePath).toLowerCase()] || 'application/octet-stream';
-    res.writeHead(200, { 'Content-Type': contentType });
+    const ext = extname(filePath).toLowerCase();
+    const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+    const headers = { 'Content-Type': contentType };
+    // Images/audio are static, content-addressed-in-spirit assets that
+    // never change without a filename change - without a Cache-Control
+    // header the browser has to re-validate (or worse, re-fetch) them on
+    // every reload, which is exactly why battle portrait/flash images kept
+    // "loading slowly" even after the client-side preload warmed the
+    // in-page cache for a single session. HTML/JS/CSS stay uncached
+    // (or short-lived) so a new deploy is picked up on next reload instead
+    // of serving a stale bundle for a year.
+    if (['.jpg', '.jpeg', '.png', '.svg', '.ico', '.mp3'].includes(ext)) {
+      headers['Cache-Control'] = 'public, max-age=31536000, immutable';
+    } else {
+      headers['Cache-Control'] = 'no-cache';
+    }
+    res.writeHead(200, headers);
     res.end(data);
   } catch {
     res.writeHead(404, { 'Content-Type': 'text/plain' });
