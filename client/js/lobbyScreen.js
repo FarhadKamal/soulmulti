@@ -11,6 +11,14 @@ import { renderFullscreenButton } from './fullscreen.js';
 // yet) - see renderLobby below.
 let aboutOpen = false;
 
+// Which seat index (if any) has an armed "Kick this player? Yes/No"
+// confirmation showing - same module-state reasoning as aboutOpen above,
+// and same "no native popup, inline confirm instead" convention as
+// battleScreen.js's Exit Game. null when nothing is armed. Reset whenever
+// the room itself changes (see renderRoomLobby) so a stale confirm from a
+// PREVIOUS room's seat list can never linger into a new one.
+let confirmingKickSeatIndex = null;
+
 // Renders the pre-match lobby: room type choice -> create/join -> seat
 // list + character picking -> start. `room` is null until a create-room or
 // join-room response/lobby-update has arrived at least once.
@@ -79,7 +87,7 @@ export function renderLobby(root, { room, error, connectionLost }, { onEnterMatc
     // next to the fullscreen button) rather than its own row inside the
     // room lobby - passed down so renderRoomLobby can push its icon button
     // into that same shared top-right cluster.
-    scroll.appendChild(renderRoomLobby(room, topControls));
+    scroll.appendChild(renderRoomLobby(room, topControls, rerender));
   }
 
   wrap.appendChild(scroll);
@@ -212,7 +220,17 @@ function renderEntryForm() {
   return form;
 }
 
-function renderRoomLobby(room, topControls) {
+// Tracks which room's seat list confirmingKickSeatIndex currently applies
+// to - a stale "confirm kick on seat 2" from a PREVIOUS room must never
+// silently apply to seat 2 of a brand new room with completely different
+// occupants.
+let confirmingKickRoomCode = null;
+
+function renderRoomLobby(room, topControls, rerender) {
+  if (confirmingKickRoomCode !== room.code) {
+    confirmingKickRoomCode = room.code;
+    confirmingKickSeatIndex = null;
+  }
   const wrap = document.createElement('div');
   wrap.className = 'room-lobby';
 
@@ -289,6 +307,39 @@ function renderRoomLobby(room, topControls) {
       removeBtn.textContent = 'Remove Bot';
       removeBtn.onclick = () => send('remove-bot', { seatIndex: seat.index });
       row.appendChild(removeBtn);
+    }
+    // Kick a real human player - never offered for your own seat (isMe),
+    // never a bot seat (that's Remove Bot above), and lobby-only just like
+    // every other seat-management action here - the server enforces the
+    // same, this just keeps the button from ever appearing somewhere it'd
+    // silently no-op.
+    if (seat.kind === 'human' && !seat.isMe && room.youAreOwner) {
+      if (confirmingKickSeatIndex === seat.index) {
+        const prompt = document.createElement('span');
+        prompt.className = 'kick-confirm-prompt';
+        prompt.textContent = `Kick ${seat.name}?`;
+        row.appendChild(prompt);
+        const yesBtn = document.createElement('button');
+        yesBtn.className = 'kick-confirm-yes';
+        yesBtn.textContent = 'Yes, kick';
+        yesBtn.onclick = () => {
+          send('kick-player', { seatIndex: seat.index });
+          confirmingKickSeatIndex = null;
+          rerender();
+        };
+        row.appendChild(yesBtn);
+        const noBtn = document.createElement('button');
+        noBtn.className = 'kick-confirm-no';
+        noBtn.textContent = 'No';
+        noBtn.onclick = () => { confirmingKickSeatIndex = null; rerender(); };
+        row.appendChild(noBtn);
+      } else {
+        const kickBtn = document.createElement('button');
+        kickBtn.className = 'kick-btn';
+        kickBtn.textContent = 'Kick';
+        kickBtn.onclick = () => { confirmingKickSeatIndex = seat.index; rerender(); };
+        row.appendChild(kickBtn);
+      }
     }
 
     seatList.appendChild(row);

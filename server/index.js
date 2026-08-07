@@ -715,6 +715,32 @@ function handleRemoveBot(room, sessionId, { seatIndex }) {
   broadcastLobby(room);
 }
 
+// Owner-only, lobby-phase-only (never mid-match - see the room.phase
+// check) removal of another HUMAN player from the room, distinct from
+// Remove Bot (that only ever un-fills a bot seat). Mirrors leaveRoom's own
+// "still in lobby" branch exactly (free the seat back to empty, hand off
+// ownership if the kicked player somehow was the owner - not reachable
+// today since only the owner can kick, but kept for symmetry/future-
+// proofing), except the kicked player didn't initiate this themselves, so
+// they need an explicit notice (not the generic 'left-room' a real Exit
+// Room click gets) telling them what happened rather than a message that
+// would read as a random disconnect.
+function handleKickPlayer(room, sessionId, { seatIndex }) {
+  if (sessionId !== room.ownerId) return;
+  if (room.phase !== 'lobby') return;
+  const seat = room.seats[seatIndex];
+  if (!seat || seat.kind !== 'human') return;
+  if (seat.playerId === sessionId) return; // can't kick yourself
+  const kickedWs = seat.spectatorId ? sessions.get(seat.spectatorId) : null;
+  if (kickedWs) send(kickedWs, 'kicked', {});
+  seat.kind = 'empty';
+  seat.playerId = null;
+  seat.spectatorId = null;
+  seat.name = null;
+  seat.characterIds = [];
+  broadcastLobby(room);
+}
+
 function handleStartMatch(room, sessionId) {
   if (sessionId !== room.ownerId) return;
   // Every human-claimed seat must have finished picking before starting.
@@ -989,6 +1015,7 @@ wss.on('connection', (ws) => {
       case 'unpick-character': return handleUnpickCharacter(room, sessionId, payload);
       case 'fill-bot': return handleFillBot(room, sessionId, payload);
       case 'remove-bot': return handleRemoveBot(room, sessionId, payload);
+      case 'kick-player': return handleKickPlayer(room, sessionId, payload);
       case 'start-match': return handleStartMatch(room, sessionId);
       case 'return-to-lobby': return handleReturnToLobby(room, sessionId);
       case 'abandon-match': return handleAbandonMatch(room, sessionId);

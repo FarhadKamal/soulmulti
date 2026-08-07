@@ -339,6 +339,22 @@ onMessage((msg) => {
       startMenuMusic();
       rerender();
       break;
+    case 'kicked':
+      // The room owner removed this player's seat directly (see
+      // handleKickPlayer in index.js) - same reset as left-room, but with
+      // an explicit notice so it reads as a deliberate host action, not a
+      // random disconnect/bug.
+      state.screen = 'lobby';
+      state.room = null;
+      state.game = null;
+      state.error = 'You were removed from the room by the host.';
+      lastLogLength = 0;
+      previousActingCharacterId = null;
+      lastKnownHearts.clear();
+      clearChatMessages();
+      startMenuMusic();
+      rerender();
+      break;
     case 'chat-message':
       addChatMessage(msg);
       rerender();

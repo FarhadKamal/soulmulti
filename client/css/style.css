@@ -76,8 +76,13 @@ input {
   padding: 10px 12px; border-radius: 8px; background: #1c1c2c; border: 1px solid #333;
 }
 .seat-row--me { border-color: #6c6cff; }
+.seat-row { flex-wrap: wrap; }
 .seat-label { font-weight: 600; }
 .seat-picks { opacity: 0.8; font-size: 0.9em; }
+.kick-btn { background: #3a1c1c; border-color: #7a3a3a; color: #ffb3b3; font-size: 0.85em; }
+.kick-confirm-prompt { font-size: 0.85em; opacity: 0.85; }
+.kick-confirm-yes { background: #5c1a1a; border-color: #7a3a3a; color: #ffb3b3; font-size: 0.85em; font-weight: 600; }
+.kick-confirm-no { font-size: 0.85em; }
 .pick-section h3 { margin-bottom: 8px; }
 .picked-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
 .picked-chip { border-width: 2px; background: #22283a; }
