@@ -9,6 +9,7 @@ import {
 import { handleLogEntryForFlash, handleDodgeForFlash, checkIdlePortrait, registerFlashRerender } from './portraitFlash.js';
 import { handleLogEntryForEffects, registerEffectRerender } from './actionEffects.js';
 import { preloadBattleImages } from './imagePreload.js';
+import { hasVoice, playIdleVoice, playInjuredVoice, playKoedVoice, playVictoryVoice, playMoveVoice } from './voice.js';
 
 const root = document.getElementById('app');
 
@@ -46,6 +47,31 @@ const state = {
 // check (see portraitFlash.js's checkIdlePortrait).
 let lastLogLength = 0;
 let previousActingCharacterId = null;
+// Tracks each character's hearts as of the LAST broadcast seen (not just
+// at their own turn start, unlike checkIdlePortrait's heartsAtLastTurnStart
+// - injured needs to fire the instant a hit drops someone below half,
+// which can happen on someone else's turn, not only at the start of the
+// injured character's own next turn) - lets playInjuredVoiceIfNewlyHurt
+// detect the exact broadcast where a character first crosses into
+// "at or below half health" rather than firing on every later broadcast
+// while they stay in that range.
+const lastKnownHearts = new Map(); // characterId -> number
+
+// Fires a character's injured voice line the FIRST broadcast where their
+// hearts cross into <= maxHearts/2 (never again afterward while they stay
+// there, and never for a character who was already at/below half on the
+// very first broadcast we ever saw them in - there's no "before" state to
+// compare against yet, so nothing to call a fresh transition).
+function playInjuredVoiceIfNewlyHurt(game) {
+  for (const character of Object.values(game.characters)) {
+    const prev = lastKnownHearts.has(character.id) ? lastKnownHearts.get(character.id) : null;
+    lastKnownHearts.set(character.id, character.hearts);
+    if (character.isKO || prev === null) continue;
+    const isInjuredNow = character.hearts <= character.maxHearts / 2;
+    const wasInjuredBefore = prev <= character.maxHearts / 2;
+    if (isInjuredNow && !wasInjuredBefore) playInjuredVoice(character.id);
+  }
+}
 
 // Guards the game-over timer chain (see startGameOverSequence below) so a
 // repeat game-state broadcast or an unrelated rerender (e.g. a chat
@@ -59,7 +85,7 @@ let gameOverSequenceStarted = false;
 // 1600ms-ish timers rather than being cut away from instantly), then show
 // victory art, then finally the Match Over banner. ~1.2s + ~3.8s, same
 // total as the main game's own two-stage delay.
-function startGameOverSequence() {
+function startGameOverSequence(game) {
   if (gameOverSequenceStarted) return;
   gameOverSequenceStarted = true;
   state.gameOverStage = 'freeze';
@@ -70,7 +96,15 @@ function startGameOverSequence() {
     setTimeout(() => {
       if (state.screen !== 'battle') return;
       state.gameOverStage = 'banner';
-      playVictory();
+      // A recorded voice REPLACES the generic victory jingle (see
+      // playVictoryVoice/hasVoice in voice.js) - the winning side can have
+      // more than one character (2v2/4p teams), so this plays the FIRST
+      // one that actually has a recorded line, falling back to the
+      // generic jingle only if none of them do (or it's a draw, no
+      // winnerPlayerId at all).
+      const winner = game.winnerPlayerId ? game.players.find((p) => p.id === game.winnerPlayerId) : null;
+      const voiceCharacterId = winner?.characterIds.find(hasVoice);
+      if (!voiceCharacterId || !playVictoryVoice(voiceCharacterId)) playVictory();
       rerender();
     }, 3800);
   }, 1200);
@@ -95,6 +129,14 @@ function processNewLogEntries(game) {
 // sound on a losing roll), and the same four distinct Jester Ball
 // resolution sounds (throw/pass/take-explode-or-revive/return) instead of
 // reusing one sound for all of them.
+// KO'd voice REPLACES the generic game-over sound for a recorded character
+// (playKoedVoice returns true once it actually played something) - falls
+// back to the generic sound for any character without a recorded koed
+// line yet, same as every other voice/sound fallback in this file.
+function playKoedFor(characterId) {
+  if (!playKoedVoice(characterId)) playKO();
+}
+
 function playLogEntrySound(entry) {
   if (entry.type === 'dodge') {
     playDodge();
@@ -105,7 +147,7 @@ function playLogEntrySound(entry) {
     return;
   }
   if (entry.type === 'curse-mirror') {
-    if (entry.koTriggered) setTimeout(() => playKO(), 200);
+    if (entry.koTriggered) setTimeout(() => playKoedFor(entry.toCharacterId), 200);
     return;
   }
   if (entry.type === 'jester-ball-pass') {
@@ -123,7 +165,7 @@ function playLogEntrySound(entry) {
     // avoid playing both for the same event.
     if (!entry.revived) {
       playSound('smash');
-      if (entry.koTriggered) setTimeout(() => playKO(), 200);
+      if (entry.koTriggered) setTimeout(() => playKoedFor(entry.targetCharacterId), 200);
     }
     return;
   }
@@ -155,7 +197,11 @@ function playLogEntrySound(entry) {
     return;
   }
   playActionSound(entry.actionId);
-  if (entry.koTriggered) setTimeout(() => playKO(), 200);
+  // Layered on top of the effect sound just played above, never replacing
+  // it (see voice.js's playMoveVoice) - a no-op for any character/action
+  // that isn't one of the 4 recorded signature moves so far.
+  playMoveVoice(entry.characterId, entry.actionId);
+  if (entry.koTriggered) setTimeout(() => playKoedFor(entry.targetCharacterId), 200);
 }
 
 function mySeatCharacterIds() {
@@ -205,6 +251,7 @@ onMessage((msg) => {
         state.screen = 'lobby';
         lastLogLength = 0; // next match starts a fresh game.log from []
         previousActingCharacterId = null;
+        lastKnownHearts.clear(); // next match's characters start fresh, nothing "already seen" yet
         gameOverSequenceStarted = false; // next match gets its own fresh sequence
         state.gameOverStage = null;
       } else if (msg.room.phase === 'in-match' && state.screen !== 'battle') {
@@ -234,16 +281,17 @@ onMessage((msg) => {
       state.tutorialRequiredActionId = msg.tutorialRequiredActionId ?? null;
       state.tutorialRequiredTargetId = msg.tutorialRequiredTargetId ?? null;
       processNewLogEntries(msg.game);
+      playInjuredVoiceIfNewlyHurt(msg.game);
       // A fresh turn just started for whoever's now acting (different from
       // who was acting on the previous broadcast) - check their idle
       // portrait (Athena's apple, Velorya's dance, etc.) the same moment
       // the main game's beginCharacterTurn hook does.
       if (msg.actingCharacterId && msg.actingCharacterId !== previousActingCharacterId) {
         const character = msg.game.characters[msg.actingCharacterId];
-        if (character) checkIdlePortrait(character);
+        if (character && checkIdlePortrait(character)) playIdleVoice(character.id);
       }
       previousActingCharacterId = msg.actingCharacterId;
-      if (msg.game.phase === 'game-over') startGameOverSequence();
+      if (msg.game.phase === 'game-over') startGameOverSequence(msg.game);
       rerender();
       break;
     case 'error':
@@ -265,6 +313,7 @@ onMessage((msg) => {
       state.error = null;
       lastLogLength = 0;
       previousActingCharacterId = null;
+      lastKnownHearts.clear();
       startMenuMusic();
       rerender();
       break;

@@ -34,10 +34,14 @@ function playOne(characterId) {
     let humanCharacterId = null;
     let humanTurnsTaken = 0;
     let gameOverSeen = false;
+    // 60s, not 30s - BOT_ACTION_DELAY_MS (index.js) is 5000ms per bot step,
+    // and the longest sequences here (Velorya's 1v2, Athena's 8-turn mirror
+    // fight) interleave several bot steps per human turn - real wall-clock
+    // time to play one through comfortably exceeds 30s at that pacing.
     const timeout = setTimeout(() => {
       reject(new Error(`${characterId}: TIMEOUT waiting for game-over`));
       ws.close();
-    }, 30000);
+    }, 60000);
 
     function send(type, payload = {}) {
       ws.send(JSON.stringify({ type, ...payload }));

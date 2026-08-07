@@ -536,6 +536,24 @@ function statusBadges(character) {
   return badges;
 }
 
+// The first ACTION_LOCKOUT_MS of your own turn, the action-pick buttons
+// stay disabled (server-side, bots pace themselves the same way - see
+// BOT_ACTION_DELAY_MS in index.js, kept equal to this) - purely a pacing
+// choice so a turn always has a beat of "look at the board" before either
+// side can act, not an anti-cheat measure. Deliberately does NOT apply to
+// Cancel, target-picking once an action is armed, or a tutorial's single
+// required button - those already have their own distinct flow and this
+// would just add friction without the "look before you act" purpose it
+// serves on the very first decision of a turn.
+const ACTION_LOCKOUT_MS = 5000;
+// Mirrors server/rooms.js's TURN_TIMER_MS - the server only ever sends the
+// absolute deadline (state.turnDeadline), not the total duration it was
+// armed for, so this is needed here purely to work backwards to "when did
+// this turn actually start" (turnDeadline - TURN_TIMER_MS) to compute the
+// lockout window below. Not sent over the wire anywhere, so it has to be
+// kept in sync with the server constant by hand if that one ever changes.
+const TURN_TIMER_MS = 30_000;
+
 function renderActionPanel(characterId, usableActions, armedAction, state) {
   const panel = document.createElement('div');
   panel.className = 'action-panel';
@@ -565,8 +583,19 @@ function renderActionPanel(characterId, usableActions, armedAction, state) {
   }
   panel.appendChild(title);
 
+  // Skipped entirely in a tutorial (its own single-required-button lock
+  // already governs clickability - see isTutorialLocked below) and for the
+  // Soul Swap free follow-up (awaitingSoulSwapWrath - that's a forced,
+  // already-in-motion continuation of the turn, not a fresh decision that
+  // needs its own "look before you act" beat).
+  const lockoutUntil = (!state.tutorialRequiredActionId && !state.awaitingSoulSwapWrath && state.turnDeadline)
+    ? state.turnDeadline - TURN_TIMER_MS + ACTION_LOCKOUT_MS
+    : 0;
+  const lockoutActive = lockoutUntil > Date.now();
+
   const btnRow = document.createElement('div');
   btnRow.className = 'action-btn-row';
+  const lockableButtons = [];
   usableActions.forEach((action) => {
     const btn = document.createElement('button');
     btn.textContent = action.label;
@@ -575,9 +604,10 @@ function renderActionPanel(characterId, usableActions, armedAction, state) {
     // actually clickable - mirrors the disabled-button precedent already
     // used for lobbyScreen.js's character-pick grid.
     const isTutorialLocked = state.tutorialRequiredActionId && action.actionId !== state.tutorialRequiredActionId;
-    btn.disabled = !!isTutorialLocked;
+    btn.disabled = !!isTutorialLocked || lockoutActive;
+    if (!isTutorialLocked) lockableButtons.push(btn);
     btn.onclick = () => {
-      if (isTutorialLocked) return;
+      if (isTutorialLocked || btn.disabled) return;
       playUiClick();
       if (!action.needsTarget) {
         submitAction(characterId, action, null, state);
@@ -589,6 +619,32 @@ function renderActionPanel(characterId, usableActions, armedAction, state) {
     btnRow.appendChild(btn);
   });
   panel.appendChild(btnRow);
+
+  if (lockoutActive) {
+    const hint = document.createElement('div');
+    hint.className = 'lockout-hint';
+    panel.appendChild(hint);
+    // Self-ticking, same pattern as renderTurnTimer above - mutates this
+    // one DOM node directly on an interval rather than triggering a full
+    // renderBattle(), which would otherwise wipe out anything else
+    // in-progress (chat draft, an armed action, etc.) just to update a
+    // countdown. Stops itself once the lockout window passes and directly
+    // un-disables the buttons in place - no server round trip needed,
+    // this was always a pure client-side pacing display.
+    const tick = () => {
+      const msLeft = lockoutUntil - Date.now();
+      if (msLeft <= 0) {
+        hint.remove();
+        lockableButtons.forEach((b) => { b.disabled = false; });
+        clearInterval(intervalId);
+        return;
+      }
+      hint.textContent = `Get ready... ${Math.ceil(msLeft / 1000)}s`;
+    };
+    const intervalId = setInterval(tick, 200);
+    tick();
+  }
+
   return panel;
 }
 

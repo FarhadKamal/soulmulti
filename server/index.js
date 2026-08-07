@@ -321,8 +321,12 @@ function isBotControlled(room, characterId) {
 // BOT_ACTION_DELAY_MS before resolving the next one. Reported directly:
 // with several consecutive bot turns (e.g. a 4-player match with 1 human),
 // they used to all resolve in one synchronous tick, broadcasting only the
-// final result - unreadable.
-const BOT_ACTION_DELAY_MS = 3000;
+// final result - unreadable. Matches battleScreen.js's own client-side
+// ACTION_LOCKOUT_MS (also 5000) - a human's action buttons stay disabled
+// for the first 5s of their own turn too, so bots and humans share the
+// same "turn just started, nothing acts instantly" pacing throughout a
+// match, not just during bot-only stretches.
+const BOT_ACTION_DELAY_MS = 5000;
 
 function runBotTurnsIfAny(room) {
   // Guard against overlapping sequences: if a paced bot sequence is

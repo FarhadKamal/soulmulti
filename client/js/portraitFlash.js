@@ -71,10 +71,17 @@ const IDLE_IMAGE = {
 // Call once per character at the moment their own turn starts (i.e. when
 // they first appear as actingCharacterId after not having been the actor
 // on the previous broadcast) - see main.js's turn-start edge detection.
+// Returns true if the character was genuinely in the "idle" state
+// (untouched since last turn, above half health) - main.js uses this same
+// boolean to decide whether to also play that character's idle voice line
+// (voice.js's playIdleVoice), so there's exactly one definition of "idle"
+// shared by both the portrait and the voice line, not two separately
+// maintained checks that could drift apart.
 export function checkIdlePortrait(character) {
-  if (character.isKO) return;
+  if (character.isKO) return false;
   const lastHearts = heartsAtLastTurnStart.has(character.id) ? heartsAtLastTurnStart.get(character.id) : null;
   const wasUntouched = lastHearts === null || character.hearts >= lastHearts;
+  const isIdle = wasUntouched && character.hearts > character.maxHearts / 2;
   // Don't stomp a more specific flash that was JUST set for this same
   // broadcast (e.g. Akyros dodging the hit that ended up rotating turn
   // order straight to him - handleDodgeForFlash's akyros_dodge flash and
@@ -87,13 +94,14 @@ export function checkIdlePortrait(character) {
   // priority, so it has to be enforced here instead.
   if (activeFlash.has(character.id)) {
     heartsAtLastTurnStart.set(character.id, character.hearts);
-    return;
+    return false;
   }
-  if (wasUntouched && character.hearts > character.maxHearts / 2) {
+  if (isIdle) {
     const src = IDLE_IMAGE[character.id];
     if (src) setFlash(character.id, src);
   }
   heartsAtLastTurnStart.set(character.id, character.hearts);
+  return isIdle;
 }
 
 // Boingo's "laughing" flash is the odd one out - triggered on the THROWER

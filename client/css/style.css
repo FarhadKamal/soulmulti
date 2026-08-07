@@ -348,6 +348,7 @@ input {
 .action-btn-row { display: flex; flex-wrap: wrap; gap: 8px; }
 .target-prompt { margin-bottom: 10px; }
 .pass-hint { font-size: 0.85em; opacity: 0.75; margin: 8px 0; }
+.lockout-hint { font-size: 0.85em; opacity: 0.6; margin-top: 8px; text-align: center; }
 
 .log-panel {
   background: #14141c; border: 1px solid #2a2a3a; border-radius: 10px;
