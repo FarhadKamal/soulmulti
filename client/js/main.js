@@ -168,6 +168,11 @@ function playLogEntrySound(entry) {
     // avoid playing both for the same event.
     if (!entry.revived) {
       playSound('smash');
+      // Boingo gets the last laugh whenever the ball bursts on SOMEONE
+      // ELSE - not when it bursts on himself (he can hold his own ball
+      // mid-pass-chain in a multi-target room). A no-op for anyone but
+      // Boingo, and a no-op if he's the one it exploded on.
+      if (entry.targetCharacterId !== 'boingo') playLaughVoice('boingo');
       if (entry.koTriggered) setTimeout(() => playKoedFor(entry.targetCharacterId), 200);
     }
     return;
