@@ -41,7 +41,7 @@ function playVoiceFile(characterId, line) {
 const VOICE_LINES = {
   chronox: { idle: 'idle', injured: 'injured', koed: 'koed', victory: 'victory', move: 'time_freeze' },
   velorya: { idle: 'idle', injured: 'injured', koed: 'koed', victory: 'victory', move: 'eclipse' },
-  boingo: { idle: 'idle', injured: 'injured', koed: 'koed', victory: 'victory', move: 'jerster' },
+  boingo: { idle: 'idle', injured: 'injured', koed: 'koed', victory: 'victory', move: 'jerster', laugh: 'HAHAHAHA' },
   athena: { idle: 'idle', injured: 'injured', koed: 'koed', victory: 'victory', move: 'devine' },
 };
 
@@ -96,5 +96,14 @@ export function playVictoryVoice(characterId) {
 export function playMoveVoice(characterId, actionId) {
   if (SIGNATURE_MOVE_ACTION_ID[characterId] !== actionId) return;
   const line = VOICE_LINES[characterId]?.move;
+  if (line) playVoiceFile(characterId, line);
+}
+
+// Boingo's cackle when the Jester Ball returns to him (see main.js's
+// 'jester-ball-return' handler) - plays alongside the existing 'magic'
+// return sound effect, same layering as playMoveVoice above. Only Boingo
+// has a 'laugh' line so far; a no-op for anyone else.
+export function playLaughVoice(characterId) {
+  const line = VOICE_LINES[characterId]?.laugh;
   if (line) playVoiceFile(characterId, line);
 }

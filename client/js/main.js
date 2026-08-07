@@ -9,7 +9,7 @@ import {
 import { handleLogEntryForFlash, handleDodgeForFlash, checkIdlePortrait, registerFlashRerender } from './portraitFlash.js';
 import { handleLogEntryForEffects, registerEffectRerender } from './actionEffects.js';
 import { preloadBattleImages } from './imagePreload.js';
-import { hasVoice, playIdleVoice, playInjuredVoice, playKoedVoice, playVictoryVoice, playMoveVoice } from './voice.js';
+import { hasVoice, playIdleVoice, playInjuredVoice, playKoedVoice, playVictoryVoice, playMoveVoice, playLaughVoice } from './voice.js';
 
 const root = document.getElementById('app');
 
@@ -156,6 +156,9 @@ function playLogEntrySound(entry) {
   }
   if (entry.type === 'jester-ball-return') {
     playSound('magic');
+    // Layered on top, never replacing the return sound - a no-op for
+    // anyone but Boingo (see voice.js's playLaughVoice).
+    playLaughVoice(entry.boingoId);
     return;
   }
   if (entry.type === 'jester-ball-take') {
