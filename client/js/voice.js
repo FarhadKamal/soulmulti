@@ -20,16 +20,83 @@ function get(characterId, line) {
   return cache[key];
 }
 
-function playVoiceFile(characterId, line) {
+// The currently-playing voice clip (if any) - tracked so a higher-priority
+// arrival within the arbitration window can actively cut it off rather
+// than letting two human voices overlap even briefly (see
+// ARBITRATION_WINDOW_MS below for why this matters: koed can legitimately
+// fire ~200ms after a move-voice from the same broadcast already started
+// playing).
+let currentClip = null;
+
+function playRawVoiceFile(characterId, line) {
   try {
+    if (currentClip) {
+      currentClip.pause();
+      currentClip = null;
+    }
     const base = get(characterId, line);
     const node = base.cloneNode();
     node.volume = 0.85;
+    node.addEventListener('ended', () => { if (currentClip === node) currentClip = null; });
+    // Set currentClip BEFORE play() resolves, not inside a .then() - a
+    // second call arriving synchronously right after this one (which is
+    // exactly the scenario this whole cutoff mechanism exists for) would
+    // otherwise still see currentClip as null and fail to cut this one
+    // off, since play()'s returned promise only resolves on a later
+    // microtask, after the synchronous call stack of both calls has
+    // already finished.
+    currentClip = node;
     node.play().catch(() => {});
   } catch {
     // ignore - missing/blocked file, same silent-fallback policy as
     // sound.js's playSound
   }
+}
+
+// Priority arbitration: multiple voice categories can genuinely fire from
+// the SAME server broadcast (e.g. Zerathys's Thunder Wrath landing is, in
+// one broadcast: his own 'release' move-voice, the victim's 'injured'
+// voice if that hit dropped them below half, AND the next character's
+// 'idle' voice if turn order rotated straight to someone untouched) -
+// several human voices talking over each other reads as broken, unlike
+// sound effects/music which are short and layer fine. Only the single
+// highest-priority voice within a short rolling window actually plays;
+// everything else in that window is dropped, not queued or delayed.
+//
+// koed/rebirth are the biggest, rarest moments (a character dying or
+// clawing back from death) - never drowned out by anything. victory sits
+// below those two but above everything else the winning side might also
+// trigger in the same instant (e.g. a move voice on the killing blow).
+// idle is the most common, lowest-stakes trigger (just "still healthy at
+// turn start") - loses to literally everything.
+const PRIORITY = { koed: 6, rebirth: 5, victory: 4, move: 3, laugh: 2, injured: 1, idle: 0 };
+// KO'd voices fire via a 200ms setTimeout in main.js (see playKoedFor)
+// rather than synchronously with the triggering action's own move-voice
+// call - the window has to be comfortably longer than that stagger, or a
+// same-broadcast koed would arrive just after the window closed and
+// wrongly play alongside whatever move-voice already claimed the slot.
+const ARBITRATION_WINDOW_MS = 300;
+let windowStartedAt = 0;
+let windowWinnerPriority = -1;
+
+function playVoiceFile(characterId, line, priority) {
+  const now = Date.now();
+  if (now - windowStartedAt > ARBITRATION_WINDOW_MS) {
+    // Previous window has fully elapsed - this is a genuinely new moment,
+    // starts its own fresh window regardless of priority.
+    windowStartedAt = now;
+    windowWinnerPriority = priority;
+  } else if (priority >= windowWinnerPriority) {
+    // Still within an active window, but this one outranks (or ties) the
+    // current winner - it preempts. Actively cuts off whatever's currently
+    // playing (see currentClip/playRawVoiceFile above) rather than letting
+    // both voices overlap even briefly, and its own priority becomes the
+    // new bar every later arrival in the window must clear.
+    windowWinnerPriority = priority;
+  } else {
+    return; // outranked by something already claimed in this window - drop it
+  }
+  playRawVoiceFile(characterId, line);
 }
 
 // Per-character filenames, exactly as recorded (see assets/voice/<id>/) -
@@ -77,29 +144,35 @@ export function hasVoice(characterId) {
 
 export function playIdleVoice(characterId) {
   const line = VOICE_LINES[characterId]?.idle;
-  if (line) playVoiceFile(characterId, line);
+  if (line) playVoiceFile(characterId, line, PRIORITY.idle);
 }
 
 export function playInjuredVoice(characterId) {
   const line = VOICE_LINES[characterId]?.injured;
-  if (line) playVoiceFile(characterId, line);
+  if (line) playVoiceFile(characterId, line, PRIORITY.injured);
 }
 
-// Returns true if a voice line actually played - callers use this to
-// decide whether to ALSO play the generic koed/victory sound (see
-// main.js): a recorded character's own voice REPLACES the generic sound
-// for that moment; an unrecorded character still gets the generic one.
+// Returns true if a voice LINE EXISTS for this character (not whether it
+// actually won arbitration and played) - callers use this to decide
+// whether to ALSO play the generic koed/victory sound: a recorded
+// character's own voice REPLACES the generic sound for that moment; an
+// unrecorded character still gets the generic one. koed is the top
+// priority so in practice it always wins arbitration when it exists, but
+// the return value intentionally reflects "do we own this moment" (skip
+// the generic sound) rather than "did audio literally start," which
+// would incorrectly re-add the generic sound on the rare case this loses
+// to something already claimed in the window.
 export function playKoedVoice(characterId) {
   const line = VOICE_LINES[characterId]?.koed;
   if (!line) return false;
-  playVoiceFile(characterId, line);
+  playVoiceFile(characterId, line, PRIORITY.koed);
   return true;
 }
 
 export function playVictoryVoice(characterId) {
   const line = VOICE_LINES[characterId]?.victory;
   if (!line) return false;
-  playVoiceFile(characterId, line);
+  playVoiceFile(characterId, line, PRIORITY.victory);
   return true;
 }
 
@@ -109,7 +182,7 @@ export function playVictoryVoice(characterId) {
 // recorded line (see ACTION_VOICE_LINES above).
 export function playMoveVoice(characterId, actionId) {
   const line = ACTION_VOICE_LINES[characterId]?.[actionId];
-  if (line) playVoiceFile(characterId, line);
+  if (line) playVoiceFile(characterId, line, PRIORITY.move);
 }
 
 // Boingo's cackle when the Jester Ball returns to him (see main.js's
@@ -118,7 +191,7 @@ export function playMoveVoice(characterId, actionId) {
 // has a 'laugh' line so far; a no-op for anyone else.
 export function playLaughVoice(characterId) {
   const line = VOICE_LINES[characterId]?.laugh;
-  if (line) playVoiceFile(characterId, line);
+  if (line) playVoiceFile(characterId, line, PRIORITY.laugh);
 }
 
 // Blade's line the moment Rebirth fires (see main.js's dedicated
@@ -128,7 +201,7 @@ export function playLaughVoice(characterId) {
 // a no-op for anyone else.
 export function playRebirthVoice(characterId) {
   const line = VOICE_LINES[characterId]?.rebirth;
-  if (line) playVoiceFile(characterId, line);
+  if (line) playVoiceFile(characterId, line, PRIORITY.rebirth);
 }
 
 // Every recorded voice file's path, derived from VOICE_LINES/
