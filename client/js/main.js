@@ -1,7 +1,7 @@
 import { connect, onMessage } from './net.js';
 import { renderLobby } from './lobbyScreen.js';
 import { renderBattle } from './battleScreen.js';
-import { addChatMessage } from './chatPanel.js';
+import { addChatMessage, clearChatMessages } from './chatPanel.js';
 import {
   startMenuMusic, startBattleMusic, stopMusic,
   playActionSound, playSound, playKO, playVictory, playDodge, playRebirth, playCoin,
@@ -252,6 +252,10 @@ onMessage((msg) => {
     case 'room-created':
     case 'room-joined':
       state.error = null;
+      // A brand new room context - the previous room's chat has nothing
+      // to do with this one (see clearChatMessages's own comment for the
+      // bug this fixes).
+      clearChatMessages();
       break;
     case 'lobby-update':
       state.room = msg.room;
@@ -330,6 +334,7 @@ onMessage((msg) => {
       lastLogLength = 0;
       previousActingCharacterId = null;
       lastKnownHearts.clear();
+      clearChatMessages();
       startMenuMusic();
       rerender();
       break;

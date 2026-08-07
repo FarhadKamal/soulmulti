@@ -96,6 +96,19 @@ export function addChatMessage(msg) {
   renderMessages();
 }
 
+// Clears the message history - call this whenever the player leaves one
+// room's context for another (creating a new room, joining a different
+// one, or leaving back to the entry screen - see main.js's room-created/
+// room-joined/left-room handlers). Without this, `messages` was a single
+// module-level array with no room association at all: exiting a room and
+// creating/joining a completely different one kept showing the OLD room's
+// chat history, since nothing ever reset it - reported as "the chat
+// carried over into a brand new room I just created."
+export function clearChatMessages() {
+  messages.length = 0;
+  renderMessages();
+}
+
 // Returns the SAME persistent <div class="chat-panel"> node every call -
 // callers just re-append it wherever it belongs in that render pass (a
 // node can only have one parent at a time in the DOM, so appendChild here
