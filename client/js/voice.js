@@ -130,3 +130,19 @@ export function playRebirthVoice(characterId) {
   const line = VOICE_LINES[characterId]?.rebirth;
   if (line) playVoiceFile(characterId, line);
 }
+
+// Every recorded voice file's path, derived from VOICE_LINES/
+// ACTION_VOICE_LINES themselves rather than a separately maintained list -
+// used by voicePreload.js to warm the cache for all of them up front. New
+// lines added to either table above are automatically included here too,
+// so there's nothing else to keep in sync when a new voice is recorded.
+export function allVoiceFilePaths() {
+  const paths = [];
+  for (const [characterId, lines] of Object.entries(VOICE_LINES)) {
+    for (const filename of Object.values(lines)) paths.push(`assets/voice/${characterId}/${filename}.mp3`);
+  }
+  for (const [characterId, actions] of Object.entries(ACTION_VOICE_LINES)) {
+    for (const filename of Object.values(actions)) paths.push(`assets/voice/${characterId}/${filename}.mp3`);
+  }
+  return paths;
+}

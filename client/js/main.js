@@ -9,6 +9,7 @@ import {
 import { handleLogEntryForFlash, handleDodgeForFlash, checkIdlePortrait, registerFlashRerender } from './portraitFlash.js';
 import { handleLogEntryForEffects, registerEffectRerender } from './actionEffects.js';
 import { preloadBattleImages } from './imagePreload.js';
+import { preloadBattleAudio } from './audioPreload.js';
 import { hasVoice, playIdleVoice, playInjuredVoice, playKoedVoice, playVictoryVoice, playMoveVoice, playLaughVoice, playRebirthVoice } from './voice.js';
 
 const root = document.getElementById('app');
@@ -353,6 +354,10 @@ document.addEventListener('fullscreenchange', rerender);
 // imagePreload.js). Never awaited - it doesn't block connecting to the
 // server or anything else on the page.
 preloadBattleImages();
+// Same idea for every sound effect, music track, and voice line (see
+// audioPreload.js) - so the first time any of them plays mid-match, it's
+// already cached rather than waiting on a live fetch.
+preloadBattleAudio();
 connect();
 rerender();
 startMenuMusic();
