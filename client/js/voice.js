@@ -43,6 +43,7 @@ const VOICE_LINES = {
   velorya: { idle: 'idle', injured: 'injured', koed: 'koed', victory: 'victory', move: 'eclipse' },
   boingo: { idle: 'idle', injured: 'injured', koed: 'koed', victory: 'victory', move: 'jerster', laugh: 'HAHAHAHA' },
   athena: { idle: 'idle', injured: 'injured', koed: 'koed', victory: 'victory', move: 'devine' },
+  zerathys: { idle: 'idle', injured: 'injured', koed: 'koed', victory: 'victory', move: 'soul_swap' },
 };
 
 // The one actionId per character whose cast/throw/etc. triggers that
@@ -56,6 +57,7 @@ const SIGNATURE_MOVE_ACTION_ID = {
   velorya: 'lunarEclipse',
   boingo: 'jesterBall',
   athena: 'divineRestore',
+  zerathys: 'soulSwap',
 };
 
 export function hasVoice(characterId) {
