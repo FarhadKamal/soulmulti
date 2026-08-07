@@ -229,6 +229,7 @@ function rerender() {
   if (state.screen === 'lobby') {
     renderLobby(root, { room: state.room, error: state.error, connectionLost: state.connectionLost }, {
       onEnterMatch: () => { state.screen = 'battle'; rerender(); },
+      rerender,
     });
   } else {
     // Pass the REAL state object through (not a fresh literal) - battleScreen

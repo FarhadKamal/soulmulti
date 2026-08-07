@@ -3,10 +3,18 @@ import { send } from './net.js';
 import { renderChatPanel } from './chatPanel.js';
 import { renderFullscreenButton } from './fullscreen.js';
 
+// Whether the About panel is open - module state (not part of the shared
+// `state` object in main.js), same reasoning as battleScreen.js's
+// drawerOpen: this whole screen tears down and rebuilds on every server
+// broadcast, so a plain local variable here is what actually survives
+// across those rebuilds. Only ever shown on the entry screen (no room
+// yet) - see renderLobby below.
+let aboutOpen = false;
+
 // Renders the pre-match lobby: room type choice -> create/join -> seat
 // list + character picking -> start. `room` is null until a create-room or
 // join-room response/lobby-update has arrived at least once.
-export function renderLobby(root, { room, error, connectionLost }, { onEnterMatch }) {
+export function renderLobby(root, { room, error, connectionLost }, { onEnterMatch, rerender }) {
   root.innerHTML = '';
   const wrap = document.createElement('div');
   wrap.className = 'lobby';
@@ -18,6 +26,9 @@ export function renderLobby(root, { room, error, connectionLost }, { onEnterMatc
 
   const topControls = document.createElement('div');
   topControls.className = 'top-right-controls';
+  // Only on the entry screen (no room yet) - a landing-page credit, not
+  // something needed once you're already in a room or mid-match.
+  if (!room) topControls.appendChild(renderAboutButton(rerender));
   topControls.appendChild(renderFullscreenButton());
   wrap.appendChild(topControls);
 
@@ -47,6 +58,8 @@ export function renderLobby(root, { room, error, connectionLost }, { onEnterMatc
     return;
   }
 
+  if (!room && aboutOpen) wrap.appendChild(renderAboutPanel());
+
   // Everything below (entry form or room lobby, including the character
   // grids and chat panel) lives inside its own scroll region, not the page
   // itself - the title/top-controls above stay a fixed header, matching
@@ -71,6 +84,32 @@ export function renderLobby(root, { room, error, connectionLost }, { onEnterMatc
 
   wrap.appendChild(scroll);
   root.appendChild(wrap);
+}
+
+// Icon button matching fullscreen/exit's exact corner style - toggles
+// aboutOpen and re-renders (no native dialog/popup, same "no popups"
+// convention as every other inline confirmation in this app).
+function renderAboutButton(rerender) {
+  const btn = document.createElement('button');
+  btn.className = 'about-icon-btn';
+  btn.title = 'About';
+  btn.textContent = 'ℹ️';
+  btn.onclick = () => { aboutOpen = !aboutOpen; rerender(); };
+  return btn;
+}
+
+function renderAboutPanel() {
+  const panel = document.createElement('div');
+  panel.className = 'about-panel';
+  const text = document.createElement('p');
+  text.className = 'about-text';
+  text.textContent = 'Somewhere between time, shadow, and thunder, eight souls were born — not from myth, but from restless nights of imagination. Soul Clash was never meant to be just a game. It began as a question: what if the forces we can\'t control — time, chaos, fate — could be given a face, a name, a fight? Created in silence, released into the world by one mind, this is only the beginning of the Clash.';
+  panel.appendChild(text);
+  const credit = document.createElement('div');
+  credit.className = 'about-credit';
+  credit.textContent = 'Sk. Farhad Kamal · remindfarhad@gmail.com';
+  panel.appendChild(credit);
+  return panel;
 }
 
 function renderEntryForm() {
