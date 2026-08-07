@@ -46,18 +46,29 @@ const VOICE_LINES = {
   boingo: { idle: 'idle', injured: 'injured', koed: 'koed', victory: 'victory', laugh: 'HAHAHAHA' },
   athena: { idle: 'idle', injured: 'injured', koed: 'koed', victory: 'victory' },
   zerathys: { idle: 'idle', injured: 'injured', koed: 'koed', victory: 'victory' },
+  // rebirth: not part of ACTION_VOICE_LINES below - Rebirth isn't a
+  // player-picked action with its own actionId, it's an automatic
+  // KO-intercept inside applyDamage (see playRebirthVoice further down).
+  blade: { idle: 'idle', injured: 'injured', koed: 'koed', victory: 'victory', rebirth: 'rebirth' },
+  tharox: { idle: 'idle', injured: 'injured', koed: 'koed', victory: 'victory' },
+  // "injued" is a real typo in the recorded filename, not a bug here -
+  // matches assets/voice/akyros/ exactly as it exists on disk.
+  akyros: { idle: 'idle', injured: 'injued', koed: 'koed', victory: 'victory' },
 };
 
 // actionId -> filename, per character - every action here plays its line
 // alongside that move's existing sound effect (playMoveVoice below), never
 // replacing it. Most characters have exactly one signature move; Zerathys
-// has three (his charge/release pair plus Soul Swap).
+// has three (his charge/release pair plus Soul Swap), Tharox and Akyros
+// each have two.
 const ACTION_VOICE_LINES = {
   chronox: { timeFreeze: 'time_freeze' },
   velorya: { lunarEclipse: 'eclipse' },
   boingo: { jesterBall: 'jerster' },
   athena: { divineRestore: 'devine' },
   zerathys: { chargeUp: 'charge', thunderWrath: 'release', soulSwap: 'soul_swap' },
+  tharox: { titanSmash: 'titan_smash', glorySmash: 'glory' },
+  akyros: { hiddenMark: 'hidden_mark', shadowExecution: 'shadow' },
 };
 
 export function hasVoice(characterId) {
@@ -107,5 +118,15 @@ export function playMoveVoice(characterId, actionId) {
 // has a 'laugh' line so far; a no-op for anyone else.
 export function playLaughVoice(characterId) {
   const line = VOICE_LINES[characterId]?.laugh;
+  if (line) playVoiceFile(characterId, line);
+}
+
+// Blade's line the moment Rebirth fires (see main.js's dedicated
+// 'rebirth' log-entry handler) - plays alongside the existing generic
+// rebirth sound effect (sound.js's playRebirth), never replacing it. Only
+// Blade has a 'rebirth' line (he's the only character with the ability);
+// a no-op for anyone else.
+export function playRebirthVoice(characterId) {
+  const line = VOICE_LINES[characterId]?.rebirth;
   if (line) playVoiceFile(characterId, line);
 }

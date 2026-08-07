@@ -9,7 +9,7 @@ import {
 import { handleLogEntryForFlash, handleDodgeForFlash, checkIdlePortrait, registerFlashRerender } from './portraitFlash.js';
 import { handleLogEntryForEffects, registerEffectRerender } from './actionEffects.js';
 import { preloadBattleImages } from './imagePreload.js';
-import { hasVoice, playIdleVoice, playInjuredVoice, playKoedVoice, playVictoryVoice, playMoveVoice, playLaughVoice } from './voice.js';
+import { hasVoice, playIdleVoice, playInjuredVoice, playKoedVoice, playVictoryVoice, playMoveVoice, playLaughVoice, playRebirthVoice } from './voice.js';
 
 const root = document.getElementById('app');
 
@@ -144,6 +144,9 @@ function playLogEntrySound(entry) {
   }
   if (entry.type === 'rebirth') {
     playRebirth();
+    // Layered on top, never replacing the generic rebirth sound - a no-op
+    // for anyone but Blade (see voice.js's playRebirthVoice).
+    playRebirthVoice(entry.targetCharacterId);
     return;
   }
   if (entry.type === 'curse-mirror') {
@@ -188,6 +191,10 @@ function playLogEntrySound(entry) {
   }
   if (entry.type === 'hidden-mark') {
     playActionSound('hiddenMark');
+    // Deliberately vague voice line (see the akyros hidden_mark recording)
+    // - doesn't name the target, matching the mark itself being secret
+    // from everyone but Akyros. Layered on top, a no-op for anyone but him.
+    playMoveVoice(entry.characterId, 'hiddenMark');
     return;
   }
   if (entry.type !== 'attack' && entry.type !== 'special' && entry.type !== 'setup') return;
