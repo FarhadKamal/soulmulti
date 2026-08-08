@@ -135,10 +135,6 @@ export function playVictory() {
   playSound('victory');
 }
 
-export function playSpecial() {
-  playSound('success');
-}
-
 export function playCoin() {
   playSound('coin');
 }

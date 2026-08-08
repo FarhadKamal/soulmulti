@@ -20,8 +20,8 @@ const SOUND_EFFECT_FILES = [
   'divinerestore.mp3', 'dodge.mp3', 'eclipse.mp3', 'freeze.mp3',
   'game-over.mp3', 'hiddenmark.mp3', 'jesterball.mp3', 'kick.mp3',
   'magic.mp3', 'miss.mp3', 'moonstep.mp3', 'punch.mp3', 'rebirth.mp3',
-  'shadowexecution.mp3', 'smash.mp3', 'soulswap.mp3', 'success.mp3',
-  'sword.mp3', 'thunder.mp3', 'tick.mp3', 'toss.mp3', 'victory.mp3',
+  'shadowexecution.mp3', 'smash.mp3', 'soulswap.mp3',
+  'sword.mp3', 'thunder.mp3', 'toss.mp3', 'victory.mp3',
 ];
 
 let started = false;
