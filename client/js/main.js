@@ -99,12 +99,19 @@ function startGameOverSequence(game) {
       state.gameOverStage = 'banner';
       // A recorded voice REPLACES the generic victory jingle (see
       // playVictoryVoice/hasVoice in voice.js) - the winning side can have
-      // more than one character (2v2/4p teams), so this plays the FIRST
-      // one that actually has a recorded line, falling back to the
-      // generic jingle only if none of them do (or it's a draw, no
-      // winnerPlayerId at all).
+      // more than one character (2v2/4p teams), and one of them may have
+      // been KO'd earlier in the match while a TEAMMATE finished the fight
+      // (a real bug this fixes: heard Boingo's victory line despite Boingo
+      // being KO'd, because he simply came first in characterIds and had a
+      // recorded voice - Akyros, the actual survivor, was never checked).
+      // Only a character who's still alive (!isKO) can speak for the win;
+      // plays the first SURVIVING one that also has a recorded line,
+      // falling back to the generic jingle if none of the survivors do (or
+      // it's a draw, no winnerPlayerId at all).
       const winner = game.winnerPlayerId ? game.players.find((p) => p.id === game.winnerPlayerId) : null;
-      const voiceCharacterId = winner?.characterIds.find(hasVoice);
+      const voiceCharacterId = winner?.characterIds
+        .filter((id) => !game.characters[id]?.isKO)
+        .find(hasVoice);
       if (!voiceCharacterId || !playVictoryVoice(voiceCharacterId)) playVictory();
       rerender();
     }, 3800);
