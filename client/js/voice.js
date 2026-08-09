@@ -126,15 +126,16 @@ const VOICE_LINES = {
 // actionId -> filename, per character - every action here plays its line
 // alongside that move's existing sound effect (playMoveVoice below), never
 // replacing it. Most characters have exactly one signature move; Zerathys
-// has three (his charge/release pair plus Soul Swap), Tharox and Akyros
-// each have two.
+// has three (his charge/release pair plus Soul Swap), Tharox now has three
+// too (titanToss - the wind-up before titanSmash - added alongside his
+// existing titanSmash/glorySmash lines), Akyros has two.
 const ACTION_VOICE_LINES = {
   chronox: { timeFreeze: 'time_freeze' },
   velorya: { lunarEclipse: 'eclipse' },
   boingo: { jesterBall: 'jerster' },
   athena: { divineRestore: 'devine' },
   zerathys: { chargeUp: 'charge', thunderWrath: 'release', soulSwap: 'soul_swap' },
-  tharox: { titanSmash: 'titan_smash', glorySmash: 'glory' },
+  tharox: { titanToss: 'titan_toss', titanSmash: 'titan_smash', glorySmash: 'glory' },
   akyros: { hiddenMark: 'hidden_mark', shadowExecution: 'shadow' },
 };
 
