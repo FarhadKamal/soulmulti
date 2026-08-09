@@ -692,31 +692,29 @@ function renderJesterBallPrompt(game, characterId, armedAction, state) {
   const btnRow = document.createElement('div');
   btnRow.className = 'action-btn-row';
 
-  const returnBtn = document.createElement('button');
-  returnBtn.textContent = 'Return to Boingo';
-  returnBtn.onclick = () => send('jester-ball-choice', { characterId, choice: 'return_' });
-  btnRow.appendChild(returnBtn);
-
   const takeBtn = document.createElement('button');
   takeBtn.textContent = 'Take it (-4 hearts)';
   takeBtn.onclick = () => send('jester-ball-choice', { characterId, choice: 'take' });
   btnRow.appendChild(takeBtn);
 
-  if (jb.canPass) {
+  // Passing is now repeatable up to 5 times (jb.passCount, not the old
+  // one-shot canPass flag) - there's no separate "Return to Boingo" button
+  // anymore, since passing TO Boingo (now a legal target, see below) is
+  // what heals him and ends the ball, same outcome as the old dedicated
+  // Return choice just reached via Pass instead.
+  if (jb.passCount < 5) {
     const passBtn = document.createElement('button');
-    passBtn.textContent = 'Pass to another player';
-    // Boingo is excluded here - giving it back to him is always "Return to
-    // Boingo" above (heals him), never a Pass. Teammates are excluded too,
-    // same as every other targeted action - passing to your own ally
-    // doesn't make sense strategically. Matches the main game's
-    // isValidBallDropTarget exactly.
+    passBtn.textContent = `Pass to another player (${5 - jb.passCount} left)`;
     const holder = game.characters[characterId];
-    const validTargetIds = Object.keys(game.characters).filter((id) =>
-      id !== characterId
-      && id !== jb.thrownByCharacterId
-      && !game.characters[id].isKO
-      && game.characters[id].ownerId !== holder.ownerId
-    );
+    const validTargetIds = Object.keys(game.characters).filter((id) => {
+      if (id === characterId || game.characters[id].isKO) return false;
+      const isBoingo = id === jb.thrownByCharacterId;
+      // Boingo is a legal target regardless of team (passing to him always
+      // heals him and ends the ball). Every other teammate is still
+      // excluded, same as every other targeted action.
+      if (game.characters[id].ownerId === holder.ownerId && !isBoingo) return false;
+      return true;
+    });
     passBtn.onclick = () => {
       state.armedAction = { actionId: '__jesterBallPass', label: 'Pass the Jester Ball', needsTarget: true, validTargetIds };
       state.rerender();

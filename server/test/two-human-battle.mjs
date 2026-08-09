@@ -38,8 +38,8 @@ function actIfMyTurn(ws, myCharacterIds, msg) {
   }
   const jb = msg.game.jesterBall;
   if (jb && jb.holderCharacterId && myCharacterIds.includes(jb.holderCharacterId)) {
-    const choices = ['return_', 'take'];
-    if (jb.canPass) choices.push('pass');
+    const choices = ['take'];
+    if (jb.passCount < 5) choices.push('pass');
     const choice = pickRandom(choices);
     let targetId;
     if (choice === 'pass') {

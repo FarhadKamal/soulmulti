@@ -55,10 +55,15 @@ export const actions = {
     isLegal: (character) => !character.usedSpecial,
     execute(character, targetId, game, log) {
       character.usedSpecial = true;
+      // passCount tracks how many times it's been PASSED since the throw
+      // (the throw itself doesn't count) - up to 5 passes are allowed
+      // before an un-intercepted pass auto-resolves as an explosion (see
+      // jesterBallResolution.pass below). Replaces the old one-shot
+      // canPass flag now that passing is repeatable.
       game.jesterBall = {
         thrownByCharacterId: character.id,
         holderCharacterId: targetId,
-        canPass: true,
+        passCount: 0,
       };
       log.push({ type: 'special', characterId: character.id, actionId: 'jesterBall', targetId });
       return {};
@@ -66,51 +71,66 @@ export const actions = {
   },
 };
 
+// Shared by both a voluntary Take and an un-intercepted 5th pass (see
+// jesterBallResolution.pass below) - same flat-4 damage, same Rebirth
+// interception, same log entry shape, same jesterBall teardown, regardless
+// of which path triggered it.
+function resolveExplosion(game, log, holderId, extra) {
+  const forced = isTutorialMode(game) ? extra : null;
+  const result = applyDamage(game, log, {
+    sourceCharacterId: game.jesterBall.thrownByCharacterId,
+    targetCharacterId: holderId,
+    amount: forced?.forcedAmount ?? 4,
+    ignoresShield: forced?.ignoresShield ?? false,
+  });
+  log.push({ type: 'jester-ball-take', targetCharacterId: holderId, ...result });
+  game.jesterBall = null;
+  return result;
+}
+
 // Resolved on the holder's own turn, not via the normal action list.
 export const jesterBallResolution = {
-  return_: {
-    label: 'Return to Boingo',
-    execute(game, log) {
-      const { thrownByCharacterId } = game.jesterBall;
-      // applyHeal no-ops (returns 0) if Boingo is already KO'd or already
-      // at full hearts - report what actually happened (and why) rather
-      // than always claiming the full +4, which would be misleading.
-      const wasKO = game.characters[thrownByCharacterId]?.isKO ?? false;
-      const healed = applyHeal(game, thrownByCharacterId, 4);
-      log.push({ type: 'jester-ball-return', boingoId: thrownByCharacterId, healed, wasKO });
-      game.jesterBall = null;
-    },
-  },
   pass: {
     label: 'Pass to another player',
-    isLegal: (game) => game.jesterBall.canPass,
+    isLegal: (game) => game.jesterBall.passCount < 5,
     execute(game, log, newHolderCharacterId) {
       const fromCharacterId = game.jesterBall.holderCharacterId;
+      game.jesterBall.passCount += 1;
+      // Landing on Boingo (the original thrower) always heals him and ends
+      // the ball immediately, regardless of which pass number this was -
+      // same outcome the old dedicated "Return to Boingo" choice produced,
+      // now reached by passing TO him rather than a separate button.
+      if (newHolderCharacterId === game.jesterBall.thrownByCharacterId) {
+        // applyHeal no-ops (returns 0) if Boingo is already KO'd or already
+        // at full hearts - report what actually happened (and why) rather
+        // than always claiming the full +4, which would be misleading.
+        const wasKO = game.characters[newHolderCharacterId]?.isKO ?? false;
+        const healed = applyHeal(game, newHolderCharacterId, 4);
+        log.push({ type: 'jester-ball-return', boingoId: newHolderCharacterId, healed, wasKO });
+        game.jesterBall = null;
+        return;
+      }
       game.jesterBall.holderCharacterId = newHolderCharacterId;
-      game.jesterBall.canPass = false;
+      // The 5th pass that DOESN'T land on Boingo auto-resolves as an
+      // explosion on whoever just received it - no 6th holder ever gets a
+      // choice. Reuses the exact same resolution as a voluntary Take.
+      if (game.jesterBall.passCount === 5) {
+        resolveExplosion(game, log, newHolderCharacterId);
+        return;
+      }
       log.push({ type: 'jester-ball-pass', fromCharacterId, toCharacterId: newHolderCharacterId });
     },
   },
   take: {
     label: 'Take it',
     execute(game, log, extra) {
-      const holderId = game.jesterBall.holderCharacterId;
       // Tutorial mode can force a flat amount with shield ignored (so a
       // Chronox-bot holder's persistent Chrono Guard shield can't
       // unpredictably discount the demo hit) - see
       // server/data/tutorialSequences.js's boingo sequence. Every
       // non-tutorial call passes no `extra`, leaving the normal flat-4,
       // shield-absorbing Take completely untouched.
-      const forced = isTutorialMode(game) ? extra : null;
-      const result = applyDamage(game, log, {
-        sourceCharacterId: game.jesterBall.thrownByCharacterId,
-        targetCharacterId: holderId,
-        amount: forced?.forcedAmount ?? 4,
-        ignoresShield: forced?.ignoresShield ?? false,
-      });
-      log.push({ type: 'jester-ball-take', targetCharacterId: holderId, ...result });
-      game.jesterBall = null;
-      return result;
+      return resolveExplosion(game, log, game.jesterBall.holderCharacterId, extra);
     },
   },
 };

@@ -14,7 +14,11 @@ const ALL_LABELS = {
   lunarStrike: 'Lunar Strike', moonstep: 'Moonstep', lunarEclipse: 'Lunar Eclipse',
   chargeUp: 'Charge Up', thunderWrath: 'Thunder Wrath', soulSwap: 'Soul Swap', soulSwapWrath: 'Thunder Wrath (free)',
 };
-const JESTER_BALL_CHOICES = { return_: 'Jester Ball: Return', take: 'Jester Ball: Take', pass: 'Jester Ball: Pass' };
+// 'return_' isn't a real choice anymore - it's what happens when a Pass
+// happens to land on Boingo (see boingo.js's jesterBallResolution.pass) -
+// kept as a coverage LABEL since the jester-ball-return log entry shape is
+// unchanged, just reached differently now.
+const JESTER_BALL_CHOICES = { return_: 'Jester Ball: Return (pass to Boingo)', take: 'Jester Ball: Take', pass: 'Jester Ball: Pass' };
 
 const seen = new Set();
 const MATCH_COUNT = process.argv[2] ? Number(process.argv[2]) : 60;
@@ -65,8 +69,8 @@ function runOneMatch(roomType) {
         if (!myCharacterIds.includes(msg.actingCharacterId)) return;
         const jb = msg.game.jesterBall;
         if (jb && jb.holderCharacterId === msg.actingCharacterId) {
-          const choices = ['return_', 'take'];
-          if (jb.canPass) choices.push('pass');
+          const choices = ['take'];
+          if (jb.passCount < 5) choices.push('pass');
           const choice = pickRandom(choices);
           let targetId;
           if (choice === 'pass') {

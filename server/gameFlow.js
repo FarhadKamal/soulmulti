@@ -45,10 +45,14 @@ export function getActingCharacterId(game) {
   return null;
 }
 
-// Resolves a Jester Ball holder's choice (return/pass/take). Return/Pass
-// consume the holder's turn action; Take does not - the holder still gets
-// their normal action afterward in the same turn (matches finishJesterBall
-// in dashboardScreen.js).
+// Resolves a Jester Ball holder's choice (pass/take) - passing TO Boingo
+// (heals him, ends the ball) and an un-intercepted 5th pass (auto-resolves
+// as an explosion on the RECEIVER) are both still reached via 'pass', not
+// a separate choice. Pass consumes the holder's turn action regardless of
+// which of those three outcomes it resolves to, since the PASSER made a
+// choice either way; Take does not - the holder still gets their normal
+// action afterward in the same turn (matches finishJesterBall in
+// dashboardScreen.js).
 export function finishJesterBall(game, choice, targetId) {
   const holderId = game.jesterBall.holderCharacterId;
   resolveJesterBall(game, holderId, choice, targetId);

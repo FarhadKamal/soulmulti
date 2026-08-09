@@ -64,10 +64,13 @@ ws.on('message', (raw) => {
 
     const jb = msg.game.jesterBall;
     if (jb && jb.holderCharacterId === myCharacterId) {
-      // Same random choice a client would offer: return, take, or pass to
-      // a random living enemy if passing is still available.
-      const choices = ['return_', 'take'];
-      if (jb.canPass) choices.push('pass');
+      // Same random choice a client would offer: take, or pass (to a
+      // random living non-self character - can include Boingo, which
+      // heals him and ends the ball, same as the old dedicated 'return_'
+      // choice) if passing is still available (passCount < 5, not the old
+      // one-shot canPass flag).
+      const choices = ['take'];
+      if (jb.passCount < 5) choices.push('pass');
       const choice = pickRandom(choices);
       let targetId;
       if (choice === 'pass') {

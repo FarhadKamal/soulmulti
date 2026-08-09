@@ -609,11 +609,20 @@ function zerathysBallComboTarget(character, game) {
   return null;
 }
 
-// Jester Ball resolution for a PC holder. Returns 'return_' | 'pass' | 'take'
-// and, for 'pass', the chosen new holder's character id.
+// Jester Ball resolution for a PC holder. Returns 'pass' | 'take' and, for
+// 'pass', the chosen new holder's character id - there is no separate
+// 'return_' choice anymore (passing TO Boingo is just a pass target that
+// happens to heal him and end the ball - see boingo.js's
+// jesterBallResolution.pass). A 5th pass that doesn't land on Boingo
+// auto-resolves as an explosion on the receiver regardless of what the
+// bot "intended" - bots don't need special awareness of that, since
+// passCount === 5 only ever comes up as the LAST legal pass anyway
+// (isLegal already gates passCount < 5, so this function is never even
+// asked to choose once 5 real passes have already happened).
 export function chooseBotJesterBallMove(character, game) {
   const jb = game.jesterBall;
   const boingo = game.characters[jb.thrownByCharacterId];
+  const canPass = jb.passCount < 5;
   // Zerathys-specific: deliberately Take the ball to set up an immediate
   // Soul Swap combo (see zerathysBallComboTarget) - this is a bigger tempo
   // swing than relocating the ball via Pass, so it takes priority whenever
@@ -626,41 +635,36 @@ export function chooseBotJesterBallMove(character, game) {
   }
   // Passing it onto an enemy is the best outcome when available - it moves
   // the eventual -4 (or the whole decision) onto whoever's the biggest
-  // threat instead of eating it themselves.
-  if (jb.canPass) {
-    // Passing back to Boingo (the original thrower) makes no sense - that's
-    // what Return is for, and it always heals him regardless of who does it.
-    const candidates = livingEnemies(game, character)
-      .filter((c) => c.id !== character.id && c.id !== jb.thrownByCharacterId);
+  // threat instead of eating it themselves. Takes priority over passing to
+  // Boingo (see below) - denying an enemy team's heal, or advancing the
+  // ball toward a real target, both beat a "free" pass-to-ally-Boingo heal
+  // when a genuine enemy target is available.
+  if (canPass) {
+    const candidates = livingEnemies(game, character).filter((c) => c.id !== character.id);
     if (candidates.length > 0) {
       const targetId = biggestThreatTarget(game, character, candidates.map((c) => c.id))
         || lowestHeartsTarget(game, candidates.map((c) => c.id));
       if (targetId) return { choice: 'pass', targetId };
     }
   }
-  // Return is always free for the holder (no self-damage) - the only
-  // downside is that it always heals Boingo +4, which is bad when he's an
+  // Passing to Boingo is free for the holder (no self-damage) - the only
+  // downside is that it always heals him +4, which is bad when he's an
   // enemy. When he's a living teammate (or this character IS Boingo), that
-  // downside doesn't exist, so Return is a clear win. There's no one to heal
-  // if he's already KO'd, in which case Return isn't a real choice - it just
-  // wastes the turn for nothing (same as Take, but Take at least still costs
-  // him nothing more than -4, so both are equivalent there; fall through to
-  // Take for consistency).
-  if (boingo && !boingo.isKO && boingo.ownerId === character.ownerId) {
-    return { choice: 'return_' };
+  // downside doesn't exist, so passing to him is a clear win. There's no
+  // one to heal if he's already KO'd, in which case it isn't a real choice
+  // either - falls through to Take for consistency.
+  if (canPass && boingo && !boingo.isKO && boingo.ownerId === character.ownerId) {
+    return { choice: 'pass', targetId: boingo.id };
   }
-  // Boingo's an enemy (FFA, or 2v2 opposing team) - Return heals him for
-  // free, Take costs the holder -4. Confirmed via a real match: the bot
-  // never once chose Return here because of a since-fixed bug (it only
-  // considered Return for a same-owner Boingo), even when Take would have
-  // been fatal. Now weigh them: only when Take would actually KO the holder
-  // is eating the free heal on an enemy Boingo worth it - staying alive
-  // matters more than denying one heal. Any survivable Take, even down to 1
-  // heart, still denies the enemy that heal, which is usually worth more
-  // than the holder's own comfort - so Return is purely a last resort here,
-  // not a general low-health caution.
-  if (boingo && !boingo.isKO && character.hearts <= 4) {
-    return { choice: 'return_' };
+  // Boingo's an enemy (FFA, or 2v2 opposing team) - passing to him heals
+  // him for free, Take costs the holder -4. Only when Take would actually
+  // KO the holder is eating the free heal on an enemy Boingo worth it -
+  // staying alive matters more than denying one heal. Any survivable Take,
+  // even down to 1 heart, still denies the enemy that heal, which is
+  // usually worth more than the holder's own comfort - so this is purely a
+  // last resort, not a general low-health caution.
+  if (canPass && boingo && !boingo.isKO && character.hearts <= 4) {
+    return { choice: 'pass', targetId: boingo.id };
   }
   // Otherwise Take is the only sensible remaining option.
   return { choice: 'take' };

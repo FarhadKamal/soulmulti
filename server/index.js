@@ -951,7 +951,7 @@ function handleJesterBallChoice(room, sessionId, { characterId, choice, targetId
   if (!jb || jb.holderCharacterId !== characterId) return;
   const seat = seatForCharacter(room, characterId);
   if (!seat || seat.playerId !== sessionId) return;
-  if (choice === 'pass' && !jb.canPass) return;
+  if (choice === 'pass' && jb.passCount >= 5) return;
   if (choice === 'pass' && !isJesterBallPassTarget(room.game, characterId, targetId)) return;
   finishJesterBall(room.game, choice, targetId);
   broadcastGameState(room);
@@ -962,12 +962,12 @@ function isJesterBallPassTarget(game, holderId, targetId) {
   const t = game.characters[targetId];
   const holder = game.characters[holderId];
   if (!t || t.isKO || targetId === holderId) return false;
-  // Boingo is never a Pass target - giving it back to him is always the
-  // dedicated Return choice (heals him), not a Pass. Passing to your own
-  // teammate is excluded too, same as every other targeted action. Matches
-  // the main game's isValidBallDropTarget exactly.
-  if (targetId === game.jesterBall.thrownByCharacterId) return false;
-  if (t.ownerId === holder.ownerId) return false;
+  const isBoingo = targetId === game.jesterBall.thrownByCharacterId;
+  // Boingo is a legal Pass target regardless of team (passing to him always
+  // heals him and ends the ball, same as the old dedicated Return choice) -
+  // exempted from the normal teammate-exclusion below. Passing to any OTHER
+  // teammate is still excluded, same as every other targeted action.
+  if (t.ownerId === holder.ownerId && !isBoingo) return false;
   return true;
 }
 
