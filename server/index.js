@@ -914,17 +914,32 @@ function handleReconnect(ws, sessionId, { code, seatIndex, reconnectToken }) {
   if (!room) return send(ws, 'reconnect-failed', {});
   const seat = room.seats[seatIndex];
   if (!seat) return send(ws, 'reconnect-failed', {});
-  // disconnectTimer being set is what proves a grace period is genuinely
-  // active for this seat right now - without this check, anyone who ever
-  // saw this seat's token (e.g. the seat's own still-connected owner poking
-  // around in devtools) could "reconnect" into an active, currently-playing
-  // seat and hijack it out from under its real occupant.
-  if (!seat.disconnectTimer || seat.reconnectToken !== reconnectToken) {
+  if (seat.reconnectToken !== reconnectToken) return send(ws, 'reconnect-failed', {});
+  // Normally, disconnectTimer being set is what proves a grace period is
+  // genuinely active for this seat right now - without checking that, a
+  // still-connected seat's own token (e.g. read out of devtools) could
+  // hijack an active, currently-playing seat out from under its real
+  // occupant. BUT a real network drop (unplugging wifi, a dead cell signal)
+  // is silent on the wire - the OLD connection can sit there looking alive
+  // to the server for up to HEARTBEAT_INTERVAL_MS*2 before the ping/pong
+  // heartbeat notices and actually fires 'close' to start the grace period,
+  // while the client's own OS-level socket error can report "disconnected"
+  // and let the player refresh and reconnect much faster than that. If the
+  // seat's old socket is no longer OPEN (confirmed dead, just not yet
+  // formally cleaned up), treat this as an early, still-legitimate
+  // reconnect rather than bouncing it - the alternative is a reconnect
+  // attempt that's correctly timed by the player but rejected purely
+  // because the server hadn't gotten around to noticing yet.
+  const oldWs = seat.spectatorId ? sessions.get(seat.spectatorId) : null;
+  const oldSocketConfirmedDead = !oldWs || oldWs.readyState !== oldWs.OPEN;
+  if (!seat.disconnectTimer && !(seat.kind === 'human' && oldSocketConfirmedDead)) {
     return send(ws, 'reconnect-failed', {});
   }
-  clearTimeout(seat.disconnectTimer);
-  seat.disconnectTimer = null;
-  seat.disconnectDeadline = null;
+  if (seat.disconnectTimer) {
+    clearTimeout(seat.disconnectTimer);
+    seat.disconnectTimer = null;
+    seat.disconnectDeadline = null;
+  }
   seat.kind = 'human';
   seat.playerId = sessionId;
   seat.spectatorId = sessionId;
