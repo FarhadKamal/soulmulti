@@ -992,9 +992,38 @@ function handleChatMessage(room, sessionId, { text }) {
 }
 
 // ---- Connection handling ----
+// Ping/pong heartbeat: without this, a connection silently dropped by an
+// intermediate proxy/load balancer (Render sits behind one) or a phone
+// putting the tab to sleep never fires a 'close' event on the server side -
+// the socket just sits there looking alive while actually being dead. That
+// left the OTHER players in a room stuck watching a "frozen" bot turn
+// forever (the disappeared player's seat never got cleaned up/handed to a
+// bot), and the disappeared player's own client never showed "Connection
+// lost" until they happened to click something and the send() itself
+// failed. ws's own documented isAlive pattern: mark every socket alive on
+// each incoming pong, ping everyone on an interval, and terminate() (which
+// fires 'close', reusing the existing leaveRoom cleanup) any socket that
+// never answered the PREVIOUS ping - gives a dead connection at most one
+// full interval before it's detected and cleaned up.
+const HEARTBEAT_INTERVAL_MS = 15000;
+function startHeartbeat() {
+  setInterval(() => {
+    wss.clients.forEach((ws) => {
+      if (ws.isAlive === false) {
+        ws.terminate();
+        return;
+      }
+      ws.isAlive = false;
+      ws.ping();
+    });
+  }, HEARTBEAT_INTERVAL_MS);
+}
+
 wss.on('connection', (ws) => {
   const sessionId = randomUUID();
   sessions.set(sessionId, ws);
+  ws.isAlive = true;
+  ws.on('pong', () => { ws.isAlive = true; });
   send(ws, 'session', { sessionId });
 
   ws.on('message', (raw) => {
@@ -1032,6 +1061,8 @@ wss.on('connection', (ws) => {
     leaveRoom(sessionId);
   });
 });
+
+startHeartbeat();
 
 httpServer.listen(PORT, () => {
   console.log(`Soul Clash multiplayer server listening on port ${PORT}`);
