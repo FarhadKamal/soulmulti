@@ -295,8 +295,10 @@ function renderRoomLobby(room, topControls, rerender) {
   // Icon button in the shared top-right cluster (next to fullscreen),
   // not its own full-width row between the code and seat list - same
   // "compact corner control, not a standalone banner" fix already applied
-  // to the in-match Exit Game button (see battleScreen.js).
-  if (room.youAreOwner) {
+  // to the in-match Exit Game button (see battleScreen.js). Available to
+  // ANY human seated in the room, not just the owner - a non-owner player
+  // previously had no way to leave the room at all once they'd joined.
+  if (room.mySeatIndex !== null) {
     const exitBtn = document.createElement('button');
     exitBtn.className = 'exit-icon-btn';
     exitBtn.title = 'Exit Room';
