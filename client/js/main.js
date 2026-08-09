@@ -1,4 +1,6 @@
-import { connect, onMessage, saveReconnectInfo, clearReconnectInfo } from './net.js';
+import {
+  connect, onMessage, saveReconnectInfo, clearReconnectInfo, getDebugTrail,
+} from './net.js';
 import { renderLobby } from './lobbyScreen.js';
 import { renderBattle } from './battleScreen.js';
 import { addChatMessage, clearChatMessages } from './chatPanel.js';
@@ -236,7 +238,9 @@ function mySeatCharacterIds() {
 
 function rerender() {
   if (state.screen === 'lobby') {
-    renderLobby(root, { room: state.room, error: state.error, connectionLost: state.connectionLost }, {
+    renderLobby(root, {
+      room: state.room, error: state.error, connectionLost: state.connectionLost, debugTrail: getDebugTrail(),
+    }, {
       onEnterMatch: () => { state.screen = 'battle'; rerender(); },
       rerender,
     });
@@ -380,6 +384,7 @@ onMessage((msg) => {
       // entry so future connects don't keep retrying a dead reconnect, and
       // let the player land on the normal entry screen instead of hanging.
       clearReconnectInfo();
+      rerender();
       break;
     case 'chat-message':
       addChatMessage(msg);

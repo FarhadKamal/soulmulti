@@ -43,10 +43,12 @@ const RECONNECT_STORAGE_KEY = 'soulclash-reconnect';
 
 export function saveReconnectInfo({ roomCode, seatIndex, reconnectToken }) {
   localStorage.setItem(RECONNECT_STORAGE_KEY, JSON.stringify({ roomCode, seatIndex, reconnectToken }));
+  logDebug(`saved reconnect info: room=${roomCode} seat=${seatIndex}`);
 }
 
 export function clearReconnectInfo() {
   localStorage.removeItem(RECONNECT_STORAGE_KEY);
+  logDebug('cleared reconnect info');
 }
 
 function loadReconnectInfo() {
@@ -58,6 +60,18 @@ function loadReconnectInfo() {
   }
 }
 
+// TEMPORARY on-screen debug trail for diagnosing a live reconnect issue on
+// a mobile device with no console access - see lobbyScreen.js's debug
+// banner. Remove once the reconnect flow is confirmed working end-to-end.
+let debugTrail = [];
+export function getDebugTrail() {
+  return debugTrail;
+}
+function logDebug(line) {
+  debugTrail.push(`${new Date().toISOString().slice(11, 19)} ${line}`);
+  if (debugTrail.length > 12) debugTrail.shift();
+}
+
 // Automatically attempts to resume a saved seat as soon as this connection
 // is confirmed live (the server's 'session' message) - no button click
 // needed, since the whole point is recovering transparently after a
@@ -65,7 +79,11 @@ function loadReconnectInfo() {
 // (handled in main.js), same as never having attempted one at all.
 function maybeSendReconnect() {
   const info = loadReconnectInfo();
-  if (!info) return;
+  if (!info) {
+    logDebug('no saved reconnect info in localStorage');
+    return;
+  }
+  logDebug(`sending reconnect: room=${info.roomCode} seat=${info.seatIndex}`);
   send('reconnect', { code: info.roomCode, seatIndex: info.seatIndex, reconnectToken: info.reconnectToken });
 }
 
@@ -108,11 +126,15 @@ export function connect() {
     const msg = JSON.parse(event.data);
     if (msg.type === 'session') {
       sessionId = msg.sessionId;
+      logDebug('session established, attempting reconnect if saved');
       maybeSendReconnect();
     }
+    if (msg.type === 'reconnect-failed') logDebug('server replied reconnect-failed');
+    if (msg.type === 'lobby-update') logDebug(`lobby-update received (phase=${msg.room?.phase})`);
     if (listener) listener(msg);
   });
-  ws.addEventListener('close', () => {
+  ws.addEventListener('close', (event) => {
+    logDebug(`socket closed (code=${event.code})`);
     stopStaleCheck();
     if (listener) listener({ type: 'connection-closed' });
   });

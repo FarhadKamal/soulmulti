@@ -23,7 +23,7 @@ let confirmingKickSeatIndex = null;
 // Renders the pre-match lobby: room type choice -> create/join -> seat
 // list + character picking -> start. `room` is null until a create-room or
 // join-room response/lobby-update has arrived at least once.
-export function renderLobby(root, { room, error, connectionLost }, { onEnterMatch, rerender }) {
+export function renderLobby(root, { room, error, connectionLost, debugTrail }, { onEnterMatch, rerender }) {
   root.innerHTML = '';
   const wrap = document.createElement('div');
   wrap.className = 'lobby';
@@ -69,6 +69,16 @@ export function renderLobby(root, { room, error, connectionLost }, { onEnterMatc
   }
 
   if (!room && aboutOpen) wrap.appendChild(renderAboutPanel());
+
+  // TEMPORARY: visible-on-mobile trail of what net.js's reconnect logic
+  // actually did, for diagnosing a live issue with no console access.
+  // Remove once the reconnect flow is confirmed working end-to-end.
+  if (!room && debugTrail && debugTrail.length) {
+    const dbg = document.createElement('pre');
+    dbg.style.cssText = 'background:#111;color:#0f0;font-size:11px;padding:8px;white-space:pre-wrap;text-align:left;max-width:100%;overflow-wrap:break-word;';
+    dbg.textContent = debugTrail.join('\n');
+    wrap.appendChild(dbg);
+  }
 
   // Everything below (entry form or room lobby, including the character
   // grids and chat panel) lives inside its own scroll region, not the page
