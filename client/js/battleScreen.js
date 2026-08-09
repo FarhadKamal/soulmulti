@@ -46,6 +46,22 @@ export function renderBattle(root, state) {
     return;
   }
 
+  // The screen can flip to 'battle' (lobbyScreen.js's onEnterMatch, fired
+  // off a lobby-update reporting phase 'in-match') a moment before the
+  // first game-state broadcast actually arrives - e.g. joining a room mid-
+  // match as a spectator, or reconnecting into one after a refresh. Rather
+  // than crash on game.phase with no game yet, show a brief placeholder;
+  // the very next game-state broadcast (already in flight) triggers a
+  // normal rerender with the real board.
+  if (!game) {
+    const loading = document.createElement('div');
+    loading.className = 'round-info';
+    loading.textContent = 'Loading match...';
+    wrap.appendChild(loading);
+    root.appendChild(wrap);
+    return;
+  }
+
   if (game.phase === 'game-over') {
     stopTurnTimer();
     // Staged reveal (see main.js's startGameOverSequence): 'freeze' keeps

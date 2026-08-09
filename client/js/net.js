@@ -1,15 +1,17 @@
 // Thin WebSocket wrapper: one persistent connection for the whole tab
 // session, dispatched to whichever listener the current screen registered.
-// No reconnect/retry logic (matches the server's "leaving = permanent bot
-// takeover" design; there's nothing to reconnect back into once a seat's
-// been handed to a bot) - but it DOES actively detect a silently-dead
-// connection rather than waiting indefinitely on the browser's own 'close'
-// event, which in practice could take minutes (or never fire at all) for a
-// connection dropped by an intermediate proxy/load balancer or a phone
-// backgrounding the tab. Reported directly: matches looked "frozen" mid
-// bot-turn with no error shown, and clicking Exit was the first time
-// anything revealed the connection had already died - the browser was
-// still reporting the socket as open the whole time.
+// No auto-retry-without-reload logic - but a fresh connect() DOES attempt to
+// resume a still-live seat via the reconnect token persisted in localStorage
+// (see maybeSendReconnect below), giving the existing Refresh-button flow
+// somewhere real to land instead of always starting over as a brand new
+// session. It also actively detects a silently-dead connection rather than
+// waiting indefinitely on the browser's own 'close' event, which in
+// practice could take minutes (or never fire at all) for a connection
+// dropped by an intermediate proxy/load balancer or a phone backgrounding
+// the tab. Reported directly: matches looked "frozen" mid bot-turn with no
+// error shown, and clicking Exit was the first time anything revealed the
+// connection had already died - the browser was still reporting the socket
+// as open the whole time.
 let ws = null;
 let listener = null;
 let sessionId = null;
@@ -31,6 +33,41 @@ let staleCheckInterval = null;
 // experience.
 const STALE_THRESHOLD_MS = 90000;
 const STALE_CHECK_INTERVAL_MS = 15000;
+
+// Survives closing the tab entirely (not just a reload), unlike
+// sessionStorage - the whole point is a player who closed the tab by
+// accident (or their phone killed it) can still come back within the
+// server's 60s disconnect grace period (see index.js's
+// DISCONNECT_GRACE_MS/startDisconnectGracePeriod) and reclaim their seat.
+const RECONNECT_STORAGE_KEY = 'soulclash-reconnect';
+
+export function saveReconnectInfo({ roomCode, seatIndex, reconnectToken }) {
+  localStorage.setItem(RECONNECT_STORAGE_KEY, JSON.stringify({ roomCode, seatIndex, reconnectToken }));
+}
+
+export function clearReconnectInfo() {
+  localStorage.removeItem(RECONNECT_STORAGE_KEY);
+}
+
+function loadReconnectInfo() {
+  try {
+    const raw = localStorage.getItem(RECONNECT_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+// Automatically attempts to resume a saved seat as soon as this connection
+// is confirmed live (the server's 'session' message) - no button click
+// needed, since the whole point is recovering transparently after a
+// Refresh. A stale/expired/wrong entry just gets a 'reconnect-failed' reply
+// (handled in main.js), same as never having attempted one at all.
+function maybeSendReconnect() {
+  const info = loadReconnectInfo();
+  if (!info) return;
+  send('reconnect', { code: info.roomCode, seatIndex: info.seatIndex, reconnectToken: info.reconnectToken });
+}
 
 // In production (Render, or any deploy where server/index.js serves the
 // client's own static files - see serveStaticFile there), the page is
@@ -69,7 +106,10 @@ export function connect() {
   ws.addEventListener('message', (event) => {
     lastMessageAt = Date.now();
     const msg = JSON.parse(event.data);
-    if (msg.type === 'session') sessionId = msg.sessionId;
+    if (msg.type === 'session') {
+      sessionId = msg.sessionId;
+      maybeSendReconnect();
+    }
     if (listener) listener(msg);
   });
   ws.addEventListener('close', () => {

@@ -96,11 +96,14 @@ const httpServer = createServer((req, res) => {
 });
 const wss = new WebSocketServer({ server: httpServer });
 
-// sessionId -> ws connection. A session survives a single tab's lifetime -
-// there is no reconnect-to-old-session support yet (see multiplayer design
-// notes: timeout/leave = permanent bot takeover, so there's nothing to
-// reconnect back into anyway).
+// sessionId -> ws connection. A session's raw id itself never survives a
+// disconnect (a fresh random one is issued on every new connection) - what
+// DOES survive is the per-seat reconnectToken (see rooms.js's createSeat and
+// handleReconnect below), which lets a returning browser prove which seat it
+// used to hold within that seat's 60s disconnect grace period.
 const sessions = new Map();
+
+const DISCONNECT_GRACE_MS = 60_000;
 
 function send(ws, type, payload = {}) {
   if (ws.readyState === ws.OPEN) ws.send(JSON.stringify({ type, ...payload }));
@@ -519,8 +522,9 @@ function handleCreateRoom(ws, sessionId, { roomType, name }) {
   seat.playerId = sessionId;
   seat.spectatorId = sessionId;
   seat.name = cleanName;
+  seat.reconnectToken = randomUUID();
   room.ownerId = sessionId;
-  send(ws, 'room-created', { code: room.code });
+  send(ws, 'room-created', { code: room.code, seatIndex: seat.index, reconnectToken: seat.reconnectToken });
   broadcastLobby(room);
 }
 
@@ -536,7 +540,8 @@ function handleJoinRoom(ws, sessionId, { code, name }) {
   seat.playerId = sessionId;
   seat.spectatorId = sessionId;
   seat.name = cleanName;
-  send(ws, 'room-joined', { code: room.code });
+  seat.reconnectToken = randomUUID();
+  send(ws, 'room-joined', { code: room.code, seatIndex: seat.index, reconnectToken: seat.reconnectToken });
   broadcastLobby(room);
 }
 
@@ -801,6 +806,36 @@ function handleAbandonMatch(room, sessionId) {
   broadcastLobby(room);
 }
 
+// Permanent bot takeover of a seat that's done for good - no more
+// reconnecting back into it (spectatorId/reconnectToken both cleared, unlike
+// a turn-timeout which keeps spectatorId so the original human can keep
+// watching). Shared by: a deliberate "Exit Room"/disconnect with no active
+// grace period (leaveRoom's mid-match branch below), and a disconnect grace
+// period (see ws.on('close')) that expired with nobody reclaiming the seat.
+// Returns the room to a clean state (ownership handoff, room deletion if no
+// humans remain) exactly as leaveRoom always has.
+function permanentlyConvertSeatToBot(room, seat, wasOwner) {
+  seat.kind = 'bot';
+  seat.playerId = null;
+  seat.spectatorId = null;
+  seat.reconnectToken = null;
+  if (seat.disconnectTimer) clearTimeout(seat.disconnectTimer);
+  seat.disconnectTimer = null;
+  seat.disconnectDeadline = null;
+  if (wasOwner) {
+    const nextHuman = room.seats.find((s) => s.kind === 'human');
+    room.ownerId = nextHuman ? nextHuman.playerId : null;
+  }
+  const anyHumanLeft = room.seats.some((s) => s.kind === 'human');
+  if (!anyHumanLeft) {
+    clearTurnTimer(room);
+    deleteRoom(room.code);
+    return;
+  }
+  broadcastLobby(room);
+  if (room.phase === 'in-match') runBotTurnsIfAny(room);
+}
+
 // Shared by both an explicit "Exit Room" click (leave-room message) and a
 // real socket disconnect (ws.on('close')) - same cleanup either way, since
 // a deliberate exit and an abrupt disconnect should behave identically
@@ -838,23 +873,63 @@ function leaveRoom(sessionId, ws) {
 
   // Mid-match (or finished, waiting on return-to-lobby): leaving = permanent
   // bot takeover, same as a timed-out turn - but this session is fully done
-  // with the room (spectatorId cleared too), unlike a timeout.
-  const wasHuman = seat.kind === 'human';
+  // with the room (spectatorId cleared too), unlike a timeout. An explicit
+  // "Exit Room" click always goes straight to permanent (no grace period -
+  // that's reserved for genuine disconnects, see ws.on('close')); a real
+  // disconnect reaching here means the seat had no reconnectToken to begin
+  // with (e.g. a tutorial room) since a reconnectable seat's close handler
+  // diverts to the grace period instead of ever calling leaveRoom directly.
+  permanentlyConvertSeatToBot(room, seat, room.ownerId === sessionId);
+}
+
+// Starts a 60s grace period for a seat whose connection just genuinely
+// dropped mid-match (heartbeat-detected dead socket, or a real close event) -
+// called only for seats that have a reconnectToken (i.e. claimed via
+// handleCreateRoom/handleJoinRoom, never a tutorial seat) and only while
+// room.phase === 'in-match'. The seat plays as a bot for the duration
+// (identical visible behavior to a permanent takeover - no separate
+// "temporarily disconnected" UI state), but keeps spectatorId/reconnectToken
+// alive so handleReconnect below can find and restore it. If nobody
+// reconnects before the timer fires, it converts exactly like a deliberate
+// leave (permanentlyConvertSeatToBot).
+function startDisconnectGracePeriod(room, seat, wasOwner) {
   seat.kind = 'bot';
   seat.playerId = null;
-  seat.spectatorId = null;
-  if (room.ownerId === sessionId) {
-    const nextHuman = room.seats.find((s) => s.kind === 'human');
-    room.ownerId = nextHuman ? nextHuman.playerId : null;
-  }
-  const anyHumanLeft = room.seats.some((s) => s.kind === 'human');
-  if (!anyHumanLeft) {
-    clearTurnTimer(room);
-    deleteRoom(room.code);
-    return;
-  }
+  seat.disconnectDeadline = Date.now() + DISCONNECT_GRACE_MS;
+  seat.disconnectTimer = setTimeout(() => {
+    permanentlyConvertSeatToBot(room, seat, wasOwner);
+  }, DISCONNECT_GRACE_MS);
+  // Ownership is NOT handed off yet (unlike a deliberate leave) - the
+  // original owner might reconnect within the grace period and should get
+  // their room control back exactly as it was, same reasoning as
+  // armTurnTimer's own timeout not stripping ownership for a still-connected
+  // player. If the grace period actually expires, permanentlyConvertSeatToBot
+  // (called above) does the real ownership handoff then.
   broadcastLobby(room);
-  if (wasHuman && room.phase === 'in-match') runBotTurnsIfAny(room);
+  if (room.phase === 'in-match') runBotTurnsIfAny(room);
+}
+
+function handleReconnect(ws, sessionId, { code, seatIndex, reconnectToken }) {
+  const room = getRoom(code);
+  if (!room) return send(ws, 'reconnect-failed', {});
+  const seat = room.seats[seatIndex];
+  if (!seat) return send(ws, 'reconnect-failed', {});
+  // disconnectTimer being set is what proves a grace period is genuinely
+  // active for this seat right now - without this check, anyone who ever
+  // saw this seat's token (e.g. the seat's own still-connected owner poking
+  // around in devtools) could "reconnect" into an active, currently-playing
+  // seat and hijack it out from under its real occupant.
+  if (!seat.disconnectTimer || seat.reconnectToken !== reconnectToken) {
+    return send(ws, 'reconnect-failed', {});
+  }
+  clearTimeout(seat.disconnectTimer);
+  seat.disconnectTimer = null;
+  seat.disconnectDeadline = null;
+  seat.kind = 'human';
+  seat.playerId = sessionId;
+  seat.spectatorId = sessionId;
+  broadcastLobby(room);
+  if (room.game) broadcastGameState(room);
 }
 
 function handleAction(room, sessionId, { characterId, actionId, targetId }) {
@@ -1034,6 +1109,7 @@ wss.on('connection', (ws) => {
     if (type === 'create-room') return handleCreateRoom(ws, sessionId, payload);
     if (type === 'create-tutorial-room') return handleCreateTutorialRoom(ws, sessionId, payload);
     if (type === 'join-room') return handleJoinRoom(ws, sessionId, payload);
+    if (type === 'reconnect') return handleReconnect(ws, sessionId, payload);
     if (type === 'leave-room') return leaveRoom(sessionId, ws);
 
     const room = findRoomBySessionId(sessionId);
@@ -1058,6 +1134,19 @@ wss.on('connection', (ws) => {
 
   ws.on('close', () => {
     sessions.delete(sessionId);
+    // A genuine disconnect mid-match, for a seat that CAN be reconnected to
+    // (has a reconnectToken - i.e. claimed via handleCreateRoom/
+    // handleJoinRoom, not a tutorial seat), gets a 60s grace period instead
+    // of leaveRoom's usual immediate-and-permanent bot conversion - see
+    // startDisconnectGracePeriod. Every other close (lobby-phase, tutorial
+    // rooms, or a seat with no token for some other reason) falls through to
+    // the existing leaveRoom behavior unchanged.
+    const room = findRoomBySessionId(sessionId);
+    const seat = room?.seats.find((s) => s.spectatorId === sessionId);
+    if (room && seat && seat.kind === 'human' && room.phase === 'in-match' && seat.reconnectToken) {
+      startDisconnectGracePeriod(room, seat, room.ownerId === sessionId);
+      return;
+    }
     leaveRoom(sessionId);
   });
 });
