@@ -17,7 +17,7 @@ const SOUND_EFFECT_FILES = [
   'bgm-battle.mp3', 'bgm-battle-2.mp3', 'bgm-battle-3.mp3',
   'bgm-menu.mp3', 'bgm-menu-2.mp3', 'bgm-menu-3.mp3',
   'charge.mp3', 'click.mp3', 'coin.mp3', 'curse.mp3', 'cyclonepunch.mp3',
-  'divinerestore.mp3', 'dodge.mp3', 'eclipse.mp3', 'freeze.mp3',
+  'divinerestore.mp3', 'dodge.mp3', 'eclipse.mp3', 'explosion.mp3', 'freeze.mp3',
   'game-over.mp3', 'hiddenmark.mp3', 'jesterball.mp3', 'kick.mp3',
   'magic.mp3', 'miss.mp3', 'moonstep.mp3', 'punch.mp3', 'rebirth.mp3',
   'shadowexecution.mp3', 'smash.mp3', 'soulswap.mp3',

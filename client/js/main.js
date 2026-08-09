@@ -173,12 +173,14 @@ function playLogEntrySound(entry) {
     return;
   }
   if (entry.type === 'jester-ball-take') {
-    // Explodes on the holder (smash) UNLESS it triggered Blade's Rebirth
-    // instead - that case gets its own dedicated 'rebirth' entry right
-    // after this one (handled above), so skip the explosion sound here to
-    // avoid playing both for the same event.
+    // Explodes on the holder UNLESS it triggered Blade's Rebirth instead -
+    // that case gets its own dedicated 'rebirth' entry right after this
+    // one (handled above), so skip the explosion sound here to avoid
+    // playing both for the same event. Its own dedicated 'explosion' sound
+    // (previously reused Tharox's 'smash' effect, since both are impact
+    // sounds - now distinct so updating one doesn't also change the other).
     if (!entry.revived) {
-      playSound('smash');
+      playSound('explosion');
       // Boingo gets the last laugh whenever the ball bursts on SOMEONE
       // ELSE - not when it bursts on himself (he can hold his own ball
       // mid-pass-chain in a multi-target room). A no-op for anyone but
