@@ -27,11 +27,18 @@ export function renderLobby(root, { room, error, connectionLost }, { onEnterMatc
   root.innerHTML = '';
   const wrap = document.createElement('div');
   wrap.className = 'lobby';
-  wrap.style.position = 'relative';
+
+  // A row (not absolute-positioned over the title) so the icon cluster
+  // never overlaps/hides the centered "Soul Clash Online" text - on a
+  // narrow phone screen, 3 icons (About, Hard Refresh, Fullscreen) wide
+  // enough to run under an absolutely-positioned title previously did
+  // exactly that.
+  const header = document.createElement('div');
+  header.className = 'lobby-header';
 
   const title = document.createElement('h1');
   title.textContent = 'Soul Clash Online';
-  wrap.appendChild(title);
+  header.appendChild(title);
 
   const topControls = document.createElement('div');
   topControls.className = 'top-right-controls';
@@ -40,7 +47,9 @@ export function renderLobby(root, { room, error, connectionLost }, { onEnterMatc
   if (!room) topControls.appendChild(renderAboutButton(rerender));
   topControls.appendChild(renderHardRefreshButton());
   topControls.appendChild(renderFullscreenButton());
-  wrap.appendChild(topControls);
+  header.appendChild(topControls);
+
+  wrap.appendChild(header);
 
   if (error) {
     const err = document.createElement('div');
