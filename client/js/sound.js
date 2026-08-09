@@ -3,11 +3,13 @@
 // client (menu music while in the lobby, battle music once a match starts,
 // no local-only concepts like undo/turn-tick sounds since those don't
 // apply here).
+import { v } from './assetVersion.js';
+
 const cache = {};
 
 function get(name) {
   if (!cache[name]) {
-    cache[name] = new Audio(`assets/sounds/${name}.mp3`);
+    cache[name] = new Audio(v(`assets/sounds/${name}.mp3`));
   }
   return cache[name];
 }
@@ -52,7 +54,7 @@ function startMusic(track, file, volume) {
   if (musicTrack === track) return;
   if (musicAudio) musicAudio.pause();
   try {
-    const node = new Audio(`assets/sounds/${file}`);
+    const node = new Audio(v(`assets/sounds/${file}`));
     node.loop = true;
     node.volume = volume;
     node.play().catch(() => {});

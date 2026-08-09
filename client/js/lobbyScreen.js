@@ -2,6 +2,7 @@ import { CHARACTERS } from './characters.js';
 import { send } from './net.js';
 import { renderChatPanel } from './chatPanel.js';
 import { renderFullscreenButton } from './fullscreen.js';
+import { hardRefresh } from './assetVersion.js';
 
 // Whether the About panel is open - module state (not part of the shared
 // `state` object in main.js), same reasoning as battleScreen.js's
@@ -37,6 +38,7 @@ export function renderLobby(root, { room, error, connectionLost }, { onEnterMatc
   // Only on the entry screen (no room yet) - a landing-page credit, not
   // something needed once you're already in a room or mid-match.
   if (!room) topControls.appendChild(renderAboutButton(rerender));
+  topControls.appendChild(renderHardRefreshButton());
   topControls.appendChild(renderFullscreenButton());
   wrap.appendChild(topControls);
 
@@ -103,6 +105,23 @@ function renderAboutButton(rerender) {
   btn.title = 'About';
   btn.textContent = 'ℹ️';
   btn.onclick = () => { aboutOpen = !aboutOpen; rerender(); };
+  return btn;
+}
+
+// Icon button matching fullscreen/about's exact corner style - bumps the
+// cache-busting version token and reloads immediately (see
+// assetVersion.js's hardRefresh). One click, no confirmation - a page
+// reload is low-stakes (same as an accidental browser refresh; nothing
+// server-side is affected, you just reconnect as a fresh session), and
+// this exists specifically to recover from a stale-cached image/sound
+// under an unchanged filename, which forcing a confirmation step wouldn't
+// meaningfully protect against.
+function renderHardRefreshButton() {
+  const btn = document.createElement('button');
+  btn.className = 'hard-refresh-btn';
+  btn.title = 'Hard Refresh (fixes stuck/stale images or sounds)';
+  btn.textContent = '🔄';
+  btn.onclick = () => hardRefresh();
   return btn;
 }
 

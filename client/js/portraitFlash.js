@@ -4,6 +4,8 @@
 // mutation. Same trigger conditions (see setter table extracted from the
 // main game), same 1600ms flash duration, same idle/untouched-since-last-
 // turn pattern for the 8 "idle portrait" characters.
+import { v } from './assetVersion.js';
+
 const FLASH_DURATION_MS = 1600;
 
 // Per-character currently-flashing image path, cleared after
@@ -39,7 +41,8 @@ function setFlash(characterId, src) {
 }
 
 export function getFlashSrc(characterId) {
-  return activeFlash.get(characterId)?.src ?? null;
+  const src = activeFlash.get(characterId)?.src ?? null;
+  return src ? v(src) : null;
 }
 
 // Two persistent (non-timed) portrait overrides, checked directly against
@@ -50,8 +53,8 @@ export function getFlashSrc(characterId) {
 // match once Rebirth has triggered.
 export function getPersistentPortrait(character) {
   if (character.isKO) return null;
-  if (character.id === 'velorya' && character.untargetable) return 'assets/images/velorya_hided.jpg';
-  if (character.id === 'blade' && character.special?.rebirthUsed) return 'assets/images/blade_alive.jpg';
+  if (character.id === 'velorya' && character.untargetable) return v('assets/images/velorya_hided.jpg');
+  if (character.id === 'blade' && character.special?.rebirthUsed) return v('assets/images/blade_alive.jpg');
   return null;
 }
 

@@ -10,12 +10,14 @@
 // character id, so characters without recordings yet fall back to
 // whatever generic sound already played for that moment (see main.js's
 // call sites), rather than erroring on a missing file.
+import { v } from './assetVersion.js';
+
 const cache = {};
 
 function get(characterId, line) {
   const key = `${characterId}/${line}`;
   if (!cache[key]) {
-    cache[key] = new Audio(`assets/voice/${characterId}/${line}.mp3`);
+    cache[key] = new Audio(v(`assets/voice/${characterId}/${line}.mp3`));
   }
   return cache[key];
 }

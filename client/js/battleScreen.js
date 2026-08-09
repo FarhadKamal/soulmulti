@@ -6,6 +6,7 @@ import { getFlashSrc, getPersistentPortrait } from './portraitFlash.js';
 import { getActiveEffects, getClawCount } from './actionEffects.js';
 import { renderFullscreenButton } from './fullscreen.js';
 import { tutorialNarrationFor } from './tutorialNarration.js';
+import { v, hardRefresh } from './assetVersion.js';
 
 // Whether the log/chat drawer is open - module state (not part of `state`
 // in main.js), same reasoning as chatPanel.js's draftText: this whole
@@ -84,6 +85,7 @@ export function renderBattle(root, state) {
   const topControls = document.createElement('div');
   topControls.className = 'top-right-controls';
   if (canExitGame) topControls.appendChild(renderExitIconButton(state));
+  topControls.appendChild(renderHardRefreshIconButton());
   topControls.appendChild(renderFullscreenButton());
   wrap.appendChild(topControls);
 
@@ -228,6 +230,21 @@ function renderExitIconButton(state) {
   return btn;
 }
 
+// Icon-only, same compact square style as fullscreen/exit - bumps the
+// cache-busting version token and reloads immediately (see
+// assetVersion.js's hardRefresh). One click, no confirmation: available
+// mid-match too since stale-cached audio/images can surface here just as
+// easily as on the entry screen, and a reload is low-stakes (you just
+// reconnect as a fresh session - nothing server-side is affected).
+function renderHardRefreshIconButton() {
+  const btn = document.createElement('button');
+  btn.className = 'hard-refresh-btn';
+  btn.title = 'Hard Refresh (fixes stuck/stale images or sounds)';
+  btn.textContent = '🔄';
+  btn.onclick = () => hardRefresh();
+  return btn;
+}
+
 // Inline confirm, not a blocking window.confirm() popup - a native dialog
 // freezes the whole page (nothing else can update while it's open) and on
 // mobile a mistimed tap can land on either "OK" or "Cancel" before the
@@ -346,7 +363,7 @@ function renderVictoryPortraits(game) {
     const box = document.createElement('div');
     box.className = 'victory-portrait-box';
     const img = document.createElement('img');
-    img.src = `assets/victory/${id}.jpg`;
+    img.src = v(`assets/victory/${id}.jpg`);
     img.alt = CHARACTERS[id]?.name || id;
     box.appendChild(img);
     const label = document.createElement('div');
@@ -440,17 +457,19 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
   const flashSrc = getFlashSrc(character.id);
   const persistentSrc = getPersistentPortrait(character);
   if (isVictorious) {
-    portrait.src = `assets/victory/${character.id}.jpg`;
+    portrait.src = v(`assets/victory/${character.id}.jpg`);
   } else if (flashSrc) {
+    // Already wrapped with v() at its source in portraitFlash.js.
     portrait.src = flashSrc;
   } else if (persistentSrc) {
+    // Already wrapped with v() at its source in portraitFlash.js.
     portrait.src = persistentSrc;
   } else if (character.isKO) {
-    portrait.src = `assets/koed/${character.id}.jpg`;
+    portrait.src = v(`assets/koed/${character.id}.jpg`);
   } else if (character.hearts <= character.maxHearts / 2) {
-    portrait.src = `assets/images/injured/${character.id}.jpg`;
+    portrait.src = v(`assets/images/injured/${character.id}.jpg`);
   } else {
-    portrait.src = `assets/portraits/${character.id}.jpg`;
+    portrait.src = v(`assets/portraits/${character.id}.jpg`);
   }
   portrait.alt = def.name;
   tile.appendChild(portrait);

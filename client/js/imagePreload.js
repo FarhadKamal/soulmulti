@@ -5,6 +5,7 @@
 // on the network before it appears, which reads as "the effect is slow to
 // show up" even though the flash timer itself is already running.
 import { CHARACTER_IDS } from './characters.js';
+import { v } from './assetVersion.js';
 
 // Per-character, one file per folder, filename === characterId.
 const PER_CHARACTER_FOLDERS = ['assets/portraits', 'assets/koed', 'assets/victory', 'assets/images/injured'];
@@ -65,6 +66,6 @@ export function preloadBattleImages() {
   // existed.
   for (const path of paths) {
     const img = new Image();
-    img.src = path;
+    img.src = v(path);
   }
 }

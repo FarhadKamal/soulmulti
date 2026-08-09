@@ -6,6 +6,7 @@
 // first time (exactly the same class of bug the image preload fixed for
 // portraits).
 import { allVoiceFilePaths } from './voice.js';
+import { v } from './assetVersion.js';
 
 // Every file under assets/sounds/ - listed explicitly (not derived from
 // sound.js's ACTION_SOUND map, which only covers ability-triggered sounds
@@ -42,6 +43,6 @@ export function preloadBattleAudio() {
   for (const path of paths) {
     const audio = new Audio();
     audio.preload = 'auto';
-    audio.src = path;
+    audio.src = v(path);
   }
 }
