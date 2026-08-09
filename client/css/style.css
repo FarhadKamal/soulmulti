@@ -87,6 +87,12 @@ input {
 .seat-row { flex-wrap: wrap; }
 .seat-label { font-weight: 600; }
 .seat-picks { opacity: 0.8; font-size: 0.9em; }
+.seat-reorder-controls { display: flex; flex-direction: column; gap: 2px; }
+.seat-reorder-btn {
+  width: 28px; height: 22px; padding: 0; font-size: 0.75em; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+}
+.seat-reorder-btn:disabled { opacity: 0.25; }
 .kick-btn { background: #3a1c1c; border-color: #7a3a3a; color: #ffb3b3; font-size: 0.85em; }
 .kick-confirm-prompt { font-size: 0.85em; opacity: 0.85; }
 .kick-confirm-yes { background: #5c1a1a; border-color: #7a3a3a; color: #ffb3b3; font-size: 0.85em; font-weight: 600; }

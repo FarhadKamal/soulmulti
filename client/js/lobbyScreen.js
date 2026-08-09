@@ -312,6 +312,33 @@ function renderRoomLobby(room, topControls, rerender) {
     const row = document.createElement('div');
     row.className = 'seat-row' + (seat.isMe ? ' seat-row--me' : '');
 
+    // Seat index directly determines turn order once the match starts (seat
+    // 1 acts first, then seat 2, etc.) - letting the owner reorder seats
+    // here is how they choose turn order, not just cosmetic. Swaps with the
+    // adjacent seat rather than a free drag-to-anywhere reorder, which is
+    // both simpler to build reliably on mobile (no drag gesture to fight
+    // with a scrolling list) and trivial for the server to validate (just a
+    // bounds check, not verifying an incoming permutation).
+    if (room.youAreOwner) {
+      const reorderControls = document.createElement('span');
+      reorderControls.className = 'seat-reorder-controls';
+      const upBtn = document.createElement('button');
+      upBtn.className = 'seat-reorder-btn';
+      upBtn.textContent = '▲';
+      upBtn.title = 'Move up';
+      upBtn.disabled = seat.index === 0;
+      upBtn.onclick = () => send('reorder-seats', { seatIndex: seat.index, direction: -1 });
+      reorderControls.appendChild(upBtn);
+      const downBtn = document.createElement('button');
+      downBtn.className = 'seat-reorder-btn';
+      downBtn.textContent = '▼';
+      downBtn.title = 'Move down';
+      downBtn.disabled = seat.index === room.seats.length - 1;
+      downBtn.onclick = () => send('reorder-seats', { seatIndex: seat.index, direction: 1 });
+      reorderControls.appendChild(downBtn);
+      row.appendChild(reorderControls);
+    }
+
     const label = document.createElement('span');
     label.className = 'seat-label';
     if (seat.kind === 'empty') label.textContent = `Seat ${seat.index + 1}: (empty)`;

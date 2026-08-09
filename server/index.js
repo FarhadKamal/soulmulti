@@ -746,6 +746,40 @@ function handleKickPlayer(room, sessionId, { seatIndex }) {
   broadcastLobby(room);
 }
 
+// Owner-only, lobby-phase-only reordering: swaps a seat with its neighbor
+// one position up or down (direction: -1 or 1) - matches the Up/Down arrow
+// buttons in lobbyScreen.js rather than an arbitrary drag-and-drop
+// permutation, which keeps validation trivial (just a bounds check, no
+// need to verify an incoming array is a genuine permutation of every seat).
+// Seat index directly determines turn order once the match starts
+// (handleStartMatch builds playerPicks straight from room.seats' array
+// order) - this is the whole point of the feature, letting the owner
+// decide who acts first/second/etc. before starting.
+//
+// Physically swaps the array elements AND renumbers each seat's own .index
+// to match its new position, keeping the array-position === seat.index
+// invariant every other seatIndex-addressed handler (fill-bot, remove-bot,
+// kick-player) depends on. This intentionally invalidates any client's
+// stale localStorage seatIndex from before the swap - handleReconnect
+// looks seats up by matching reconnectToken instead of trusting the
+// client's seatIndex for exactly this reason, so a reorder never breaks
+// reconnection for a currently-connected or later-reconnecting player.
+function handleReorderSeats(room, sessionId, { seatIndex, direction }) {
+  if (sessionId !== room.ownerId) return;
+  if (room.phase !== 'lobby') return;
+  if (direction !== -1 && direction !== 1) return;
+  const otherIndex = seatIndex + direction;
+  if (seatIndex < 0 || seatIndex >= room.seats.length) return;
+  if (otherIndex < 0 || otherIndex >= room.seats.length) return;
+  const seat = room.seats[seatIndex];
+  const other = room.seats[otherIndex];
+  room.seats[seatIndex] = other;
+  room.seats[otherIndex] = seat;
+  other.index = seatIndex;
+  seat.index = otherIndex;
+  broadcastLobby(room);
+}
+
 function handleStartMatch(room, sessionId) {
   if (sessionId !== room.ownerId) return;
   // Every human-claimed seat must have finished picking before starting.
@@ -909,30 +943,30 @@ function startDisconnectGracePeriod(room, seat, wasOwner) {
   if (room.phase === 'in-match') runBotTurnsIfAny(room);
 }
 
-function handleReconnect(ws, sessionId, { code, seatIndex, reconnectToken }) {
+function handleReconnect(ws, sessionId, { code, reconnectToken }) {
   const room = getRoom(code);
   if (!room) return send(ws, 'reconnect-failed', {});
-  const seat = room.seats[seatIndex];
+  // Looked up by matching token, not by trusting the client's own
+  // (possibly stale) seatIndex - seats can be reordered in the lobby
+  // (handleReorderSeats), which renumbers seat.index, so a client's
+  // localStorage-persisted seatIndex from before a reorder could otherwise
+  // point at the WRONG seat entirely after a refresh. The token alone is
+  // already the real security boundary (see below), so there's no reason
+  // to also depend on the array position staying stable.
+  const seat = room.seats.find((s) => s.reconnectToken === reconnectToken);
   if (!seat) return send(ws, 'reconnect-failed', {});
   // The token itself (a random UUID, unguessable, issued once at seat-claim
   // time and never exposed anywhere but this seat's own client) IS the
   // security boundary - anyone who has it correct is the seat's legitimate
-  // owner, full stop. Earlier this also required an active disconnectTimer
-  // (proof the server had ALREADY started a grace period) or the old
-  // socket's readyState reporting closed, on the theory that a still-human
-  // seat with no timer meant nobody had disconnected. That's wrong for a
-  // real network drop: the OLD connection can sit there reporting OPEN for
-  // a long time (a proxy/load-balancer layer, like Render's, may not
-  // surface the drop immediately - readyState only updates once something
-  // actively tries to use the socket and fails), while the client's own
-  // faster local detection lets the player reconnect before the server's
-  // heartbeat has caught up. That left a real, fast reconnect attempt
-  // rejected outright - confirmed live. Trusting the token unconditionally
-  // and force-closing whatever's currently in the seat (if anything) fixes
-  // this without depending on any liveness signal at all.
-  if (!seat.reconnectToken || seat.reconnectToken !== reconnectToken) {
-    return send(ws, 'reconnect-failed', {});
-  }
+  // owner, full stop. There's no additional liveness check (e.g. requiring
+  // an active disconnectTimer, or the old socket's readyState reporting
+  // closed) - a real network drop can leave the OLD connection reporting
+  // OPEN for a long time (a proxy/load-balancer layer, like Render's, may
+  // not surface the drop immediately), while the client's own faster local
+  // detection lets the player reconnect before the server's heartbeat has
+  // caught up. A liveness gate here rejected exactly that legitimate, fast
+  // reconnect - confirmed live. Force-closing whatever's currently in the
+  // seat (if anything) handles a still-technically-open old socket safely.
   if (seat.disconnectTimer) {
     clearTimeout(seat.disconnectTimer);
     seat.disconnectTimer = null;
@@ -1141,6 +1175,7 @@ wss.on('connection', (ws) => {
       case 'fill-bot': return handleFillBot(room, sessionId, payload);
       case 'remove-bot': return handleRemoveBot(room, sessionId, payload);
       case 'kick-player': return handleKickPlayer(room, sessionId, payload);
+      case 'reorder-seats': return handleReorderSeats(room, sessionId, payload);
       case 'start-match': return handleStartMatch(room, sessionId);
       case 'return-to-lobby': return handleReturnToLobby(room, sessionId);
       case 'abandon-match': return handleAbandonMatch(room, sessionId);
