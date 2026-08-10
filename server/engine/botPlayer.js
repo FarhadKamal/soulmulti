@@ -497,6 +497,22 @@ function chooseBladeMove(character, game, usable) {
   if (targets.length === 0) return { actionId: 'bloodHunt', targetId: null };
   const streakTarget = character.special.streakTargetId;
   if (streakTarget && targets.includes(streakTarget)) {
+    // A streak locked onto Athena needs its own safety check, separate from
+    // pickDefaultTarget's (which this branch bypasses entirely) - Blood
+    // Hunt's damage compounds every consecutive hit (1, 2, 3...), so a
+    // streak that was perfectly safe when it started can become self-lethal
+    // via her curse mirror as it grows, with nothing here ever having
+    // checked for that. Same class of bug as Akyros/Zerathys's own cursed-
+    // Athena guards: break off the streak (switch target) once continuing
+    // it would kill Blade himself through the mirror, unless she's the only
+    // living enemy left.
+    if (streakTarget === 'athena' && isCursedByLiveAthena(game, character)) {
+      const nextStreakDamage = character.special.streakCount + 1;
+      const otherTargets = targets.filter((tid) => tid !== 'athena');
+      if (character.hearts <= nextStreakDamage && otherTargets.length > 0) {
+        return { actionId: 'bloodHunt', targetId: pickDefaultTarget(game, character, 'bloodHunt') };
+      }
+    }
     return { actionId: 'bloodHunt', targetId: streakTarget };
   }
   return { actionId: 'bloodHunt', targetId: pickDefaultTarget(game, character, 'bloodHunt') };
