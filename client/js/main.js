@@ -97,6 +97,11 @@ function startGameOverSequence(game) {
     setTimeout(() => {
       if (state.screen !== 'battle') return;
       state.gameOverStage = 'banner';
+      // Battle music stops and menu music takes over the instant the
+      // actual Match Over screen appears - previously it just kept playing
+      // straight through victory/defeat and into the post-match banner,
+      // which read as the fight never really ending.
+      startMenuMusic();
       // A recorded voice REPLACES the generic victory jingle (see
       // playVictoryVoice/hasVoice in voice.js) - the winning side can have
       // more than one character (2v2/4p teams), and one of them may have
