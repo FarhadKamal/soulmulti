@@ -122,7 +122,7 @@ function processNewLogEntries(game) {
   const newEntries = game.log.slice(lastLogLength);
   lastLogLength = game.log.length;
   for (const entry of newEntries) {
-    playLogEntrySound(entry);
+    playLogEntrySound(entry, game);
     handleLogEntryForFlash(entry, game);
     handleDodgeForFlash(entry, game);
     handleLogEntryForEffects(entry, game);
@@ -145,7 +145,18 @@ function playKoedFor(characterId) {
   if (!playKoedVoice(characterId)) playKO();
 }
 
-function playLogEntrySound(entry) {
+// A KO'd character shouldn't have a voice line play for them - mirrors
+// portraitFlash.js's handleLaughing, which already skips the laughing
+// portrait flash once Boingo is KO'd (e.g. KO'd earlier in the same pass
+// chain, before the ball goes on to explode on someone else). Without this,
+// the laugh line would still play even though Boingo himself is down and
+// nothing shows on screen to justify it.
+function playLaughVoiceIfAlive(characterId, game) {
+  if (game.characters[characterId]?.isKO) return;
+  playLaughVoice(characterId);
+}
+
+function playLogEntrySound(entry, game) {
   if (entry.type === 'dodge') {
     playDodge();
     return;
@@ -168,8 +179,9 @@ function playLogEntrySound(entry) {
   if (entry.type === 'jester-ball-return') {
     playSound('magic');
     // Layered on top, never replacing the return sound - a no-op for
-    // anyone but Boingo (see voice.js's playLaughVoice).
-    playLaughVoice(entry.boingoId);
+    // anyone but Boingo (see voice.js's playLaughVoice), and for a KO'd
+    // Boingo (see playLaughVoiceIfAlive above).
+    playLaughVoiceIfAlive(entry.boingoId, game);
     return;
   }
   if (entry.type === 'jester-ball-take') {
@@ -184,8 +196,10 @@ function playLogEntrySound(entry) {
       // Boingo gets the last laugh whenever the ball bursts on SOMEONE
       // ELSE - not when it bursts on himself (he can hold his own ball
       // mid-pass-chain in a multi-target room). A no-op for anyone but
-      // Boingo, and a no-op if he's the one it exploded on.
-      if (entry.targetCharacterId !== 'boingo') playLaughVoice('boingo');
+      // Boingo, a no-op if he's the one it exploded on, and (via
+      // playLaughVoiceIfAlive) a no-op if he was already KO'd earlier in
+      // this same pass chain before it went on to explode on someone else.
+      if (entry.targetCharacterId !== 'boingo') playLaughVoiceIfAlive('boingo', game);
       if (entry.koTriggered) setTimeout(() => playKoedFor(entry.targetCharacterId), 200);
     }
     return;
