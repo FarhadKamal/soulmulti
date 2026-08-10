@@ -370,7 +370,16 @@ function chooseAkyrosMove(character, game, usable) {
     const wouldKillAthenaNow = athena.hearts <= Math.max(0, bestDamage - (shadowLegal ? 0 : athena.shield));
     const mirrorSurvivableNow = character.hearts > bestDamage;
     const otherTargets = fatalTargets.filter((tid) => tid !== 'athena');
-    if (wouldKillAthenaNow) {
+    // A kill on Athena is only worth taking unconditionally if Akyros
+    // actually survives his own mirrored damage - otherwise it's a mutual
+    // kill/suicide trade, not a clean win, and should be treated exactly
+    // like any other risky hit on her (only accepted once she's truly the
+    // last enemy standing, same as the non-lethal case below). Confirmed
+    // via a real match: the bot took a "lethal" Shadow Execution on Athena
+    // while sitting at 3 hearts from earlier mirror damage, and the
+    // mirrored 3 damage KO'd Akyros in the same instant - a needless trade
+    // when other living enemies (and thus safer moves) were available.
+    if (wouldKillAthenaNow && mirrorSurvivableNow) {
       if (shadowLegal) return { actionId: 'shadowExecution', targetId: 'athena' };
       return { actionId: 'fatalSlash', targetId: 'athena' };
     }
@@ -388,13 +397,10 @@ function chooseAkyrosMove(character, game, usable) {
       }
       return { actionId: 'fatalSlash', targetId: pickRandom(otherTargets) };
     }
-    // Athena's the only living enemy - if the trade would be self-lethal
-    // for no gain, there's nothing safer to do (Hidden Mark on her again
-    // isn't legal, she's already marked), so fall through and attack anyway
-    // since it's the only legal move left regardless of outcome.
-    if (!mirrorSurvivableNow) {
-      // Nothing better available - fall through to normal attack logic.
-    }
+    // Athena's the only living enemy - take the kill even if it's a mutual
+    // trade (still ends the match/removes a threat), and even a non-lethal
+    // hit is the only legal move left regardless of survivability, so fall
+    // through to the normal attack logic below either way.
   }
 
   // Shadow Execution secures a kill/heavy hit on an already-marked, weak
