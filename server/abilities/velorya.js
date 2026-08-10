@@ -55,6 +55,7 @@ export const actions = {
   lunarEclipse: {
     label: 'Lunar Eclipse',
     needsTarget: false,
+    special: true,
     isLegal: (character) => !character.usedSpecial,
     execute(character, targetId, game, log) {
       character.usedSpecial = true;

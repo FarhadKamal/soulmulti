@@ -371,6 +371,19 @@ input {
 .action-panel { background: #1c1c2c; border-radius: 10px; padding: 14px; margin-bottom: 16px; }
 .action-panel-title { font-weight: 600; margin-bottom: 10px; }
 .action-btn-row { display: flex; flex-wrap: wrap; gap: 8px; }
+/* Fire theme for each character's one signature special ability, so it
+   reads as visually distinct from a normal attack at a glance (e.g.
+   Boingo's Jester Ball vs. his normal Chaos Gamble) - a subtle glow rather
+   than a loud animation, since this sits in a list the player scans
+   quickly every turn. */
+.special-action-btn {
+  background: linear-gradient(180deg, #4a1f0a, #2a1206);
+  border-color: #ff7a1a;
+  color: #ffd9b3;
+  box-shadow: 0 0 8px rgba(255, 122, 26, 0.35);
+}
+.special-action-btn:not(:disabled):hover { box-shadow: 0 0 12px rgba(255, 122, 26, 0.55); }
+.special-action-btn:disabled { box-shadow: none; }
 .target-prompt { margin-bottom: 10px; }
 .pass-hint { font-size: 0.85em; opacity: 0.75; margin: 8px 0; }
 .lockout-hint { font-size: 0.85em; opacity: 0.6; margin-top: 8px; text-align: center; }

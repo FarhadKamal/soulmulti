@@ -18,6 +18,7 @@ export const actions = {
   divineRestore: {
     label: 'Divine Restore',
     needsTarget: false,
+    special: true,
     isLegal: (character) => !character.usedSpecial,
     execute(character, targetId, game, log) {
       character.usedSpecial = true;

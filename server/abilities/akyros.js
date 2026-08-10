@@ -44,6 +44,7 @@ export const actions = {
   shadowExecution: {
     label: 'Shadow Execution',
     needsTarget: true,
+    special: true,
     isLegal: (character, game) => !character.usedSpecial && anyEnemyIsMarked(game, character.id),
     execute(character, targetId, game, log) {
       character.usedSpecial = true;

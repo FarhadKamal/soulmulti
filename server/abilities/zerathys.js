@@ -32,6 +32,7 @@ export const actions = {
   soulSwap: {
     label: 'Soul Swap',
     needsTarget: true,
+    special: true,
     isLegal: (character) => !character.usedSpecial,
     execute(character, targetId, game, log) {
       character.usedSpecial = true;

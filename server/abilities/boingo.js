@@ -52,6 +52,7 @@ export const actions = {
   jesterBall: {
     label: 'Jester Ball',
     needsTarget: true,
+    special: true,
     isLegal: (character) => !character.usedSpecial,
     execute(character, targetId, game, log) {
       character.usedSpecial = true;

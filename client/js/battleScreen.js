@@ -634,6 +634,11 @@ function renderActionPanel(characterId, usableActions, armedAction, state) {
   usableActions.forEach((action) => {
     const btn = document.createElement('button');
     btn.textContent = action.label;
+    // Distinct styling for each character's one signature special ability
+    // (server-flagged, see usableActionsFor in index.js) - not every
+    // character has one (Blade has just his one repeatable Blood Hunt), so
+    // this is a no-op for those.
+    if (action.special) btn.classList.add('special-action-btn');
     // In a tutorial, every button still renders (so the player can see
     // their full real kit), but only the one scripted next move is
     // actually clickable - mirrors the disabled-button precedent already

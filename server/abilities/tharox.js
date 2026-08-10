@@ -47,6 +47,7 @@ export const actions = {
   glorySmash: {
     label: 'Glory Smash',
     needsTarget: true,
+    special: true,
     isLegal: (character) => character.special.hasCharge && !character.usedSpecial,
     execute(character, targetId, game, log) {
       character.usedSpecial = true;

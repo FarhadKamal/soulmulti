@@ -210,6 +210,12 @@ function usableActionsFor(game, characterId) {
     actionId: a.actionId,
     label: a.label,
     needsTarget: a.needsTarget,
+    // Marks each character's one signature special ability (declared on the
+    // action def in server/abilities/*.js) so the client can style that
+    // button distinctly from a normal attack - not every character has one
+    // (Blade has just his one repeatable Blood Hunt), so this is often
+    // false/absent for every button.
+    special: !!a.special,
     validTargetIds: a.needsTarget
       ? Object.keys(game.characters).filter((tid) => isValidTarget(game, characterId, a.actionId, tid))
       : [],
