@@ -1,4 +1,4 @@
-import { CHARACTER_IDS } from './data/characters.js';
+import { CHARACTER_IDS } from '../client/js/characters.js';
 
 // All rooms live in memory only - no database. A server restart drops every
 // in-progress room/match, which is an accepted tradeoff for a free-tier,

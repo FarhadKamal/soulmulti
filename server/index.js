@@ -5,7 +5,7 @@ import { readFile, stat } from 'fs/promises';
 import { join, extname, normalize } from 'path';
 import { fileURLToPath } from 'url';
 
-import { CHARACTER_IDS } from './data/characters.js';
+import { CHARACTER_IDS } from '../client/js/characters.js';
 import { createGame } from './engine/state.js';
 import {
   getUsableActions, executeAction, isValidTarget, markCharacterActed,

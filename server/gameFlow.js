@@ -6,7 +6,7 @@
 // happen automatically (frozen skips, the Jester Ball auto-bursting on a
 // frozen holder, turn-start passives). Everything else is left to clients to
 // render off of the state + log the server broadcasts.
-import { CHARACTERS } from './data/characters.js';
+import { CHARACTERS } from '../client/js/characters.js';
 import {
   getUsableActions, beginCharacterTurn, consumeSkipIfFrozen, markCharacterActed,
   hasCharacterActedThisTurn, charactersActingThisTurn, resolveJesterBall, endTurn,
