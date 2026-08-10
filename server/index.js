@@ -977,8 +977,22 @@ function handleReconnect(ws, sessionId, { code, reconnectToken }) {
   // believing they own this seat - the old one's own close handler will
   // then find spectatorId already reassigned below and safely no-op (see
   // leaveRoom/ws.on('close')'s findRoomBySessionId lookup).
-  const oldWs = seat.spectatorId ? sessions.get(seat.spectatorId) : null;
+  const oldSessionId = seat.spectatorId;
+  const oldWs = oldSessionId ? sessions.get(oldSessionId) : null;
   if (oldWs && oldWs !== ws && oldWs.readyState === oldWs.OPEN) oldWs.terminate();
+  // If this seat WAS the room's owner (room.ownerId still points at its old
+  // sessionId - startDisconnectGracePeriod deliberately leaves ownership
+  // untouched during the grace period, clearing only playerId, so a
+  // reconnecting owner gets control back exactly as it was, not handed off
+  // to someone else), the new sessionId needs to take over as ownerId too.
+  // oldSessionId (still preserved in spectatorId even mid-grace-period) is
+  // what lets this compare against the RIGHT id - seat.playerId is already
+  // null by this point (cleared at disconnect time), so comparing against
+  // that would never match. Without this fix, an owner who disconnects and
+  // reconnects mid-match keeps playing fine but silently loses every
+  // owner-only ability (no "(owner)" label, Fill with Bot/Start Match/Kick
+  // all silently no-op) for the rest of that room's life.
+  if (room.ownerId === oldSessionId) room.ownerId = sessionId;
   seat.kind = 'human';
   seat.playerId = sessionId;
   seat.spectatorId = sessionId;
