@@ -79,17 +79,23 @@ input {
 .room-code { text-align: center; font-size: 1.3em; letter-spacing: 3px; }
 .copy-code-btn { font-size: 0.8em; padding: 6px 12px; }
 .seat-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
+/* Fixed 3-column row (reorder arrows | label+picks | action button) rather
+   than a loosely flex-wrapped row - previously each piece (label, picks,
+   button) wrapped onto its own full-width line on a narrow screen, making
+   every seat noticeably taller than it needed to be. */
 .seat-row {
-  display: flex; justify-content: space-between; align-items: center; gap: 8px;
-  padding: 10px 12px; border-radius: 8px; background: #1c1c2c; border: 1px solid #333;
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px; border-radius: 8px; background: #1c1c2c; border: 1px solid #333;
 }
 .seat-row--me { border-color: #6c6cff; }
-.seat-row { flex-wrap: wrap; }
-.seat-label { font-weight: 600; }
-.seat-picks { opacity: 0.8; font-size: 0.9em; }
-.seat-reorder-controls { display: flex; flex-direction: column; gap: 2px; }
+.seat-info { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.seat-label { font-weight: 600; font-size: 0.95em; }
+.seat-picks { opacity: 0.75; font-size: 0.82em; }
+.seat-actions { flex: 0 0 auto; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.seat-actions button { font-size: 0.85em; padding: 6px 10px; }
+.seat-reorder-controls { flex: 0 0 auto; display: flex; flex-direction: column; gap: 2px; }
 .seat-reorder-btn {
-  width: 28px; height: 22px; padding: 0; font-size: 0.75em; line-height: 1;
+  width: 26px; height: 20px; padding: 0; font-size: 0.7em; line-height: 1;
   display: flex; align-items: center; justify-content: center;
 }
 .seat-reorder-btn:disabled { opacity: 0.25; }

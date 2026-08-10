@@ -341,29 +341,42 @@ function renderRoomLobby(room, topControls, rerender) {
       row.appendChild(reorderControls);
     }
 
+    // Label + picks stacked as one compact two-line block instead of two
+    // separate flex-wrapped items - previously, on a narrow screen, the
+    // label, picks text, and action button each wrapped onto their own
+    // full-width line, making every seat row much taller than it needed
+    // to be.
+    const info = document.createElement('span');
+    info.className = 'seat-info';
+
     const label = document.createElement('span');
     label.className = 'seat-label';
     if (seat.kind === 'empty') label.textContent = `Seat ${seat.index + 1}: (empty)`;
     else if (seat.kind === 'bot') label.textContent = `Seat ${seat.index + 1}: Bot`;
     else label.textContent = `Seat ${seat.index + 1}: ${seat.name}${seat.isOwner ? ' (owner)' : ''}${seat.isMe ? ' (you)' : ''}`;
-    row.appendChild(label);
+    info.appendChild(label);
 
     const picks = document.createElement('span');
     picks.className = 'seat-picks';
     picks.textContent = seat.characterIds.map((id) => CHARACTERS[id].name).join(' + ') || '(no character yet)';
-    row.appendChild(picks);
+    info.appendChild(picks);
+
+    row.appendChild(info);
+
+    const actions = document.createElement('span');
+    actions.className = 'seat-actions';
 
     if (seat.kind === 'empty' && room.youAreOwner) {
       const botBtn = document.createElement('button');
       botBtn.textContent = 'Fill with Bot';
       botBtn.onclick = () => send('fill-bot', { seatIndex: seat.index });
-      row.appendChild(botBtn);
+      actions.appendChild(botBtn);
     }
     if (seat.kind === 'bot' && room.youAreOwner) {
       const removeBtn = document.createElement('button');
       removeBtn.textContent = 'Remove Bot';
       removeBtn.onclick = () => send('remove-bot', { seatIndex: seat.index });
-      row.appendChild(removeBtn);
+      actions.appendChild(removeBtn);
     }
     // Kick a real human player - never offered for your own seat (isMe),
     // never a bot seat (that's Remove Bot above), and lobby-only just like
@@ -375,7 +388,7 @@ function renderRoomLobby(room, topControls, rerender) {
         const prompt = document.createElement('span');
         prompt.className = 'kick-confirm-prompt';
         prompt.textContent = `Kick ${seat.name}?`;
-        row.appendChild(prompt);
+        actions.appendChild(prompt);
         const yesBtn = document.createElement('button');
         yesBtn.className = 'kick-confirm-yes';
         yesBtn.textContent = 'Yes, kick';
@@ -384,20 +397,22 @@ function renderRoomLobby(room, topControls, rerender) {
           confirmingKickSeatIndex = null;
           rerender();
         };
-        row.appendChild(yesBtn);
+        actions.appendChild(yesBtn);
         const noBtn = document.createElement('button');
         noBtn.className = 'kick-confirm-no';
         noBtn.textContent = 'No';
         noBtn.onclick = () => { confirmingKickSeatIndex = null; rerender(); };
-        row.appendChild(noBtn);
+        actions.appendChild(noBtn);
       } else {
         const kickBtn = document.createElement('button');
         kickBtn.className = 'kick-btn';
         kickBtn.textContent = 'Kick';
         kickBtn.onclick = () => { confirmingKickSeatIndex = seat.index; rerender(); };
-        row.appendChild(kickBtn);
+        actions.appendChild(kickBtn);
       }
     }
+
+    row.appendChild(actions);
 
     seatList.appendChild(row);
   });
