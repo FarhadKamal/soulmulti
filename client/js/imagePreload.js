@@ -8,7 +8,7 @@ import { CHARACTER_IDS } from './characters.js';
 import { v } from './assetVersion.js';
 
 // Per-character, one file per folder, filename === characterId.
-const PER_CHARACTER_FOLDERS = ['assets/portraits', 'assets/koed', 'assets/victory', 'assets/images/injured'];
+const PER_CHARACTER_FOLDERS = ['assets/portraits', 'assets/koed', 'assets/victory', 'assets/injured'];
 
 // Flash/persistent-portrait images - filenames don't follow a fixed
 // pattern (varies per character/action), so listed explicitly. Kept in

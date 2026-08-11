@@ -483,7 +483,7 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
   } else if (character.isKO) {
     portrait.src = v(`assets/koed/${character.id}.jpg`);
   } else if (character.hearts <= character.maxHearts / 2) {
-    portrait.src = v(`assets/images/injured/${character.id}.jpg`);
+    portrait.src = v(`assets/injured/${character.id}.jpg`);
   } else {
     portrait.src = v(`assets/portraits/${character.id}.jpg`);
   }
