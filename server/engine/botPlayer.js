@@ -190,9 +190,28 @@ function chooseTharoxMove(character, game, usable) {
       return { actionId: 'smash', targetId: securesKill };
     }
   }
-  // Otherwise, Toss to build a charge for the much bigger Titan Smash later.
+  // Otherwise, Toss to build a charge for the much bigger Titan Smash later -
+  // UNLESS Athena is the ONLY living enemy (cursing Tharox already, or not
+  // yet but a live Athena in a 1v1 will curse whoever her only target is on
+  // her very next turn regardless), in which case charging is a trap: Titan
+  // Smash/Glory Smash are MANDATORY once charged (no way to hold back or
+  // pick a different target - pickDefaultTarget's own Athena-avoidance
+  // can't help when she's the only option), so committing to a charge here
+  // locks in a forced, likely self-lethal mirror hit with no way out.
+  // Confirmed via a real match: Tharox charged while Athena was his only
+  // remaining enemy, she cursed him on her very next turn, and he was then
+  // forced into Titan Smash, mutual-killing himself finishing her off - a
+  // poke with plain Smash instead (safe, just slower) would have won
+  // cleanly over several more turns with zero risk. Only holds back when
+  // the eventual trade would actually be fatal (character.hearts <= 3,
+  // Titan Smash's damage) - a survivable mirror is still worth charging
+  // for the bigger hit.
   if (byId.titanToss) {
-    return { actionId: 'titanToss', targetId: null };
+    const enemies = livingEnemies(game, character);
+    const onlyAthenaLeft = enemies.length === 1 && enemies[0].id === 'athena';
+    if (!(onlyAthenaLeft && character.hearts <= 3)) {
+      return { actionId: 'titanToss', targetId: null };
+    }
   }
   return { actionId: 'smash', targetId: pickDefaultTarget(game, character, 'smash') };
 }
