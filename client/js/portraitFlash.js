@@ -53,22 +53,22 @@ export function getFlashSrc(characterId) {
 // match once Rebirth has triggered.
 export function getPersistentPortrait(character) {
   if (character.isKO) return null;
-  if (character.id === 'velorya' && character.untargetable) return v('assets/images/velorya_hided.jpg');
-  if (character.id === 'blade' && character.special?.rebirthUsed) return v('assets/images/blade_alive.jpg');
+  if (character.id === 'velorya' && character.untargetable) return v('assets/images/velorya/hided.jpg');
+  if (character.id === 'blade' && character.special?.rebirthUsed) return v('assets/images/blade/alive.jpg');
   return null;
 }
 
 // Every character's idle/untouched portrait, keyed by id - the 8 "own turn
 // started, took no damage since last turn, above half health" flashes.
 const IDLE_IMAGE = {
-  athena: 'assets/images/athena_apple.jpg',
-  velorya: 'assets/images/velorya_dance.jpg',
-  boingo: 'assets/images/boingo_circus.jpg',
-  zerathys: 'assets/images/zerathys_glass.jpg',
-  tharox: 'assets/images/tharox_roar.jpg',
-  blade: 'assets/images/blade_guitar.jpg',
-  chronox: 'assets/images/chronox_space.jpg',
-  akyros: 'assets/images/akyros_rose.jpg',
+  athena: 'assets/images/athena/apple.jpg',
+  velorya: 'assets/images/velorya/dance.jpg',
+  boingo: 'assets/images/boingo/circus.jpg',
+  zerathys: 'assets/images/zerathys/glass.jpg',
+  tharox: 'assets/images/tharox/roar.jpg',
+  blade: 'assets/images/blade/guitar.jpg',
+  chronox: 'assets/images/chronox/space.jpg',
+  akyros: 'assets/images/akyros/rose.jpg',
 };
 
 // Call once per character at the moment their own turn starts (i.e. when
@@ -116,7 +116,7 @@ function handleLaughing(entry, game) {
   if (!thrownById) return;
   const thrower = game.characters[thrownById];
   if (!thrower || thrower.isKO) return;
-  setFlash(thrownById, 'assets/images/boingo_laughing.jpg');
+  setFlash(thrownById, 'assets/images/boingo/laughing.jpg');
 }
 
 // jester-ball-take entries don't carry the original thrower's id directly
@@ -136,7 +136,7 @@ export function handleLogEntryForFlash(entry, game) {
 
   if (entry.type === 'special' && entry.actionId === 'jesterBall') {
     lastJesterBallThrowerId = entry.characterId;
-    if (!isKO(entry.characterId)) setFlash(entry.characterId, 'assets/images/boingo_throwing.jpg');
+    if (!isKO(entry.characterId)) setFlash(entry.characterId, 'assets/images/boingo/throwing.jpg');
     return;
   }
   if (entry.type === 'jester-ball-return') {
@@ -154,13 +154,13 @@ export function handleLogEntryForFlash(entry, game) {
     // 'attack'/'special'/'setup') rather than folding into the generic
     // switch below - matches the main game, which fires this flash
     // straight off the executed actionId rather than a log-entry type.
-    if (!isKO(entry.characterId)) setFlash(entry.characterId, 'assets/images/akyros_hidden.jpg');
+    if (!isKO(entry.characterId)) setFlash(entry.characterId, 'assets/images/akyros/hidden.jpg');
     return;
   }
   if (entry.type === 'curse') {
     // Athena's Curse Strike also logs its own dedicated type (never
     // 'attack'/'special'/'setup') - same reasoning as hidden-mark above.
-    if (!isKO(entry.characterId)) setFlash(entry.characterId, 'assets/images/athena_curse.jpg');
+    if (!isKO(entry.characterId)) setFlash(entry.characterId, 'assets/images/athena/curse.jpg');
     return;
   }
 
@@ -170,39 +170,39 @@ export function handleLogEntryForFlash(entry, game) {
 
   switch (actionId) {
     case 'divineRestore':
-      setFlash(characterId, 'assets/images/athena_heal.jpg'); break;
+      setFlash(characterId, 'assets/images/athena/heal.jpg'); break;
     case 'glorySmash':
-      setFlash(characterId, 'assets/images/tharox_glory.jpg'); break;
+      setFlash(characterId, 'assets/images/tharox/glory.jpg'); break;
     case 'titanToss':
-      setFlash(characterId, 'assets/images/tharox_toss.jpg'); break;
+      setFlash(characterId, 'assets/images/tharox/toss.jpg'); break;
     case 'smash': case 'titanSmash':
-      if (!dodged && amountDealt > 0) setFlash(characterId, 'assets/images/tharox_smash.jpg');
+      if (!dodged && amountDealt > 0) setFlash(characterId, 'assets/images/tharox/smash.jpg');
       break;
     case 'soulSwap':
-      setFlash(characterId, 'assets/images/zerathys_soul.jpg'); break;
+      setFlash(characterId, 'assets/images/zerathys/soul.jpg'); break;
     case 'chargeUp':
-      setFlash(characterId, 'assets/images/zerathys_charge.jpg'); break;
+      setFlash(characterId, 'assets/images/zerathys/charge.jpg'); break;
     case 'thunderWrath': case 'soulSwapWrath':
-      if (!dodged) setFlash(characterId, 'assets/images/zerathys_strike.jpg');
+      if (!dodged) setFlash(characterId, 'assets/images/zerathys/strike.jpg');
       break;
     case 'timeFreeze':
-      setFlash(characterId, 'assets/images/chronox_time.jpg'); break;
+      setFlash(characterId, 'assets/images/chronox/time.jpg'); break;
     case 'cyclonePunch':
-      if (!dodged) setFlash(characterId, 'assets/images/chronox_cyclone.jpg');
+      if (!dodged) setFlash(characterId, 'assets/images/chronox/cyclone.jpg');
       break;
     case 'shadowExecution':
-      if (!dodged && amountDealt > 0) setFlash(characterId, 'assets/images/akyros_shadow.jpg');
+      if (!dodged && amountDealt > 0) setFlash(characterId, 'assets/images/akyros/shadow.jpg');
       break;
     case 'fatalSlash':
-      if (!dodged && amountDealt > 0) setFlash(characterId, 'assets/images/akyros_fatal.jpg');
+      if (!dodged && amountDealt > 0) setFlash(characterId, 'assets/images/akyros/fatal.jpg');
       break;
     case 'lunarEclipse':
-      setFlash(characterId, 'assets/images/velorya_casting.jpg'); break;
+      setFlash(characterId, 'assets/images/velorya/casting.jpg'); break;
     case 'lunarStrike': case 'moonstep':
-      if (!dodged) setFlash(characterId, 'assets/images/velorya_strike.jpg');
+      if (!dodged) setFlash(characterId, 'assets/images/velorya/strike.jpg');
       break;
     case 'bloodHunt':
-      if (!dodged && amountDealt > 0) setFlash(characterId, 'assets/images/blade_strike.jpg');
+      if (!dodged && amountDealt > 0) setFlash(characterId, 'assets/images/blade/strike.jpg');
       break;
     case 'chaosGamble':
       // 'lose' always flashes the miss portrait regardless of dodged (a
@@ -210,10 +210,10 @@ export function handleLogEntryForFlash(entry, game) {
       // hit) - matches the main game, which has no dodge guard on this
       // branch. 'win'/'draw' stay dodge-gated since those rolls deal real
       // damage that Akyros can actually dodge.
-      if (entry.outcome === 'lose') setFlash(characterId, 'assets/images/boingo_miss.jpg');
+      if (entry.outcome === 'lose') setFlash(characterId, 'assets/images/boingo/miss.jpg');
       else if (!dodged) {
-        if (entry.outcome === 'win') setFlash(characterId, 'assets/images/boingo_hardpunch.jpg');
-        else if (entry.outcome === 'draw') setFlash(characterId, 'assets/images/boingo_normalpunch.jpg');
+        if (entry.outcome === 'win') setFlash(characterId, 'assets/images/boingo/hardpunch.jpg');
+        else if (entry.outcome === 'draw') setFlash(characterId, 'assets/images/boingo/normalpunch.jpg');
       }
       break;
     default:
@@ -227,5 +227,5 @@ export function handleDodgeForFlash(entry, game) {
   if (entry.type !== 'dodge') return;
   const target = game.characters[entry.targetCharacterId];
   if (!target || target.isKO) return;
-  setFlash(entry.targetCharacterId, 'assets/images/akyros_dodge.jpg');
+  setFlash(entry.targetCharacterId, 'assets/images/akyros/dodge.jpg');
 }
