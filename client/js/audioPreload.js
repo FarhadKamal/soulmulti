@@ -8,15 +8,24 @@
 import { allVoiceFilePaths } from './voice.js';
 import { v } from './assetVersion.js';
 
-// Every file under assets/sounds/ - listed explicitly (not derived from
-// sound.js's ACTION_SOUND map, which only covers ability-triggered sounds
-// and misses music tracks, click/dodge/victory/etc.) since this list
+// Every one-shot sound effect under assets/sounds/ - listed explicitly (not
+// derived from sound.js's ACTION_SOUND map, which only covers ability-
+// triggered sounds and misses click/dodge/victory/etc.) since this list
 // changes rarely, unlike voice lines which are actively being added
 // character-by-character - keep this in sync with assets/sounds/ if a new
-// effect or music track is ever added.
+// effect is ever added.
+//
+// Deliberately excludes the 6 bgm-*.mp3 music tracks (~26MB total) - each
+// startMenuMusic()/startBattleMusic() call randomly picks ONE track and
+// fetches it directly via its own new Audio()+play(), so preloading all 6
+// here just downloaded ~20MB of music that would never be heard in that
+// session, on every single fresh page load. That was the single largest
+// contributor to blowing through Render's free-tier bandwidth cap.
+// startMenuMusic() already fires immediately at page load (see main.js),
+// so there was never a meaningful "first play is slow" gap for music to
+// begin with - unlike the short action-sound effects below, where that
+// gap is real and worth avoiding.
 const SOUND_EFFECT_FILES = [
-  'bgm-battle.mp3', 'bgm-battle-2.mp3', 'bgm-battle-3.mp3',
-  'bgm-menu.mp3', 'bgm-menu-2.mp3', 'bgm-menu-3.mp3',
   'charge.mp3', 'click.mp3', 'coin.mp3', 'curse.mp3', 'cyclonepunch.mp3',
   'divinerestore.mp3', 'dodge.mp3', 'eclipse.mp3', 'explosion.mp3', 'freeze.mp3',
   'game-over.mp3', 'hiddenmark.mp3', 'jesterball.mp3', 'kick.mp3',
