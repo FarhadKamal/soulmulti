@@ -25,6 +25,20 @@ import { TUTORIAL_SEQUENCES, TUTORIAL_SEQUENCES_1V2, tutorialBotCharacterId } fr
 
 const PORT = process.env.PORT || 3001;
 
+// Stamped onto index.html's own script tag (see serveStaticFile below) so
+// every fresh page load pulls a brand-new URL for the client's entire JS
+// module graph after each server restart/deploy. index.html itself is
+// served 'no-cache', which SHOULD force revalidation on every load, but
+// that's only as reliable as whatever sits between the browser and this
+// server actually honoring it - a hosting platform's own static/CDN layer
+// (confirmed a real risk after a live report: a client-side bug fix that
+// worked correctly server-side, verified via a live protocol test, still
+// silently failed to take effect in a real browser session on the current
+// host) can silently cache .js files regardless of the header this process
+// sends. Query-string busting sidesteps that entirely, the same trick
+// assetVersion.js's v() already uses for images/audio.
+const SERVER_BOOT_VERSION = String(Date.now());
+
 // Serves the client's static files (HTML/CSS/JS/assets) from the SAME
 // origin/port as the WebSocket server, rather than requiring a separate
 // static file server (dev_server.py, used only for local dev) - this is
@@ -71,8 +85,34 @@ async function serveStaticFile(req, res) {
     if (stats.isDirectory()) {
       return serveStaticFile({ ...req, url: join(relativePath, 'index.html') }, res);
     }
-    const data = await readFile(filePath);
+    let data = await readFile(filePath);
     const ext = extname(filePath).toLowerCase();
+    // Cache-busting for the client's ES module graph - see SERVER_BOOT_VERSION
+    // above for why this exists (index.html's own no-cache header alone isn't
+    // reliably enough on every host). A query string on the entry script
+    // alone would NOT be enough: ES module imports resolve to their own URL
+    // independently of how the importing script itself was fetched, so
+    // './battleScreen.js' inside main.js is still a completely unversioned
+    // request unless ITS OWN import specifier carries the param too. So both
+    // rewrites are needed together: index.html's <script src> starts the
+    // chain, and every .js file's own relative import specifiers propagate
+    // it one level further - transitively covering the whole graph.
+    if (ext === '.html' && relativePath.replace(/^[/\\]+/, '') === 'index.html') {
+      data = Buffer.from(
+        data.toString('utf8').replace('src="js/main.js"', `src="js/main.js?v=${SERVER_BOOT_VERSION}"`)
+      );
+    } else if (ext === '.js') {
+      // Matches `from './x.js'` / `from "../y.js"` (single or double quotes,
+      // any relative depth) - deliberately does NOT match bare/absolute
+      // specifiers (there are none in this codebase; every import here is
+      // relative), so this can't accidentally mangle a future external import.
+      data = Buffer.from(
+        data.toString('utf8').replace(
+          /from\s+(['"])(\.\.?\/[^'"]+\.js)\1/g,
+          (match, quote, path) => `from ${quote}${path}?v=${SERVER_BOOT_VERSION}${quote}`
+        )
+      );
+    }
     const contentType = MIME_TYPES[ext] || 'application/octet-stream';
     const headers = { 'Content-Type': contentType };
     // Images/audio are static, content-addressed-in-spirit assets that
