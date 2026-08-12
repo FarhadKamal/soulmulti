@@ -660,7 +660,7 @@ export function chooseBotMove(character, game) {
 // is, so calling MOVE_CHOOSERS[puppet.id] here with the puppet's own
 // character object is safe and reuses each character's full bot
 // intelligence rather than duplicating 8 separate decision trees.
-export function chooseBotMelyssaPuppetAction(puppetCharacter, game) {
+export function chooseBotMelyssaPuppetAction(puppetCharacter, game, melyssaId) {
   const jb = game.jesterBall;
   if (jb && jb.holderCharacterId === puppetCharacter.id) {
     const move = chooseBotJesterBallMove(puppetCharacter, game);
@@ -683,6 +683,30 @@ export function chooseBotMelyssaPuppetAction(puppetCharacter, game) {
   if (move.targetId === null && usableEntry?.needsTarget) {
     move = { actionId: move.actionId, targetId: pickDefaultTarget(game, puppetCharacter, move.actionId) };
   }
+
+  // Self Choke check: chooser() above only knows the puppet's own
+  // perspective, so an enemy puppet's "best" real move is always aimed AT
+  // Melyssa's side (there's no one else for it to attack) - left
+  // unchecked, a bot Melyssa would puppet the last enemy into repeatedly
+  // attacking herself/her allies forever, never taking the guaranteed-safe
+  // Self Choke kill instead (this is exactly what was observed in a real
+  // match: Melyssa at 7 hearts lost to a 1-heart Velorya because her bot
+  // kept puppeting Velorya's Moonstep onto herself). Only relevant for an
+  // ENEMY puppet - Self Choke isn't offered at all for an ally puppet.
+  const melyssa = melyssaId ? game.characters[melyssaId] : null;
+  const isEnemyPuppet = melyssa && puppetCharacter.ownerId !== melyssa.ownerId;
+  if (isEnemyPuppet) {
+    const chosenTarget = move.targetId ? game.characters[move.targetId] : null;
+    const hitsMelyssaSide = chosenTarget && chosenTarget.ownerId === melyssa.ownerId;
+    // Self Choke always deals exactly 1 flat, ignoresShield damage (see
+    // executeSelfChoke in index.js) - safe to hardcode that amount here
+    // rather than importing the ability module just to read a constant.
+    const selfChokeWouldKill = puppetCharacter.hearts <= 1;
+    if (selfChokeWouldKill || hitsMelyssaSide) {
+      return { kind: 'selfChoke' };
+    }
+  }
+
   return { kind: 'realAction', actionId: move.actionId, targetId: move.targetId };
 }
 

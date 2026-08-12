@@ -535,7 +535,7 @@ function stepBotTurn(room) {
 // turn if it hasn't come up yet this round).
 function resolveBotMindControlTurn(game, melyssaId, puppetId) {
   const puppet = game.characters[puppetId];
-  const decision = chooseBotMelyssaPuppetAction(puppet, game);
+  const decision = chooseBotMelyssaPuppetAction(puppet, game, melyssaId);
   if (decision.kind === 'selfChoke') {
     executeSelfChoke(game, melyssaId, puppetId);
     return;
