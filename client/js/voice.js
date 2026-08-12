@@ -123,6 +123,7 @@ const VOICE_LINES = {
   // "injued" is a real typo in the recorded filename, not a bug here -
   // matches assets/voice/akyros/ exactly as it exists on disk.
   akyros: { idle: 'idle', injured: 'injued', koed: 'koed', victory: 'victory' },
+  melyssa: { idle: 'idle', injured: 'injured', koed: 'koed', victory: 'victory' },
 };
 
 // actionId -> filename, per character - every action here plays its line
@@ -139,6 +140,14 @@ const ACTION_VOICE_LINES = {
   zerathys: { chargeUp: 'charge', thunderWrath: 'release', soulSwap: 'soul_swap' },
   tharox: { titanToss: 'titan_toss', titanSmash: 'titan_smash', glorySmash: 'glory' },
   akyros: { hiddenMark: 'hidden_mark', shadowExecution: 'shadow' },
+  // mindControl's line fires from main.js's dedicated 'mind-control-select'
+  // sound branch (via playMoveVoice(entry.characterId, 'mindControl')), not
+  // the generic bottom-of-switch call every other actionId uses - selection
+  // is its own log entry type, not 'attack'/'special'/'setup'. selfChoke
+  // needs no special-casing anywhere: its log entry IS a normal
+  // type: 'attack' with actionId: 'selfChoke', so it flows through the
+  // existing generic playMoveVoice call automatically.
+  melyssa: { mindControl: 'mind_control', selfChoke: 'self_choke' },
 };
 
 export function hasVoice(characterId) {

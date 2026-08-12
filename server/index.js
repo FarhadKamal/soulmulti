@@ -8,9 +8,14 @@ import { fileURLToPath } from 'url';
 import { CHARACTER_IDS } from '../client/js/characters.js';
 import { createGame } from './engine/state.js';
 import {
-  getUsableActions, executeAction, isValidTarget, markCharacterActed,
+  getUsableActions, executeAction, isValidTarget, isValidMindControlTarget, markCharacterActed,
+  finalizeAction, executeActionAsPuppet,
 } from './engine/turnEngine.js';
-import { chooseBotMove, chooseBotJesterBallMove, chooseSoulSwapWrathTarget } from './engine/botPlayer.js';
+import { applyDamage } from './engine/damagePipeline.js';
+import {
+  chooseBotMove, chooseBotJesterBallMove, chooseSoulSwapWrathTarget,
+  chooseBotMelyssaPuppetAction,
+} from './engine/botPlayer.js';
 import { settleToNextDecision, finishJesterBall } from './gameFlow.js';
 import {
   createRoom, getRoom, deleteRoom, findRoomBySessionId, roomShapeFor,
@@ -216,10 +221,81 @@ function usableActionsFor(game, characterId) {
     // (Blade has just his one repeatable Blood Hunt), so this is often
     // false/absent for every button.
     special: !!a.special,
+    // mindControl routes through isValidMindControlTarget (ally-allowed),
+    // never isValidTarget (enemy-only) - the one exception in the roster.
     validTargetIds: a.needsTarget
-      ? Object.keys(game.characters).filter((tid) => isValidTarget(game, characterId, a.actionId, tid))
+      ? Object.keys(game.characters).filter((tid) => (a.actionId === 'mindControl'
+          ? isValidMindControlTarget(game, tid)
+          : isValidTarget(game, characterId, a.actionId, tid)))
       : [],
   }));
+}
+
+// Computes the serializable option list for stage 2 of Mind Control (what
+// the puppet can be made to do) - reuses usableActionsFor verbatim for the
+// puppet's REAL options (never re-derived by hand), then layers in the
+// Jester-Ball-holder forced choice and/or Self Choke as needed. Both
+// server/index.js's own handlers and the bot flow (via chooseBotMelyssaPuppetAction,
+// which calls getUsableActions directly rather than this function - see
+// botPlayer.js) need this exact same option set for legality purposes, but
+// only the human-facing path needs it SERIALIZED for broadcast, hence this
+// lives here rather than in turnEngine.js.
+function mindControlOptionsFor(game, melyssaId, puppetId) {
+  const puppet = game.characters[puppetId];
+  const isEnemyPuppet = puppet.ownerId !== game.characters[melyssaId].ownerId;
+
+  const jb = game.jesterBall;
+  if (jb && jb.holderCharacterId === puppetId) {
+    const passTargets = Object.keys(game.characters).filter((tid) => isJesterBallPassTarget(game, puppetId, tid));
+    const jbOptions = [
+      { actionId: '__mcJesterBallTake', label: 'Take the Jester Ball (-4 hearts)', needsTarget: false, special: false, validTargetIds: [] },
+    ];
+    if (jb.passCount < 5) {
+      jbOptions.push({ actionId: '__mcJesterBallPass', label: 'Pass the Jester Ball', needsTarget: true, special: false, validTargetIds: passTargets });
+    }
+    return isEnemyPuppet ? [...jbOptions, selfChokeOption()] : jbOptions;
+  }
+
+  const realOptions = usableActionsFor(game, puppetId);
+  if (!isEnemyPuppet) return realOptions;
+  return [...realOptions, selfChokeOption()];
+}
+
+function selfChokeOption() {
+  return { actionId: '__mcSelfChoke', label: 'Self Choke (1 flat damage, ignores shield)', needsTarget: false, special: false, validTargetIds: [] };
+}
+
+// Self Choke: Melyssa's own move against an enemy puppet, NOT routed
+// through either ability-module map (the puppet is the victim here, not
+// the actor whose kit is being used). Deliberately uses characterId:
+// melyssaId / targetId: puppetId in its log entry - the TRUE actor/victim -
+// unlike every puppeted-real-action entry, which uses the puppet's own id
+// as characterId. Do not "fix" this to match the puppet-action convention;
+// it's intentional (see client/js/portraitFlash.js's dedicated Self-Choke
+// flash check, which relies on this exact attribution).
+function executeSelfChoke(game, melyssaId, puppetId) {
+  const log = [];
+  const result = applyDamage(game, log, {
+    sourceCharacterId: melyssaId,
+    targetCharacterId: puppetId,
+    amount: 1,
+    ignoresShield: true,
+  });
+  log.push({ type: 'attack', characterId: melyssaId, actionId: 'selfChoke', targetId: puppetId, ...result });
+  finalizeAction(game, log, result, melyssaId, 'selfChoke', puppetId);
+  return result;
+}
+
+// Marks a Mind-Control-driven turn as truly, fully over - used at every one
+// of the exactly 3 points that's the case: handleMindControlAction's
+// no-follow-up branch, resolveBotMindControlTurn's outermost caller
+// (stepBotTurn), and the tutorial's final puppetOf-tagged step of a
+// sequence. Replaces the bare markCharacterActed(..., melyssaId) call each
+// of those sites would otherwise need, since Melyssa's turn also needs her
+// own special.controlling flag cleared (ends the held selection portrait).
+function finishMelyssaTurn(game, melyssaId) {
+  markCharacterActed(game, melyssaId);
+  game.characters[melyssaId].special.controlling = false;
 }
 
 function broadcastGameState(room) {
@@ -412,9 +488,14 @@ function stepBotTurn(room) {
         if (move.actionId === 'soulSwap') {
           const wrathTarget = chooseSoulSwapWrathTarget(character, room.game);
           if (wrathTarget) executeAction(room.game, acting, 'soulSwapWrath', wrathTarget);
+        } else if (move.actionId === 'mindControl') {
+          resolveBotMindControlTurn(room.game, acting, move.targetId);
         }
       }
       markCharacterActed(room.game, acting);
+      if (move && move.actionId === 'mindControl') {
+        room.game.characters[acting].special.controlling = false;
+      }
     }
   }
 
@@ -438,6 +519,44 @@ function stepBotTurn(room) {
     return;
   }
   setTimeout(() => stepBotTurn(room), BOT_ACTION_DELAY_MS);
+}
+
+// Resolves a bot-controlled Melyssa's ENTIRE Mind Control turn (puppet
+// action + any nested follow-up - a puppeted Take->normal-action chain, or
+// a puppeted Soul Swap->Wrath chain) within one stepBotTurn tick, matching
+// how Soul Swap's own follow-up already resolves inline (see stepBotTurn's
+// 'soulSwap' branch above) - preserves the "one bot action visible per
+// BOT_ACTION_DELAY_MS tick" pacing promise. Deliberately never calls
+// markCharacterActed for the PUPPET at any point - only Melyssa's own
+// acting id gets marked, once, back in stepBotTurn after this returns - so
+// an ally puppet's own real upcoming turn later this same round is
+// completely unaffected (actedThisTurn is per-round anyway, reset by
+// endTurn, but marking the puppet here would incorrectly skip their real
+// turn if it hasn't come up yet this round).
+function resolveBotMindControlTurn(game, melyssaId, puppetId) {
+  const puppet = game.characters[puppetId];
+  const decision = chooseBotMelyssaPuppetAction(puppet, game);
+  if (decision.kind === 'selfChoke') {
+    executeSelfChoke(game, melyssaId, puppetId);
+    return;
+  }
+  if (decision.kind === 'jesterBall') {
+    finishJesterBall(game, decision.choice, decision.targetId);
+    if (decision.choice === 'take') {
+      // Take doesn't consume the puppet's turn - puppet also normal-acts,
+      // same Mind Control turn. A second ball-holder scenario for the SAME
+      // puppet is impossible immediately after Take (Take clears
+      // game.jesterBall entirely) - no infinite recursion risk.
+      resolveBotMindControlTurn(game, melyssaId, puppetId);
+    }
+    return;
+  }
+  // decision.kind === 'realAction'
+  executeActionAsPuppet(game, melyssaId, puppetId, decision.actionId, decision.targetId);
+  if (decision.actionId === 'soulSwap') {
+    const wrathTarget = chooseSoulSwapWrathTarget(puppet, game);
+    if (wrathTarget) executeActionAsPuppet(game, melyssaId, puppetId, 'soulSwapWrath', wrathTarget);
+  }
 }
 
 // ---- Tutorial mode: a scripted human-vs-bot(s) sequence (see
@@ -498,6 +617,16 @@ function executeTutorialStep(room, step) {
     // finishJesterBall directly rather than executeAction/the ability map,
     // matching how Take is actually resolved for a real Jester Ball holder.
     finishJesterBall(room.game, 'take', extra);
+  } else if (step.puppetOf) {
+    // Mind Control stage-2+: actingCharacterId is Melyssa's own id (the
+    // seat that must click/be driven), but the actual executeAction
+    // identity is the PUPPET (step.puppetOf, a literal characterId
+    // hardcoded in the step data itself - every tutorial step is already a
+    // fully pre-determined literal, same as every other step's targetId).
+    executeActionAsPuppet(room.game, actingCharacterId, step.puppetOf, step.actionId, targetId, extra);
+    if (step.actionId !== 'soulSwap') {
+      finishMelyssaTurn(room.game, actingCharacterId);
+    }
   } else {
     executeAction(room.game, actingCharacterId, step.actionId, targetId, extra);
     // Soul Swap doesn't mark the character acted yet - same as the real
@@ -565,6 +694,11 @@ function handleCreateTutorialRoom(ws, sessionId, { name, characterId }) {
   if (!CHARACTER_IDS.includes(characterId)) return send(ws, 'error', { message: 'Invalid character.' });
 
   if (characterId === 'velorya') return createVeloryaTutorialRoom(ws, sessionId, cleanName);
+  // Melyssa has no tutorial sequence yet (deferred) - without this guard
+  // TUTORIAL_SEQUENCES[characterId] is undefined and currentTutorialStep's
+  // room.tutorial.sequence[...] lookup would throw as soon as the game
+  // starts, since the lobby's tutorial grid lists every character generically.
+  if (!TUTORIAL_SEQUENCES[characterId]) return send(ws, 'error', { message: 'Tutorial not available for this character yet.' });
 
   const room = createRoom('tutorial');
   const humanSeat = room.seats[0];
@@ -1015,7 +1149,14 @@ function handleAction(room, sessionId, { characterId, actionId, targetId }) {
   const usable = getUsableActions(room.game.characters[characterId], room.game);
   const actionDef = usable.find((a) => a.actionId === actionId);
   if (!actionDef) return;
-  if (actionDef.needsTarget && !isValidTarget(room.game, characterId, actionId, targetId)) return;
+  if (actionDef.needsTarget) {
+    // mindControl is the one action allowed to target allies - routes
+    // through isValidMindControlTarget instead of the enemy-only isValidTarget.
+    const validNow = actionId === 'mindControl'
+      ? isValidMindControlTarget(room.game, targetId)
+      : isValidTarget(room.game, characterId, actionId, targetId);
+    if (!validNow) return;
+  }
   // Tutorial rooms only ever accept the one scripted next step - this runs
   // IN ADDITION TO the normal legality checks above (never instead of
   // them), as a consistency safeguard: every scripted step was designed to
@@ -1038,8 +1179,38 @@ function handleAction(room, sessionId, { characterId, actionId, targetId }) {
       });
       return;
     }
+    if (actionId === 'mindControl') {
+      const nextStep = currentTutorialStep(room);
+      const puppetId = nextStep?.puppetOf;
+      const puppetOptions = puppetId ? mindControlOptionsFor(room.game, characterId, puppetId) : [];
+      broadcastRoom(room, 'game-state', {
+        game: sanitizeGameForBroadcast(room.game),
+        actingCharacterId: characterId,
+        awaitingMindControlAction: true,
+        mindControlPuppetId: puppetId,
+        usableActions: puppetOptions,
+        tutorialRequiredActionId: nextStep?.actionId ?? null,
+        tutorialRequiredTargetId: nextStep ? resolveTutorialTarget(room, nextStep) : null,
+      });
+      return;
+    }
     broadcastGameState(room);
     runBotTurnsIfAny(room);
+    return;
+  }
+
+  if (actionId === 'mindControl') {
+    const result = executeAction(room.game, characterId, actionId, targetId);
+    const puppetId = result.puppetCharacterId;
+    const puppetOptions = mindControlOptionsFor(room.game, characterId, puppetId);
+    room.melyssaControl = { melyssaCharacterId: characterId, puppetCharacterId: puppetId };
+    broadcastRoom(room, 'game-state', {
+      game: sanitizeGameForBroadcast(room.game),
+      actingCharacterId: characterId,
+      awaitingMindControlAction: true,
+      mindControlPuppetId: puppetId,
+      usableActions: puppetOptions,
+    });
     return;
   }
 
@@ -1090,6 +1261,75 @@ function handleSoulSwapWrath(room, sessionId, { characterId, targetId }) {
   }
   executeAction(room.game, characterId, 'soulSwapWrath', targetId);
   markCharacterActed(room.game, characterId);
+  broadcastGameState(room);
+  runBotTurnsIfAny(room);
+}
+
+// Stage 2 of Mind Control: Melyssa has already selected a puppet (stage 1,
+// handled inside handleAction's 'mindControl' branch above, which stored
+// room.melyssaControl and broadcast the puppet's options). This resolves
+// what that puppet actually does - a real action, Self Choke, or a forced
+// Jester Ball Pass/Take - and, unless there's a follow-up (a forced Take
+// that doesn't consume the puppet's turn, or a puppeted Soul Swap's free
+// Thunder Wrath), finishes Melyssa's whole turn.
+function handleMindControlAction(room, sessionId, { characterId, puppetId, actionId, targetId }) {
+  if (room.phase !== 'in-match' || !room.game) return;
+  const seat = seatForCharacter(room, characterId);
+  if (!seat || seat.playerId !== sessionId) return; // Melyssa's own seat, not the puppet's
+  const acting = settleToNextDecision(room.game);
+  if (acting !== characterId) return;
+  const control = room.melyssaControl;
+  if (!control || control.melyssaCharacterId !== characterId || control.puppetCharacterId !== puppetId) return;
+
+  // Never trust the client's own option list - re-derive server-side.
+  const validOptions = mindControlOptionsFor(room.game, characterId, puppetId);
+  const optionDef = validOptions.find((o) => o.actionId === actionId);
+  if (!optionDef) return;
+  if (optionDef.needsTarget && !optionDef.validTargetIds.includes(targetId)) return;
+
+  let followUp = null; // set when the chosen action needs a stage-3 continuation
+  if (actionId === '__mcSelfChoke') {
+    executeSelfChoke(room.game, characterId, puppetId);
+  } else if (actionId === '__mcJesterBallTake') {
+    finishJesterBall(room.game, 'take', undefined);
+    // Take doesn't consume the puppet's turn - per spec, Melyssa also
+    // puppets the follow-up normal action, same overall Mind Control turn.
+    followUp = { puppetId, options: mindControlOptionsFor(room.game, characterId, puppetId) };
+  } else if (actionId === '__mcJesterBallPass') {
+    finishJesterBall(room.game, 'pass', targetId);
+    // Pass DOES consume the holder's action - Mind Control turn is complete.
+  } else {
+    executeActionAsPuppet(room.game, characterId, puppetId, actionId, targetId);
+    if (actionId === 'soulSwap') {
+      // Puppeted Soul Swap's automatic Thunder Wrath follow-up - she picks
+      // its target too, same Mind Control turn. Submitted back through
+      // THIS same handler (not handleSoulSwapWrath, whose seat-check
+      // assumes characterId is the caster - wrong for a puppeted
+      // continuation, where the client must keep sending
+      // characterId: 'melyssa' to pass the seat-ownership check above).
+      const wrathTargets = Object.keys(room.game.characters).filter((tid) => isValidTarget(room.game, puppetId, 'soulSwapWrath', tid));
+      followUp = {
+        puppetId,
+        options: [{ actionId: 'soulSwapWrath', label: 'Thunder Wrath (free, from Soul Swap)', needsTarget: true, special: false, validTargetIds: wrathTargets }],
+      };
+    }
+  }
+
+  if (followUp) {
+    room.melyssaControl = { melyssaCharacterId: characterId, puppetCharacterId: followUp.puppetId };
+    broadcastRoom(room, 'game-state', {
+      game: sanitizeGameForBroadcast(room.game),
+      actingCharacterId: characterId,
+      awaitingMindControlAction: true,
+      mindControlPuppetId: followUp.puppetId,
+      usableActions: followUp.options,
+    });
+    return;
+  }
+
+  // Mind Control turn genuinely over.
+  room.melyssaControl = null;
+  finishMelyssaTurn(room.game, characterId);
   broadcastGameState(room);
   runBotTurnsIfAny(room);
 }
@@ -1201,6 +1441,7 @@ wss.on('connection', (ws) => {
       case 'abandon-match': return handleAbandonMatch(room, sessionId);
       case 'action': return handleAction(room, sessionId, payload);
       case 'soul-swap-wrath': return handleSoulSwapWrath(room, sessionId, payload);
+      case 'mind-control-action': return handleMindControlAction(room, sessionId, payload);
       case 'jester-ball-choice': return handleJesterBallChoice(room, sessionId, payload);
       case 'chat-message': return handleChatMessage(room, sessionId, payload);
       default: return;

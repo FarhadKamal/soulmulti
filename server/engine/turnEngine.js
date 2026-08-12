@@ -7,8 +7,9 @@ import * as velorya from '../abilities/velorya.js';
 import * as boingo from '../abilities/boingo.js';
 import * as blade from '../abilities/blade.js';
 import * as athena from '../abilities/athena.js';
+import * as melyssa from '../abilities/melyssa.js';
 
-const ABILITY_MODULES = { chronox, tharox, zerathys, akyros, velorya, boingo, blade, athena };
+const ABILITY_MODULES = { chronox, tharox, zerathys, akyros, velorya, boingo, blade, athena, melyssa };
 
 export function getAbilityModule(characterId) {
   return ABILITY_MODULES[characterId];
@@ -41,7 +42,27 @@ export function isValidTarget(game, characterId, actionId, targetId) {
   return true;
 }
 
+// Melyssa's Mind Control is the one action in the game allowed to target
+// allies - isValidTarget's enemy-only rule (ownerId check) is load-bearing
+// for every other action's semantics, so this is a DEDICATED function
+// rather than a per-actionId bypass baked into isValidTarget itself.
+// skipNextTurn is the actual "frozen" flag (set by Chronox's Time Freeze,
+// consumed by consumeSkipIfFrozen) - a frozen character can't be puppeted.
+export function isValidMindControlTarget(game, targetId) {
+  const target = game.characters[targetId];
+  if (!target || target.id === 'melyssa') return false;
+  if (target.isKO || target.untargetable || target.skipNextTurn) return false;
+  return true; // deliberately no ownerId check - ally or enemy both legal
+}
+
 export function hasAnyValidTarget(game, characterId, actionId) {
+  // mindControl routes through isValidMindControlTarget (ally-allowed),
+  // never isValidTarget (enemy-only) - without this, getUsableActions would
+  // wrongly hide her Mind Control button whenever no ENEMY target exists,
+  // even if a perfectly valid ally puppet is available.
+  if (actionId === 'mindControl') {
+    return Object.keys(game.characters).some((tid) => isValidMindControlTarget(game, tid));
+  }
   return Object.keys(game.characters).some((tid) => isValidTarget(game, characterId, actionId, tid));
 }
 
@@ -67,6 +88,17 @@ export function executeAction(game, characterId, actionId, targetId, extra) {
   const actionDef = mod.actions[actionId];
   const log = [];
   const result = actionDef.execute(character, targetId, game, log, extra);
+  finalizeAction(game, log, result, characterId, actionId, targetId);
+  return result;
+}
+
+// Extracted from executeAction so a non-ability-map damage source (Melyssa's
+// Self Choke, server/index.js's executeSelfChoke) can share the same
+// end-of-action bookkeeping (elimination/game-over detection, hearts
+// snapshot, deferred rebirth/mirror log entries) without needing a fake
+// entry in some character's actions map. Pure extraction - executeAction's
+// own behavior is unchanged.
+export function finalizeAction(game, log, result, characterId, actionId, targetId) {
   // Blade's Rebirth and Athena's curse-mirror log entries are deferred
   // until here so they land AFTER the triggering attack's own log entry,
   // not before it. Rebirth can also fire on the MIRROR hit itself (curse
@@ -77,6 +109,22 @@ export function executeAction(game, characterId, actionId, targetId, extra) {
   if (result?.mirrorResult?.rebirthLogEntry) log.push(result.mirrorResult.rebirthLogEntry);
   applyEndOfActionChecks(game);
   game.log.push(...log, { type: 'end-action', round: game.round, characterId, actionId, targetId, hearts: heartsSnapshot(game) });
+}
+
+// Executes a puppeted action on behalf of Melyssa's Mind Control - calls
+// the normal executeAction(game, puppetId, ...) (puppet's own ability
+// module runs unmodified, so Dodge/curse-mirror/Rebirth all attribute to
+// the puppet automatically), then stamps controllingMelyssaId onto every
+// log entry it just produced. Without this stamp, the client has no way to
+// know a given puppet-attributed log entry was Melyssa-driven (needed for
+// her own mind_control_action.jpg flash to fire alongside the puppet's own
+// normal flash - see client/js/portraitFlash.js).
+export function executeActionAsPuppet(game, melyssaCharacterId, puppetCharacterId, actionId, targetId, extra) {
+  const before = game.log.length;
+  const result = executeAction(game, puppetCharacterId, actionId, targetId, extra);
+  for (let i = before; i < game.log.length; i++) {
+    game.log[i].controllingMelyssaId = melyssaCharacterId;
+  }
   return result;
 }
 

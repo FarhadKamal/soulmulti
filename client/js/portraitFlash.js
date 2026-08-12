@@ -53,6 +53,12 @@ export function getFlashSrc(characterId) {
 // match once Rebirth has triggered.
 export function getPersistentPortrait(character) {
   if (character.isKO) return null;
+  // Held for the entire duration of a Mind Control sequence (from puppet
+  // selection through the puppeted action and any nested follow-up) -
+  // character.special.controlling is real, serialized character state, set
+  // by melyssa.js's own mindControl.execute() and cleared by
+  // finishMelyssaTurn (server/index.js) once the whole sequence resolves.
+  if (character.id === 'melyssa' && character.special?.controlling) return v('assets/images/melyssa/mind_control_selection.jpg');
   if (character.id === 'velorya' && character.untargetable) return v('assets/images/velorya/hided.jpg');
   if (character.id === 'blade' && character.special?.rebirthUsed) return v('assets/images/blade/alive.jpg');
   return null;
@@ -69,6 +75,7 @@ const IDLE_IMAGE = {
   blade: 'assets/images/blade/guitar.jpg',
   chronox: 'assets/images/chronox/space.jpg',
   akyros: 'assets/images/akyros/rose.jpg',
+  melyssa: 'assets/images/melyssa/chess.jpg',
 };
 
 // Call once per character at the moment their own turn starts (i.e. when
@@ -133,6 +140,25 @@ function findThrowerFor() {
 // and fires whatever flash(es) it implies. Call in log-append order.
 export function handleLogEntryForFlash(entry, game) {
   const isKO = (id) => game.characters[id]?.isKO;
+
+  // Self Choke gets its own dedicated flash on Melyssa herself - checked
+  // first and returns, since its entry's characterId is already 'melyssa'
+  // directly (she's the true actor, per server/index.js's executeSelfChoke)
+  // and must not ALSO trigger the generic controllingMelyssaId flash below.
+  if (entry.actionId === 'selfChoke' && entry.characterId === 'melyssa') {
+    if (!isKO('melyssa')) setFlash('melyssa', 'assets/images/melyssa/self_choke.jpg');
+    return;
+  }
+  // Any puppeted action (real or a forced Jester Ball take/pass) additionally
+  // flashes Melyssa's own portrait the instant it resolves - the puppet's
+  // own portrait still separately flashes for the SAME entry via the
+  // switch below (different characterIds in the activeFlash map, both
+  // coexist). controllingMelyssaId is stamped server-side by
+  // executeActionAsPuppet (turnEngine.js) onto every log entry a puppeted
+  // action produces.
+  if (entry.controllingMelyssaId && !isKO(entry.controllingMelyssaId)) {
+    setFlash(entry.controllingMelyssaId, 'assets/images/melyssa/mind_control_action.jpg');
+  }
 
   if (entry.type === 'special' && entry.actionId === 'jesterBall') {
     lastJesterBallThrowerId = entry.characterId;

@@ -121,6 +121,25 @@ export function applyDamage(game, log, {
     }
   }
 
+  // Melyssa's reactive shield: whenever damage actually reaches her hearts
+  // (result.amountDealt, computed above - already reduced by absorption for
+  // a normal hit, or the full raw amount for an ignoresShield hit since
+  // those skip absorption entirely), she gains new shield EXACTLY equal to
+  // that leaked-through amount, REPLACING whatever shield she had left (not
+  // additive - see applyShield below, which is +=). Reuses the same
+  // decaying:true persistence Tharox/Athena already have (clears only at
+  // the start of HER OWN next turn, via decayShieldIfDue in melyssa.js's
+  // onTurnStart). Fires even when amountDealt is 0 (a fully-absorbed hit) -
+  // REPLACE semantics mean a stale leftover shield must be explicitly
+  // zeroed that turn too, not just left alone. Gated on !isKO purely for a
+  // clean broadcast snapshot on a dead character (harmless either way,
+  // since applyDamage's own early isKO guard blocks any future hit from
+  // ever reading it again).
+  if (target.id === 'melyssa' && !target.isKO) {
+    target.shield = result.amountDealt;
+    target.shieldDecaying = true;
+  }
+
   // Athena curse mirror: triggered by damage actually landing on Athena.
   // The mirror log entry is deferred (returned on the result, not pushed to
   // `log` here) and pushed by executeAction() after the triggering ability's

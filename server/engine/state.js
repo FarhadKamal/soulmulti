@@ -18,6 +18,14 @@ function baseSpecialFor(id) {
       return { streakTargetId: null, streakCount: 0, rebirthUsed: false };
     case 'athena':
       return { curseTargetCharacterId: null };
+    case 'melyssa':
+      // controlling: true for the entire duration of a Mind Control
+      // sequence (from puppet selection through the puppeted action, and
+      // any nested follow-up) - drives portraitFlash.js's held
+      // "mind_control_selection.jpg" portrait client-side. Cleared by
+      // finishMelyssaTurn (server/index.js) at the exact 3 points a Mind
+      // Control turn is truly over.
+      return { controlling: false };
     default:
       return {};
   }

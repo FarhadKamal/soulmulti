@@ -153,6 +153,16 @@ input {
   background: #ffd75e; color: #1a1a12; font-size: 0.65em; font-weight: 700;
   padding: 2px 6px; border-radius: 4px; letter-spacing: 0.5px;
 }
+/* Melyssa's current Mind Control puppet - a distinct violet glow (matching
+   her own portrait theme) so both halves of the mechanic (her own acting
+   tile in gold, her puppet in violet) are clearly visible at once, never
+   confusable with the acting glow itself. */
+.char-tile--puppet { box-shadow: 0 0 0 4px #a855f7, 0 0 16px 2px #a855f788; }
+.char-tile--puppet::before {
+  content: 'PUPPET'; position: absolute; top: -10px; left: 8px;
+  background: #a855f7; color: #fff; font-size: 0.65em; font-weight: 700;
+  padding: 2px 6px; border-radius: 4px; letter-spacing: 0.5px;
+}
 .char-tile--mine { background: #22283a; }
 /* Winning side's tile during the game-over 'victory' stage - grows and
    glows gold in place, with the portrait already swapped to victory art
@@ -384,6 +394,16 @@ input {
 }
 .special-action-btn:not(:disabled):hover { box-shadow: 0 0 12px rgba(255, 122, 26, 0.55); }
 .special-action-btn:disabled { box-shadow: none; }
+/* Melyssa's Self Choke - a distinct dark-red warning look (a self-inflicted
+   forced hit is meaningfully different from a normal borrowed action) so
+   it doesn't blend in with her puppet's own real option buttons. */
+.self-choke-btn {
+  background: linear-gradient(180deg, #4a0a0a, #2a0606);
+  border-color: #ff3a3a;
+  color: #ffb3b3;
+  box-shadow: 0 0 8px rgba(255, 58, 58, 0.35);
+}
+.self-choke-btn:not(:disabled):hover { box-shadow: 0 0 12px rgba(255, 58, 58, 0.55); }
 .target-prompt { margin-bottom: 10px; }
 .pass-hint { font-size: 0.85em; opacity: 0.75; margin: 8px 0; }
 .lockout-hint { font-size: 0.85em; opacity: 0.6; margin-top: 8px; text-align: center; }

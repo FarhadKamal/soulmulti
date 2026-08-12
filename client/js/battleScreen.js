@@ -146,6 +146,7 @@ export function renderBattle(root, state) {
   // Cancel. Restricting clickability client-side to the exact scripted
   // target prevents ever sending that dead-end request in the first place.
   const tutorialTargetLock = state.tutorialRequiredActionId ? state.tutorialRequiredTargetId : null;
+  const puppetHighlightId = state.awaitingMindControlAction ? state.mindControlPuppetId : null;
   Object.values(game.characters).forEach((character) => {
     board.appendChild(renderCharacterTile(character, {
       isActing: character.id === actingCharacterId,
@@ -160,6 +161,7 @@ export function renderBattle(root, state) {
       // tutorial) - every other tutorial has exactly one enemy, so this is
       // never ambiguous there, but still harmless to set generally.
       isTutorialRequiredTarget: !!state.tutorialRequiredActionId && character.id === state.tutorialRequiredTargetId,
+      isPuppet: character.id === puppetHighlightId,
     }));
   });
   scroll.appendChild(board);
@@ -170,6 +172,8 @@ export function renderBattle(root, state) {
 
   if (isMyBallDecision) {
     scroll.appendChild(renderJesterBallPrompt(game, actingCharacterId, armedAction, state));
+  } else if (isMyTurn && state.awaitingMindControlAction) {
+    scroll.appendChild(renderMindControlActionPanel(game, actingCharacterId, state));
   } else if (isMyTurn) {
     scroll.appendChild(renderActionPanel(actingCharacterId, usableActions, armedAction, state));
   } else {
@@ -392,11 +396,14 @@ function renderVictoryPortraits(game) {
   return container;
 }
 
-function renderCharacterTile(character, { isActing, isMine, isTargetable, onTargetClick, isHoldingBall, isCursed, isFrozenVisual, isVictorious, isTutorialRequiredTarget }) {
+function renderCharacterTile(character, { isActing, isMine, isTargetable, onTargetClick, isHoldingBall, isCursed, isFrozenVisual, isVictorious, isTutorialRequiredTarget, isPuppet }) {
   const def = CHARACTERS[character.id];
   const tile = document.createElement('div');
   tile.className = 'char-tile';
   if (isActing) tile.classList.add('char-tile--acting');
+  // Melyssa's current Mind Control puppet - highlighted alongside her own
+  // acting tile so both halves of the mechanic are visible at once.
+  if (isPuppet && !character.isKO) tile.classList.add('char-tile--puppet');
   if (isMine) tile.classList.add('char-tile--mine');
   if (character.isKO) tile.classList.add('char-tile--ko');
   if (isCursed && !character.isKO) tile.classList.add('cursed-mark');
@@ -697,6 +704,17 @@ function onTargetPicked(targetId, state) {
     send('jester-ball-choice', { characterId, choice: 'pass', targetId });
     return;
   }
+  // Covers a puppeted real action's target-pick AND the puppeted
+  // soulSwapWrath follow-up's target-pick alike - awaitingMindControlAction
+  // stays true through the whole nested Mind Control flow (see
+  // main.js/server/index.js's handleMindControlAction), so a puppeted Soul
+  // Swap must route here too, never through handleSoulSwapWrath (whose
+  // seat-check assumes characterId is the caster - wrong for a puppeted
+  // continuation, where the client keeps sending characterId: 'melyssa').
+  if (state.awaitingMindControlAction) {
+    submitMindControlAction(characterId, state.mindControlPuppetId, action, targetId, state);
+    return;
+  }
   submitAction(characterId, action, targetId, state);
 }
 
@@ -706,6 +724,69 @@ function submitAction(characterId, action, targetId, state) {
   } else {
     send('action', { characterId, actionId: action.actionId, targetId });
   }
+}
+
+// Stage 2 of Mind Control: renders whatever the puppet's options are
+// (state.usableActions, already computed server-side by
+// mindControlOptionsFor - never re-derived client-side, same anti-cheat
+// principle as every other action panel here). Reuses the exact same
+// armed-action/target-picking pattern as renderActionPanel, just posting
+// to a different message type (submitMindControlAction) instead of
+// submitAction.
+function renderMindControlActionPanel(game, melyssaId, state) {
+  const panel = document.createElement('div');
+  panel.className = 'action-panel';
+  const puppet = game.characters[state.mindControlPuppetId];
+  const title = document.createElement('div');
+  title.className = 'action-panel-title';
+  title.textContent = state.tutorialRequiredActionId
+    ? tutorialNarrationFor(melyssaId, state.tutorialRequiredActionId, state.tutorialRequiredTargetId, state.game?.characters[melyssaId])
+    : `Mind Control: choose ${puppet ? CHARACTERS[puppet.id].name : 'their'}'s action`;
+  panel.appendChild(title);
+
+  if (state.armedAction) {
+    const prompt = document.createElement('div');
+    prompt.className = 'target-prompt';
+    prompt.textContent = `Choose a target for ${state.armedAction.label}...`;
+    panel.appendChild(prompt);
+    // A puppeted Soul Swap's free soulSwapWrath follow-up is forced, same
+    // as the real (non-puppeted) case - no Cancel for it.
+    if (state.armedAction.actionId !== 'soulSwapWrath') {
+      const cancelBtn = document.createElement('button');
+      cancelBtn.textContent = 'Cancel';
+      cancelBtn.onclick = () => { state.armedAction = null; state.rerender(); };
+      panel.appendChild(cancelBtn);
+    }
+    return panel;
+  }
+
+  const btnRow = document.createElement('div');
+  btnRow.className = 'action-btn-row';
+  state.usableActions.forEach((action) => {
+    const btn = document.createElement('button');
+    btn.textContent = action.label;
+    if (action.special) btn.classList.add('special-action-btn');
+    if (action.actionId === '__mcSelfChoke') btn.classList.add('self-choke-btn');
+    const isTutorialLocked = state.tutorialRequiredActionId && action.actionId !== state.tutorialRequiredActionId;
+    btn.disabled = !!isTutorialLocked;
+    btn.onclick = () => {
+      if (isTutorialLocked) return;
+      playUiClick();
+      if (!action.needsTarget) {
+        submitMindControlAction(melyssaId, state.mindControlPuppetId, action, null, state);
+      } else {
+        state.armedAction = action;
+        state.rerender();
+      }
+    };
+    btnRow.appendChild(btn);
+  });
+  panel.appendChild(btnRow);
+  return panel;
+}
+
+function submitMindControlAction(characterId, puppetId, action, targetId, state) {
+  send('mind-control-action', { characterId, puppetId, actionId: action.actionId, targetId });
 }
 
 function renderJesterBallPrompt(game, characterId, armedAction, state) {
@@ -863,6 +944,7 @@ const ACTION_LABELS = {
   lunarStrike: 'Lunar Strike', moonstep: 'Moonstep', lunarEclipse: 'Lunar Eclipse',
   chaosGamble: 'Chaos Gamble', jesterBall: 'Jester Ball', bloodHunt: 'Blood Hunt',
   curseStrike: 'Curse Strike', divineRestore: 'Divine Restore',
+  selfChoke: 'Self Choke',
 };
 function actionLabel(actionId) {
   return ACTION_LABELS[actionId] || actionId;
@@ -871,6 +953,8 @@ function actionLabel(actionId) {
 function describeLogEntry(entry) {
   const name = (id) => CHARACTERS[id]?.name || id;
   switch (entry.type) {
+    case 'mind-control-select':
+      return `${name(entry.characterId)} took control of ${name(entry.targetId)}'s mind!`;
     case 'attack':
       return `${name(entry.characterId)} used ${actionLabel(entry.actionId)} on ${name(entry.targetId)}${entry.amountDealt != null ? ` - ${entry.amountDealt} damage` : ''}${entry.koTriggered ? ' - KO!' : ''}`;
     case 'special':

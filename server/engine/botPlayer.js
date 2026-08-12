@@ -1,4 +1,4 @@
-import { getUsableActions, isValidTarget } from './turnEngine.js';
+import { getUsableActions, isValidTarget, isValidMindControlTarget } from './turnEngine.js';
 
 // Pure decision logic for PC-controlled characters - no DOM, no side
 // effects. Given a character whose turn it is, returns the action+target
@@ -586,6 +586,28 @@ function chooseBoingoMove(character, game, usable) {
   return { actionId: 'chaosGamble', targetId: pickDefaultTarget(game, character, 'chaosGamble') };
 }
 
+// Melyssa's own turn is entirely "pick a puppet" - usable is always just
+// [{ actionId: 'mindControl', needsTarget: true, validTargetIds: [...] }].
+// The actual sub-decision (what the puppet does) is resolved separately,
+// AFTER this returns, by chooseBotMelyssaPuppetAction below (called from
+// server/index.js's stepBotTurn, mirroring how Soul Swap's own follow-up
+// target is chosen in a second step after the initial move).
+function chooseMelyssaMove(character, game, usable) {
+  const candidates = Object.keys(game.characters).filter((tid) => isValidMindControlTarget(game, tid));
+  if (candidates.length === 0) return null; // defensive; shouldn't happen if usable is nonempty
+  // Prefer puppeting an ENEMY (offensive value) over an ally, falling back
+  // to an ally only when no enemy candidate exists - puppeting most kits in
+  // this roster is inherently offensive regardless of who "holds" it (e.g.
+  // Athena's curseStrike/divineRestore can still be aimed usefully even via
+  // an ally puppet), so an ally fallback is never wasted, just lower-priority
+  // than a genuine enemy puppet.
+  const enemyIds = candidates.filter((tid) => game.characters[tid].ownerId !== character.ownerId);
+  const allyIds = candidates.filter((tid) => game.characters[tid].ownerId === character.ownerId);
+  const pool = enemyIds.length > 0 ? enemyIds : allyIds;
+  const puppetId = biggestThreatTarget(game, character, pool) || lowestHeartsTarget(game, pool) || pickRandom(pool);
+  return { actionId: 'mindControl', targetId: puppetId };
+}
+
 const MOVE_CHOOSERS = {
   tharox: chooseTharoxMove,
   zerathys: chooseZerathysMove,
@@ -595,6 +617,7 @@ const MOVE_CHOOSERS = {
   blade: chooseBladeMove,
   athena: chooseAthenaMove,
   boingo: chooseBoingoMove,
+  melyssa: chooseMelyssaMove,
 };
 
 // Fallback for characters without bot logic yet: picks a random usable
@@ -626,6 +649,41 @@ export function chooseBotMove(character, game) {
     return { actionId: move.actionId, targetId: pickDefaultTarget(game, character, move.actionId) };
   }
   return move;
+}
+
+// Chooses what a bot-controlled Melyssa's puppeted turn actually does,
+// given the puppet she already committed to (see chooseMelyssaMove).
+// Handles the ball-holder forced choice and the no-real-action fallback
+// (Self Choke), otherwise delegates to the puppet's OWN real bot chooser -
+// every existing choose*Move function is a pure function of
+// (character, game, usable) with no assumption about whose turn it "really"
+// is, so calling MOVE_CHOOSERS[puppet.id] here with the puppet's own
+// character object is safe and reuses each character's full bot
+// intelligence rather than duplicating 8 separate decision trees.
+export function chooseBotMelyssaPuppetAction(puppetCharacter, game) {
+  const jb = game.jesterBall;
+  if (jb && jb.holderCharacterId === puppetCharacter.id) {
+    const move = chooseBotJesterBallMove(puppetCharacter, game);
+    return { kind: 'jesterBall', choice: move.choice, targetId: move.targetId };
+  }
+  const usable = getUsableActions(puppetCharacter, game);
+  if (usable.length === 0) {
+    // No real action available - Self Choke is the only option. In
+    // practice this should be unreachable (every living, non-frozen
+    // character in the roster always has at least a base attack legal),
+    // kept as a defensive fallback rather than assumed impossible.
+    return { kind: 'selfChoke' };
+  }
+  const chooser = MOVE_CHOOSERS[puppetCharacter.id] || chooseFallbackMove;
+  let move = chooser(puppetCharacter, game, usable);
+  if (!move) move = chooseFallbackMove(puppetCharacter, game, usable);
+  // Same safety net as chooseBotMove's own post-processing above.
+  const usableEntry = usable.find((a) => a.actionId === move.actionId);
+  if (!usableEntry) move = chooseFallbackMove(puppetCharacter, game, usable);
+  if (move.targetId === null && usableEntry?.needsTarget) {
+    move = { actionId: move.actionId, targetId: pickDefaultTarget(game, puppetCharacter, move.actionId) };
+  }
+  return { kind: 'realAction', actionId: move.actionId, targetId: move.targetId };
 }
 
 // True if Zerathys, after eating the Jester Ball's -4 damage, would have a

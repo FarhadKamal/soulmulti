@@ -47,6 +47,10 @@ const FLASH_IMAGES = [
   'assets/images/zerathys/glass.jpg',
   'assets/images/zerathys/soul.jpg',
   'assets/images/zerathys/strike.jpg',
+  'assets/images/melyssa/chess.jpg',
+  'assets/images/melyssa/mind_control_selection.jpg',
+  'assets/images/melyssa/mind_control_action.jpg',
+  'assets/images/melyssa/self_choke.jpg',
 ];
 
 let started = false;

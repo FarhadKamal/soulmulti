@@ -118,6 +118,7 @@ const ACTION_SOUND = {
   bloodHunt: 'sword',
   curseStrike: 'curse',
   divineRestore: 'divinerestore',
+  selfChoke: 'self_choke',
 };
 
 export function playActionSound(actionId) {

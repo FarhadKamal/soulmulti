@@ -23,6 +23,13 @@ const state = {
   actingCharacterId: null,
   usableActions: [],
   awaitingSoulSwapWrath: false,
+  // Mirrors awaitingSoulSwapWrath's pattern for Melyssa's own two-stage
+  // Mind Control flow - true from the moment she selects a puppet through
+  // to the puppeted action (and any nested follow-up) fully resolving.
+  // mindControlPuppetId is whichever character she's currently puppeting -
+  // drives both the stage-2 action panel and the puppet's tile highlight.
+  awaitingMindControlAction: false,
+  mindControlPuppetId: null,
   armedAction: null,
   confirmingExit: false,
   turnDeadline: null,
@@ -209,6 +216,13 @@ function playLogEntrySound(entry, game) {
     }
     return;
   }
+  if (entry.type === 'mind-control-select') {
+    playSound('mind_control');
+    // Layered on top, never replacing the selection sound - a no-op for
+    // anyone but Melyssa.
+    playMoveVoice(entry.characterId, 'mindControl');
+    return;
+  }
   // Curse Strike ('curse') and Hidden Mark ('hidden-mark') each log their
   // own dedicated type rather than 'attack'/'special'/'setup' - same
   // reasoning as portraitFlash.js's equivalent branches - so they need
@@ -330,6 +344,8 @@ onMessage((msg) => {
       state.actingCharacterId = msg.actingCharacterId;
       state.usableActions = msg.usableActions || [];
       state.awaitingSoulSwapWrath = !!msg.awaitingSoulSwapWrath;
+      state.awaitingMindControlAction = !!msg.awaitingMindControlAction;
+      state.mindControlPuppetId = msg.mindControlPuppetId ?? null;
       state.armedAction = null;
       state.confirmingExit = false;
       state.turnDeadline = msg.turnDeadline || null;
