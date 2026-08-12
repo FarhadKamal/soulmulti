@@ -1244,12 +1244,24 @@ function handleAction(room, sessionId, { characterId, actionId, targetId }) {
     const puppetId = result.puppetCharacterId;
     const puppetOptions = mindControlOptionsFor(room.game, characterId, puppetId);
     room.melyssaControl = { melyssaCharacterId: characterId, puppetCharacterId: puppetId };
+    // Re-arm a fresh 30s window for THIS stage - this bypasses
+    // broadcastGameState (the only other place armTurnTimer is normally
+    // called from), so without this explicit call here the timer armed at
+    // the START of Melyssa's turn keeps counting down uninterrupted through
+    // every stage of Mind Control (puppet select -> puppet action -> any
+    // nested follow-up). A player who takes any real time across those
+    // several decisions could burn through that single original window and
+    // get silently timed out (seat converted to bot) mid-sequence - exactly
+    // what a live report traced: stuck on "Waiting for Melyssa's turn..."
+    // despite Melyssa visibly still being mid-Mind-Control on screen.
+    armTurnTimer(room, characterId);
     broadcastRoom(room, 'game-state', {
       game: sanitizeGameForBroadcast(room.game),
       actingCharacterId: characterId,
       awaitingMindControlAction: true,
       mindControlPuppetId: puppetId,
       usableActions: puppetOptions,
+      turnDeadline: room.turnDeadline,
     });
     return;
   }
@@ -1263,11 +1275,17 @@ function handleAction(room, sessionId, { characterId, actionId, targetId }) {
     // intermediate state (swap already applied) so clients show it, then
     // wait for a soulSwapWrath action message from this same player.
     const soulSwapWrathTargets = Object.keys(room.game.characters).filter((tid) => isValidTarget(room.game, characterId, 'soulSwapWrath', tid));
+    // Same reasoning as the mindControl branch above - this is a distinct
+    // decision stage bypassing broadcastGameState, so it needs its own
+    // explicit re-arm or the original turn-start timer keeps counting down
+    // through it unnoticed.
+    armTurnTimer(room, characterId);
     broadcastRoom(room, 'game-state', {
       game: sanitizeGameForBroadcast(room.game),
       actingCharacterId: characterId,
       awaitingSoulSwapWrath: true,
       usableActions: [{ actionId: 'soulSwapWrath', label: 'Thunder Wrath (free, from Soul Swap)', needsTarget: true, validTargetIds: soulSwapWrathTargets }],
+      turnDeadline: room.turnDeadline,
     });
     return;
   }
@@ -1357,12 +1375,18 @@ function handleMindControlAction(room, sessionId, { characterId, puppetId, actio
 
   if (followUp) {
     room.melyssaControl = { melyssaCharacterId: characterId, puppetCharacterId: followUp.puppetId };
+    // Same reasoning as handleAction's mindControl/soulSwap branches - this
+    // covers the deepest nested stage (e.g. puppeted Soul Swap's own Wrath
+    // follow-up), which needs its own fresh window just as much as the
+    // earlier stages do.
+    armTurnTimer(room, characterId);
     broadcastRoom(room, 'game-state', {
       game: sanitizeGameForBroadcast(room.game),
       actingCharacterId: characterId,
       awaitingMindControlAction: true,
       mindControlPuppetId: followUp.puppetId,
       usableActions: followUp.options,
+      turnDeadline: room.turnDeadline,
     });
     return;
   }
