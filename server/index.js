@@ -1331,19 +1331,43 @@ function handleSoulSwapWrath(room, sessionId, { characterId, targetId }) {
 // that doesn't consume the puppet's turn, or a puppeted Soul Swap's free
 // Thunder Wrath), finishes Melyssa's whole turn.
 function handleMindControlAction(room, sessionId, { characterId, puppetId, actionId, targetId }) {
-  if (room.phase !== 'in-match' || !room.game) return;
+  // Temporary diagnostic logging (server console only, no client-facing
+  // change) - added while chasing a live report of a puppeted Soul Swap's
+  // Wrath target-pick silently doing nothing in the browser despite every
+  // other layer (server protocol via a live test, and a hand-run DOM-shim
+  // replay of the exact click) checking out correctly. Every rejection
+  // point below normally just silently `return`s (the established
+  // convention for every handler in this file) - remove these logs once
+  // the root cause is found.
+  if (room.phase !== 'in-match' || !room.game) { console.log('[MC-DEBUG] reject: room not in-match'); return; }
   const seat = seatForCharacter(room, characterId);
-  if (!seat || seat.playerId !== sessionId) return; // Melyssa's own seat, not the puppet's
+  if (!seat || seat.playerId !== sessionId) {
+    console.log('[MC-DEBUG] reject: seat mismatch', { characterId, seatPlayerId: seat?.playerId, sessionId });
+    return;
+  }
   const acting = settleToNextDecision(room.game);
-  if (acting !== characterId) return;
+  if (acting !== characterId) {
+    console.log('[MC-DEBUG] reject: not acting turn', { characterId, acting });
+    return;
+  }
   const control = room.melyssaControl;
-  if (!control || control.melyssaCharacterId !== characterId || control.puppetCharacterId !== puppetId) return;
+  if (!control || control.melyssaCharacterId !== characterId || control.puppetCharacterId !== puppetId) {
+    console.log('[MC-DEBUG] reject: control mismatch', { control, characterId, puppetId });
+    return;
+  }
 
   // Never trust the client's own option list - re-derive server-side.
   const validOptions = mindControlOptionsFor(room.game, characterId, puppetId);
   const optionDef = validOptions.find((o) => o.actionId === actionId);
-  if (!optionDef) return;
-  if (optionDef.needsTarget && !optionDef.validTargetIds.includes(targetId)) return;
+  if (!optionDef) {
+    console.log('[MC-DEBUG] reject: no matching option', { actionId, validOptions: validOptions.map((o) => o.actionId) });
+    return;
+  }
+  if (optionDef.needsTarget && !optionDef.validTargetIds.includes(targetId)) {
+    console.log('[MC-DEBUG] reject: bad target', { targetId, validTargetIds: optionDef.validTargetIds });
+    return;
+  }
+  console.log('[MC-DEBUG] accepted', { characterId, puppetId, actionId, targetId });
 
   let followUp = null; // set when the chosen action needs a stage-3 continuation
   if (actionId === '__mcSelfChoke') {

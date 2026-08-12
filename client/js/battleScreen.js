@@ -786,6 +786,10 @@ function renderMindControlActionPanel(game, melyssaId, state) {
 }
 
 function submitMindControlAction(characterId, puppetId, action, targetId, state) {
+  // Temporary diagnostic log - see matching [MC-DEBUG] logs server-side
+  // (index.js's handleMindControlAction), added while chasing a live
+  // report of this click silently doing nothing. Remove once resolved.
+  console.log('[MC-DEBUG] sending mind-control-action', { characterId, puppetId, actionId: action.actionId, targetId });
   send('mind-control-action', { characterId, puppetId, actionId: action.actionId, targetId });
 }
 
