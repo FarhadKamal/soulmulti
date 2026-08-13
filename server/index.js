@@ -926,12 +926,15 @@ function createVeloryaTutorialRoom(ws, sessionId, cleanName) {
     isPC: s.kind === 'bot',
   }));
   room.game = createGame('tutorial3', playerPicks);
-  // Athena's custom 2-max-hearts override for this tutorial only - applied
+  // Boingo/Athena custom hearts overrides for this tutorial only - applied
   // directly on the created character rather than threading a per-seat
   // hearts override through createCharacter/createGame's general-purpose
-  // signature, which every other room type also calls.
-  room.game.characters.athena.hearts = 2;
-  room.game.characters.athena.maxHearts = 2;
+  // signature, which every other room type also calls. Deliberately
+  // fragile (2 and 3, Athena capped at 3 max too) so the whole match
+  // resolves in 4 turns - see TUTORIAL_SEQUENCES_1V2.velorya's own comment.
+  room.game.characters.boingo.hearts = 2;
+  room.game.characters.athena.hearts = 3;
+  room.game.characters.athena.maxHearts = 3;
   room.phase = 'in-match';
   send(ws, 'room-created', { code: room.code });
   broadcastLobby(room);

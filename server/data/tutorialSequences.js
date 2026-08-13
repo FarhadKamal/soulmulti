@@ -329,39 +329,33 @@ export const TUTORIAL_SEQUENCES_1V2 = {
     { actor: 'human', actionId: 'mindControl', targetId: 'tharox' },
     { actor: 'human', actionId: '__mcSelfChoke', targetId: null, puppetOf: 'tharox' },
   ],
+  // Shortened from an earlier, much longer draft (13 turns, both bots at
+  // full 7 hearts, a whole curse-mirror sub-plot) - Boingo and Athena are
+  // now deliberately fragile (2 and 3 hearts, Athena capped at 3 max too)
+  // so the lesson lands in 4 turns flat: cast the Eclipse, then 3 attacks
+  // demonstrate both of Moonstep's real rules (no bonus on the very first
+  // real attack after opening with a non-attack special; +1 EXTRA (2 total
+  // instead of 1) whenever the target changes from the previous attack) -
+  // Velorya never takes a single hit, since the whole match resolves
+  // before her own untargetable window (3 attacks) even runs out.
   velorya: [
     // Opens with Lunar Eclipse (turn-1 restriction satisfied) - becomes
-    // untargetable for her next 3 attacks. Both bots' entire turns are
-    // SKIPPED while she's untargetable (zero legal targets, not merely 0
-    // damage - see gameFlow.js's getActingCharacterId), so this whole
-    // opening is free.
+    // untargetable for her next 3 attacks. Boingo's entire turn is SKIPPED
+    // while she's untargetable (zero legal targets, not merely 0 damage -
+    // see gameFlow.js's getActingCharacterId).
     { actor: 'human', actionId: 'lunarEclipse', targetId: null },
     // boingo SKIPPED - Velorya untargetable, zero legal targets. Athena is
     // NOT skipped here even though Velorya is untargetable too - her Divine
     // Restore is self-targeted (needsTarget: false) and legal once per
     // match regardless of enemy targetability, so the engine always hands
-    // her a real first turn. Harmless: both of Velorya's attacks
-    // (lunarStrike, moonstep) set ignoresShield:true, so Athena's shield
-    // from this never blocks any of the scripted damage below.
+    // her a real first turn. Harmless no-op: she's already at her capped
+    // 3/3 hearts, so the heal does nothing (and both of Velorya's attacks
+    // below set ignoresShield:true anyway, so the granted shield is moot too).
     { actor: 'athena', actionId: 'divineRestore', targetId: null },
     // boingo SKIPPED
-    { actor: 'human', actionId: 'lunarStrike', targetId: 'boingo' }, // 1 dmg. B 7->6. eclipse 1/3
-    // boingo, athena SKIPPED
-    { actor: 'human', actionId: 'lunarStrike', targetId: 'athena' }, // 1 dmg. A 2->1. Uncursed yet -> NO mirror. eclipse 2/3
-    // boingo, athena SKIPPED
-    { actor: 'human', actionId: 'moonstep', targetId: 'boingo' }, // switch(athena->boingo) = 2 dmg. B 6->4. eclipse 3/3 -> ENDS
-    { actor: 'boingo', actionId: 'chaosGamble', targetId: 'velorya', forcedAmount: 1, ignoresShield: true },
-    { actor: 'athena', actionId: 'curseStrike', targetId: 'velorya' }, // curse live for the first time
-    { actor: 'human', actionId: 'lunarStrike', targetId: 'athena' }, // switch(boingo->athena), flat 1. A 1->0 KO. mirrors 1->Velorya
-    { actor: 'boingo', actionId: 'chaosGamble', targetId: 'velorya', forcedAmount: 1, ignoresShield: true },
-    // athena SKIPPED - KO'd, seat eliminated from here on
-    { actor: 'human', actionId: 'moonstep', targetId: 'boingo' }, // switch(athena->boingo) = 2 dmg. B 4->2
-    { actor: 'boingo', actionId: 'chaosGamble', targetId: 'velorya', forcedAmount: 1, ignoresShield: true },
-    { actor: 'human', actionId: 'moonstep', targetId: 'boingo' }, // same-target = 1 dmg (the -1 case). B 2->1
-    { actor: 'boingo', actionId: 'chaosGamble', targetId: 'velorya', forcedAmount: 1, ignoresShield: true },
-    { actor: 'human', actionId: 'moonstep', targetId: 'boingo' }, // same-target = 1 dmg. B 1->0 KO. MATCH OVER.
-    // Boingo damage sum: 1+2+1+1+1=7 exact. Athena damage sum: 1+1=2
-    // exact. Velorya hearts trace: 7,7,7,6,6,6,5,4,4,3,3,2,2 - minimum 2,
-    // reached only after Boingo is already dead.
+    { actor: 'human', actionId: 'lunarStrike', targetId: 'athena' }, // 1 dmg (no target-switch bonus - this is her first-ever real attack, lastTargetId was null). A 3->2. eclipse 1/3
+    // boingo, athena SKIPPED (Athena already used her one-time special)
+    { actor: 'human', actionId: 'moonstep', targetId: 'boingo' }, // switch(athena->boingo) = 2 dmg. B 2->0 KO. eclipse 2/3
+    { actor: 'human', actionId: 'moonstep', targetId: 'athena' }, // switch(boingo->athena) = 2 dmg. A 2->0 KO. eclipse 3/3 -> ends. MATCH OVER.
   ],
 };

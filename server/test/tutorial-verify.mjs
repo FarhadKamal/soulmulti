@@ -13,16 +13,18 @@ const CHARACTERS = ['chronox', 'tharox', 'zerathys', 'akyros', 'velorya', 'boing
 // on the deliberately separate finishing blow - Rebirth and Athena's own KO
 // are scripted to land on two DIFFERENT hits (not the same one) so the
 // player gets an actual beat to see Rebirth before the win screen, rather
-// than both happening in the same instant. Velorya's is now a 1v2 fight
+// than both happening in the same instant. Velorya's is a 1v2 fight
 // (TUTORIAL_SEQUENCES_1V2, room type 'tutorial3') against Boingo AND
-// Athena - re-derive her number from a real run rather than trusting the
+// Athena, shortened to a 4-turn sequence where she stays untargetable
+// (Lunar Eclipse) for the ENTIRE match and never takes a single hit -
+// re-derive her number from a real run rather than trusting the
 // hand-traced plan doc if they ever disagree.
 const EXPECTED = {
   chronox: { finalHearts: 5 },
   tharox: { finalHearts: 5 },
   zerathys: { finalHearts: 4 },
   akyros: { finalHearts: 5 },
-  velorya: { finalHearts: 2 },
+  velorya: { finalHearts: 7 },
   boingo: { finalHearts: 6 },
   blade: { finalHearts: 1 },
   athena: { finalHearts: 3 },
