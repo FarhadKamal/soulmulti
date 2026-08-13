@@ -185,6 +185,10 @@ export function renderBattle(root, state) {
     scroll.appendChild(waiting);
   }
 
+  if (state.awaitingMindControlAction && state.mcDebugLog?.length) {
+    scroll.appendChild(renderMindControlDebugPanel(state));
+  }
+
   wrap.appendChild(scroll);
   wrap.appendChild(renderLogChatDrawer(game.log, state.rerender));
 
@@ -695,8 +699,40 @@ function renderActionPanel(characterId, usableActions, armedAction, state) {
   return panel;
 }
 
+// Temporary on-screen debug trail for the Mind Control Wrath-click
+// investigation - the user can't easily relay DevTools console output, so
+// this renders directly in the battle UI (see renderMindControlDebugPanel)
+// instead. Appends a short timestamped line; capped so it can't grow
+// unbounded across a long match. Remove once the root cause is found.
+function mcDebugLog(state, line) {
+  if (!state.mcDebugLog) state.mcDebugLog = [];
+  const t = new Date().toISOString().slice(11, 23);
+  state.mcDebugLog.push(`${t} ${line}`);
+  if (state.mcDebugLog.length > 12) state.mcDebugLog.shift();
+}
+
+// Renders the accumulated mcDebugLog lines directly on screen (below the
+// action panel) so the user can just screenshot the whole thing instead of
+// relaying DevTools console output by hand. Plain text, monospace, small -
+// purely diagnostic, not meant to look like part of the normal UI.
+function renderMindControlDebugPanel(state) {
+  const box = document.createElement('div');
+  box.style.background = '#000';
+  box.style.color = '#0f0';
+  box.style.fontFamily = 'monospace';
+  box.style.fontSize = '11px';
+  box.style.padding = '8px';
+  box.style.marginTop = '8px';
+  box.style.borderRadius = '6px';
+  box.style.whiteSpace = 'pre-wrap';
+  box.style.wordBreak = 'break-all';
+  box.textContent = '[MC DEBUG]\n' + state.mcDebugLog.join('\n');
+  return box;
+}
+
 function onTargetPicked(targetId, state) {
-  if (!state.armedAction) return;
+  mcDebugLog(state, `onTargetPicked(${targetId}) armed=${state.armedAction?.actionId ?? 'null'} awaitingMC=${state.awaitingMindControlAction}`);
+  if (!state.armedAction) { mcDebugLog(state, 'ABORT: no armedAction'); state.rerender(); return; }
   const action = state.armedAction;
   const characterId = state.actingCharacterId;
   state.armedAction = null;
@@ -770,6 +806,7 @@ function renderMindControlActionPanel(game, melyssaId, state) {
     const isTutorialLocked = state.tutorialRequiredActionId && action.actionId !== state.tutorialRequiredActionId;
     btn.disabled = !!isTutorialLocked;
     btn.onclick = () => {
+      mcDebugLog(state, `BUTTON CLICK actionId=${action.actionId} needsTarget=${action.needsTarget} locked=${isTutorialLocked}`);
       if (isTutorialLocked) return;
       playUiClick();
       if (!action.needsTarget) {
@@ -786,11 +823,9 @@ function renderMindControlActionPanel(game, melyssaId, state) {
 }
 
 function submitMindControlAction(characterId, puppetId, action, targetId, state) {
-  // Temporary diagnostic log - see matching [MC-DEBUG] logs server-side
-  // (index.js's handleMindControlAction), added while chasing a live
-  // report of this click silently doing nothing. Remove once resolved.
-  console.log('[MC-DEBUG] sending mind-control-action', { characterId, puppetId, actionId: action.actionId, targetId });
+  mcDebugLog(state, `SEND mind-control-action char=${characterId} puppet=${puppetId} action=${action.actionId} target=${targetId}`);
   send('mind-control-action', { characterId, puppetId, actionId: action.actionId, targetId });
+  state.rerender();
 }
 
 function renderJesterBallPrompt(game, characterId, armedAction, state) {
