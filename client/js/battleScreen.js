@@ -781,7 +781,13 @@ function renderMindControlActionPanel(game, melyssaId, state) {
     const btn = document.createElement('button');
     btn.textContent = action.label;
     if (action.special) btn.classList.add('special-action-btn');
-    if (action.actionId === '__mcSelfChoke') btn.classList.add('self-choke-btn');
+    if (action.actionId === '__mcSelfChoke') {
+      btn.classList.add('self-choke-btn');
+      // Detail lives in a tooltip, not the button label itself - a short
+      // label keeps this row visually in line with the puppet's own real
+      // option buttons instead of wrapping onto its own oversized line.
+      btn.title = '1 flat damage to the puppet, ignores shield';
+    }
     const isTutorialLocked = state.tutorialRequiredActionId && action.actionId !== state.tutorialRequiredActionId;
     btn.disabled = !!isTutorialLocked || lockoutActive;
     if (!isTutorialLocked) lockableButtons.push(btn);

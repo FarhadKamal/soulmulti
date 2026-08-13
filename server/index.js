@@ -302,7 +302,11 @@ function mindControlOptionsFor(game, melyssaId, puppetId) {
 }
 
 function selfChokeOption() {
-  return { actionId: '__mcSelfChoke', label: 'Self Choke (1 flat damage, ignores shield)', needsTarget: false, special: false, validTargetIds: [] };
+  // Short label - the panel is a compact button row (see battleScreen.js's
+  // renderMindControlActionPanel), not a place for a full sentence; the
+  // "1 flat damage, ignores shield" detail lives in the button's title
+  // tooltip client-side instead, same as every other action's label here.
+  return { actionId: '__mcSelfChoke', label: 'Self Choke', needsTarget: false, special: false, validTargetIds: [] };
 }
 
 // Self Choke: Melyssa's own move against an enemy puppet, NOT routed
