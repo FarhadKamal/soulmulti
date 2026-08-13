@@ -339,16 +339,6 @@ onMessage((msg) => {
       rerender();
       break;
     case 'game-state':
-      // Temporary on-screen debug trail (see battleScreen.js's mcDebugLog/
-      // renderMindControlDebugPanel) - logged here too so the RECEIVING end
-      // of every broadcast during a Mind Control sequence is visible in the
-      // same on-screen trail as the click events, not just DevTools.
-      if (msg.awaitingMindControlAction || state.awaitingMindControlAction) {
-        if (!state.mcDebugLog) state.mcDebugLog = [];
-        const t = new Date().toISOString().slice(11, 23);
-        state.mcDebugLog.push(`${t} RECV game-state acting=${msg.actingCharacterId} awaitingMC=${!!msg.awaitingMindControlAction} puppet=${msg.mindControlPuppetId ?? 'null'} usable=${(msg.usableActions || []).map((a) => a.actionId).join(',')}`);
-        if (state.mcDebugLog.length > 12) state.mcDebugLog.shift();
-      }
       state.screen = 'battle';
       state.game = msg.game;
       state.actingCharacterId = msg.actingCharacterId;
