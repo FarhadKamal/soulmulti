@@ -760,17 +760,33 @@ function renderMindControlActionPanel(game, melyssaId, state) {
     return panel;
   }
 
+  // Same "look before you act" pacing as renderActionPanel's own lockout -
+  // handleMindControlAction/handleAction's mindControl branch (server-side)
+  // both call armTurnTimer fresh right before broadcasting THIS stage, so
+  // turnDeadline here is a genuinely fresh 30s window for this decision,
+  // not a leftover from an earlier stage - the same formula correctly
+  // yields "5s from when this stage started" either way. Skipped for a
+  // forced soulSwapWrath follow-up (armedAction already handles that via
+  // its own no-Cancel branch above) and in a tutorial, exactly like
+  // renderActionPanel.
+  const lockoutUntil = (!state.tutorialRequiredActionId && state.turnDeadline)
+    ? state.turnDeadline - TURN_TIMER_MS + ACTION_LOCKOUT_MS
+    : 0;
+  const lockoutActive = lockoutUntil > Date.now();
+
   const btnRow = document.createElement('div');
   btnRow.className = 'action-btn-row';
+  const lockableButtons = [];
   state.usableActions.forEach((action) => {
     const btn = document.createElement('button');
     btn.textContent = action.label;
     if (action.special) btn.classList.add('special-action-btn');
     if (action.actionId === '__mcSelfChoke') btn.classList.add('self-choke-btn');
     const isTutorialLocked = state.tutorialRequiredActionId && action.actionId !== state.tutorialRequiredActionId;
-    btn.disabled = !!isTutorialLocked;
+    btn.disabled = !!isTutorialLocked || lockoutActive;
+    if (!isTutorialLocked) lockableButtons.push(btn);
     btn.onclick = () => {
-      if (isTutorialLocked) return;
+      if (isTutorialLocked || btn.disabled) return;
       playUiClick();
       if (!action.needsTarget) {
         submitMindControlAction(melyssaId, state.mindControlPuppetId, action, null, state);
@@ -782,6 +798,25 @@ function renderMindControlActionPanel(game, melyssaId, state) {
     btnRow.appendChild(btn);
   });
   panel.appendChild(btnRow);
+
+  if (lockoutActive) {
+    const hint = document.createElement('div');
+    hint.className = 'lockout-hint';
+    panel.appendChild(hint);
+    const tick = () => {
+      const msLeft = lockoutUntil - Date.now();
+      if (msLeft <= 0) {
+        hint.remove();
+        lockableButtons.forEach((b) => { b.disabled = false; });
+        clearInterval(intervalId);
+        return;
+      }
+      hint.textContent = `Get ready... ${Math.ceil(msLeft / 1000)}s`;
+    };
+    const intervalId = setInterval(tick, 200);
+    tick();
+  }
+
   return panel;
 }
 
