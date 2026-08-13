@@ -55,6 +55,35 @@ export function isValidMindControlTarget(game, targetId) {
   return true; // deliberately no ownerId check - ally or enemy both legal
 }
 
+// A puppeted character's REAL action, once Melyssa has taken control, is
+// allowed to hit ANY other character on the board - including the puppet's
+// own teammate - not just who the puppet would normally consider an enemy.
+// Requested directly: "she can chose blade attack on tharox" (both on the
+// same enemy team) - being forced to turn on your own ally is a genuine
+// extra threat Mind Control should be able to create, beyond what
+// isValidTarget's ownership check allows for a character acting normally.
+// Same shape as isValidTarget (KO'd/untargetable exclusions, Shadow
+// Execution's mark requirement, hiddenMark's once-ever-marked rule) minus
+// the ownerId equality check - just also excludes the puppet targeting
+// itself, which isValidTarget gets for free from the ownerId check but
+// this function has to state explicitly since it no longer has that check
+// as a side effect.
+export function isValidPuppetTarget(game, puppetId, actionId, targetId) {
+  if (targetId === puppetId) return false;
+  const target = game.characters[targetId];
+  if (!target || target.isKO) return false;
+  const puppet = game.characters[puppetId];
+  if (game.mode === 'tutorial3' && puppetId !== 'velorya' && targetId !== 'velorya') return false;
+  if (target.untargetable) return false;
+  if (actionId === 'shadowExecution') return puppet.special.marks.has(targetId);
+  if (actionId === 'hiddenMark') return !puppet.special.everMarkedIds.has(targetId);
+  return true;
+}
+
+export function hasAnyValidPuppetTarget(game, puppetId, actionId) {
+  return Object.keys(game.characters).some((tid) => isValidPuppetTarget(game, puppetId, actionId, tid));
+}
+
 export function hasAnyValidTarget(game, characterId, actionId) {
   // mindControl routes through isValidMindControlTarget (ally-allowed),
   // never isValidTarget (enemy-only) - without this, getUsableActions would
@@ -73,6 +102,21 @@ export function getUsableActions(character, game) {
   return getLegalActions(character, game).filter((action) => {
     if (!action.needsTarget) return true;
     return hasAnyValidTarget(game, character.id, action.actionId);
+  });
+}
+
+// Puppet-aware counterpart to getUsableActions - same legal-action list
+// (getLegalActions doesn't know or care about targets at all), but a
+// targeted action's "is this even usable right now" check goes through
+// hasAnyValidPuppetTarget instead of hasAnyValidTarget, so a puppeted
+// character whose only legal target is their OWN teammate still shows the
+// button (getUsableActions would wrongly hide it, same class of gap
+// isValidMindControlTarget's own hasAnyValidTarget branch already fixed
+// for Melyssa's own selection step).
+export function getUsablePuppetActions(puppetCharacter, game) {
+  return getLegalActions(puppetCharacter, game).filter((action) => {
+    if (!action.needsTarget) return true;
+    return hasAnyValidPuppetTarget(game, puppetCharacter.id, action.actionId);
   });
 }
 

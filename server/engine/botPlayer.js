@@ -336,8 +336,23 @@ function chooseZerathysMove(character, game, usable) {
 // real match where a fully random follow-up wasted the free hit on a
 // shielded target (0 damage through the shield) instead of an unshielded
 // one that would have landed real damage.
-export function chooseSoulSwapWrathTarget(character, game) {
-  const targets = validTargetsFor(game, character, 'soulSwapWrath');
+//
+// excludeOwnerId: when this follow-up is firing off a PUPPETED Soul Swap
+// (Melyssa puppeting Zerathys, see stepBotMindControlTurn in index.js),
+// this function has no awareness on its own that the "attacker" is really
+// Melyssa - left unchecked, it happily rates Melyssa's own side as a normal
+// target (focus-fire/lowest-hearts/etc. don't know any better) and can
+// freely land a real hit on her, completely bypassing
+// chooseBotMelyssaPuppetAction's own Self Choke safety check (which only
+// covers the puppet's INITIAL move, never this automatic follow-up).
+// Confirmed via a live report: Melyssa at 7 hearts still lost to a
+// puppeted Zerathys in a 4p match. Passing Melyssa's ownerId here excludes
+// her whole side from the candidate pool before any of the normal
+// heuristics run; a normal (non-puppeted) Soul Swap never passes this, so
+// its own behavior is completely unchanged.
+export function chooseSoulSwapWrathTarget(character, game, excludeOwnerId = null) {
+  const targets = validTargetsFor(game, character, 'soulSwapWrath')
+    .filter((tid) => !excludeOwnerId || game.characters[tid].ownerId !== excludeOwnerId);
   if (targets.length === 0) return null;
   const securesKill = targets.find((tid) => {
     const t = game.characters[tid];
@@ -698,11 +713,21 @@ export function chooseBotMelyssaPuppetAction(puppetCharacter, game, melyssaId) {
   if (isEnemyPuppet) {
     const chosenTarget = move.targetId ? game.characters[move.targetId] : null;
     const hitsMelyssaSide = chosenTarget && chosenTarget.ownerId === melyssa.ownerId;
+    // A puppeted setup move (Zerathys's Charge Up, Tharox's Titan Toss -
+    // anything with no target and no damage this turn) deals zero progress
+    // right now, banking on a LATER puppeted turn to cash in a bigger hit -
+    // a turn Melyssa has no guarantee of ever getting again (the enemy
+    // could die, change targets, or simply not get puppeted again). Self
+    // Choke's guaranteed 1 damage this turn is strictly better than a
+    // payoff that may never arrive, so prefer it over any move that does
+    // nothing this turn - reported live: Melyssa puppeting Zerathys into
+    // Charge Up in a 1v1 instead of choking him down immediately.
+    const dealsNoDamageThisTurn = !usableEntry?.needsTarget && move.actionId !== 'soulSwap';
     // Self Choke always deals exactly 1 flat, ignoresShield damage (see
     // executeSelfChoke in index.js) - safe to hardcode that amount here
     // rather than importing the ability module just to read a constant.
     const selfChokeWouldKill = puppetCharacter.hearts <= 1;
-    if (selfChokeWouldKill || hitsMelyssaSide) {
+    if (selfChokeWouldKill || hitsMelyssaSide || dealsNoDamageThisTurn) {
       return { kind: 'selfChoke' };
     }
   }

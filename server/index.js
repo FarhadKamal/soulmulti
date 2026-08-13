@@ -8,8 +8,8 @@ import { fileURLToPath } from 'url';
 import { CHARACTER_IDS } from '../client/js/characters.js';
 import { createGame } from './engine/state.js';
 import {
-  getUsableActions, executeAction, isValidTarget, isValidMindControlTarget, markCharacterActed,
-  finalizeAction, executeActionAsPuppet,
+  getUsableActions, getUsablePuppetActions, executeAction, isValidTarget, isValidMindControlTarget,
+  isValidPuppetTarget, markCharacterActed, finalizeAction, executeActionAsPuppet,
 } from './engine/turnEngine.js';
 import { applyDamage } from './engine/damagePipeline.js';
 import {
@@ -280,15 +280,38 @@ function usableActionsFor(game, characterId) {
   }));
 }
 
+// Puppet-aware counterpart to usableActionsFor - a puppeted character's
+// real options are allowed to hit ANY other character, including their own
+// teammate, not just who they'd normally consider an enemy (requested
+// directly: puppeting Blade should be able to make him attack his own
+// teammate Tharox). Uses getUsablePuppetActions/isValidPuppetTarget instead
+// of getUsableActions/isValidTarget - see those functions' own comments in
+// turnEngine.js for why a puppet-only exception, not a change to
+// isValidTarget itself (which is load-bearing enemy-only logic for every
+// character's OWN normal turn).
+function puppetActionsFor(game, puppetId) {
+  const puppet = game.characters[puppetId];
+  if (!puppet) return [];
+  return getUsablePuppetActions(puppet, game).map((a) => ({
+    actionId: a.actionId,
+    label: a.label,
+    needsTarget: a.needsTarget,
+    special: !!a.special,
+    validTargetIds: a.needsTarget
+      ? Object.keys(game.characters).filter((tid) => isValidPuppetTarget(game, puppetId, a.actionId, tid))
+      : [],
+  }));
+}
+
 // Computes the serializable option list for stage 2 of Mind Control (what
-// the puppet can be made to do) - reuses usableActionsFor verbatim for the
-// puppet's REAL options (never re-derived by hand), then layers in the
+// the puppet can be made to do) - reuses puppetActionsFor for the puppet's
+// REAL options (never re-derived by hand), then layers in the
 // Jester-Ball-holder forced choice and/or Self Choke as needed. Both
 // server/index.js's own handlers and the bot flow (via chooseBotMelyssaPuppetAction,
-// which calls getUsableActions directly rather than this function - see
-// botPlayer.js) need this exact same option set for legality purposes, but
-// only the human-facing path needs it SERIALIZED for broadcast, hence this
-// lives here rather than in turnEngine.js.
+// which calls getUsablePuppetActions directly rather than this function -
+// see botPlayer.js) need this exact same option set for legality purposes,
+// but only the human-facing path needs it SERIALIZED for broadcast, hence
+// this lives here rather than in turnEngine.js.
 function mindControlOptionsFor(game, melyssaId, puppetId) {
   const puppet = game.characters[puppetId];
   const isEnemyPuppet = puppet.ownerId !== game.characters[melyssaId].ownerId;
@@ -305,7 +328,7 @@ function mindControlOptionsFor(game, melyssaId, puppetId) {
     return isEnemyPuppet ? [...jbOptions, selfChokeOption()] : jbOptions;
   }
 
-  const realOptions = usableActionsFor(game, puppetId);
+  const realOptions = puppetActionsFor(game, puppetId);
   if (!isEnemyPuppet) return realOptions;
   return [...realOptions, selfChokeOption()];
 }
@@ -685,7 +708,12 @@ function stepBotMindControlTurn(room, melyssaId, puppetId) {
 
   // decision.kind === 'realAction'
   executeActionAsPuppet(room.game, melyssaId, puppetId, decision.actionId, decision.targetId);
-  const wrathTarget = decision.actionId === 'soulSwap' ? chooseSoulSwapWrathTarget(puppet, room.game) : null;
+  // excludeOwnerId=Melyssa's own side - see chooseSoulSwapWrathTarget's own
+  // comment for why this follow-up needs it and a normal (non-puppeted)
+  // Soul Swap doesn't.
+  const wrathTarget = decision.actionId === 'soulSwap'
+    ? chooseSoulSwapWrathTarget(puppet, room.game, room.game.characters[melyssaId].ownerId)
+    : null;
   if (wrathTarget) {
     // Same reasoning as the Take case above - still mid-sequence, so this
     // broadcasts the awaiting-decision shape (a single soulSwapWrath
@@ -1597,7 +1625,10 @@ function handleMindControlAction(room, sessionId, { characterId, puppetId, actio
   // version) already validates its own submission: isValidTarget(...,
   // 'soulSwapWrath', ...) directly, never through getLegalActions.
   if (actionId === 'soulSwapWrath') {
-    if (!isValidTarget(room.game, puppetId, 'soulSwapWrath', targetId)) return;
+    // isValidPuppetTarget (ally-allowed), not isValidTarget - a puppeted
+    // Wrath follow-up gets the same "can hit the puppet's own teammate"
+    // treatment as every other puppeted real action, see puppetActionsFor.
+    if (!isValidPuppetTarget(room.game, puppetId, 'soulSwapWrath', targetId)) return;
     executeActionAsPuppet(room.game, characterId, puppetId, 'soulSwapWrath', targetId);
     room.melyssaControl = null;
     finishMelyssaTurn(room.game, characterId);
@@ -1642,7 +1673,7 @@ function handleMindControlAction(room, sessionId, { characterId, puppetId, actio
       // assumes characterId is the caster - wrong for a puppeted
       // continuation, where the client must keep sending
       // characterId: 'melyssa' to pass the seat-ownership check above).
-      const wrathTargets = Object.keys(room.game.characters).filter((tid) => isValidTarget(room.game, puppetId, 'soulSwapWrath', tid));
+      const wrathTargets = Object.keys(room.game.characters).filter((tid) => isValidPuppetTarget(room.game, puppetId, 'soulSwapWrath', tid));
       followUp = {
         puppetId,
         options: [{ actionId: 'soulSwapWrath', label: 'Thunder Wrath (free, from Soul Swap)', needsTarget: true, special: false, validTargetIds: wrathTargets }],
