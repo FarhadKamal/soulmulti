@@ -244,6 +244,22 @@ function renderEntryForm() {
   tutorialSection.appendChild(tutorialGrid);
   form.appendChild(tutorialSection);
 
+  const botShowSection = document.createElement('div');
+  botShowSection.className = 'bot-show-section';
+  const botShowTitle = document.createElement('h2');
+  botShowTitle.textContent = 'Watch bots play';
+  botShowSection.appendChild(botShowTitle);
+  const botShowHint = document.createElement('div');
+  botShowHint.className = 'name-hint';
+  botShowHint.textContent = '4 random bots play each other, no human seat - a new match starts automatically when one ends.';
+  botShowSection.appendChild(botShowHint);
+  const botShowBtn = document.createElement('button');
+  botShowBtn.textContent = 'Start Watching';
+  botShowBtn.onclick = () => send('create-bot-show-room', { name: currentName() });
+  tutorialButtons.push(botShowBtn); // reuses the same name-required disable wiring as the tutorial grid
+  botShowSection.appendChild(botShowBtn);
+  form.appendChild(botShowSection);
+
   updateNameValidity();
   return form;
 }

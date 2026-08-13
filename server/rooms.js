@@ -19,11 +19,15 @@ const TURN_TIMER_MS = 30_000;
 //   Velorya's tutorial, which needs a genuine second enemy to demonstrate
 //   Moonstep's real "-2 for switching targets" bonus (impossible to show
 //   honestly in a strict 1v1, where only one legal target ever exists).
+// - 'bots4': 4 bot-only seats, no human seat at all - a pure "watch the
+//   bots play" spectacle room (see handleCreateBotShowRoom in index.js).
+//   Same shape as '4p' since it reuses the same engine mode/turn order.
 const ROOM_SHAPES = {
   '2p': { seatCount: 2, picksPerSeat: 2 },
   '4p': { seatCount: 4, picksPerSeat: 1 },
   tutorial: { seatCount: 2, picksPerSeat: 1 },
   tutorial3: { seatCount: 3, picksPerSeat: 1 },
+  bots4: { seatCount: 4, picksPerSeat: 1 },
 };
 
 export function roomShapeFor(roomType) {
@@ -78,14 +82,22 @@ export function createRoom(roomType) {
 
   const room = {
     code,
-    roomType, // '2p' | '4p'
+    roomType, // '2p' | '4p' | 'tutorial' | 'tutorial3' | 'bots4'
     seats,
-    ownerId: null, // set once the owner's seat claim happens
+    ownerId: null, // set once the owner's seat claim happens - stays null for a 'bots4' room, which has no human-owned seat
     phase: 'lobby', // 'lobby' | 'in-match' | 'finished'
     game: null, // populated by engine createGame() once match starts
     turnTimer: null,
     botSequenceActive: false, // guards against overlapping paced bot-turn sequences
     createdAt: Date.now(),
+    // Session ids watching this room WITHOUT occupying a seat - only ever
+    // populated for a 'bots4' room (see handleCreateBotShowRoom), where
+    // every seat is a bot and the connecting viewer has nothing to claim.
+    // broadcastRoom/broadcastPersonalized (index.js) and
+    // findRoomBySessionId (below) both need to know about these sessions
+    // too, not just seat.spectatorId - a plain Set since a 'bots4' room in
+    // practice has exactly one viewer, but nothing stops more from watching.
+    spectatorIds: new Set(),
   };
   rooms.set(code, room);
   return room;
@@ -109,6 +121,7 @@ export function deleteRoom(code) {
 export function findRoomBySessionId(sessionId) {
   for (const room of rooms.values()) {
     if (room.seats.some((s) => s.spectatorId === sessionId)) return room;
+    if (room.spectatorIds.has(sessionId)) return room;
   }
   return null;
 }

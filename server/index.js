@@ -169,6 +169,11 @@ function broadcastRoom(room, type, payload = {}) {
       if (ws) send(ws, type, payload);
     }
   }
+  // Room-level (seatless) watchers - see rooms.js's spectatorIds comment.
+  for (const sessionId of room.spectatorIds) {
+    const ws = sessions.get(sessionId);
+    if (ws) send(ws, type, payload);
+  }
 }
 
 // Sends a per-recipient payload built from buildPayload(recipientSessionId)
@@ -183,6 +188,10 @@ function broadcastPersonalized(room, type, buildPayload) {
       const ws = sessions.get(seat.spectatorId);
       if (ws) send(ws, type, buildPayload(seat.spectatorId));
     }
+  }
+  for (const sessionId of room.spectatorIds) {
+    const ws = sessions.get(sessionId);
+    if (ws) send(ws, type, buildPayload(sessionId));
   }
 }
 
@@ -376,6 +385,23 @@ function broadcastGameState(room) {
   if (room.game.phase === 'game-over') {
     room.phase = 'finished';
     clearTurnTimer(room);
+    // 'bots4' has no human to click Return to Lobby/Start Match - the
+    // spectacle keeps going on its own. Scheduled after a delay so the
+    // win screen actually has a moment on screen before the board resets;
+    // guarded by a code match (not just room identity) in case this
+    // exact room got deleted (spectator disconnected, see its own
+    // handling) and a NEW room later reused the same code slot.
+    if (room.roomType === 'bots4') {
+      const code = room.code;
+      setTimeout(() => {
+        const stillHere = getRoom(code);
+        if (stillHere !== room) return;
+        startFreshBotShowMatch(room);
+        broadcastLobby(room);
+        broadcastGameState(room);
+        runBotTurnsIfAny(room);
+      }, BOT_SHOW_RESTART_DELAY_MS);
+    }
   } else if (isBotControlled(room, acting) || isTutorialRoom(room)) {
     // Bots never time out (they always act on their own within
     // BOT_ACTION_DELAY_MS, see runBotTurnsIfAny) - arming the 30s human
@@ -999,6 +1025,53 @@ function fillSeatWithTutorialBot(seat, characterId) {
   seat.characterIds = [characterId];
 }
 
+// Delay before a 'bots4' room's next match auto-starts after the previous
+// one ends - long enough for a viewer to actually register the win screen
+// (matches BOT_ACTION_DELAY_MS's own "give a human a beat to read this"
+// reasoning) before the board resets under them.
+const BOT_SHOW_RESTART_DELAY_MS = 6000;
+
+// "Watch 4 bots play" - a pure spectacle room with no human seat at all.
+// The connecting session is added to room.spectatorIds (never a seat - see
+// that field's own comment in rooms.js) so it keeps receiving every
+// broadcast without owning/controlling anything. All 4 seats are
+// immediately bot-filled with distinct random characters (fillSeatWithBot
+// already guarantees no repeats, via availableCharacterIds) and the match
+// starts right away, exactly like handleStartMatch's own tail. See
+// broadcastGameState's 'bots4' branch for the auto-restart-on-game-over loop.
+function handleCreateBotShowRoom(ws, sessionId, { name }) {
+  const cleanName = sanitizeName(name);
+  if (!cleanName) return send(ws, 'error', { message: 'A name is required.' });
+  const room = createRoom('bots4');
+  room.spectatorIds.add(sessionId);
+  startFreshBotShowMatch(room);
+  send(ws, 'room-created', { code: room.code });
+  broadcastLobby(room);
+  broadcastGameState(room);
+  runBotTurnsIfAny(room);
+}
+
+// Resets all 4 seats to freshly bot-filled (new random distinct
+// characters, same as a first-time creation) and starts a brand new game -
+// shared by the initial creation above and the auto-restart loop in
+// broadcastGameState, so both paths produce an identical fresh match.
+function startFreshBotShowMatch(room) {
+  for (const seat of room.seats) {
+    seat.kind = 'empty';
+    seat.characterIds = [];
+    seat.name = null;
+  }
+  for (const seat of room.seats) fillSeatWithBot(room, seat);
+  const playerPicks = room.seats.map((s) => ({
+    id: `bot-${s.index}`,
+    name: s.name,
+    characterIds: s.characterIds,
+    isPC: true,
+  }));
+  room.game = createGame(room.roomType, playerPicks);
+  room.phase = 'in-match';
+}
+
 function handlePickCharacter(room, sessionId, { characterId }) {
   if (room.phase !== 'lobby') return; // picks are frozen once a match has actually started
   if (!CHARACTER_IDS.includes(characterId)) return;
@@ -1215,6 +1288,18 @@ function permanentlyConvertSeatToBot(room, seat, wasOwner) {
 function leaveRoom(sessionId, ws) {
   const room = findRoomBySessionId(sessionId);
   if (!room) return;
+  // A 'bots4' room's viewer never owns a seat (see rooms.js's
+  // spectatorIds) - once they leave/disconnect, nothing is watching a
+  // bot-only spectacle anymore, so the whole room is torn down immediately
+  // rather than left running forever for no one (the same tradeoff every
+  // other "all humans leave" case already makes, just via a different check
+  // since there's no human seat here to notice leaving).
+  if (room.spectatorIds.has(sessionId)) {
+    room.spectatorIds.delete(sessionId);
+    if (ws) send(ws, 'left-room', {});
+    deleteRoom(room.code);
+    return;
+  }
   const seat = room.seats.find((s) => s.spectatorId === sessionId);
   if (!seat) return;
   // Confirm directly to the leaving client (not a room broadcast - they're
@@ -1665,6 +1750,7 @@ wss.on('connection', (ws) => {
 
     if (type === 'create-room') return handleCreateRoom(ws, sessionId, payload);
     if (type === 'create-tutorial-room') return handleCreateTutorialRoom(ws, sessionId, payload);
+    if (type === 'create-bot-show-room') return handleCreateBotShowRoom(ws, sessionId, payload);
     if (type === 'join-room') return handleJoinRoom(ws, sessionId, payload);
     if (type === 'reconnect') return handleReconnect(ws, sessionId, payload);
     if (type === 'leave-room') return leaveRoom(sessionId, ws);
