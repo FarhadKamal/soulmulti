@@ -749,6 +749,15 @@ function executeTutorialStep(room, step) {
     // finishJesterBall directly rather than executeAction/the ability map,
     // matching how Take is actually resolved for a real Jester Ball holder.
     finishJesterBall(room.game, 'take', extra);
+  } else if (step.actionId === '__mcSelfChoke') {
+    // Self Choke is Melyssa's own move against her puppet, never a real
+    // ability-module action (see the live '__mcSelfChoke' handling in
+    // handleMindControlAction) - executeActionAsPuppet/executeAction would
+    // look it up in ABILITY_MODULES[puppetOf].actions and find nothing.
+    // step.puppetOf here is the VICTIM (the puppet being choked), not an
+    // actor whose kit is being borrowed - actingCharacterId is Melyssa's own.
+    executeSelfChoke(room.game, actingCharacterId, step.puppetOf);
+    finishMelyssaTurn(room.game, actingCharacterId);
   } else if (step.puppetOf) {
     // Mind Control stage-2+: actingCharacterId is Melyssa's own id (the
     // seat that must click/be driven), but the actual executeAction
@@ -761,11 +770,15 @@ function executeTutorialStep(room, step) {
     }
   } else {
     executeAction(room.game, actingCharacterId, step.actionId, targetId, extra);
-    // Soul Swap doesn't mark the character acted yet - same as the real
-    // human action handler (handleAction), it still owes the separate
-    // soulSwapWrath step before its turn is actually over. Every other
-    // step marks acted normally.
-    if (step.actionId !== 'soulSwap') {
+    // Soul Swap and mindControl both don't mark the character acted yet -
+    // same as the real (non-tutorial) handlers, they still owe a follow-up
+    // step (soulSwapWrath, or the puppet's own action/__mcSelfChoke) before
+    // the turn is actually over. Every other plain step marks acted
+    // normally. Missing the mindControl case here was a real bug: without
+    // it, settleToNextDecision advanced straight past Melyssa to the next
+    // character's real turn the instant she PICKED a puppet, before the
+    // puppet's own action step could ever be submitted/accepted.
+    if (step.actionId !== 'soulSwap' && step.actionId !== 'mindControl') {
       markCharacterActed(room.game, actingCharacterId);
     }
   }
@@ -826,10 +839,7 @@ function handleCreateTutorialRoom(ws, sessionId, { name, characterId }) {
   if (!CHARACTER_IDS.includes(characterId)) return send(ws, 'error', { message: 'Invalid character.' });
 
   if (characterId === 'velorya') return createVeloryaTutorialRoom(ws, sessionId, cleanName);
-  // Melyssa has no tutorial sequence yet (deferred) - without this guard
-  // TUTORIAL_SEQUENCES[characterId] is undefined and currentTutorialStep's
-  // room.tutorial.sequence[...] lookup would throw as soon as the game
-  // starts, since the lobby's tutorial grid lists every character generically.
+  if (characterId === 'melyssa') return createMelyssaTutorialRoom(ws, sessionId, cleanName);
   if (!TUTORIAL_SEQUENCES[characterId]) return send(ws, 'error', { message: 'Tutorial not available for this character yet.' });
 
   const room = createRoom('tutorial');
@@ -922,6 +932,53 @@ function createVeloryaTutorialRoom(ws, sessionId, cleanName) {
   // signature, which every other room type also calls.
   room.game.characters.athena.hearts = 2;
   room.game.characters.athena.maxHearts = 2;
+  room.phase = 'in-match';
+  send(ws, 'room-created', { code: room.code });
+  broadcastLobby(room);
+  broadcastGameState(room);
+}
+
+// Melyssa's 1v2 tutorial: seat 0 = human, seat 1 = Velorya (bot), seat 2 =
+// Tharox (bot), both custom 3 max hearts - deliberately fragile, same
+// "keep the scripted sequence a reasonable length" reasoning as Athena's
+// 2-heart override above. Same structural need as Velorya's own tutorial:
+// Mind Control (puppeting ANY other character, ally or enemy, into their
+// real kit) is impossible to demonstrate honestly ("puppet an enemy into
+// attacking the OTHER enemy") with only one enemy on the board. Turn order
+// fixed by seat index (Melyssa -> Velorya -> Tharox -> repeat) - Velorya
+// MUST act right before Tharox each round for the shield lesson to land
+// honestly (see the long comment on TUTORIAL_SEQUENCES_1V2.melyssa for why
+// the reverse order doesn't work).
+function createMelyssaTutorialRoom(ws, sessionId, cleanName) {
+  const room = createRoom('tutorial3');
+  const humanSeat = room.seats[0];
+  humanSeat.kind = 'human';
+  humanSeat.playerId = sessionId;
+  humanSeat.spectatorId = sessionId;
+  humanSeat.name = cleanName;
+  humanSeat.characterIds = ['melyssa'];
+  room.ownerId = sessionId;
+
+  fillSeatWithTutorialBot(room.seats[1], 'velorya');
+  fillSeatWithTutorialBot(room.seats[2], 'tharox');
+
+  room.tutorial = {
+    humanCharacterId: 'melyssa',
+    sequence: TUTORIAL_SEQUENCES_1V2.melyssa,
+    stepIndex: 0,
+  };
+
+  const playerPicks = room.seats.map((s) => ({
+    id: s.playerId || `bot-${s.index}`,
+    name: s.name,
+    characterIds: s.characterIds,
+    isPC: s.kind === 'bot',
+  }));
+  room.game = createGame('tutorial3', playerPicks);
+  room.game.characters.velorya.hearts = 3;
+  room.game.characters.velorya.maxHearts = 3;
+  room.game.characters.tharox.hearts = 3;
+  room.game.characters.tharox.maxHearts = 3;
   room.phase = 'in-match';
   send(ws, 'room-created', { code: room.code });
   broadcastLobby(room);
@@ -1315,6 +1372,11 @@ function handleAction(room, sessionId, { characterId, actionId, targetId }) {
       const nextStep = currentTutorialStep(room);
       const puppetId = nextStep?.puppetOf;
       const puppetOptions = puppetId ? mindControlOptionsFor(room.game, characterId, puppetId) : [];
+      // Without this, handleMindControlAction's own room.melyssaControl
+      // check (its very first gate, before any tutorial-specific logic)
+      // rejects the follow-up submission unconditionally - the tutorial's
+      // stage-2 step would never be reachable at all.
+      room.melyssaControl = { melyssaCharacterId: characterId, puppetCharacterId: puppetId };
       broadcastRoom(room, 'game-state', {
         game: sanitizeGameForBroadcast(room.game),
         actingCharacterId: characterId,
@@ -1411,6 +1473,24 @@ function handleMindControlAction(room, sessionId, { characterId, puppetId, actio
   if (acting !== characterId) return;
   const control = room.melyssaControl;
   if (!control || control.melyssaCharacterId !== characterId || control.puppetCharacterId !== puppetId) return;
+
+  // Tutorial rooms only ever accept the one scripted next step - same
+  // defense-in-depth principle as handleAction/handleSoulSwapWrath's own
+  // tutorial gates (the client UI already fully locks this via
+  // tutorialRequiredActionId, so an honest client can never reach here with
+  // a mismatched actionId/targetId, but the server shouldn't rely on that
+  // alone). step.puppetOf must match the puppet actually being driven -
+  // every Mind Control tutorial step is puppetOf-tagged from stage 2
+  // onward (see tutorialSequences.js).
+  if (isTutorialRoom(room)) {
+    const step = currentTutorialStep(room);
+    if (!step || step.actor !== 'human' || step.actionId !== actionId || step.puppetOf !== puppetId) return;
+    if (step.actionId !== '__mcSelfChoke' && resolveTutorialTarget(room, step) !== (targetId ?? null)) return;
+    executeTutorialStep(room, step);
+    broadcastGameState(room);
+    runBotTurnsIfAny(room);
+    return;
+  }
 
   // soulSwapWrath needs its OWN branch here rather than falling through to
   // mindControlOptionsFor below: that function calls usableActionsFor ->
