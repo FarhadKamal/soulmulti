@@ -42,16 +42,33 @@ export function isValidTarget(game, characterId, actionId, targetId) {
   return true;
 }
 
+// True if targetId is under an ACTIVE Time Freeze right now, regardless of
+// the momentary skipNextTurn flag. skipNextTurn is transient - it's set
+// true only from the moment Chronox's onTurnStart re-applies the freeze
+// until the frozen character's own turn consumes it (consumeSkipIfFrozen
+// resets it straight back to false the instant their turn is skipped).
+// Time Freeze's real duration is 2 full rounds (freezeActive/
+// freezeTargetId/freezeSkipsApplied on the CASTING Chronox), so there's a
+// real window - from the frozen character's skipped turn until Chronox's
+// own next turn re-applies it - where skipNextTurn reads false even though
+// the freeze is still conceptually active for its second round. Confirmed
+// live: Melyssa could puppet a still-frozen character during exactly that
+// window, before this check existed.
+function isCurrentlyFrozen(game, targetId) {
+  return Object.values(game.characters).some(
+    (c) => c.id === 'chronox' && !c.isKO && c.special.freezeActive && c.special.freezeTargetId === targetId
+  );
+}
+
 // Melyssa's Mind Control is the one action in the game allowed to target
 // allies - isValidTarget's enemy-only rule (ownerId check) is load-bearing
 // for every other action's semantics, so this is a DEDICATED function
 // rather than a per-actionId bypass baked into isValidTarget itself.
-// skipNextTurn is the actual "frozen" flag (set by Chronox's Time Freeze,
-// consumed by consumeSkipIfFrozen) - a frozen character can't be puppeted.
 export function isValidMindControlTarget(game, targetId) {
   const target = game.characters[targetId];
   if (!target || target.id === 'melyssa') return false;
   if (target.isKO || target.untargetable || target.skipNextTurn) return false;
+  if (isCurrentlyFrozen(game, targetId)) return false;
   return true; // deliberately no ownerId check - ally or enemy both legal
 }
 

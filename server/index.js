@@ -1056,8 +1056,11 @@ function fillSeatWithTutorialBot(seat, characterId) {
 // Delay before a 'bots4' room's next match auto-starts after the previous
 // one ends - long enough for a viewer to actually register the win screen
 // (matches BOT_ACTION_DELAY_MS's own "give a human a beat to read this"
-// reasoning) before the board resets under them.
-const BOT_SHOW_RESTART_DELAY_MS = 6000;
+// reasoning) AND to let the winner's victory voice line finish playing
+// (client-side, playVictoryVoice - see main.js's game-over handling)
+// before the board resets out from under them. Bumped from an initial 6s,
+// which cut voice lines off mid-line.
+const BOT_SHOW_RESTART_DELAY_MS = 12000;
 
 // "Watch 4 bots play" - a pure spectacle room with no human seat at all.
 // The connecting session is added to room.spectatorIds (never a seat - see
