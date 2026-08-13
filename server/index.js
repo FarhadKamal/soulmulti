@@ -636,7 +636,11 @@ function stepBotMindControlTurn(room, melyssaId, puppetId) {
 
   if (decision.kind === 'jesterBall') {
     finishJesterBall(room.game, decision.choice, decision.targetId);
-    if (decision.choice === 'take') {
+    // Take's flat -4 can itself KO the puppet outright - same gap as the
+    // human path in handleMindControlAction, see its comment for why a
+    // follow-up stage would otherwise offer a phantom action panel for an
+    // already-dead puppet.
+    if (decision.choice === 'take' && !room.game.characters[puppetId].isKO) {
       // Take doesn't consume the puppet's turn - same as the human path,
       // the puppet also normal-acts as its own separate paced stage next.
       // Still mid-sequence (not a terminal broadcast), so this uses the
@@ -1443,8 +1447,18 @@ function handleMindControlAction(room, sessionId, { characterId, puppetId, actio
   } else if (actionId === '__mcJesterBallTake') {
     finishJesterBall(room.game, 'take', undefined);
     // Take doesn't consume the puppet's turn - per spec, Melyssa also
-    // puppets the follow-up normal action, same overall Mind Control turn.
-    followUp = { puppetId, options: mindControlOptionsFor(room.game, characterId, puppetId) };
+    // puppets the follow-up normal action, same overall Mind Control turn -
+    // BUT Take's flat -4 can itself KO the puppet outright. A KO'd
+    // character has no real action to offer (getLegalActions has no isKO
+    // guard at all - it's normally unreachable territory, since a dead
+    // character never gets a turn under normal play; puppeting one into a
+    // fatal Take is the one way to reach it), so a follow-up here would
+    // show a phantom "choose their action" panel with real buttons for a
+    // character already shown KO'd on the board. Skip the follow-up
+    // entirely and end Melyssa's turn instead.
+    if (!room.game.characters[puppetId].isKO) {
+      followUp = { puppetId, options: mindControlOptionsFor(room.game, characterId, puppetId) };
+    }
   } else if (actionId === '__mcJesterBallPass') {
     finishJesterBall(room.game, 'pass', targetId);
     // Pass DOES consume the holder's action - Mind Control turn is complete.
