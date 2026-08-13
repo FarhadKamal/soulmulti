@@ -257,23 +257,35 @@ export const TUTORIAL_SEQUENCES_1V2 = {
   // BOT_GAMBLE, whose forcedAmount path makes Chaos Gamble silently
   // ignoresShield in tutorial mode - misleading for Melyssa's shield
   // lesson specifically, see the design discussion this sequence came out
-  // of). Both bots start at 3 hearts (reduced from 7, same "deliberately
-  // fragile" idea as Athena's 2-heart override below) so the match
-  // resolves in a reasonable number of turns.
+  // of). Velorya starts at 3 hearts, Tharox at 2 (both reduced from 7,
+  // same "deliberately fragile" idea as Athena's 2-heart override below)
+  // so the match resolves in a reasonable number of turns. Tharox
+  // specifically needs at least 1 heart left after the opening puppeted
+  // hit (T1) or the later charge/Titan Smash beat never gets to happen -
+  // a flat 1 would die immediately, so he gets 2.
   //
   // Turn order fixed by seat index: Melyssa (seat 0) -> Velorya (seat 1)
-  // -> Tharox (seat 2) -> repeat. This exact order matters for the shield
-  // lesson to land honestly: Melyssa's own onTurnStart decays her shield
-  // (decayShieldIfDue, see melyssa.js) the instant HER turn begins - with
-  // Velorya acting right before Tharox each round, Velorya's ignoresShield
-  // hit sets the shield, and it survives just long enough for Tharox's
-  // very next NORMAL hit to actually be absorbed by it, before Melyssa's
-  // own following turn wipes it clean. (The reverse order - Tharox before
-  // Velorya - was tried first and doesn't work: Melyssa's own turn always
-  // falls between Velorya's hit and Tharox's NEXT hit, so a Tharox-set
-  // shield can only ever be "tested" by Velorya's shield-ignoring hit,
-  // which was always going to bypass it anyway - no real absorption ever
-  // happens. Re-verified against a live playthrough before locking this in.)
+  // -> Tharox (seat 2) -> repeat. This exact order matters for TWO
+  // different reasons at once:
+  // 1. The shield lesson needs Velorya to act right before Tharox each
+  //    round: Melyssa's own onTurnStart decays her shield (decayShieldIfDue,
+  //    see melyssa.js) the instant HER turn begins - Velorya's
+  //    ignoresShield hit sets the shield, and it survives just long enough
+  //    for Tharox's very next NORMAL hit to actually be absorbed by it,
+  //    before Melyssa's own following turn wipes it clean. (The reverse
+  //    order - Tharox before Velorya - was tried first and doesn't work:
+  //    Melyssa's own turn always falls between Velorya's hit and Tharox's
+  //    NEXT hit, so a Tharox-set shield could only ever be "tested" by
+  //    Velorya's shield-ignoring hit, which bypasses it anyway - no real
+  //    absorption ever happens.)
+  // 2. The Titan Smash beat needs Tharox's OWN real turn (T3) to be what
+  //    charges him up, not a puppeted Titan Toss - puppeting his charge
+  //    herself would let HIS OWN very next real turn auto-fire Titan Smash
+  //    on its own (charged = his only legal move) before Melyssa ever got
+  //    a second turn to puppet it herself. Only works because Melyssa's
+  //    turn (T4) comes immediately after his (T3), before his own next
+  //    real turn (T5) can consume the charge itself.
+  // Re-verified against a live playthrough before locking this in.
   //
   // A mindControl step's own targetId is the PUPPET being selected; the
   // step(s) immediately after it carry `puppetOf: <that same puppet id>`
@@ -281,55 +293,39 @@ export const TUTORIAL_SEQUENCES_1V2 = {
   // throughout (Melyssa's own seat is what must act/be driven), matching
   // executeTutorialStep's puppetOf branch exactly.
   //
-  // Heart trace (Melyssa / Velorya / Tharox) after each of the 15 turns,
-  // re-verified against a live playthrough: 7,3,3 -> T1 7,3,2 -> T2 6,3,2
-  // -> T3(absorbed) 6,3,2 -> T4 6,2,2 -> T5 5,2,2 -> T6(absorbed) 5,2,2 ->
-  // T7 5,1,2 -> T8 4,1,2 -> T9(absorbed) 4,1,2 -> T10 4,1,1 -> T11 3,1,1 ->
-  // T12(absorbed) 3,1,1 -> T13 3,0,1 -> T14 2,0,1 -> T15 2,0,0. Melyssa's
-  // minimum is 2, reached on the final hit, survives with both enemies KO'd.
+  // Heart trace (Melyssa / Velorya / Tharox) after each of the 6 turns:
+  // 7,3,2 -> T1 7,3,1 -> T2 6,3,1 -> T3 6,3,1 -> T4 6,0,1(Velorya KO) ->
+  // T5 5,0,1(Smash is a genuine flat 1, shield=0 so unabsorbed) -> T6
+  // 5,0,0 (Tharox KO, match over). Melyssa's minimum is 5, both enemies KO'd.
   melyssa: [
     // T1: puppet Velorya -> Lunar Strike Tharox. Redirects an enemy at the
     // OTHER enemy - the core Mind Control lesson (ignoresShield is genuine
-    // but moot here, Tharox has no shield to begin with). Tharox 3->2
+    // but moot here, Tharox has no shield to begin with). Tharox 2->1
     { actor: 'human', actionId: 'mindControl', targetId: 'velorya' },
     { actor: 'human', actionId: 'lunarStrike', targetId: 'tharox', puppetOf: 'velorya' },
     // T2: Velorya's own real turn - genuinely ignoresShield, shield=0 so
     // the full 1 hits Melyssa's hearts either way, then her reactive
     // shield gains exactly 1.
     { actor: 'velorya', actionId: 'lunarStrike', targetId: 'melyssa' }, // M 7->6, shield 0->1
-    // T3: Tharox's own real turn - a genuinely NORMAL attack. Melyssa's
-    // fresh shield=1 (from T2) fully absorbs it - the shield lesson's payoff.
-    { actor: 'tharox', actionId: 'smash', targetId: 'melyssa' }, // shield=1 absorbs. M stays 6, shield->0
-    // T4: puppet Velorya -> Self Choke. First finishing-move demo.
-    { actor: 'human', actionId: 'mindControl', targetId: 'velorya' },
-    { actor: 'human', actionId: '__mcSelfChoke', targetId: null, puppetOf: 'velorya' }, // Velorya 3->2
-    // T5: Velorya's own turn.
-    { actor: 'velorya', actionId: 'lunarStrike', targetId: 'melyssa' }, // M 6->5, shield->1
-    // T6: Tharox's own turn - shield=1 absorbs again.
-    { actor: 'tharox', actionId: 'smash', targetId: 'melyssa' }, // M stays 5, shield->0
-    // T7: puppet Velorya -> Self Choke again.
-    { actor: 'human', actionId: 'mindControl', targetId: 'velorya' },
-    { actor: 'human', actionId: '__mcSelfChoke', targetId: null, puppetOf: 'velorya' }, // Velorya 2->1
-    // T8: Velorya's own turn.
-    { actor: 'velorya', actionId: 'lunarStrike', targetId: 'melyssa' }, // M 5->4, shield->1
-    // T9: Tharox's own turn - shield=1 absorbs.
-    { actor: 'tharox', actionId: 'smash', targetId: 'melyssa' }, // M stays 4, shield->0
-    // T10: puppet Tharox -> Self Choke.
+    // T3: Tharox's OWN real turn - not charged yet, uses Titan Toss
+    // (charge, no attack). This is what makes the T4 puppeted Titan Smash
+    // legal - his own charge, not one Melyssa set up herself (see the
+    // long comment above for why puppeting the charge wouldn't work).
+    { actor: 'tharox', actionId: 'titanToss', targetId: null },
+    // T4: puppet Tharox -> Titan Smash Velorya (he's charged from HIS OWN
+    // T3 turn). Puppeting a charged special, not just a plain attack - a
+    // beat the earlier tutorial draft never showed. 3 dmg, exact KO on
+    // Velorya's 3 hearts.
     { actor: 'human', actionId: 'mindControl', targetId: 'tharox' },
-    { actor: 'human', actionId: '__mcSelfChoke', targetId: null, puppetOf: 'tharox' }, // Tharox 2->1
-    // T11: Velorya's own turn.
-    { actor: 'velorya', actionId: 'lunarStrike', targetId: 'melyssa' }, // M 4->3, shield->1
-    // T12: Tharox's own turn - shield=1 absorbs.
-    { actor: 'tharox', actionId: 'smash', targetId: 'melyssa' }, // M stays 3, shield->0
-    // T13: puppet Velorya -> Self Choke. Velorya 1->0 KO.
-    { actor: 'human', actionId: 'mindControl', targetId: 'velorya' },
-    { actor: 'human', actionId: '__mcSelfChoke', targetId: null, puppetOf: 'velorya' },
-    // T14: Tharox's own turn (Velorya already dead, no longer in the
-    // sequence). Shield is 0 (decayed at the start of Melyssa's T13 turn,
-    // and nothing set it again since Velorya's dead) - this hit lands
-    // unabsorbed, straight on her hearts.
-    { actor: 'tharox', actionId: 'smash', targetId: 'melyssa' }, // shield=0. M 3->2, shield SET->1 (new reactive shield, now moot - match ends next)
-    // T15: puppet Tharox -> Self Choke. Tharox 1->0 KO. MATCH OVER.
+    { actor: 'human', actionId: 'titanSmash', targetId: 'velorya', puppetOf: 'tharox' }, // Velorya 3->0 KO
+    // T5: Tharox's own real turn (Velorya dead, his charge already
+    // consumed by T4's puppeted Titan Smash) - back to a genuinely normal,
+    // flat-1 Smash (no randomness - see tharox.js). Melyssa's shield is 0
+    // here (decayed at the start of her own T4 turn, nothing re-set it
+    // since Velorya, the only ignoresShield attacker, is already dead) -
+    // this hit lands unabsorbed, straight on her hearts.
+    { actor: 'tharox', actionId: 'smash', targetId: 'melyssa' }, // shield=0. M 6->5, shield SET->1 (moot - match ends next turn)
+    // T6: puppet Tharox -> Self Choke. Tharox 1->0 KO. MATCH OVER.
     { actor: 'human', actionId: 'mindControl', targetId: 'tharox' },
     { actor: 'human', actionId: '__mcSelfChoke', targetId: null, puppetOf: 'tharox' },
   ],

@@ -977,8 +977,11 @@ function createMelyssaTutorialRoom(ws, sessionId, cleanName) {
   room.game = createGame('tutorial3', playerPicks);
   room.game.characters.velorya.hearts = 3;
   room.game.characters.velorya.maxHearts = 3;
-  room.game.characters.tharox.hearts = 3;
-  room.game.characters.tharox.maxHearts = 3;
+  // 2, not 1 - a flat 1 would die to the very first puppeted Lunar Strike
+  // (T1 of the sequence below), before the later charge/Titan Smash beat
+  // ever gets a chance to happen.
+  room.game.characters.tharox.hearts = 2;
+  room.game.characters.tharox.maxHearts = 2;
   room.phase = 'in-match';
   send(ws, 'room-created', { code: room.code });
   broadcastLobby(room);
