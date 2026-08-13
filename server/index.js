@@ -328,14 +328,43 @@ function executeSelfChoke(game, melyssaId, puppetId) {
 
 // Marks a Mind-Control-driven turn as truly, fully over - used at every one
 // of the exactly 3 points that's the case: handleMindControlAction's
-// no-follow-up branch, resolveBotMindControlTurn's outermost caller
-// (stepBotTurn), and the tutorial's final puppetOf-tagged step of a
-// sequence. Replaces the bare markCharacterActed(..., melyssaId) call each
-// of those sites would otherwise need, since Melyssa's turn also needs her
-// own special.controlling flag cleared (ends the held selection portrait).
+// no-follow-up branch, finishBotMindControlTurn (bot equivalent), and the
+// tutorial's final puppetOf-tagged step of a sequence. Replaces the bare
+// markCharacterActed(..., melyssaId) call each of those sites would
+// otherwise need, since Melyssa's turn also needs her own
+// special.controlling flag cleared (ends the held selection portrait).
 function finishMelyssaTurn(game, melyssaId) {
   markCharacterActed(game, melyssaId);
   game.characters[melyssaId].special.controlling = false;
+}
+
+// Shared broadcast shape for every "Melyssa is mid-Mind-Control, waiting on
+// a decision for this puppet" moment - used by both the human path
+// (handleAction's mindControl branch, handleMindControlAction's follow-up)
+// and the bot path (stepBotTurn's mindControl branch, stepBotMindControlTurn's
+// follow-up) so a spectator/opponent sees the exact same intermediate state
+// regardless of who's actually driving Melyssa. Re-arms a fresh TURN_TIMER
+// for a human-controlled Melyssa (without this, the timer from the START of
+// her turn keeps counting down uninterrupted through every stage, and a
+// slow decision could time out mid-sequence) - deliberately clears it
+// instead for a bot-controlled seat, mirroring broadcastGameState's own
+// isBotControlled branch, since a bot never needs (or should be exposed to)
+// a human timeout while it's mid-sequence.
+function broadcastMindControlStage(room, melyssaId, puppetId, usableActions) {
+  room.melyssaControl = { melyssaCharacterId: melyssaId, puppetCharacterId: puppetId };
+  if (isBotControlled(room, melyssaId)) {
+    clearTurnTimer(room);
+  } else {
+    armTurnTimer(room, melyssaId);
+  }
+  broadcastRoom(room, 'game-state', {
+    game: sanitizeGameForBroadcast(room.game),
+    actingCharacterId: melyssaId,
+    awaitingMindControlAction: true,
+    mindControlPuppetId: puppetId,
+    usableActions,
+    turnDeadline: room.turnTimer ? room.turnDeadline : null,
+  });
 }
 
 function broadcastGameState(room) {
@@ -523,19 +552,37 @@ function stepBotTurn(room) {
       finishJesterBall(room.game, move.choice, move.targetId);
     } else {
       const move = chooseBotMove(character, room.game);
+      if (move && move.actionId === 'mindControl') {
+        // Mind Control is NOT resolved inline here, unlike every other bot
+        // move - it's a multi-stage decision (puppet select -> puppet
+        // action -> possible follow-up), and a human player sees each of
+        // those stages as its own paced beat (see battleScreen.js's 5s
+        // lockout on both the target-select and puppet-action panels). A
+        // bot resolving the whole thing synchronously in one tick made
+        // Melyssa impossible to follow as a spectator/opponent - one
+        // broadcast showed the puppet selected, acted, AND any follow-up
+        // all already done. executeAction here only performs the puppet
+        // SELECTION, broadcast via the same broadcastMindControlStage shape
+        // the human path uses (so a spectator sees identical intermediate
+        // state either way); stepBotMindControlTurn (below) paces every
+        // subsequent stage the same BOT_ACTION_DELAY_MS apart, and is the
+        // one that eventually calls markCharacterActed/clears `controlling`
+        // once the whole sequence is genuinely over.
+        const result = executeAction(room.game, acting, move.actionId, move.targetId);
+        const puppetId = result.puppetCharacterId;
+        const puppetOptions = mindControlOptionsFor(room.game, acting, puppetId);
+        broadcastMindControlStage(room, acting, puppetId, puppetOptions);
+        setTimeout(() => stepBotMindControlTurn(room, acting, puppetId), BOT_ACTION_DELAY_MS);
+        return;
+      }
       if (move) {
         executeAction(room.game, acting, move.actionId, move.targetId);
         if (move.actionId === 'soulSwap') {
           const wrathTarget = chooseSoulSwapWrathTarget(character, room.game);
           if (wrathTarget) executeAction(room.game, acting, 'soulSwapWrath', wrathTarget);
-        } else if (move.actionId === 'mindControl') {
-          resolveBotMindControlTurn(room.game, acting, move.targetId);
         }
       }
       markCharacterActed(room.game, acting);
-      if (move && move.actionId === 'mindControl') {
-        room.game.characters[acting].special.controlling = false;
-      }
     }
   }
 
@@ -561,42 +608,79 @@ function stepBotTurn(room) {
   setTimeout(() => stepBotTurn(room), BOT_ACTION_DELAY_MS);
 }
 
-// Resolves a bot-controlled Melyssa's ENTIRE Mind Control turn (puppet
-// action + any nested follow-up - a puppeted Take->normal-action chain, or
-// a puppeted Soul Swap->Wrath chain) within one stepBotTurn tick, matching
-// how Soul Swap's own follow-up already resolves inline (see stepBotTurn's
-// 'soulSwap' branch above) - preserves the "one bot action visible per
-// BOT_ACTION_DELAY_MS tick" pacing promise. Deliberately never calls
-// markCharacterActed for the PUPPET at any point - only Melyssa's own
-// acting id gets marked, once, back in stepBotTurn after this returns - so
-// an ally puppet's own real upcoming turn later this same round is
-// completely unaffected (actedThisTurn is per-round anyway, reset by
-// endTurn, but marking the puppet here would incorrectly skip their real
-// turn if it hasn't come up yet this round).
-function resolveBotMindControlTurn(game, melyssaId, puppetId) {
-  const puppet = game.characters[puppetId];
-  const decision = chooseBotMelyssaPuppetAction(puppet, game, melyssaId);
+// Paces exactly ONE sub-stage of a bot-controlled Melyssa's Mind Control
+// turn per call (mirrors stepBotTurn's own one-action-per-tick promise,
+// scoped to just this multi-stage move) - the puppet's real action or Self
+// Choke, a Jester Ball Take/Pass decision, or a Soul-Swap-triggered Wrath
+// follow-up. Broadcasts after each one and, if there's more to resolve
+// (Take doesn't consume the puppet's turn; Soul Swap always chains into a
+// free Wrath), schedules itself again after BOT_ACTION_DELAY_MS - otherwise
+// this is where the whole Mind Control turn actually ends: finishMelyssaTurn
+// (markCharacterActed + clearing special.controlling) only fires here, once,
+// at the true end of the sequence, then the normal bot-turn pacing resumes
+// via runBotTurnsIfAny exactly as if stepBotTurn itself had just finished.
+function stepBotMindControlTurn(room, melyssaId, puppetId) {
+  if (!room.game) { room.botSequenceActive = false; return; }
+  const puppet = room.game.characters[puppetId];
+  const decision = chooseBotMelyssaPuppetAction(puppet, room.game, melyssaId);
+
   if (decision.kind === 'selfChoke') {
-    executeSelfChoke(game, melyssaId, puppetId);
+    executeSelfChoke(room.game, melyssaId, puppetId);
+    finishBotMindControlTurn(room, melyssaId); // broadcasts internally
     return;
   }
+
   if (decision.kind === 'jesterBall') {
-    finishJesterBall(game, decision.choice, decision.targetId);
+    finishJesterBall(room.game, decision.choice, decision.targetId);
     if (decision.choice === 'take') {
-      // Take doesn't consume the puppet's turn - puppet also normal-acts,
-      // same Mind Control turn. A second ball-holder scenario for the SAME
-      // puppet is impossible immediately after Take (Take clears
-      // game.jesterBall entirely) - no infinite recursion risk.
-      resolveBotMindControlTurn(game, melyssaId, puppetId);
+      // Take doesn't consume the puppet's turn - same as the human path,
+      // the puppet also normal-acts as its own separate paced stage next.
+      // Still mid-sequence (not a terminal broadcast), so this uses the
+      // same awaitingMindControlAction shape as every other in-progress
+      // stage, not the generic broadcastGameState. A second ball-holder
+      // scenario for the SAME puppet is impossible immediately after Take
+      // (Take clears game.jesterBall entirely) - no infinite pacing loop risk.
+      const nextOptions = mindControlOptionsFor(room.game, melyssaId, puppetId);
+      broadcastMindControlStage(room, melyssaId, puppetId, nextOptions);
+      setTimeout(() => stepBotMindControlTurn(room, melyssaId, puppetId), BOT_ACTION_DELAY_MS);
+    } else {
+      finishBotMindControlTurn(room, melyssaId); // broadcasts internally
     }
     return;
   }
+
   // decision.kind === 'realAction'
-  executeActionAsPuppet(game, melyssaId, puppetId, decision.actionId, decision.targetId);
-  if (decision.actionId === 'soulSwap') {
-    const wrathTarget = chooseSoulSwapWrathTarget(puppet, game);
-    if (wrathTarget) executeActionAsPuppet(game, melyssaId, puppetId, 'soulSwapWrath', wrathTarget);
+  executeActionAsPuppet(room.game, melyssaId, puppetId, decision.actionId, decision.targetId);
+  const wrathTarget = decision.actionId === 'soulSwap' ? chooseSoulSwapWrathTarget(puppet, room.game) : null;
+  if (wrathTarget) {
+    // Same reasoning as the Take case above - still mid-sequence, so this
+    // broadcasts the awaiting-decision shape (a single soulSwapWrath
+    // option) rather than a terminal one.
+    broadcastMindControlStage(room, melyssaId, puppetId, [
+      { actionId: 'soulSwapWrath', label: 'Thunder Wrath (free, from Soul Swap)', needsTarget: true, special: false, validTargetIds: [wrathTarget] },
+    ]);
+    setTimeout(() => {
+      if (!room.game) { room.botSequenceActive = false; return; }
+      executeActionAsPuppet(room.game, melyssaId, puppetId, 'soulSwapWrath', wrathTarget);
+      finishBotMindControlTurn(room, melyssaId); // broadcasts internally
+    }, BOT_ACTION_DELAY_MS);
+    return;
   }
+
+  finishBotMindControlTurn(room, melyssaId); // broadcasts internally
+}
+
+function finishBotMindControlTurn(room, melyssaId) {
+  // Cleared here for the same reason the human path clears it (see
+  // handleMindControlAction) - stale room.melyssaControl left over from a
+  // just-finished bot sequence could otherwise wrongly validate/reject a
+  // human's UNRELATED next action if they reconnect into this seat right
+  // after a bot-driven Mind Control turn completes.
+  room.melyssaControl = null;
+  finishMelyssaTurn(room.game, melyssaId);
+  broadcastGameState(room);
+  room.botSequenceActive = false;
+  runBotTurnsIfAny(room);
 }
 
 // ---- Tutorial mode: a scripted human-vs-bot(s) sequence (see
@@ -1243,26 +1327,7 @@ function handleAction(room, sessionId, { characterId, actionId, targetId }) {
     const result = executeAction(room.game, characterId, actionId, targetId);
     const puppetId = result.puppetCharacterId;
     const puppetOptions = mindControlOptionsFor(room.game, characterId, puppetId);
-    room.melyssaControl = { melyssaCharacterId: characterId, puppetCharacterId: puppetId };
-    // Re-arm a fresh 30s window for THIS stage - this bypasses
-    // broadcastGameState (the only other place armTurnTimer is normally
-    // called from), so without this explicit call here the timer armed at
-    // the START of Melyssa's turn keeps counting down uninterrupted through
-    // every stage of Mind Control (puppet select -> puppet action -> any
-    // nested follow-up). A player who takes any real time across those
-    // several decisions could burn through that single original window and
-    // get silently timed out (seat converted to bot) mid-sequence - exactly
-    // what a live report traced: stuck on "Waiting for Melyssa's turn..."
-    // despite Melyssa visibly still being mid-Mind-Control on screen.
-    armTurnTimer(room, characterId);
-    broadcastRoom(room, 'game-state', {
-      game: sanitizeGameForBroadcast(room.game),
-      actingCharacterId: characterId,
-      awaitingMindControlAction: true,
-      mindControlPuppetId: puppetId,
-      usableActions: puppetOptions,
-      turnDeadline: room.turnDeadline,
-    });
+    broadcastMindControlStage(room, characterId, puppetId, puppetOptions);
     return;
   }
 
@@ -1397,20 +1462,7 @@ function handleMindControlAction(room, sessionId, { characterId, puppetId, actio
   }
 
   if (followUp) {
-    room.melyssaControl = { melyssaCharacterId: characterId, puppetCharacterId: followUp.puppetId };
-    // Same reasoning as handleAction's mindControl/soulSwap branches - this
-    // covers the deepest nested stage (e.g. puppeted Soul Swap's own Wrath
-    // follow-up), which needs its own fresh window just as much as the
-    // earlier stages do.
-    armTurnTimer(room, characterId);
-    broadcastRoom(room, 'game-state', {
-      game: sanitizeGameForBroadcast(room.game),
-      actingCharacterId: characterId,
-      awaitingMindControlAction: true,
-      mindControlPuppetId: followUp.puppetId,
-      usableActions: followUp.options,
-      turnDeadline: room.turnDeadline,
-    });
+    broadcastMindControlStage(room, characterId, followUp.puppetId, followUp.options);
     return;
   }
 
