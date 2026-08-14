@@ -691,6 +691,32 @@ export function chooseBotMelyssaPuppetAction(puppetCharacter, game, melyssaId) {
     // kept as a defensive fallback rather than assumed impossible.
     return { kind: 'selfChoke' };
   }
+  // Puppeted Zerathys needs his OWN dedicated Soul Swap decision, not
+  // chooseZerathysMove's normal one - that function decides "is this swap
+  // worth it" from ZERATHYS's own perspective (only swaps if the target
+  // has meaningfully MORE hearts than HIM), which is backwards once he's
+  // puppeted: the swap should be judged by whether it helps MELYSSA.
+  // Left unchecked, a puppeted Zerathys would refuse to Soul Swap Melyssa
+  // even when she's critically low and he's healthy - exactly the winning
+  // combo a human player can already pull off manually (puppet Zerathys,
+  // Soul Swap onto herself, redirect his own forced Wrath follow-up back
+  // at herself too), silently unavailable to the bot. Checked BEFORE the
+  // normal chooser so it takes priority over his own kill-securing/
+  // mutual-kill logic whenever it applies - a puppeted turn serves
+  // Melyssa's interests, not his. The automatic Wrath follow-up (see
+  // stepBotMindControlTurn in index.js) already independently excludes
+  // Melyssa's own side via chooseSoulSwapWrathTarget's excludeOwnerId
+  // param, so it needs no special handling here.
+  const melyssa = melyssaId ? game.characters[melyssaId] : null;
+  if (puppetCharacter.id === 'zerathys' && melyssa && !melyssa.isKO && usable.some((a) => a.actionId === 'soulSwap')) {
+    const canTargetMelyssa = validTargetsFor(game, puppetCharacter, 'soulSwap').includes(melyssa.id);
+    // Same "meaningfully better" margin chooseZerathysMove itself uses
+    // (>1 heart difference), just evaluated for HER pool instead of his.
+    if (canTargetMelyssa && puppetCharacter.hearts > melyssa.hearts + 1) {
+      return { kind: 'realAction', actionId: 'soulSwap', targetId: melyssa.id };
+    }
+  }
+
   const chooser = MOVE_CHOOSERS[puppetCharacter.id] || chooseFallbackMove;
   let move = chooser(puppetCharacter, game, usable);
   if (!move) move = chooseFallbackMove(puppetCharacter, game, usable);
@@ -710,7 +736,7 @@ export function chooseBotMelyssaPuppetAction(puppetCharacter, game, melyssaId) {
   // match: Melyssa at 7 hearts lost to a 1-heart Velorya because her bot
   // kept puppeting Velorya's Moonstep onto herself). Only relevant for an
   // ENEMY puppet - Self Choke isn't offered at all for an ally puppet.
-  const melyssa = melyssaId ? game.characters[melyssaId] : null;
+  // (melyssa itself is already declared above, for the Soul Swap check.)
   const isEnemyPuppet = melyssa && puppetCharacter.ownerId !== melyssa.ownerId;
   if (isEnemyPuppet) {
     const chosenTarget = move.targetId ? game.characters[move.targetId] : null;
