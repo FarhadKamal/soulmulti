@@ -98,6 +98,15 @@ export function handleLogEntryForEffects(entry, game) {
     return;
   }
 
+  // Jester Ball returning to Boingo heals him - same self-buff golden glow
+  // as Divine Restore/Glory Smash below, just triggered from its own log
+  // entry type rather than 'attack'/'special'. Only when it actually
+  // healed (not already full/KO'd), same "no misleading sparkle" guard.
+  if (entry.type === 'jester-ball-return') {
+    if (entry.healed > 0 && !entry.wasKO) addEffect(entry.boingoId, 'divine', EFFECT_DURATION_MS.divine);
+    return;
+  }
+
   // Athena's curse mirror is its own log-entry type (not 'attack'/
   // 'special') - still deserves the general hit-flash on whoever it landed
   // on, same as the main game's markHitFromResult recursing into
