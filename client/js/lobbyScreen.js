@@ -226,10 +226,6 @@ function renderEntryForm() {
   const trainingTitle = document.createElement('h2');
   trainingTitle.textContent = 'Training (vs 3 bots)';
   trainingSection.appendChild(trainingTitle);
-  const trainingHint = document.createElement('div');
-  trainingHint.className = 'name-hint';
-  trainingHint.textContent = 'Pick a character - you will face 3 real bot opponents. They will not target you until it is down to a 1v1.';
-  trainingSection.appendChild(trainingHint);
 
   const trainingGrid = document.createElement('div');
   trainingGrid.className = 'character-grid';
@@ -249,10 +245,6 @@ function renderEntryForm() {
   const botShowTitle = document.createElement('h2');
   botShowTitle.textContent = 'Watch bots play';
   botShowSection.appendChild(botShowTitle);
-  const botShowHint = document.createElement('div');
-  botShowHint.className = 'name-hint';
-  botShowHint.textContent = '4 random bots play each other, no human seat - a new match starts automatically when one ends.';
-  botShowSection.appendChild(botShowHint);
   const botShowBtn = document.createElement('button');
   botShowBtn.textContent = 'Start Watching';
   botShowBtn.onclick = () => send('create-bot-show-room', { name: currentName() });
