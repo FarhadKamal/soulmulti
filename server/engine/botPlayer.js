@@ -1,4 +1,6 @@
-import { getUsableActions, isValidTarget, isValidMindControlTarget } from './turnEngine.js';
+import {
+  getUsableActions, isValidTarget, isValidMindControlTarget, isMelyssaLoneDuel, LONE_DUEL_EXCEPTIONS,
+} from './turnEngine.js';
 
 // Pure decision logic for PC-controlled characters - no DOM, no side
 // effects. Given a character whose turn it is, returns the action+target
@@ -727,7 +729,19 @@ export function chooseBotMelyssaPuppetAction(puppetCharacter, game, melyssaId) {
     // executeSelfChoke in index.js) - safe to hardcode that amount here
     // rather than importing the ability module just to read a constant.
     const selfChokeWouldKill = puppetCharacter.hearts <= 1;
-    if (selfChokeWouldKill || hitsMelyssaSide || dealsNoDamageThisTurn) {
+    // Lone-duel stall guard (see isMelyssaLoneDuel's own comment in
+    // turnEngine.js): with only Melyssa and this one enemy left, Athena's
+    // Curse Strike is the one remaining zero-damage move that
+    // dealsNoDamageThisTurn misses above (it DOES have a target, it just
+    // never deals damage itself - see athena.js) - repeated every turn,
+    // this alone can stall the match forever. Named explicitly rather than
+    // inferred, since it's the only targeted-but-harmless action in the
+    // roster right now. Zerathys is exempted - his Soul Swap is a genuine
+    // advantage play, not a stall.
+    const isLoneDuelStall = !LONE_DUEL_EXCEPTIONS.has(puppetCharacter.id)
+      && isMelyssaLoneDuel(game, melyssaId)
+      && move.actionId === 'curseStrike';
+    if (selfChokeWouldKill || hitsMelyssaSide || dealsNoDamageThisTurn || isLoneDuelStall) {
       return { kind: 'selfChoke' };
     }
   }

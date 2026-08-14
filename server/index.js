@@ -10,6 +10,7 @@ import { createGame } from './engine/state.js';
 import {
   getUsableActions, getUsablePuppetActions, executeAction, isValidTarget, isValidMindControlTarget,
   isValidPuppetTarget, markCharacterActed, finalizeAction, executeActionAsPuppet,
+  isMelyssaLoneDuel, LONE_DUEL_EXCEPTIONS,
 } from './engine/turnEngine.js';
 import { applyDamage } from './engine/damagePipeline.js';
 import {
@@ -326,6 +327,13 @@ function mindControlOptionsFor(game, melyssaId, puppetId) {
       jbOptions.push({ actionId: '__mcJesterBallPass', label: 'Pass the Jester Ball', needsTarget: true, special: false, validTargetIds: passTargets });
     }
     return isEnemyPuppet ? [...jbOptions, selfChokeOption()] : jbOptions;
+  }
+
+  // Lone-duel restriction only applies to an ENEMY puppet (an ally puppet
+  // was never offered Self Choke at all, so there's nothing to restrict
+  // TO) and never to Zerathys (see LONE_DUEL_EXCEPTIONS above).
+  if (isEnemyPuppet && !LONE_DUEL_EXCEPTIONS.has(puppetId) && isMelyssaLoneDuel(game, melyssaId)) {
+    return [selfChokeOption()];
   }
 
   const realOptions = puppetActionsFor(game, puppetId);

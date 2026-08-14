@@ -72,6 +72,34 @@ export function isValidMindControlTarget(game, targetId) {
   return true; // deliberately no ownerId check - ally or enemy both legal
 }
 
+// True in the specific stalemate condition: exactly 2 characters left
+// alive on the whole board, one of them Melyssa, the other her enemy.
+// Curse Strike/Divine Restore (and every other character's own setup
+// moves) deal 0 damage, so a puppeted enemy stuck re-casting one of those
+// forever - while Melyssa does the same via Mind Control - can stall a
+// match indefinitely with neither side ever losing a heart. Reported
+// directly via a live scenario (Melyssa puppeting Athena into Curse
+// Strike on herself, back and forth forever). Shared by both the human
+// path (mindControlOptionsFor, index.js) and the bot AI
+// (chooseBotMelyssaPuppetAction, botPlayer.js), so neither can stall.
+export function isMelyssaLoneDuel(game, melyssaId) {
+  const living = Object.values(game.characters).filter((c) => !c.isKO);
+  return living.length === 2 && living.some((c) => c.id === melyssaId);
+}
+
+// Zerathys is the one deliberate exception to the lone-duel restriction:
+// Soul Swap is the only ability in the game that TRANSFERS hearts rather
+// than dealing damage or buffing the caster, so puppeting him is a
+// genuine, real way for Melyssa to turn a losing 1v1 around (swap her low
+// hearts for his high total, then his own forced Wrath follow-up can even
+// be aimed back at herself) - locking that out would remove a legitimate,
+// fun strategic play, not just close a stalling loophole. Every other
+// puppeted kit's self-targeted options either only ever deal damage (never
+// help Melyssa) or buff/heal the PUPPET, not her (Tharox's Glory Smash,
+// Athena's Divine Restore, Velorya's Lunar Eclipse, Boingo's Jester Ball
+// return-heal) - confirmed character-by-character before deciding this.
+export const LONE_DUEL_EXCEPTIONS = new Set(['zerathys']);
+
 // A puppeted character's REAL action, once Melyssa has taken control, is
 // allowed to hit ANY other character on the board - including the puppet's
 // own teammate - not just who the puppet would normally consider an enemy.
