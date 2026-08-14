@@ -33,6 +33,7 @@ const SOUND_EFFECT_FILES = [
   'shadowexecution.mp3', 'smash.mp3', 'soulswap.mp3',
   'sword.mp3', 'thunder.mp3', 'toss.mp3', 'victory.mp3',
   'mind_control.mp3', 'self_choke.mp3',
+  'grudge_hit.mp3', 'bird_heal.mp3',
 ];
 
 let started = false;

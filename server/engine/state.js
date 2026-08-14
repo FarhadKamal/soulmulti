@@ -26,6 +26,15 @@ function baseSpecialFor(id) {
       // finishMelyssaTurn (server/index.js) at the exact 3 points a Mind
       // Control turn is truly over.
       return { controlling: false };
+    case 'kaelis':
+      // grudgedAttackerIds: per-attacker boolean-style flag (Set), armed in
+      // damagePipeline.js's applyDamage whenever a real hit lands on her,
+      // cleared either by a landed Grudge Strike against that attacker or
+      // by that attacker reviving (see the Rebirth block in applyDamage).
+      // ashkaHealsRemaining: counts her own remaining FOLLOW-UP heal ticks
+      // from Call Ashka (not counting the cast turn's own immediate heal) -
+      // ticked down in kaelis.js's onTurnStart.
+      return { grudgedAttackerIds: new Set(), ashkaHealsRemaining: 0 };
     default:
       return {};
   }

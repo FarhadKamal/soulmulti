@@ -684,6 +684,37 @@ function chooseMelyssaMove(character, game, usable) {
   return { actionId: 'mindControl', targetId: puppetId };
 }
 
+// Any candidate target currently armed on Kaelis's own grudge list - the
+// flag lives on HER OWN character.special, not on a third character's
+// state, so this is a direct filter rather than a cross-character search
+// (unlike e.g. bladeStreakThreatAgainstMelyssa above, which has to search
+// for a THIRD character referencing melyssaId).
+function grudgedTarget(game, character, targetIds) {
+  const flagged = targetIds.filter((tid) => character.special.grudgedAttackerIds.has(tid));
+  if (flagged.length === 0) return null;
+  return biggestThreatTarget(game, character, flagged) || lowestHeartsTarget(game, flagged);
+}
+
+function chooseKaelisMove(character, game, usable) {
+  const byId = Object.fromEntries(usable.map((a) => [a.actionId, a]));
+  // Cast Call Ashka when critical, same LOW_HEARTS_THRESHOLD used elsewhere
+  // (e.g. Melyssa's own Zerathys-rescue check) - securing the heal-over-
+  // turns before it's too late outranks a normal Grudge Strike that turn.
+  if (byId.callAshka && character.hearts <= LOW_HEARTS_THRESHOLD) {
+    return { actionId: 'callAshka', targetId: null };
+  }
+  const targets = validTargetsFor(game, character, 'grudgeStrike');
+  // Cashing in a grudge (double damage) takes priority over the generic
+  // threat/lowest-hearts chain, same "specific check before generic
+  // fallback" ordering bladeStreakThreatAgainstMelyssa/
+  // zerathysSoulSwapRescueTarget already establish.
+  const targetId = grudgedTarget(game, character, targets)
+    || biggestThreatTarget(game, character, targets)
+    || lowestHeartsTarget(game, targets)
+    || pickRandom(targets);
+  return { actionId: 'grudgeStrike', targetId };
+}
+
 const MOVE_CHOOSERS = {
   tharox: chooseTharoxMove,
   zerathys: chooseZerathysMove,
@@ -694,6 +725,7 @@ const MOVE_CHOOSERS = {
   athena: chooseAthenaMove,
   boingo: chooseBoingoMove,
   melyssa: chooseMelyssaMove,
+  kaelis: chooseKaelisMove,
 };
 
 // Fallback for characters without bot logic yet: picks a random usable

@@ -577,6 +577,11 @@ function statusBadges(character) {
     case 'blade':
       if (character.special.streakCount > 0) badges.push({ text: `Streak x${character.special.streakCount}`, cls: 'warn' });
       break;
+    case 'kaelis':
+      if (character.special.ashkaHealsRemaining > 0) {
+        badges.push({ text: `Ashka heals: ${character.special.ashkaHealsRemaining}` });
+      }
+      break;
   }
   return badges;
 }
@@ -972,6 +977,7 @@ const ACTION_LABELS = {
   chaosGamble: 'Chaos Gamble', jesterBall: 'Jester Ball', bloodHunt: 'Blood Hunt',
   curseStrike: 'Curse Strike', divineRestore: 'Divine Restore',
   selfChoke: 'Self Choke',
+  grudgeStrike: 'Grudge Strike', callAshka: 'Call Ashka',
 };
 function actionLabel(actionId) {
   return ACTION_LABELS[actionId] || actionId;
@@ -994,6 +1000,8 @@ function describeLogEntry(entry) {
       return `${name(entry.characterId)} cast Curse Strike on ${name(entry.targetId)}`;
     case 'curse-mirror':
       return `Curse mirrors ${entry.amount} damage to ${name(entry.toCharacterId)}${entry.koTriggered ? ' - KO!' : ''}`;
+    case 'ashka-heal':
+      return `${name(entry.characterId)}'s Ashka heals +${entry.healed}`;
     case 'rebirth':
       return `${name(entry.targetCharacterId)} used REBIRTH - revived with 2 hearts!`;
     case 'dodge':

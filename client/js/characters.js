@@ -8,6 +8,7 @@ export const CHARACTERS = {
   blade: { id: 'blade', name: 'Blade', role: 'Blood Hunter', color: '#ef4444' },
   athena: { id: 'athena', name: 'Athena', role: 'Curse Guardian', color: '#f59e0b' },
   melyssa: { id: 'melyssa', name: 'Melyssa', role: 'Mind Controller', color: '#a855f7' },
+  kaelis: { id: 'kaelis', name: 'Kaelis', role: 'Grudge Warrior', color: '#b91c1c' },
 };
 
 export const CHARACTER_IDS = Object.keys(CHARACTERS);

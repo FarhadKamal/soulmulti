@@ -119,6 +119,8 @@ const ACTION_SOUND = {
   curseStrike: 'curse',
   divineRestore: 'divinerestore',
   selfChoke: 'self_choke',
+  grudgeStrike: 'grudge_hit',
+  callAshka: 'bird_heal',
 };
 
 export function playActionSound(actionId) {

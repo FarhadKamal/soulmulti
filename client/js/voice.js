@@ -124,6 +124,7 @@ const VOICE_LINES = {
   // matches assets/voice/akyros/ exactly as it exists on disk.
   akyros: { idle: 'idle', injured: 'injued', koed: 'koed', victory: 'victory' },
   melyssa: { idle: 'idle', injured: 'injured', koed: 'koed', victory: 'victory' },
+  kaelis: { idle: 'idle', injured: 'injured', koed: 'koed', victory: 'victory' },
 };
 
 // actionId -> filename, per character - every action here plays its line
@@ -148,6 +149,13 @@ const ACTION_VOICE_LINES = {
   // type: 'attack' with actionId: 'selfChoke', so it flows through the
   // existing generic playMoveVoice call automatically.
   melyssa: { mindControl: 'mind_control', selfChoke: 'self_choke' },
+  // grudgeStrike is a normal type: 'attack' entry - flows through the
+  // generic bottom-of-switch playMoveVoice call automatically. callAshka's
+  // "thank you, Ashka" line fires once, on the CAST itself (a normal
+  // type: 'special' entry), same generic path - no bespoke wiring needed
+  // since it's a real player-picked action, unlike Melyssa's mindControl
+  // selection above.
+  kaelis: { grudgeStrike: 'grudge_strike', callAshka: 'thank_you' },
 };
 
 export function hasVoice(characterId) {

@@ -235,6 +235,15 @@ function playLogEntrySound(entry, game) {
     playMoveVoice(entry.characterId, 'hiddenMark');
     return;
   }
+  if (entry.type === 'ashka-heal') {
+    // Kaelis's passive follow-up bird heal (Call Ashka's 2 free ticks) -
+    // not a player-picked action, so it can't flow through the generic
+    // playActionSound(entry.actionId) dispatch below (no actionId on this
+    // entry type). The CAST turn's own heal (a real 'special' entry with
+    // actionId: 'callAshka') already gets its sound via that generic path.
+    playSound('bird_heal');
+    return;
+  }
   if (entry.type !== 'attack' && entry.type !== 'special' && entry.type !== 'setup') return;
 
   // A dodged hit already got its own 'dodge' log entry (and playDodge()

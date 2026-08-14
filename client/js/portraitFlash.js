@@ -76,6 +76,7 @@ const IDLE_IMAGE = {
   chronox: 'assets/images/chronox/space.jpg',
   akyros: 'assets/images/akyros/rose.jpg',
   melyssa: 'assets/images/melyssa/chess.jpg',
+  kaelis: 'assets/images/kaelis/idle.jpg',
 };
 
 // Call once per character at the moment their own turn starts (i.e. when
@@ -189,6 +190,13 @@ export function handleLogEntryForFlash(entry, game) {
     if (!isKO(entry.characterId)) setFlash(entry.characterId, 'assets/images/athena/curse.jpg');
     return;
   }
+  if (entry.type === 'ashka-heal') {
+    // Kaelis's passive follow-up bird heal (Call Ashka's 2 free ticks) -
+    // its own dedicated type, same reasoning as hidden-mark/curse above,
+    // since it's not player-triggered and never carries an actionId.
+    if (!isKO(entry.characterId)) setFlash(entry.characterId, 'assets/images/kaelis/bird.jpg');
+    return;
+  }
 
   if (entry.type !== 'attack' && entry.type !== 'special' && entry.type !== 'setup') return;
   const { characterId, actionId, dodged, amountDealt } = entry;
@@ -230,6 +238,11 @@ export function handleLogEntryForFlash(entry, game) {
     case 'bloodHunt':
       if (!dodged && amountDealt > 0) setFlash(characterId, 'assets/images/blade/strike.jpg');
       break;
+    case 'grudgeStrike':
+      if (!dodged && amountDealt > 0) setFlash(characterId, 'assets/images/kaelis/grudge.jpg');
+      break;
+    case 'callAshka':
+      setFlash(characterId, 'assets/images/kaelis/bird.jpg'); break;
     case 'chaosGamble':
       // 'lose' always flashes the miss portrait regardless of dodged (a
       // 0-damage roll can still report dodged:true against Akyros's first

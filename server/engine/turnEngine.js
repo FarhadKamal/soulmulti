@@ -8,8 +8,9 @@ import * as boingo from '../abilities/boingo.js';
 import * as blade from '../abilities/blade.js';
 import * as athena from '../abilities/athena.js';
 import * as melyssa from '../abilities/melyssa.js';
+import * as kaelis from '../abilities/kaelis.js';
 
-const ABILITY_MODULES = { chronox, tharox, zerathys, akyros, velorya, boingo, blade, athena, melyssa };
+const ABILITY_MODULES = { chronox, tharox, zerathys, akyros, velorya, boingo, blade, athena, melyssa, kaelis };
 
 export function getAbilityModule(characterId) {
   return ABILITY_MODULES[characterId];
