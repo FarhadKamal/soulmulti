@@ -13,21 +13,19 @@ const TURN_TIMER_MS = 30_000;
 //   It's called 2v2 because each SIDE fields 2 characters, not because 2
 //   separate humans share one side.
 // - '4p'  ("4 player" FFA): 4 seats, each seat picks 1 character.
-// - 'tutorial': 1 human seat vs 1 scripted bot seat, 1 character each - see
-//   server/data/tutorialSequences.js for the scripted move sequence.
-// - 'tutorial3': 1 human seat vs 2 scripted bot seats - used only by
-//   Velorya's tutorial, which needs a genuine second enemy to demonstrate
-//   Moonstep's real "-2 for switching targets" bonus (impossible to show
-//   honestly in a strict 1v1, where only one legal target ever exists).
 // - 'bots4': 4 bot-only seats, no human seat at all - a pure "watch the
 //   bots play" spectacle room (see handleCreateBotShowRoom in index.js).
 //   Same shape as '4p' since it reuses the same engine mode/turn order.
+// - 'training4': 1 human seat + 3 real (non-scripted) bot seats, same shape
+//   as '4p'/'bots4' - see handleCreateTrainingRoom in index.js. The bots
+//   avoid targeting the human while more than 2 characters are alive (see
+//   trainingBotsMustAvoidHuman in engine/turnEngine.js); once it's down to
+//   a 1v1, full-strength bot AI takes over with no restriction.
 const ROOM_SHAPES = {
   '2p': { seatCount: 2, picksPerSeat: 2 },
   '4p': { seatCount: 4, picksPerSeat: 1 },
-  tutorial: { seatCount: 2, picksPerSeat: 1 },
-  tutorial3: { seatCount: 3, picksPerSeat: 1 },
   bots4: { seatCount: 4, picksPerSeat: 1 },
+  training4: { seatCount: 4, picksPerSeat: 1 },
 };
 
 export function roomShapeFor(roomType) {
@@ -82,7 +80,7 @@ export function createRoom(roomType) {
 
   const room = {
     code,
-    roomType, // '2p' | '4p' | 'tutorial' | 'tutorial3' | 'bots4'
+    roomType, // '2p' | '4p' | 'bots4' | 'training4'
     seats,
     ownerId: null, // set once the owner's seat claim happens - stays null for a 'bots4' room, which has no human-owned seat
     phase: 'lobby', // 'lobby' | 'in-match' | 'finished'

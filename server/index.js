@@ -22,7 +22,6 @@ import {
   createRoom, getRoom, deleteRoom, findRoomBySessionId, roomShapeFor,
   availableSeats, availableCharacterIds, seatIsReady, resetRoomToLobby, TURN_TIMER_DURATION_MS,
 } from './rooms.js';
-import { TUTORIAL_SEQUENCES, TUTORIAL_SEQUENCES_1V2, tutorialBotCharacterId } from './data/tutorialSequences.js';
 
 const PORT = process.env.PORT || 3001;
 
@@ -370,10 +369,9 @@ function executeSelfChoke(game, melyssaId, puppetId) {
   return result;
 }
 
-// Marks a Mind-Control-driven turn as truly, fully over - used at every one
-// of the exactly 3 points that's the case: handleMindControlAction's
-// no-follow-up branch, finishBotMindControlTurn (bot equivalent), and the
-// tutorial's final puppetOf-tagged step of a sequence. Replaces the bare
+// Marks a Mind-Control-driven turn as truly, fully over - used at both
+// points that's the case: handleMindControlAction's no-follow-up branch
+// and finishBotMindControlTurn (bot equivalent). Replaces the bare
 // markCharacterActed(..., melyssaId) call each of those sites would
 // otherwise need, since Melyssa's turn also needs her own
 // special.controlling flag cleared (ends the held selection portrait).
@@ -433,30 +431,16 @@ function broadcastGameState(room) {
         runBotTurnsIfAny(room);
       }, BOT_SHOW_RESTART_DELAY_MS);
     }
-  } else if (isBotControlled(room, acting) || isTutorialRoom(room)) {
+  } else if (isBotControlled(room, acting)) {
     // Bots never time out (they always act on their own within
     // BOT_ACTION_DELAY_MS, see runBotTurnsIfAny) - arming the 30s human
     // timer for them is pure waste, and with paced bot turns now spending
     // real wall-clock time "between actions", skip it rather than
-    // needlessly re-arm/clear every ~1.2s. Tutorial rooms ALSO never arm
-    // the timer even for the human's own turn - a tutorial has no failure
-    // state to auto-resolve into (there's no "wrong" auto-pick, only the
-    // one scripted next move), and a timeout converting the human's seat
-    // to 'bot' would corrupt the whole scripted sequence (the tutorial bot
-    // step data is for the OPPONENT, not the human's own character).
+    // needlessly re-arm/clear every ~1.2s.
     clearTurnTimer(room);
   } else {
     armTurnTimer(room, acting);
   }
-  // The client needs to see the FULL normal usableActions list (so it can
-  // render every button and grey out all but the one required this step),
-  // not a server-filtered single-option list - so this stays the same
-  // getUsableActions()-derived list for tutorial rooms as for every other
-  // room type. tutorialRequiredActionId/TargetId (below) is the separate
-  // field the client uses purely for its own disabling logic.
-  const tutorialStep = isTutorialRoom(room) && acting === room.tutorial?.humanCharacterId
-    ? currentTutorialStep(room)
-    : null;
   broadcastRoom(room, 'game-state', {
     game: sanitizeGameForBroadcast(room.game),
     actingCharacterId: acting,
@@ -472,8 +456,6 @@ function broadcastGameState(room) {
     // last lobby-update) is stale mid-match under normal play, so this is
     // computed fresh here rather than relying on the client's old snapshot.
     humanCount: room.seats.filter((s) => s.kind === 'human').length,
-    tutorialRequiredActionId: tutorialStep?.actionId ?? null,
-    tutorialRequiredTargetId: tutorialStep ? resolveTutorialTarget(room, tutorialStep) : null,
   });
 }
 
@@ -590,61 +572,44 @@ function stepBotTurn(room) {
     return;
   }
 
-  if (isTutorialRoom(room)) {
-    // Bypass chooseBotMove/chooseBotJesterBallMove entirely - the bot's
-    // heuristics are irrelevant here (it only ever has one legal move for
-    // its fixed character anyway), and the tutorial needs a fully
-    // deterministic, pre-scripted move+damage, not the bot's normal
-    // decision logic. The Boingo sequence's forced Jester Ball Take is
-    // handled inside executeTutorialStep itself (via the synthetic
-    // 'jesterBallTake' actionId), not here, so no isBallHolder branch is
-    // needed - the scripted step data already knows exactly what to do.
-    // `step.actor !== 'human'` (not `=== 'bot'`) so this also covers
-    // tutorial3's literal-bot-id actor values (e.g. 'boingo', 'athena').
-    const step = currentTutorialStep(room);
-    if (step && step.actor !== 'human') {
-      executeTutorialStep(room, step);
-    }
+  const character = room.game.characters[acting];
+  const isBallHolder = room.game.jesterBall && room.game.jesterBall.holderCharacterId === acting;
+  if (isBallHolder) {
+    const move = chooseBotJesterBallMove(character, room.game);
+    finishJesterBall(room.game, move.choice, move.targetId);
   } else {
-    const character = room.game.characters[acting];
-    const isBallHolder = room.game.jesterBall && room.game.jesterBall.holderCharacterId === acting;
-    if (isBallHolder) {
-      const move = chooseBotJesterBallMove(character, room.game);
-      finishJesterBall(room.game, move.choice, move.targetId);
-    } else {
-      const move = chooseBotMove(character, room.game);
-      if (move && move.actionId === 'mindControl') {
-        // Mind Control is NOT resolved inline here, unlike every other bot
-        // move - it's a multi-stage decision (puppet select -> puppet
-        // action -> possible follow-up), and a human player sees each of
-        // those stages as its own paced beat (see battleScreen.js's 5s
-        // lockout on both the target-select and puppet-action panels). A
-        // bot resolving the whole thing synchronously in one tick made
-        // Melyssa impossible to follow as a spectator/opponent - one
-        // broadcast showed the puppet selected, acted, AND any follow-up
-        // all already done. executeAction here only performs the puppet
-        // SELECTION, broadcast via the same broadcastMindControlStage shape
-        // the human path uses (so a spectator sees identical intermediate
-        // state either way); stepBotMindControlTurn (below) paces every
-        // subsequent stage the same BOT_ACTION_DELAY_MS apart, and is the
-        // one that eventually calls markCharacterActed/clears `controlling`
-        // once the whole sequence is genuinely over.
-        const result = executeAction(room.game, acting, move.actionId, move.targetId);
-        const puppetId = result.puppetCharacterId;
-        const puppetOptions = mindControlOptionsFor(room.game, acting, puppetId);
-        broadcastMindControlStage(room, acting, puppetId, puppetOptions);
-        setTimeout(() => stepBotMindControlTurn(room, acting, puppetId), BOT_ACTION_DELAY_MS);
-        return;
-      }
-      if (move) {
-        executeAction(room.game, acting, move.actionId, move.targetId);
-        if (move.actionId === 'soulSwap') {
-          const wrathTarget = chooseSoulSwapWrathTarget(character, room.game);
-          if (wrathTarget) executeAction(room.game, acting, 'soulSwapWrath', wrathTarget);
-        }
-      }
-      markCharacterActed(room.game, acting);
+    const move = chooseBotMove(character, room.game);
+    if (move && move.actionId === 'mindControl') {
+      // Mind Control is NOT resolved inline here, unlike every other bot
+      // move - it's a multi-stage decision (puppet select -> puppet
+      // action -> possible follow-up), and a human player sees each of
+      // those stages as its own paced beat (see battleScreen.js's 5s
+      // lockout on both the target-select and puppet-action panels). A
+      // bot resolving the whole thing synchronously in one tick made
+      // Melyssa impossible to follow as a spectator/opponent - one
+      // broadcast showed the puppet selected, acted, AND any follow-up
+      // all already done. executeAction here only performs the puppet
+      // SELECTION, broadcast via the same broadcastMindControlStage shape
+      // the human path uses (so a spectator sees identical intermediate
+      // state either way); stepBotMindControlTurn (below) paces every
+      // subsequent stage the same BOT_ACTION_DELAY_MS apart, and is the
+      // one that eventually calls markCharacterActed/clears `controlling`
+      // once the whole sequence is genuinely over.
+      const result = executeAction(room.game, acting, move.actionId, move.targetId);
+      const puppetId = result.puppetCharacterId;
+      const puppetOptions = mindControlOptionsFor(room.game, acting, puppetId);
+      broadcastMindControlStage(room, acting, puppetId, puppetOptions);
+      setTimeout(() => stepBotMindControlTurn(room, acting, puppetId), BOT_ACTION_DELAY_MS);
+      return;
     }
+    if (move) {
+      executeAction(room.game, acting, move.actionId, move.targetId);
+      if (move.actionId === 'soulSwap') {
+        const wrathTarget = chooseSoulSwapWrathTarget(character, room.game);
+        if (wrathTarget) executeAction(room.game, acting, 'soulSwapWrath', wrathTarget);
+      }
+    }
+    markCharacterActed(room.game, acting);
   }
 
   // Broadcast this single bot action right away, then pause before the
@@ -753,100 +718,6 @@ function finishBotMindControlTurn(room, melyssaId) {
   runBotTurnsIfAny(room);
 }
 
-// ---- Tutorial mode: a scripted human-vs-bot(s) sequence (see
-// server/data/tutorialSequences.js) where the bot's moves AND their
-// damage, and the human's own next-allowed move, are both fully
-// predetermined rather than driven by chooseBotMove/normal legality
-// alone. room.tutorial lives alongside room.game (not part of the engine's
-// own game object) and is the single source of truth for "what happens
-// next" - stepIndex walks through the interleaved human+bot step list in
-// order. Two room types: 'tutorial' (strict 1v1, every character except
-// Velorya) and 'tutorial3' (1v2, Velorya only - needs a genuine second
-// enemy to demonstrate Moonstep's real target-switch bonus). ----
-function isTutorialRoom(room) {
-  return room.roomType === 'tutorial' || room.roomType === 'tutorial3';
-}
-
-// A step's `actor` field is either 'human', the legacy 1v1 sentinel 'bot'
-// (resolves to the single room.tutorial.botCharacterId, for every existing
-// strict-1v1 tutorial's sequence data - left unchanged rather than mass-
-// edited to literal ids), or - for a multi-bot room like Velorya's 1v2 -
-// a LITERAL bot character id (e.g. 'boingo', 'athena'), which is already
-// exactly the character id and needs no lookup at all.
-function resolveTutorialActor(room, step) {
-  if (step.actor === 'human') return room.tutorial.humanCharacterId;
-  if (step.actor === 'bot') return room.tutorial.botCharacterId;
-  return step.actor;
-}
-
-// `targetId: 'opponent'` resolves to "the one enemy" - only valid in a
-// strict 1v1 room (every tutorial except Velorya's 1v2). Multi-bot
-// sequences must always use a literal target id instead (never 'opponent',
-// which would be ambiguous with 2 possible enemies) - already true of
-// every step in the velorya1v2 sequence.
-function resolveTutorialTarget(room, step) {
-  if (step.targetId !== 'opponent') return step.targetId;
-  const actingCharacterId = resolveTutorialActor(room, step);
-  return actingCharacterId === room.tutorial.humanCharacterId ? room.tutorial.botCharacterId : room.tutorial.humanCharacterId;
-}
-
-function currentTutorialStep(room) {
-  return room.tutorial.sequence[room.tutorial.stepIndex] ?? null;
-}
-
-// Executes the CURRENT scripted step for whichever side (human or bot) it
-// belongs to, then advances stepIndex. Called from handleAction/
-// handleSoulSwapWrath (human steps, after their own gate confirms the
-// incoming action matches) and from stepBotTurn's tutorial branch (bot
-// steps). Centralizing the actual execution here (rather than duplicating
-// it at each call site) keeps the forced-amount/ignoresShield wiring and
-// the stepIndex advancement in one place.
-function executeTutorialStep(room, step) {
-  const targetId = resolveTutorialTarget(room, step);
-  const extra = step.forcedAmount != null ? { forcedAmount: step.forcedAmount, ignoresShield: step.ignoresShield } : undefined;
-  const actingCharacterId = resolveTutorialActor(room, step);
-
-  if (step.actionId === 'jesterBallTake') {
-    // Synthetic marker (see tutorialSequences.js) - routed to
-    // finishJesterBall directly rather than executeAction/the ability map,
-    // matching how Take is actually resolved for a real Jester Ball holder.
-    finishJesterBall(room.game, 'take', extra);
-  } else if (step.actionId === '__mcSelfChoke') {
-    // Self Choke is Melyssa's own move against her puppet, never a real
-    // ability-module action (see the live '__mcSelfChoke' handling in
-    // handleMindControlAction) - executeActionAsPuppet/executeAction would
-    // look it up in ABILITY_MODULES[puppetOf].actions and find nothing.
-    // step.puppetOf here is the VICTIM (the puppet being choked), not an
-    // actor whose kit is being borrowed - actingCharacterId is Melyssa's own.
-    executeSelfChoke(room.game, actingCharacterId, step.puppetOf);
-    finishMelyssaTurn(room.game, actingCharacterId);
-  } else if (step.puppetOf) {
-    // Mind Control stage-2+: actingCharacterId is Melyssa's own id (the
-    // seat that must click/be driven), but the actual executeAction
-    // identity is the PUPPET (step.puppetOf, a literal characterId
-    // hardcoded in the step data itself - every tutorial step is already a
-    // fully pre-determined literal, same as every other step's targetId).
-    executeActionAsPuppet(room.game, actingCharacterId, step.puppetOf, step.actionId, targetId, extra);
-    if (step.actionId !== 'soulSwap') {
-      finishMelyssaTurn(room.game, actingCharacterId);
-    }
-  } else {
-    executeAction(room.game, actingCharacterId, step.actionId, targetId, extra);
-    // Soul Swap and mindControl both don't mark the character acted yet -
-    // same as the real (non-tutorial) handlers, they still owe a follow-up
-    // step (soulSwapWrath, or the puppet's own action/__mcSelfChoke) before
-    // the turn is actually over. Every other plain step marks acted
-    // normally. Missing the mindControl case here was a real bug: without
-    // it, settleToNextDecision advanced straight past Melyssa to the next
-    // character's real turn the instant she PICKED a puppet, before the
-    // puppet's own action step could ever be submitted/accepted.
-    if (step.actionId !== 'soulSwap' && step.actionId !== 'mindControl') {
-      markCharacterActed(room.game, actingCharacterId);
-    }
-  }
-  room.tutorial.stepIndex += 1;
-}
-
 // ---- Room/lobby message handlers ----
 function sanitizeName(name) {
   return typeof name === 'string' ? name.trim().slice(0, 20) : '';
@@ -887,180 +758,6 @@ function handleJoinRoom(ws, sessionId, { code, name }) {
   broadcastLobby(room);
 }
 
-// One-click tutorial room: unlike a normal room, this skips the whole
-// pick-character -> fill-bot -> start-match lobby flow entirely - the
-// human's one character pick arrives in this same message, the opponent(s)
-// are derived automatically, and the match starts immediately. Velorya is
-// the one special case - she needs a genuine second enemy (a 'tutorial3'
-// room, 1v2) to demonstrate Moonstep's real target-switch bonus, which is
-// structurally impossible to show honestly in a strict 1v1. Every other
-// character uses the normal 1v1 'tutorial' room.
-function handleCreateTutorialRoom(ws, sessionId, { name, characterId }) {
-  const cleanName = sanitizeName(name);
-  if (!cleanName) return send(ws, 'error', { message: 'A name is required.' });
-  if (!CHARACTER_IDS.includes(characterId)) return send(ws, 'error', { message: 'Invalid character.' });
-
-  if (characterId === 'velorya') return createVeloryaTutorialRoom(ws, sessionId, cleanName);
-  if (characterId === 'melyssa') return createMelyssaTutorialRoom(ws, sessionId, cleanName);
-  if (!TUTORIAL_SEQUENCES[characterId]) return send(ws, 'error', { message: 'Tutorial not available for this character yet.' });
-
-  const room = createRoom('tutorial');
-  const humanSeat = room.seats[0];
-  humanSeat.kind = 'human';
-  humanSeat.playerId = sessionId;
-  humanSeat.spectatorId = sessionId;
-  humanSeat.name = cleanName;
-  humanSeat.characterIds = [characterId];
-  room.ownerId = sessionId;
-
-  const botCharacterId = tutorialBotCharacterId(characterId);
-  const botSeat = room.seats[1];
-  fillSeatWithTutorialBot(botSeat, botCharacterId);
-
-  room.tutorial = {
-    humanCharacterId: characterId,
-    botCharacterId,
-    sequence: TUTORIAL_SEQUENCES[characterId],
-    stepIndex: 0,
-  };
-
-  const playerPicks = room.seats.map((s) => ({
-    id: s.playerId || `bot-${s.index}`,
-    name: s.name,
-    characterIds: s.characterIds,
-    isPC: s.kind === 'bot',
-  }));
-  room.game = createGame('tutorial', playerPicks);
-  if (characterId === 'blade') {
-    // Athena needs slightly MORE than her normal 7 hearts here (not less) -
-    // Blade's Rebirth and Athena's own KO are driven by the exact same
-    // cumulative mirror-damage sequence once her curse is live (a 1:1
-    // mirror of whatever she takes), so with both starting at 7 they always
-    // hit 0 on the identical hit - Rebirth would fire in the SAME instant
-    // the match ends, giving the player no beat to actually see it before
-    // the win screen takes over. Bumping her to 8 makes Rebirth land one
-    // hit early (turn 4, Blade 4->0->revived to 2, Athena left at 1) with
-    // the kill happening on a separate later hit (turn 5, post-rebirth
-    // streak reset to a safe 1 damage) - two distinct beats instead of one.
-    // Hand-verified: this is the smallest change that decouples them while
-    // keeping Blade safely above 0 on the finishing hit (revived to 2,
-    // streak resets to 0 after Rebirth so the next hit is only 1 damage).
-    room.game.characters.athena.hearts = 8;
-    room.game.characters.athena.maxHearts = 8;
-  }
-  room.phase = 'in-match';
-  send(ws, 'room-created', { code: room.code });
-  broadcastLobby(room);
-  // Human always goes first in a tutorial (see tutorialSequences.js) - no
-  // runBotTurnsIfAny() kickoff needed here, unlike a normal match's
-  // handleStartMatch, which may need the bot to move first.
-  broadcastGameState(room);
-}
-
-// Velorya's 1v2 tutorial: seat 0 = human, seat 1 = Boingo (bot), seat 2 =
-// Athena (bot, custom 2 max hearts - deliberately fragile, per design).
-// Turn order is fixed by seat index (Velorya -> Boingo -> Athena -> repeat,
-// confirmed generic in the engine), so no special turn-order logic is
-// needed beyond creating the seats in the right order.
-function createVeloryaTutorialRoom(ws, sessionId, cleanName) {
-  const room = createRoom('tutorial3');
-  const humanSeat = room.seats[0];
-  humanSeat.kind = 'human';
-  humanSeat.playerId = sessionId;
-  humanSeat.spectatorId = sessionId;
-  humanSeat.name = cleanName;
-  humanSeat.characterIds = ['velorya'];
-  room.ownerId = sessionId;
-
-  fillSeatWithTutorialBot(room.seats[1], 'boingo');
-  fillSeatWithTutorialBot(room.seats[2], 'athena');
-
-  room.tutorial = {
-    humanCharacterId: 'velorya',
-    sequence: TUTORIAL_SEQUENCES_1V2.velorya,
-    stepIndex: 0,
-  };
-
-  const playerPicks = room.seats.map((s) => ({
-    id: s.playerId || `bot-${s.index}`,
-    name: s.name,
-    characterIds: s.characterIds,
-    isPC: s.kind === 'bot',
-  }));
-  room.game = createGame('tutorial3', playerPicks);
-  // Boingo/Athena custom hearts overrides for this tutorial only - applied
-  // directly on the created character rather than threading a per-seat
-  // hearts override through createCharacter/createGame's general-purpose
-  // signature, which every other room type also calls. Deliberately
-  // fragile (2 and 3, Athena capped at 3 max too) so the whole match
-  // resolves in 4 turns - see TUTORIAL_SEQUENCES_1V2.velorya's own comment.
-  room.game.characters.boingo.hearts = 2;
-  room.game.characters.athena.hearts = 3;
-  room.game.characters.athena.maxHearts = 3;
-  room.phase = 'in-match';
-  send(ws, 'room-created', { code: room.code });
-  broadcastLobby(room);
-  broadcastGameState(room);
-}
-
-// Melyssa's 1v2 tutorial: seat 0 = human, seat 1 = Velorya (bot), seat 2 =
-// Tharox (bot), both custom 3 max hearts - deliberately fragile, same
-// "keep the scripted sequence a reasonable length" reasoning as Athena's
-// 2-heart override above. Same structural need as Velorya's own tutorial:
-// Mind Control (puppeting ANY other character, ally or enemy, into their
-// real kit) is impossible to demonstrate honestly ("puppet an enemy into
-// attacking the OTHER enemy") with only one enemy on the board. Turn order
-// fixed by seat index (Melyssa -> Velorya -> Tharox -> repeat) - Velorya
-// MUST act right before Tharox each round for the shield lesson to land
-// honestly (see the long comment on TUTORIAL_SEQUENCES_1V2.melyssa for why
-// the reverse order doesn't work).
-function createMelyssaTutorialRoom(ws, sessionId, cleanName) {
-  const room = createRoom('tutorial3');
-  const humanSeat = room.seats[0];
-  humanSeat.kind = 'human';
-  humanSeat.playerId = sessionId;
-  humanSeat.spectatorId = sessionId;
-  humanSeat.name = cleanName;
-  humanSeat.characterIds = ['melyssa'];
-  room.ownerId = sessionId;
-
-  fillSeatWithTutorialBot(room.seats[1], 'velorya');
-  fillSeatWithTutorialBot(room.seats[2], 'tharox');
-
-  room.tutorial = {
-    humanCharacterId: 'melyssa',
-    sequence: TUTORIAL_SEQUENCES_1V2.melyssa,
-    stepIndex: 0,
-  };
-
-  const playerPicks = room.seats.map((s) => ({
-    id: s.playerId || `bot-${s.index}`,
-    name: s.name,
-    characterIds: s.characterIds,
-    isPC: s.kind === 'bot',
-  }));
-  room.game = createGame('tutorial3', playerPicks);
-  room.game.characters.velorya.hearts = 3;
-  room.game.characters.velorya.maxHearts = 3;
-  // 2, not 1 - a flat 1 would die to the very first puppeted Lunar Strike
-  // (T1 of the sequence below), before the later charge/Titan Smash beat
-  // ever gets a chance to happen.
-  room.game.characters.tharox.hearts = 2;
-  room.game.characters.tharox.maxHearts = 2;
-  room.phase = 'in-match';
-  send(ws, 'room-created', { code: room.code });
-  broadcastLobby(room);
-  broadcastGameState(room);
-}
-
-// Parallel to fillSeatWithBot, but deterministic - a tutorial's opponent is
-// always exactly one fixed character, never randomly drawn from the pool.
-function fillSeatWithTutorialBot(seat, characterId) {
-  seat.kind = 'bot';
-  seat.name = 'Bot';
-  seat.characterIds = [characterId];
-}
-
 // Delay before a 'bots4' room's next match auto-starts after the previous
 // one ends - long enough for a viewer to actually register the win screen
 // (matches BOT_ACTION_DELAY_MS's own "give a human a beat to read this"
@@ -1087,6 +784,49 @@ function handleCreateBotShowRoom(ws, sessionId, { name }) {
   send(ws, 'room-created', { code: room.code });
   broadcastLobby(room);
   broadcastGameState(room);
+  runBotTurnsIfAny(room);
+}
+
+// training4: human picks ONE character, dropped into a 4-player FFA with 3
+// REAL bot-controlled characters (chooseBotMove etc. - not scripted), each
+// randomly assigned exactly like bots4's fillSeatWithBot. The only behavior
+// difference from a normal 4p/bots4 match is enforced entirely inside
+// turnEngine.js's isValidTarget/isValidMindControlTarget/isValidPuppetTarget
+// (bots avoid the human's character above 2-alive) - this function itself
+// is otherwise a plain room+match bootstrap, no scripting of any kind. This
+// replaces the old per-character scripted tutorial system: a single generic
+// flow that works for every character, including future ones, with zero new
+// content required per character.
+function handleCreateTrainingRoom(ws, sessionId, { name, characterId }) {
+  const cleanName = sanitizeName(name);
+  if (!cleanName) return send(ws, 'error', { message: 'A name is required.' });
+  if (!CHARACTER_IDS.includes(characterId)) return send(ws, 'error', { message: 'Invalid character.' });
+
+  const room = createRoom('training4');
+  const humanSeat = room.seats[0];
+  humanSeat.kind = 'human';
+  humanSeat.playerId = sessionId;
+  humanSeat.spectatorId = sessionId;
+  humanSeat.name = cleanName;
+  humanSeat.characterIds = [characterId];
+  room.ownerId = sessionId;
+
+  for (let i = 1; i < room.seats.length; i++) fillSeatWithBot(room, room.seats[i]);
+
+  const playerPicks = room.seats.map((s) => ({
+    id: s.playerId || `bot-${s.index}`,
+    name: s.name,
+    characterIds: s.characterIds,
+    isPC: s.kind === 'bot',
+  }));
+  room.game = createGame('training4', playerPicks);
+  room.phase = 'in-match';
+  send(ws, 'room-created', { code: room.code });
+  broadcastLobby(room);
+  broadcastGameState(room);
+  // Safety/consistency with bots4's own creation flow - human is always
+  // seat 0 so this is a no-op in practice today, but keeps the two flows
+  // structurally identical in case seat order ever changes.
   runBotTurnsIfAny(room);
 }
 
@@ -1370,15 +1110,17 @@ function leaveRoom(sessionId, ws) {
   // "Exit Room" click always goes straight to permanent (no grace period -
   // that's reserved for genuine disconnects, see ws.on('close')); a real
   // disconnect reaching here means the seat had no reconnectToken to begin
-  // with (e.g. a tutorial room) since a reconnectable seat's close handler
-  // diverts to the grace period instead of ever calling leaveRoom directly.
+  // with (e.g. a training4 room, seated directly rather than via
+  // handleCreateRoom/handleJoinRoom) since a reconnectable seat's close
+  // handler diverts to the grace period instead of ever calling leaveRoom
+  // directly.
   permanentlyConvertSeatToBot(room, seat, room.ownerId === sessionId);
 }
 
 // Starts a 60s grace period for a seat whose connection just genuinely
 // dropped mid-match (heartbeat-detected dead socket, or a real close event) -
 // called only for seats that have a reconnectToken (i.e. claimed via
-// handleCreateRoom/handleJoinRoom, never a tutorial seat) and only while
+// handleCreateRoom/handleJoinRoom, never a training4 seat) and only while
 // room.phase === 'in-match'. The seat plays as a bot for the duration
 // (identical visible behavior to a permanent takeover - no separate
 // "temporarily disconnected" UI state), but keeps spectatorId/reconnectToken
@@ -1476,53 +1218,6 @@ function handleAction(room, sessionId, { characterId, actionId, targetId }) {
       : isValidTarget(room.game, characterId, actionId, targetId);
     if (!validNow) return;
   }
-  // Tutorial rooms only ever accept the one scripted next step - this runs
-  // IN ADDITION TO the normal legality checks above (never instead of
-  // them), as a consistency safeguard: every scripted step was designed to
-  // also be a genuinely legal move, so both checks passing is expected,
-  // not redundant.
-  if (isTutorialRoom(room)) {
-    const step = currentTutorialStep(room);
-    if (!step || step.actor !== 'human' || step.actionId !== actionId) return;
-    if (resolveTutorialTarget(room, step) !== (targetId ?? null)) return;
-    executeTutorialStep(room, step);
-    if (actionId === 'soulSwap') {
-      const nextStep = currentTutorialStep(room);
-      broadcastRoom(room, 'game-state', {
-        game: sanitizeGameForBroadcast(room.game),
-        actingCharacterId: characterId,
-        awaitingSoulSwapWrath: true,
-        usableActions: [{ actionId: 'soulSwapWrath', label: 'Thunder Wrath (free, from Soul Swap)', needsTarget: true, validTargetIds: [resolveTutorialTarget(room, nextStep)] }],
-        tutorialRequiredActionId: nextStep?.actionId ?? null,
-        tutorialRequiredTargetId: nextStep ? resolveTutorialTarget(room, nextStep) : null,
-      });
-      return;
-    }
-    if (actionId === 'mindControl') {
-      const nextStep = currentTutorialStep(room);
-      const puppetId = nextStep?.puppetOf;
-      const puppetOptions = puppetId ? mindControlOptionsFor(room.game, characterId, puppetId) : [];
-      // Without this, handleMindControlAction's own room.melyssaControl
-      // check (its very first gate, before any tutorial-specific logic)
-      // rejects the follow-up submission unconditionally - the tutorial's
-      // stage-2 step would never be reachable at all.
-      room.melyssaControl = { melyssaCharacterId: characterId, puppetCharacterId: puppetId };
-      broadcastRoom(room, 'game-state', {
-        game: sanitizeGameForBroadcast(room.game),
-        actingCharacterId: characterId,
-        awaitingMindControlAction: true,
-        mindControlPuppetId: puppetId,
-        usableActions: puppetOptions,
-        tutorialRequiredActionId: nextStep?.actionId ?? null,
-        tutorialRequiredTargetId: nextStep ? resolveTutorialTarget(room, nextStep) : null,
-      });
-      return;
-    }
-    broadcastGameState(room);
-    runBotTurnsIfAny(room);
-    return;
-  }
-
   if (actionId === 'mindControl') {
     const result = executeAction(room.game, characterId, actionId, targetId);
     const puppetId = result.puppetCharacterId;
@@ -1569,19 +1264,6 @@ function handleSoulSwapWrath(room, sessionId, { characterId, targetId }) {
   const seat = seatForCharacter(room, characterId);
   if (!seat || seat.playerId !== sessionId) return;
   if (!isValidTarget(room.game, characterId, 'soulSwapWrath', targetId)) return;
-  // Zerathys's tutorial sequence has a scripted soulSwapWrath step - this
-  // handler is a completely separate function from handleAction (a human's
-  // Soul Swap doesn't auto-fire its own follow-up, unlike a bot's), so it
-  // needs its own tutorial gate too, not just handleAction's.
-  if (isTutorialRoom(room)) {
-    const step = currentTutorialStep(room);
-    if (!step || step.actor !== 'human' || step.actionId !== 'soulSwapWrath') return;
-    if (resolveTutorialTarget(room, step) !== targetId) return;
-    executeTutorialStep(room, step);
-    broadcastGameState(room);
-    runBotTurnsIfAny(room);
-    return;
-  }
   executeAction(room.game, characterId, 'soulSwapWrath', targetId);
   markCharacterActed(room.game, characterId);
   broadcastGameState(room);
@@ -1603,24 +1285,6 @@ function handleMindControlAction(room, sessionId, { characterId, puppetId, actio
   if (acting !== characterId) return;
   const control = room.melyssaControl;
   if (!control || control.melyssaCharacterId !== characterId || control.puppetCharacterId !== puppetId) return;
-
-  // Tutorial rooms only ever accept the one scripted next step - same
-  // defense-in-depth principle as handleAction/handleSoulSwapWrath's own
-  // tutorial gates (the client UI already fully locks this via
-  // tutorialRequiredActionId, so an honest client can never reach here with
-  // a mismatched actionId/targetId, but the server shouldn't rely on that
-  // alone). step.puppetOf must match the puppet actually being driven -
-  // every Mind Control tutorial step is puppetOf-tagged from stage 2
-  // onward (see tutorialSequences.js).
-  if (isTutorialRoom(room)) {
-    const step = currentTutorialStep(room);
-    if (!step || step.actor !== 'human' || step.actionId !== actionId || step.puppetOf !== puppetId) return;
-    if (step.actionId !== '__mcSelfChoke' && resolveTutorialTarget(room, step) !== (targetId ?? null)) return;
-    executeTutorialStep(room, step);
-    broadcastGameState(room);
-    runBotTurnsIfAny(room);
-    return;
-  }
 
   // soulSwapWrath needs its OWN branch here rather than falling through to
   // mindControlOptionsFor below: that function calls usableActionsFor ->
@@ -1791,8 +1455,8 @@ wss.on('connection', (ws) => {
     const { type, ...payload } = msg;
 
     if (type === 'create-room') return handleCreateRoom(ws, sessionId, payload);
-    if (type === 'create-tutorial-room') return handleCreateTutorialRoom(ws, sessionId, payload);
     if (type === 'create-bot-show-room') return handleCreateBotShowRoom(ws, sessionId, payload);
+    if (type === 'create-training-room') return handleCreateTrainingRoom(ws, sessionId, payload);
     if (type === 'join-room') return handleJoinRoom(ws, sessionId, payload);
     if (type === 'reconnect') return handleReconnect(ws, sessionId, payload);
     if (type === 'leave-room') return leaveRoom(sessionId, ws);
@@ -1823,9 +1487,9 @@ wss.on('connection', (ws) => {
     sessions.delete(sessionId);
     // A genuine disconnect mid-match, for a seat that CAN be reconnected to
     // (has a reconnectToken - i.e. claimed via handleCreateRoom/
-    // handleJoinRoom, not a tutorial seat), gets a 60s grace period instead
+    // handleJoinRoom, not a training4 seat), gets a 60s grace period instead
     // of leaveRoom's usual immediate-and-permanent bot conversion - see
-    // startDisconnectGracePeriod. Every other close (lobby-phase, tutorial
+    // startDisconnectGracePeriod. Every other close (lobby-phase, training4
     // rooms, or a seat with no token for some other reason) falls through to
     // the existing leaveRoom behavior unchanged.
     const room = findRoomBySessionId(sessionId);

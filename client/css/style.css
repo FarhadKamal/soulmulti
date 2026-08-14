@@ -72,7 +72,7 @@ input {
 .room-type-row { display: flex; gap: 10px; margin-top: 10px; }
 .room-type-row button { flex: 1; }
 .join-section { display: flex; flex-direction: column; gap: 10px; }
-.tutorial-section { display: flex; flex-direction: column; gap: 10px; }
+.training-section { display: flex; flex-direction: column; gap: 10px; }
 .code-input { text-align: center; letter-spacing: 4px; font-size: 1.2em; }
 
 .room-code-row { display: flex; align-items: center; justify-content: center; gap: 12px; margin: 10px 0 20px; }
@@ -175,18 +175,6 @@ input {
 }
 .char-tile--ko { opacity: 0.4; }
 .char-tile--targetable { cursor: pointer; box-shadow: 0 0 0 3px #ff5e5e; }
-/* Marks the tutorial's scripted target this turn - needed once more than
-   one legal target can exist (Velorya's 1v2 fight), so the player has a
-   clear cue which tile to click rather than guessing between two
-   otherwise-identical-looking clickable enemies. */
-.char-tile--tutorial-target {
-  box-shadow: 0 0 0 3px #ffd75e, 0 0 16px 4px #ffd75e99;
-  animation: tutorial-target-pulse 1.2s ease-in-out infinite;
-}
-@keyframes tutorial-target-pulse {
-  0%, 100% { box-shadow: 0 0 0 3px #ffd75e, 0 0 16px 4px #ffd75e99; }
-  50% { box-shadow: 0 0 0 4px #ffd75e, 0 0 24px 8px #ffd75ecc; }
-}
 .char-portrait {
   width: 100%; aspect-ratio: 1 / 1; object-fit: cover; border-radius: 6px;
   margin-bottom: 6px; display: block; background: #0d0d14;

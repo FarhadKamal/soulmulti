@@ -93,13 +93,6 @@ export function activePlayer(game) {
   return game.players.find((p) => p.id === game.turnOrder[game.activePlayerIndex]);
 }
 
-// True for both tutorial room types ('tutorial' 1v1, 'tutorial3' Velorya's
-// 1v2) - abilities use this to gate forced/deterministic damage that must
-// never apply during a real match.
-export function isTutorialMode(game) {
-  return game.mode === 'tutorial' || game.mode === 'tutorial3';
-}
-
 export function ownerOf(game, characterId) {
   const char = game.characters[characterId];
   return game.players.find((p) => p.id === char.ownerId);

@@ -5,7 +5,6 @@ import { playUiClick } from './sound.js';
 import { getFlashSrc, getPersistentPortrait } from './portraitFlash.js';
 import { getActiveEffects, getClawCount } from './actionEffects.js';
 import { renderFullscreenButton } from './fullscreen.js';
-import { tutorialNarrationFor } from './tutorialNarration.js';
 import { v, hardRefresh } from './assetVersion.js';
 
 // Whether the log/chat drawer is open - module state (not part of `state`
@@ -147,32 +146,16 @@ export function renderBattle(root, state) {
   const cursedId = athena ? athena.special.curseTargetCharacterId : null;
   const chronox = Object.values(game.characters).find((c) => c.id === 'chronox');
   const frozenId = chronox && chronox.special.freezeActive ? chronox.special.freezeTargetId : null;
-  // In a tutorial, a tile that's a normally-legal target for the armed
-  // action but ISN'T the scripted next target (e.g. Velorya's 1v2 fight,
-  // where Lunar Strike can legally hit either Boingo or Athena, but only
-  // one of them is the actual scripted move) must not be clickable at all
-  // - the server silently rejects a mismatched target with no error/
-  // rebroadcast (see handleAction's tutorial gate in index.js), and the
-  // client had already optimistically cleared armedAction on click, so the
-  // player was left stuck on a stale panel with no feedback until they hit
-  // Cancel. Restricting clickability client-side to the exact scripted
-  // target prevents ever sending that dead-end request in the first place.
-  const tutorialTargetLock = state.tutorialRequiredActionId ? state.tutorialRequiredTargetId : null;
   const puppetHighlightId = state.awaitingMindControlAction ? state.mindControlPuppetId : null;
   Object.values(game.characters).forEach((character) => {
     board.appendChild(renderCharacterTile(character, {
       isActing: character.id === actingCharacterId,
       isMine: mySeatCharacterIds.includes(character.id),
-      isTargetable: !!armedAction && armedAction.validTargetIds.includes(character.id)
-        && (tutorialTargetLock === null || character.id === tutorialTargetLock),
+      isTargetable: !!armedAction && armedAction.validTargetIds.includes(character.id),
       onTargetClick: () => onTargetPicked(character.id, state),
       isHoldingBall: character.id === ballHolderId,
       isCursed: character.id === cursedId,
       isFrozenVisual: character.id === frozenId,
-      // Only meaningful once >1 legal target can exist (Velorya's 1v2
-      // tutorial) - every other tutorial has exactly one enemy, so this is
-      // never ambiguous there, but still harmless to set generally.
-      isTutorialRequiredTarget: !!state.tutorialRequiredActionId && character.id === state.tutorialRequiredTargetId,
       isPuppet: character.id === puppetHighlightId,
     }));
   });
@@ -423,7 +406,7 @@ function renderVictoryPortraits(game) {
   return container;
 }
 
-function renderCharacterTile(character, { isActing, isMine, isTargetable, onTargetClick, isHoldingBall, isCursed, isFrozenVisual, isVictorious, isTutorialRequiredTarget, isPuppet }) {
+function renderCharacterTile(character, { isActing, isMine, isTargetable, onTargetClick, isHoldingBall, isCursed, isFrozenVisual, isVictorious, isPuppet }) {
   const def = CHARACTERS[character.id];
   const tile = document.createElement('div');
   tile.className = 'char-tile';
@@ -440,13 +423,6 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
   // separate floating portrait below the board, so it reads as "this
   // character's card is celebrating" instead of a disconnected duplicate.
   if (isVictorious) tile.classList.add('char-tile--victorious');
-  // Marks which enemy tile is the tutorial's scripted target this turn -
-  // without this, a tutorial with more than one legal target (Velorya's
-  // 1v2 fight) would leave the player guessing which tile to click, since
-  // both are otherwise equally "clickable" once the required action is
-  // armed. Every other tutorial has exactly one enemy, where this is
-  // harmless/redundant with isTargetable but never actively needed.
-  if (isTutorialRequiredTarget && !character.isKO) tile.classList.add('char-tile--tutorial-target');
   if (isTargetable) {
     tile.classList.add('char-tile--targetable');
     tile.onclick = onTargetClick;
@@ -610,10 +586,10 @@ function statusBadges(character) {
 // BOT_ACTION_DELAY_MS in index.js, kept equal to this) - purely a pacing
 // choice so a turn always has a beat of "look at the board" before either
 // side can act, not an anti-cheat measure. Deliberately does NOT apply to
-// Cancel, target-picking once an action is armed, or a tutorial's single
-// required button - those already have their own distinct flow and this
-// would just add friction without the "look before you act" purpose it
-// serves on the very first decision of a turn.
+// Cancel or target-picking once an action is armed - those already have
+// their own distinct flow and this would just add friction without the
+// "look before you act" purpose it serves on the very first decision of a
+// turn.
 const ACTION_LOCKOUT_MS = 5000;
 // Mirrors server/rooms.js's TURN_TIMER_MS - the server only ever sends the
 // absolute deadline (state.turnDeadline), not the total duration it was
@@ -645,19 +621,13 @@ function renderActionPanel(characterId, usableActions, armedAction, state) {
 
   const title = document.createElement('div');
   title.className = 'action-panel-title';
-  if (state.tutorialRequiredActionId) {
-    title.textContent = tutorialNarrationFor(characterId, state.tutorialRequiredActionId, state.tutorialRequiredTargetId, state.game?.characters[characterId]);
-  } else {
-    title.textContent = state.awaitingSoulSwapWrath ? 'Soul Swap landed - choose your free Thunder Wrath target' : 'Your turn - choose an action';
-  }
+  title.textContent = state.awaitingSoulSwapWrath ? 'Soul Swap landed - choose your free Thunder Wrath target' : 'Your turn - choose an action';
   panel.appendChild(title);
 
-  // Skipped entirely in a tutorial (its own single-required-button lock
-  // already governs clickability - see isTutorialLocked below) and for the
-  // Soul Swap free follow-up (awaitingSoulSwapWrath - that's a forced,
-  // already-in-motion continuation of the turn, not a fresh decision that
-  // needs its own "look before you act" beat).
-  const lockoutUntil = (!state.tutorialRequiredActionId && !state.awaitingSoulSwapWrath && state.turnDeadline)
+  // Skipped for the Soul Swap free follow-up (awaitingSoulSwapWrath -
+  // that's a forced, already-in-motion continuation of the turn, not a
+  // fresh decision that needs its own "look before you act" beat).
+  const lockoutUntil = (!state.awaitingSoulSwapWrath && state.turnDeadline)
     ? state.turnDeadline - TURN_TIMER_MS + ACTION_LOCKOUT_MS
     : 0;
   const lockoutActive = lockoutUntil > Date.now();
@@ -673,15 +643,10 @@ function renderActionPanel(characterId, usableActions, armedAction, state) {
     // character has one (Blade has just his one repeatable Blood Hunt), so
     // this is a no-op for those.
     if (action.special) btn.classList.add('special-action-btn');
-    // In a tutorial, every button still renders (so the player can see
-    // their full real kit), but only the one scripted next move is
-    // actually clickable - mirrors the disabled-button precedent already
-    // used for lobbyScreen.js's character-pick grid.
-    const isTutorialLocked = state.tutorialRequiredActionId && action.actionId !== state.tutorialRequiredActionId;
-    btn.disabled = !!isTutorialLocked || lockoutActive;
-    if (!isTutorialLocked) lockableButtons.push(btn);
+    btn.disabled = lockoutActive;
+    lockableButtons.push(btn);
     btn.onclick = () => {
-      if (isTutorialLocked || btn.disabled) return;
+      if (btn.disabled) return;
       playUiClick();
       if (!action.needsTarget) {
         submitAction(characterId, action, null, state);
@@ -766,9 +731,7 @@ function renderMindControlActionPanel(game, melyssaId, state) {
   const puppet = game.characters[state.mindControlPuppetId];
   const title = document.createElement('div');
   title.className = 'action-panel-title';
-  title.textContent = state.tutorialRequiredActionId
-    ? tutorialNarrationFor(melyssaId, state.tutorialRequiredActionId, state.tutorialRequiredTargetId, state.game?.characters[melyssaId])
-    : `Mind Control: choose ${puppet ? CHARACTERS[puppet.id].name : 'their'}'s action`;
+  title.textContent = `Mind Control: choose ${puppet ? CHARACTERS[puppet.id].name : 'their'}'s action`;
   panel.appendChild(title);
 
   if (state.armedAction) {
@@ -792,11 +755,8 @@ function renderMindControlActionPanel(game, melyssaId, state) {
   // both call armTurnTimer fresh right before broadcasting THIS stage, so
   // turnDeadline here is a genuinely fresh 30s window for this decision,
   // not a leftover from an earlier stage - the same formula correctly
-  // yields "5s from when this stage started" either way. Skipped for a
-  // forced soulSwapWrath follow-up (armedAction already handles that via
-  // its own no-Cancel branch above) and in a tutorial, exactly like
-  // renderActionPanel.
-  const lockoutUntil = (!state.tutorialRequiredActionId && state.turnDeadline)
+  // yields "5s from when this stage started" either way.
+  const lockoutUntil = state.turnDeadline
     ? state.turnDeadline - TURN_TIMER_MS + ACTION_LOCKOUT_MS
     : 0;
   const lockoutActive = lockoutUntil > Date.now();
@@ -815,11 +775,10 @@ function renderMindControlActionPanel(game, melyssaId, state) {
       // option buttons instead of wrapping onto its own oversized line.
       btn.title = '1 flat damage to the puppet, ignores shield';
     }
-    const isTutorialLocked = state.tutorialRequiredActionId && action.actionId !== state.tutorialRequiredActionId;
-    btn.disabled = !!isTutorialLocked || lockoutActive;
-    if (!isTutorialLocked) lockableButtons.push(btn);
+    btn.disabled = lockoutActive;
+    lockableButtons.push(btn);
     btn.onclick = () => {
-      if (isTutorialLocked || btn.disabled) return;
+      if (btn.disabled) return;
       playUiClick();
       if (!action.needsTarget) {
         submitMindControlAction(melyssaId, state.mindControlPuppetId, action, null, state);
@@ -1072,31 +1031,22 @@ function renderGameOver(game, youAreOwner) {
   const btnRow = document.createElement('div');
   btnRow.className = 'game-over-actions';
 
-  // A tutorial room has no lobby/re-pick flow to return to (see
-  // handleCreateTutorialRoom - it skips straight from creation to
-  // in-match) - "Play Again" doesn't apply, only Exit below does. Picking
-  // a fresh (or the same) character from the entry screen is how you
-  // replay a tutorial. Two room modes count as "tutorial" here: 'tutorial'
-  // (every 1v1 character) and 'tutorial3' (Velorya's 1v2 fight against
-  // Boingo and Athena - same one-shot, no-lobby-to-return-to shape).
-  if (game.mode !== 'tutorial' && game.mode !== 'tutorial3') {
-    if (youAreOwner) {
-      const homeBtn = document.createElement('button');
-      homeBtn.className = 'game-over-pill';
-      homeBtn.innerHTML = '<span>🔁</span> Play Again';
-      homeBtn.title = 'Play Again (same room)';
-      // Returns everyone in this room to the SAME room's lobby (same code) so
-      // the group can pick again and play another match without re-sharing a
-      // code - a plain page reload would instead drop the WebSocket entirely
-      // and start a brand new, unrelated session.
-      homeBtn.onclick = () => send('return-to-lobby');
-      btnRow.appendChild(homeBtn);
-    } else {
-      const waiting = document.createElement('div');
-      waiting.className = 'waiting-note';
-      waiting.textContent = 'Waiting for the room owner to return to the lobby...';
-      btnRow.appendChild(waiting);
-    }
+  if (youAreOwner) {
+    const homeBtn = document.createElement('button');
+    homeBtn.className = 'game-over-pill';
+    homeBtn.innerHTML = '<span>🔁</span> Play Again';
+    homeBtn.title = 'Play Again (same room)';
+    // Returns everyone in this room to the SAME room's lobby (same code) so
+    // the group can pick again and play another match without re-sharing a
+    // code - a plain page reload would instead drop the WebSocket entirely
+    // and start a brand new, unrelated session.
+    homeBtn.onclick = () => send('return-to-lobby');
+    btnRow.appendChild(homeBtn);
+  } else {
+    const waiting = document.createElement('div');
+    waiting.className = 'waiting-note';
+    waiting.textContent = 'Waiting for the room owner to return to the lobby...';
+    btnRow.appendChild(waiting);
   }
 
   // Available to anyone regardless of ownership - a full exit back to the

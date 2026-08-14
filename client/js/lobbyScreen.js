@@ -83,7 +83,7 @@ export function renderLobby(root, { room, error, connectionLost }, { onEnterMatc
   // grids and chat panel) lives inside its own scroll region, not the page
   // itself - the title/top-controls above stay a fixed header, matching
   // battleScreen.js's .battle-scroll shell. Without this, the entry form's
-  // 3 stacked sections (create/join/tutorial, the tutorial one alone has an
+  // stacked sections (create/join/training, the training one alone has an
   // 8-button character grid) routinely ran taller than a phone screen.
   const scroll = document.createElement('div');
   scroll.className = 'lobby-scroll';
@@ -170,13 +170,13 @@ function renderEntryForm() {
     return nameInput.value.trim();
   }
 
-  const tutorialButtons = [];
+  const nameRequiredButtons = [];
   function updateNameValidity() {
     const hasName = currentName().length > 0;
     nameInput.classList.toggle('input--invalid', !hasName);
     nameHint.style.display = hasName ? 'none' : 'block';
     if (hasName) sessionStorage.setItem('soulclash-name', currentName());
-    [btn4p, btn2p, joinBtn, ...tutorialButtons].forEach((btn) => { btn.disabled = !hasName; });
+    [btn4p, btn2p, joinBtn, ...nameRequiredButtons].forEach((btn) => { btn.disabled = !hasName; });
   }
   nameInput.addEventListener('input', updateNameValidity);
 
@@ -221,28 +221,28 @@ function renderEntryForm() {
   joinSection.appendChild(joinBtn);
   form.appendChild(joinSection);
 
-  const tutorialSection = document.createElement('div');
-  tutorialSection.className = 'tutorial-section';
-  const tutorialTitle = document.createElement('h2');
-  tutorialTitle.textContent = 'Learn to play (Tutorial)';
-  tutorialSection.appendChild(tutorialTitle);
-  const tutorialHint = document.createElement('div');
-  tutorialHint.className = 'name-hint';
-  tutorialHint.textContent = 'Pick a character - a guided 1v1 walks you through their moves.';
-  tutorialSection.appendChild(tutorialHint);
+  const trainingSection = document.createElement('div');
+  trainingSection.className = 'training-section';
+  const trainingTitle = document.createElement('h2');
+  trainingTitle.textContent = 'Training (vs 3 bots)';
+  trainingSection.appendChild(trainingTitle);
+  const trainingHint = document.createElement('div');
+  trainingHint.className = 'name-hint';
+  trainingHint.textContent = 'Pick a character - you will face 3 real bot opponents. They will not target you until it is down to a 1v1.';
+  trainingSection.appendChild(trainingHint);
 
-  const tutorialGrid = document.createElement('div');
-  tutorialGrid.className = 'character-grid';
+  const trainingGrid = document.createElement('div');
+  trainingGrid.className = 'character-grid';
   Object.values(CHARACTERS).forEach((def) => {
     const btn = document.createElement('button');
     btn.textContent = def.name;
     btn.style.borderColor = def.color;
-    btn.onclick = () => send('create-tutorial-room', { name: currentName(), characterId: def.id });
-    tutorialButtons.push(btn);
-    tutorialGrid.appendChild(btn);
+    btn.onclick = () => send('create-training-room', { name: currentName(), characterId: def.id });
+    nameRequiredButtons.push(btn); // reuses the same name-required disable wiring
+    trainingGrid.appendChild(btn);
   });
-  tutorialSection.appendChild(tutorialGrid);
-  form.appendChild(tutorialSection);
+  trainingSection.appendChild(trainingGrid);
+  form.appendChild(trainingSection);
 
   const botShowSection = document.createElement('div');
   botShowSection.className = 'bot-show-section';
@@ -256,7 +256,7 @@ function renderEntryForm() {
   const botShowBtn = document.createElement('button');
   botShowBtn.textContent = 'Start Watching';
   botShowBtn.onclick = () => send('create-bot-show-room', { name: currentName() });
-  tutorialButtons.push(botShowBtn); // reuses the same name-required disable wiring as the tutorial grid
+  nameRequiredButtons.push(botShowBtn); // reuses the same name-required disable wiring as the training grid
   botShowSection.appendChild(botShowBtn);
   form.appendChild(botShowSection);
 
