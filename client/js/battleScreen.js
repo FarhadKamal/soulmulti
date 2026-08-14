@@ -97,10 +97,22 @@ export function renderBattle(root, state) {
   // owner, but checking youAreOwner directly is more explicit/robust than
   // relying on that inference).
   const canExitGame = state.humanCount !== null && state.humanCount <= 1 && state.room?.youAreOwner;
+  // A 'bots4' spectator never owns a seat (room.ownerId stays null - see
+  // rooms.js's spectatorIds) so canExitGame above can never be true here,
+  // and "abandon match, return to lobby" makes no sense anyway (there's no
+  // lobby to return to, no seats to re-pick). Requested directly after a
+  // live report: no way to leave a bot-vs-bot spectacle mid-match except
+  // closing the tab. A plain full exit (leave-room, same as the game-over
+  // screen's own "Exit to Main Menu" button) is the right equivalent -
+  // tears the room down immediately (see leaveRoom's own spectatorIds
+  // branch, index.js) since there's nothing left to watch once the one
+  // viewer leaves.
+  const isBotShowSpectator = state.room?.roomType === 'bots4';
 
   const topControls = document.createElement('div');
   topControls.className = 'top-right-controls';
   if (canExitGame) topControls.appendChild(renderExitIconButton(state));
+  if (isBotShowSpectator) topControls.appendChild(renderBotShowExitButton());
   topControls.appendChild(renderHardRefreshIconButton());
   topControls.appendChild(renderFullscreenButton());
   wrap.appendChild(topControls);
@@ -247,6 +259,21 @@ function renderExitIconButton(state) {
   // scraps the in-progress match so you can pick fresh characters and
   // start again, staying in the same room.
   btn.onclick = () => { playUiClick(); state.confirmingExit = true; state.rerender(); };
+  return btn;
+}
+
+// A 'bots4' spectator's own exit - no confirmation needed (unlike
+// renderExitIconButton's abandon-match flow above): there's no in-progress
+// decision or teammates to leave hanging, just a bot-vs-bot spectacle with
+// one viewer. Sends leave-room directly, same as the game-over screen's
+// own "Exit to Main Menu" button - main.js's 'left-room' handler resets
+// straight back to the entry screen.
+function renderBotShowExitButton() {
+  const btn = document.createElement('button');
+  btn.className = 'exit-icon-btn';
+  btn.title = 'Stop watching';
+  btn.textContent = '🚪';
+  btn.onclick = () => { playUiClick(); send('leave-room'); };
   return btn;
 }
 
