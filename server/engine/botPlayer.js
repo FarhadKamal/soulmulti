@@ -609,6 +609,30 @@ function chooseBoingoMove(character, game, usable) {
 // AFTER this returns, by chooseBotMelyssaPuppetAction below (called from
 // server/index.js's stepBotTurn, mirroring how Soul Swap's own follow-up
 // target is chosen in a second step after the initial move).
+// Streak count at/above which an enemy Blade's live streak against Melyssa
+// is treated as an urgent, forward-looking threat - his NEXT bloodHunt hit
+// (if left alone) deals exactly this much damage and would only grow further.
+// This deliberately outranks biggestThreatTarget's backward-looking damage
+// tally, since a streak of 2+ is a known, escalating future hit, not just a
+// historical one.
+const BLADE_STREAK_DANGER_THRESHOLD = 2;
+
+// A live enemy Blade with a dangerous streak specifically against Melyssa -
+// puppeting him to redirect bloodHunt at a different target resets his
+// streak (see server/abilities/blade.js), defusing the escalating threat
+// before it lands. Returns Blade's characterId, or null if no such threat
+// exists among the given candidate pool.
+function bladeStreakThreatAgainstMelyssa(game, melyssaId, candidateIds) {
+  for (const tid of candidateIds) {
+    const c = game.characters[tid];
+    if (c.id === 'blade' && !c.isKO && c.special.streakTargetId === melyssaId
+      && c.special.streakCount >= BLADE_STREAK_DANGER_THRESHOLD) {
+      return tid;
+    }
+  }
+  return null;
+}
+
 function chooseMelyssaMove(character, game, usable) {
   const candidates = Object.keys(game.characters).filter((tid) => isValidMindControlTarget(game, tid));
   if (candidates.length === 0) return null; // defensive; shouldn't happen if usable is nonempty
@@ -621,7 +645,11 @@ function chooseMelyssaMove(character, game, usable) {
   const enemyIds = candidates.filter((tid) => game.characters[tid].ownerId !== character.ownerId);
   const allyIds = candidates.filter((tid) => game.characters[tid].ownerId === character.ownerId);
   const pool = enemyIds.length > 0 ? enemyIds : allyIds;
-  const puppetId = biggestThreatTarget(game, character, pool) || lowestHeartsTarget(game, pool) || pickRandom(pool);
+  const bladeThreatId = bladeStreakThreatAgainstMelyssa(game, character.id, pool);
+  const puppetId = bladeThreatId
+    || biggestThreatTarget(game, character, pool)
+    || lowestHeartsTarget(game, pool)
+    || pickRandom(pool);
   return { actionId: 'mindControl', targetId: puppetId };
 }
 
@@ -714,6 +742,30 @@ export function chooseBotMelyssaPuppetAction(puppetCharacter, game, melyssaId) {
     // (>1 heart difference), just evaluated for HER pool instead of his.
     if (canTargetMelyssa && puppetCharacter.hearts > melyssa.hearts + 1) {
       return { kind: 'realAction', actionId: 'soulSwap', targetId: melyssa.id };
+    }
+  }
+
+  // Puppeted Blade needs his OWN dedicated target decision too, for the
+  // exact same reason as Zerathys above: chooseBladeMove (see its own
+  // comments) deliberately STAYS on an existing streak target whenever
+  // it's still valid - correct for his own real turn, but backwards here.
+  // The entire point of bot-Melyssa choosing to puppet a Blade who has a
+  // dangerous streak against her (see bladeStreakThreatAgainstMelyssa in
+  // chooseMelyssaMove) is to break that streak by redirecting his attack
+  // elsewhere - left unchecked, the normal chooser would just re-lock onto
+  // her again, wasting the puppeted turn and leaving the threat intact.
+  if (puppetCharacter.id === 'blade' && melyssa && puppetCharacter.special.streakTargetId === melyssa.id
+    && puppetCharacter.special.streakCount >= 1 && usable.some((a) => a.actionId === 'bloodHunt')) {
+    const targets = validTargetsFor(game, puppetCharacter, 'bloodHunt').filter((tid) => tid !== melyssa.id);
+    if (targets.length > 0) {
+      // Redirecting resets his streak to 1 against whoever is picked (see
+      // bloodHunt's execute in blade.js) - any legal target off Melyssa's
+      // side defuses the threat, so just take the best remaining target by
+      // the same priority pickDefaultTarget itself uses (focus fire >
+      // biggest recent threat > lowest hearts), restricted to this pool.
+      const redirectTarget = focusFireTarget(game, targets) || biggestThreatTarget(game, puppetCharacter, targets)
+        || lowestHeartsTarget(game, targets) || pickRandom(targets);
+      return { kind: 'realAction', actionId: 'bloodHunt', targetId: redirectTarget };
     }
   }
 
