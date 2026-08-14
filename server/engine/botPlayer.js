@@ -1,5 +1,5 @@
 import {
-  getUsableActions, isValidTarget, isValidMindControlTarget, isMelyssaLoneDuel, LONE_DUEL_EXCEPTIONS,
+  getUsableActions, isValidTarget, isValidPuppetTarget, isValidMindControlTarget, isMelyssaLoneDuel, LONE_DUEL_EXCEPTIONS,
 } from './turnEngine.js';
 
 // Pure decision logic for PC-controlled characters - no DOM, no side
@@ -633,9 +633,40 @@ function bladeStreakThreatAgainstMelyssa(game, melyssaId, candidateIds) {
   return null;
 }
 
+// True when Melyssa is critical AND a puppeted Zerathys's Soul Swap would
+// be a genuine, meaningful rescue - same "worth it" margin already used
+// once he's puppeted (see chooseBotMelyssaPuppetAction's own soulSwap
+// check below), just evaluated here BEFORE puppet selection so bot-Melyssa
+// actually seeks him out instead of only stumbling onto him via
+// biggestThreatTarget/lowestHeartsTarget. Reported directly: a bot
+// Melyssa at critical health was seen puppeting other characters instead,
+// missing an available Zerathys steal. Checked regardless of ally/enemy -
+// Soul Swap helps her either way, unlike every other puppeted kit's value
+// which is enemy-targeting-only (that's why this can't just reuse `pool`,
+// which narrows to enemies-only whenever any enemy is alive). Requires
+// Soul Swap to actually still be usable (his special isn't a repeatable
+// move - !usedSpecial) and Melyssa to be a legal PUPPET target for it
+// right now (isValidPuppetTarget, not the enemy-only isValidTarget - a
+// puppeted Zerathys is allowed to Soul Swap his own ally, same as any
+// other puppeted action, per puppetActionsFor's own ally-allowed rule),
+// otherwise puppeting him would be a wasted turn.
+function zerathysSoulSwapRescueTarget(game, melyssaCharacter, candidateIds) {
+  if (melyssaCharacter.hearts > LOW_HEARTS_THRESHOLD) return null;
+  for (const tid of candidateIds) {
+    const c = game.characters[tid];
+    if (c.id === 'zerathys' && !c.isKO && !c.usedSpecial && c.hearts > melyssaCharacter.hearts + 1
+      && isValidPuppetTarget(game, tid, 'soulSwap', melyssaCharacter.id)) {
+      return tid;
+    }
+  }
+  return null;
+}
+
 function chooseMelyssaMove(character, game, usable) {
   const candidates = Object.keys(game.characters).filter((tid) => isValidMindControlTarget(game, tid));
   if (candidates.length === 0) return null; // defensive; shouldn't happen if usable is nonempty
+  const rescueId = zerathysSoulSwapRescueTarget(game, character, candidates);
+  if (rescueId) return { actionId: 'mindControl', targetId: rescueId };
   // Prefer puppeting an ENEMY (offensive value) over an ally, falling back
   // to an ally only when no enemy candidate exists - puppeting most kits in
   // this roster is inherently offensive regardless of who "holds" it (e.g.
@@ -736,8 +767,15 @@ export function chooseBotMelyssaPuppetAction(puppetCharacter, game, melyssaId) {
   // Melyssa's own side via chooseSoulSwapWrathTarget's excludeOwnerId
   // param, so it needs no special handling here.
   const melyssa = melyssaId ? game.characters[melyssaId] : null;
-  if (puppetCharacter.id === 'zerathys' && melyssa && !melyssa.isKO && usable.some((a) => a.actionId === 'soulSwap')) {
-    const canTargetMelyssa = validTargetsFor(game, puppetCharacter, 'soulSwap').includes(melyssa.id);
+  if (puppetCharacter.id === 'zerathys' && melyssa && !melyssa.isKO && !puppetCharacter.usedSpecial) {
+    // isValidPuppetTarget (ally-allowed), not validTargetsFor/isValidTarget
+    // (enemy-only) - a puppeted Zerathys is allowed to Soul Swap his own
+    // ally, same as puppetActionsFor's own ally-allowed rule for every
+    // other puppeted action (e.g. puppeted Blade attacking his own
+    // teammate). Using the enemy-only check here meant this whole rescue
+    // combo silently never fired whenever Zerathys happened to be on
+    // Melyssa's own side that match.
+    const canTargetMelyssa = isValidPuppetTarget(game, puppetCharacter.id, 'soulSwap', melyssa.id);
     // Same "meaningfully better" margin chooseZerathysMove itself uses
     // (>1 heart difference), just evaluated for HER pool instead of his.
     if (canTargetMelyssa && puppetCharacter.hearts > melyssa.hearts + 1) {
