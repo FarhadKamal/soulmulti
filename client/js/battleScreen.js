@@ -492,6 +492,13 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
     portrait.src = persistentSrc;
   } else if (character.isKO) {
     portrait.src = v(`assets/koed/${character.id}.jpg`);
+    // Her koed art's subject (face) sits right-of-center in the wide
+    // source image - the shared .char-portrait crop (object-position:
+    // 50% center via object-fit: cover) cuts her face off entirely,
+    // showing only her torso/arm. Nudge the crop right for her specific
+    // koed image only, rather than changing the shared rule every other
+    // character's koed art already looks correct under.
+    if (character.id === 'kaelis') portrait.classList.add('char-portrait--kaelis-koed');
   } else if (character.hearts <= character.maxHearts / 2) {
     portrait.src = v(`assets/injured/${character.id}.jpg`);
   } else {

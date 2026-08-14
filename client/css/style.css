@@ -179,6 +179,10 @@ input {
   width: 100%; aspect-ratio: 1 / 1; object-fit: cover; border-radius: 6px;
   margin-bottom: 6px; display: block; background: #0d0d14;
 }
+/* Kaelis's koed art has her face right-of-center in the wide source image -
+   the default 50% center crop cuts her face off, showing only her fallen
+   torso/arm. Shift the crop right so her face is actually visible. */
+.char-portrait--kaelis-koed { object-position: 70% center; }
 .char-name { font-weight: 700; }
 .char-hearts { font-size: 0.9em; display: flex; flex-wrap: wrap; gap: 2px; }
 .heart-icon { font-size: 1.1em; line-height: 1; }
