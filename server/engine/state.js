@@ -29,11 +29,12 @@ function baseSpecialFor(id) {
     case 'kaelis':
       // grudgeCounts: per-attacker hit counter (Map<characterId, number>),
       // incremented in damagePipeline.js's applyDamage every time that
-      // attacker lands a real hit on her. A landed Grudge Strike against a
-      // grudged attacker deals damage equal to their CURRENT count, then
-      // resets that specific attacker's count back to 0 (their next hit
-      // starts the count over from 1) - see kaelis.js. Also reset to 0 if
-      // that attacker revives (see the Rebirth block in applyDamage).
+      // attacker lands a real hit on her. A landed Grudge Strike against
+      // ANY target deals the base 1 damage PLUS their current count (e.g.
+      // 1 stored hit -> 2 damage total), then resets that specific
+      // attacker's count back to 0 regardless (their next hit starts the
+      // count over from 1) - see kaelis.js. Also reset to 0 if that
+      // attacker revives (see the Rebirth block in applyDamage).
       // ashkaHealsRemaining: counts her own remaining FOLLOW-UP heal ticks
       // from Call Ashka (not counting the cast turn's own immediate heal) -
       // ticked down in kaelis.js's onTurnStart.

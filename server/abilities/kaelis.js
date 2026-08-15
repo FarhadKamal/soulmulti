@@ -22,22 +22,23 @@ export const actions = {
     isLegal: () => true,
     execute(character, targetId, game, log) {
       // A per-attacker hit COUNTER, not a boolean flag - each real hit that
-      // attacker landed on her (see damagePipeline.js's applyDamage) adds 1.
-      // Landing a Grudge Strike against a grudged target deals damage equal
-      // to their current count (e.g. 5 accumulated hits -> 5 damage here),
-      // then resets THAT attacker's count back to 0 - every other
-      // attacker's count stays independently intact. No count (0/absent)
-      // means a plain 1 damage hit, same as before.
+      // attacker landed on her (see damagePipeline.js's applyDamage) adds 1
+      // to THEIR OWN count, independent of every other attacker's. Damage
+      // here is always the base 1 PLUS that attacker's stored count (e.g.
+      // 1 stored hit -> 1+1=2 damage; 0 stored hits -> just the base 1) -
+      // the base damage is never replaced, only topped up. Landing a
+      // Grudge Strike against ANY target always resets THAT target's count
+      // back to 0 afterward (even if it was already 0) - every other
+      // attacker's count stays untouched.
       const grudgeCount = character.special.grudgeCounts.get(targetId) || 0;
-      const wasGrudged = grudgeCount > 0;
-      if (wasGrudged) character.special.grudgeCounts.set(targetId, 0);
-      const amount = wasGrudged ? grudgeCount : 1;
+      const amount = 1 + grudgeCount;
+      character.special.grudgeCounts.set(targetId, 0);
       const result = applyDamage(game, log, {
         sourceCharacterId: character.id,
         targetCharacterId: targetId,
         amount,
       });
-      log.push({ type: 'attack', characterId: character.id, actionId: 'grudgeStrike', targetId, wasGrudged, grudgeCount, ...result });
+      log.push({ type: 'attack', characterId: character.id, actionId: 'grudgeStrike', targetId, wasGrudged: grudgeCount > 0, grudgeCount, ...result });
       return result;
     },
   },
