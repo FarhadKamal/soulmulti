@@ -519,6 +519,7 @@ input {
    shell (see .lobby/.battle above) has the best shot at fitting everything
    important above the drawer without its own internal scroll kicking in. */
 @media (max-width: 480px) {
+  .battle { padding-left: 8px; padding-right: 8px; }
   .board { grid-template-columns: 1fr 1fr; gap: 6px; }
   .char-tile { padding: 6px; }
   button { padding: 10px 14px; }
