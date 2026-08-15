@@ -151,10 +151,10 @@ input {
 .turn-timer--urgent { background: #5c1a1a; color: #ffb3b3; }
 .board {
   display: grid; grid-template-columns: repeat(2, 1fr);
-  gap: 10px; margin-bottom: 16px;
+  gap: 8px; margin-bottom: 10px;
 }
 .char-tile {
-  border: 2px solid #444; border-radius: 10px; padding: 10px; background: #1c1c2c;
+  border: 2px solid #444; border-radius: 10px; padding: 8px; background: #1c1c2c;
   position: relative;
 }
 /* Acting must read as unmistakably distinct from a character's own border
@@ -194,11 +194,12 @@ input {
      can get before it's scaled DOWN to fit (letterboxed, never cropped) -
      without this, a 2x2 board of full-width uncropped images can run
      taller than many laptop-height viewports, pushing the action panel
-     below .battle-scroll's visible area. 22vh keeps 2 stacked rows well
-     within a typical desktop/laptop window; the mobile media query below
-     tightens this further for phone screens. */
-  width: 100%; max-height: 22vh; object-fit: contain; border-radius: 6px;
-  margin-bottom: 6px; display: block; background: #0d0d14;
+     below .battle-scroll's visible area. 16vh keeps 2 stacked rows (32vh
+     total) comfortably within a typical desktop/laptop window even with
+     the header/turn-timer/action-panel chrome around it; the mobile media
+     query below tightens this further for phone screens. */
+  width: 100%; max-height: 16vh; object-fit: contain; border-radius: 6px;
+  margin-bottom: 4px; display: block; background: #0d0d14;
 }
 .char-name { font-weight: 700; }
 .char-hearts { font-size: 0.9em; display: flex; flex-wrap: wrap; gap: 2px; }
