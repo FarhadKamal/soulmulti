@@ -21,22 +21,23 @@ export const actions = {
     needsTarget: true,
     isLegal: () => true,
     execute(character, targetId, game, log) {
-      // A per-attacker boolean-style flag (Set), not a stacking counter -
-      // being hit multiple times by the same attacker before she retaliates
-      // just keeps them "armed," never escalates the revenge damage.
-      // Armed in damagePipeline.js's applyDamage whenever a real hit lands
-      // on her; cleared here, and ONLY here, the moment she lands a Grudge
-      // Strike against that specific attacker - every other attacker's flag
-      // stays independently armed.
-      const wasGrudged = character.special.grudgedAttackerIds.has(targetId);
-      if (wasGrudged) character.special.grudgedAttackerIds.delete(targetId);
-      const amount = wasGrudged ? 2 : 1;
+      // A per-attacker hit COUNTER, not a boolean flag - each real hit that
+      // attacker landed on her (see damagePipeline.js's applyDamage) adds 1.
+      // Landing a Grudge Strike against a grudged target deals damage equal
+      // to their current count (e.g. 5 accumulated hits -> 5 damage here),
+      // then resets THAT attacker's count back to 0 - every other
+      // attacker's count stays independently intact. No count (0/absent)
+      // means a plain 1 damage hit, same as before.
+      const grudgeCount = character.special.grudgeCounts.get(targetId) || 0;
+      const wasGrudged = grudgeCount > 0;
+      if (wasGrudged) character.special.grudgeCounts.set(targetId, 0);
+      const amount = wasGrudged ? grudgeCount : 1;
       const result = applyDamage(game, log, {
         sourceCharacterId: character.id,
         targetCharacterId: targetId,
         amount,
       });
-      log.push({ type: 'attack', characterId: character.id, actionId: 'grudgeStrike', targetId, wasGrudged, ...result });
+      log.push({ type: 'attack', characterId: character.id, actionId: 'grudgeStrike', targetId, wasGrudged, grudgeCount, ...result });
       return result;
     },
   },

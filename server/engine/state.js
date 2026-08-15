@@ -27,14 +27,17 @@ function baseSpecialFor(id) {
       // Control turn is truly over.
       return { controlling: false };
     case 'kaelis':
-      // grudgedAttackerIds: per-attacker boolean-style flag (Set), armed in
-      // damagePipeline.js's applyDamage whenever a real hit lands on her,
-      // cleared either by a landed Grudge Strike against that attacker or
-      // by that attacker reviving (see the Rebirth block in applyDamage).
+      // grudgeCounts: per-attacker hit counter (Map<characterId, number>),
+      // incremented in damagePipeline.js's applyDamage every time that
+      // attacker lands a real hit on her. A landed Grudge Strike against a
+      // grudged attacker deals damage equal to their CURRENT count, then
+      // resets that specific attacker's count back to 0 (their next hit
+      // starts the count over from 1) - see kaelis.js. Also reset to 0 if
+      // that attacker revives (see the Rebirth block in applyDamage).
       // ashkaHealsRemaining: counts her own remaining FOLLOW-UP heal ticks
       // from Call Ashka (not counting the cast turn's own immediate heal) -
       // ticked down in kaelis.js's onTurnStart.
-      return { grudgedAttackerIds: new Set(), ashkaHealsRemaining: 0 };
+      return { grudgeCounts: new Map(), ashkaHealsRemaining: 0 };
     default:
       return {};
   }

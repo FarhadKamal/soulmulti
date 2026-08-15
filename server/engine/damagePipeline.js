@@ -93,13 +93,15 @@ export function applyDamage(game, log, {
       akyros.special.marks.delete(target.id);
       akyros.special.revealedMarks.delete(target.id);
     }
-    // Kaelis's grudge against the reviving character doesn't carry over -
-    // he/she comes back "fresh," same reasoning as the Akyros mark/Chronox
-    // freeze/Athena curse cleanup above. Looked up generically (not assumed
-    // to be Blade specifically) so this also covers any future revive-
-    // capable character without needing changes here.
+    // Kaelis's grudge COUNT against the reviving character doesn't carry
+    // over - he/she comes back "fresh," same reasoning as the Akyros
+    // mark/Chronox freeze/Athena curse cleanup above. Deleting the map key
+    // is equivalent to resetting the count to 0 (grudgeCounts.get() falls
+    // back to 0 for an absent key). Looked up generically (not assumed to
+    // be Blade specifically) so this also covers any future revive-capable
+    // character without needing changes here.
     const kaelis = Object.values(game.characters).find((c) => c.id === 'kaelis');
-    if (kaelis) kaelis.special.grudgedAttackerIds.delete(target.id);
+    if (kaelis) kaelis.special.grudgeCounts.delete(target.id);
     // Deferred (not pushed to `log` here) and returned on the result so
     // executeAction() can push it AFTER the triggering attack's own log
     // entry - otherwise it lands BEFORE that entry in the log, since this
@@ -147,16 +149,18 @@ export function applyDamage(game, log, {
     target.shieldDecaying = true;
   }
 
-  // Kaelis's grudge: whenever a REAL (non-mirrored) hit lands on her, the
-  // attacker is armed on her grudge list - a per-attacker boolean-style
-  // flag (Set), not a stacking counter. Cleared (removed) only when SHE
-  // later lands a Grudge Strike against that same attacker (see
-  // kaelis.js), or when that attacker revives (see the Rebirth block
-  // above). Gated identically to Athena's own curse-trigger check just
-  // below (!isMirror && result.amountDealt > 0) - a fully shield-absorbed
-  // or mirrored hit does not count as "attacking her" for this purpose.
+  // Kaelis's grudge: whenever a REAL (non-mirrored) hit lands on her, that
+  // attacker's per-attacker hit COUNT increments by 1 - a stacking counter,
+  // not a boolean flag, so 5 hits before she retaliates means her next
+  // Grudge Strike against that attacker deals 5 damage (see kaelis.js).
+  // Reset to 0 only when SHE later lands a Grudge Strike against that same
+  // attacker, or when that attacker revives (see the Rebirth block above).
+  // Gated identically to Athena's own curse-trigger check just below
+  // (!isMirror && result.amountDealt > 0) - a fully shield-absorbed or
+  // mirrored hit does not count as "attacking her" for this purpose.
   if (target.id === 'kaelis' && !isMirror && result.amountDealt > 0 && sourceCharacterId !== 'kaelis') {
-    target.special.grudgedAttackerIds.add(sourceCharacterId);
+    const counts = target.special.grudgeCounts;
+    counts.set(sourceCharacterId, (counts.get(sourceCharacterId) || 0) + 1);
   }
 
   // Athena curse mirror: triggered by damage actually landing on Athena.

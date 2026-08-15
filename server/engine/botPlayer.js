@@ -684,15 +684,20 @@ function chooseMelyssaMove(character, game, usable) {
   return { actionId: 'mindControl', targetId: puppetId };
 }
 
-// Any candidate target currently armed on Kaelis's own grudge list - the
-// flag lives on HER OWN character.special, not on a third character's
-// state, so this is a direct filter rather than a cross-character search
-// (unlike e.g. bladeStreakThreatAgainstMelyssa above, which has to search
-// for a THIRD character referencing melyssaId).
+// Whichever candidate target has the HIGHEST grudge count currently armed
+// against them - the count lives on HER OWN character.special, not on a
+// third character's state, so this is a direct lookup rather than a
+// cross-character search (unlike e.g. bladeStreakThreatAgainstMelyssa
+// above, which has to search for a THIRD character referencing
+// melyssaId). Prioritizing the biggest count cashes in the biggest
+// available revenge damage first, rather than any grudged target equally.
 function grudgedTarget(game, character, targetIds) {
-  const flagged = targetIds.filter((tid) => character.special.grudgedAttackerIds.has(tid));
-  if (flagged.length === 0) return null;
-  return biggestThreatTarget(game, character, flagged) || lowestHeartsTarget(game, flagged);
+  const counts = character.special.grudgeCounts;
+  const grudged = targetIds.filter((tid) => (counts.get(tid) || 0) > 0);
+  if (grudged.length === 0) return null;
+  const maxCount = Math.max(...grudged.map((tid) => counts.get(tid)));
+  const tied = grudged.filter((tid) => counts.get(tid) === maxCount);
+  return tied.length === 1 ? tied[0] : (biggestThreatTarget(game, character, tied) || pickRandom(tied));
 }
 
 function chooseKaelisMove(character, game, usable) {
