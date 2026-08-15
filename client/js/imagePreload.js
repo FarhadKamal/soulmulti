@@ -54,6 +54,10 @@ const FLASH_IMAGES = [
   'assets/images/kaelis/idle.jpg',
   'assets/images/kaelis/grudge.jpg',
   'assets/images/kaelis/bird.jpg',
+  'assets/images/draxus/idle.jpg',
+  'assets/images/draxus/normal_strike.jpg',
+  'assets/images/draxus/immortal_strike.jpg',
+  'assets/images/draxus/immortality.jpg',
 ];
 
 let started = false;

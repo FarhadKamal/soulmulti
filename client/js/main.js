@@ -10,7 +10,7 @@ import { handleLogEntryForFlash, handleDodgeForFlash, checkIdlePortrait, registe
 import { handleLogEntryForEffects, registerEffectRerender } from './actionEffects.js';
 import { preloadBattleImages } from './imagePreload.js';
 import { preloadBattleAudio } from './audioPreload.js';
-import { hasVoice, playIdleVoice, playInjuredVoice, playKoedVoice, playVictoryVoice, playMoveVoice, playLaughVoice, playRebirthVoice } from './voice.js';
+import { hasVoice, playIdleVoice, playInjuredVoice, playKoedVoice, playVictoryVoice, playMoveVoice, playLaughVoice, playRebirthVoice, playDraxusStrikeVoice } from './voice.js';
 
 const root = document.getElementById('app');
 
@@ -273,6 +273,14 @@ function playLogEntrySound(entry, game) {
   // owed stays silent rather than playing the same line every time.
   if (entry.actionId !== 'grudgeStrike' || entry.amountDealt > 1) {
     playMoveVoice(entry.characterId, entry.actionId);
+  }
+  // Draxus's 3 Deathless Fury bonus strikes each get their own One/Two/
+  // Three line - can't use the generic playMoveVoice dispatch above since
+  // that only supports one fixed filename per actionId, and both normal
+  // and bonus dyingBlow hits share the same actionId. A normal (non-bonus)
+  // Dying Blow stays voice-silent, same as Kaelis's baseline grudge hits.
+  if (entry.actionId === 'dyingBlow' && entry.isBonusStrike) {
+    playDraxusStrikeVoice(entry.strikeNumber);
   }
   if (entry.koTriggered) setTimeout(() => playKoedFor(entry.targetCharacterId), 200);
 }

@@ -163,4 +163,11 @@ export function handleLogEntryForEffects(entry, game) {
   if (actionId === 'grudgeStrike' && targetId && !dodged && amountDealt > 1) {
     addEffect(targetId, 'shake', EFFECT_DURATION_MS.shake);
   }
+
+  // Dying Blow: shake only at his top damage tier (amountDealt === 3, his
+  // 3/2/1-hearts tier) - a routine 1 or 2 damage hit doesn't shake, only
+  // his hardest-hitting, most-desperate strikes do.
+  if (actionId === 'dyingBlow' && targetId && !dodged && amountDealt === 3) {
+    addEffect(targetId, 'shake', EFFECT_DURATION_MS.shake);
+  }
 }

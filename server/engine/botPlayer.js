@@ -726,6 +726,22 @@ function chooseKaelisMove(character, game, usable) {
   return { actionId: 'grudgeStrike', targetId };
 }
 
+function chooseDraxusMove(character, game, usable) {
+  const byId = Object.fromEntries(usable.map((a) => [a.actionId, a]));
+  // Cast Deathless Fury when meaningfully hurt but BEFORE he's already on
+  // the verge of dying - unlike Call Ashka/Divine Restore's critical-only
+  // gating, the payoff here (become unkillable, then land 3 strikes) is
+  // worth banking early, not held back until he's nearly dead already.
+  if (byId.deathlessFury && character.hearts <= LOW_HEARTS_THRESHOLD) {
+    return { actionId: 'deathlessFury', targetId: null };
+  }
+  const targets = validTargetsFor(game, character, 'dyingBlow');
+  const targetId = biggestThreatTarget(game, character, targets)
+    || lowestHeartsTarget(game, targets)
+    || pickRandom(targets);
+  return { actionId: 'dyingBlow', targetId };
+}
+
 const MOVE_CHOOSERS = {
   tharox: chooseTharoxMove,
   zerathys: chooseZerathysMove,
@@ -737,6 +753,7 @@ const MOVE_CHOOSERS = {
   boingo: chooseBoingoMove,
   melyssa: chooseMelyssaMove,
   kaelis: chooseKaelisMove,
+  draxus: chooseDraxusMove,
 };
 
 // Fallback for characters without bot logic yet: picks a random usable

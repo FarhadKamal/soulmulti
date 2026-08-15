@@ -587,6 +587,14 @@ function statusBadges(character) {
         badges.push({ text: `Ashka heals: ${character.special.ashkaHealsRemaining}` });
       }
       break;
+    case 'draxus':
+      if (character.special.deathproofActive) {
+        badges.push({ text: 'Deathless Fury active', cls: 'warn' });
+      }
+      if (character.special.bonusActionsRemaining > 0) {
+        badges.push({ text: `Bonus strikes: ${character.special.bonusActionsRemaining}`, cls: 'warn' });
+      }
+      break;
   }
   return badges;
 }
@@ -983,6 +991,7 @@ const ACTION_LABELS = {
   curseStrike: 'Curse Strike', divineRestore: 'Divine Restore',
   selfChoke: 'Self Choke',
   grudgeStrike: 'Grudge Strike', callAshka: 'Call Ashka',
+  dyingBlow: 'Dying Blow', deathlessFury: 'Deathless Fury',
 };
 function actionLabel(actionId) {
   return ACTION_LABELS[actionId] || actionId;
@@ -1007,6 +1016,8 @@ function describeLogEntry(entry) {
       return `Curse mirrors ${entry.amount} damage to ${name(entry.toCharacterId)}${entry.koTriggered ? ' - KO!' : ''}`;
     case 'ashka-heal':
       return `${name(entry.characterId)}'s Ashka heals +${entry.healed}`;
+    case 'deathless-fury-end':
+      return `${name(entry.characterId)}'s Deathless Fury ends - 3 strikes granted!`;
     case 'rebirth':
       return `${name(entry.targetCharacterId)} used REBIRTH - revived with 2 hearts!`;
     case 'dodge':

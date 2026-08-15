@@ -121,6 +121,8 @@ const ACTION_SOUND = {
   selfChoke: 'self_choke',
   grudgeStrike: 'grudge_hit',
   callAshka: 'bird_heal',
+  dyingBlow: 'axe_strike',
+  deathlessFury: 'deathless_fury',
 };
 
 export function playActionSound(actionId) {

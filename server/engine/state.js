@@ -39,6 +39,15 @@ function baseSpecialFor(id) {
       // from Call Ashka (not counting the cast turn's own immediate heal) -
       // ticked down in kaelis.js's onTurnStart.
       return { grudgeCounts: new Map(), ashkaHealsRemaining: 0 };
+    case 'draxus':
+      // deathproofActive: true from the moment Deathless Fury is cast
+      // until his own next onTurnStart clears it (see draxus.js) -
+      // checked on every qualifying hit in damagePipeline.js's applyDamage
+      // to floor lethal damage at 1 instead of KO'ing him.
+      // bonusActionsRemaining: set to 3 by his own onTurnStart when the
+      // window above just ended - decremented in index.js's handleAction/
+      // stepBotTurn instead of calling markCharacterActed, until it hits 0.
+      return { deathproofActive: false, bonusActionsRemaining: 0 };
     default:
       return {};
   }

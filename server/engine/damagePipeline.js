@@ -108,6 +108,17 @@ export function applyDamage(game, log, {
     // runs mid-way through the ability's execute(), before its own
     // log.push() for the attack/special line itself.
     result.rebirthLogEntry = { type: 'rebirth', targetCharacterId };
+  } else if (target.id === 'draxus' && target.hearts === 0 && target.special.deathproofActive) {
+    // Floors at 1 instead of KO - NOT a revival event (isKO is never set,
+    // no "comes back fresh" cleanup like Rebirth's above, since he never
+    // actually died: his hearts never truly reach/stay at 0). Deliberately
+    // NOT flipped off here, unlike Blade's one-shot rebirthUsed - stays
+    // active and re-triggers for every subsequent qualifying hit (any
+    // source: direct attacks, curse mirrors, Jester Ball explosions, all
+    // of which route through this same applyDamage) until his own
+    // onTurnStart clears it (draxus.js), at the start of his own next turn.
+    target.hearts = 1;
+    result.deathproofSave = true;
   } else if (target.hearts === 0) {
     target.isKO = true;
     result.koTriggered = true;

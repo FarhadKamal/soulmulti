@@ -9,6 +9,7 @@ export const CHARACTERS = {
   athena: { id: 'athena', name: 'Athena', role: 'Curse Guardian', color: '#f59e0b' },
   melyssa: { id: 'melyssa', name: 'Melyssa', role: 'Mind Controller', color: '#a855f7' },
   kaelis: { id: 'kaelis', name: 'Kaelis', role: 'Grudge Warrior', color: '#b91c1c' },
+  draxus: { id: 'draxus', name: 'Draxus', role: 'Deathless Berserker', color: '#a35a1e' },
 };
 
 export const CHARACTER_IDS = Object.keys(CHARACTERS);

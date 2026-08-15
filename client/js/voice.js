@@ -125,6 +125,7 @@ const VOICE_LINES = {
   akyros: { idle: 'idle', injured: 'injued', koed: 'koed', victory: 'victory' },
   melyssa: { idle: 'idle', injured: 'injured', koed: 'koed', victory: 'victory' },
   kaelis: { idle: 'idle', injured: 'injured', koed: 'koed', victory: 'victory' },
+  draxus: { idle: 'idle', injured: 'injured', koed: 'koed', victory: 'victory' },
 };
 
 // actionId -> filename, per character - every action here plays its line
@@ -156,7 +157,30 @@ const ACTION_VOICE_LINES = {
   // since it's a real player-picked action, unlike Melyssa's mindControl
   // selection above.
   kaelis: { grudgeStrike: 'grudge_strike', callAshka: 'thank_you' },
+  // dyingBlow (both normal and bonus strikes) stays voice-silent on a
+  // normal strike, matching Kaelis's own baseline-hit silence - normal
+  // strikes get no entry here at all. The bonus-turn One/Two/Three lines
+  // don't fit this table (one fixed filename per actionId can't express
+  // "1st/2nd/3rd strike" - both share actionId: 'dyingBlow') so they're
+  // wired separately via playDraxusStrikeVoice below, called directly from
+  // main.js's dedicated isBonusStrike branch instead of the generic
+  // playMoveVoice dispatch every other actionId uses.
+  draxus: { deathlessFury: 'immortality' },
 };
+
+// Exact filenames on disk are capitalized (One.mp3/Two.mp3/Three.mp3),
+// unlike every other voice file in this project - do not lowercase these.
+const DRAXUS_STRIKE_LINES = { 1: 'One', 2: 'Two', 3: 'Three' };
+
+// Plays the right One/Two/Three line for one of Draxus's 3 Deathless Fury
+// bonus strikes - called directly from main.js (not the generic
+// playMoveVoice path, since that only supports one fixed filename per
+// actionId and all 3 bonus strikes share actionId: 'dyingBlow' with a
+// normal strike). strikeNumber is 1-based (see draxus.js's own log entry).
+export function playDraxusStrikeVoice(strikeNumber) {
+  const line = DRAXUS_STRIKE_LINES[strikeNumber];
+  if (line) playVoiceFile('draxus', line, PRIORITY.move);
+}
 
 export function hasVoice(characterId) {
   return !!VOICE_LINES[characterId];

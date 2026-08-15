@@ -577,6 +577,17 @@ function stepBotTurn(room) {
   if (isBallHolder) {
     const move = chooseBotJesterBallMove(character, room.game);
     finishJesterBall(room.game, move.choice, move.targetId);
+    // Draxus's Deathless Fury bonus turn, forfeited: resolving the ball -
+    // Take OR Pass, either one - consumes his ENTIRE bonus turn per spec.
+    // Take normally does NOT call markCharacterActed (see finishJesterBall,
+    // gameFlow.js), letting the holder act again that same turn - that's
+    // exactly the behavior overridden here, ONLY while his bonus turn is
+    // active, so it never changes ball behavior for his own normal turns
+    // or anyone else's.
+    if (character.id === 'draxus' && character.special.bonusActionsRemaining > 0) {
+      character.special.bonusActionsRemaining = 0;
+      markCharacterActed(room.game, acting);
+    }
   } else {
     const move = chooseBotMove(character, room.game);
     if (move && move.actionId === 'mindControl') {
@@ -609,7 +620,18 @@ function stepBotTurn(room) {
         if (wrathTarget) executeAction(room.game, acting, 'soulSwapWrath', wrathTarget);
       }
     }
-    markCharacterActed(room.game, acting);
+    // Draxus's Deathless Fury bonus turn: his own onTurnStart already set
+    // bonusActionsRemaining to 3 (draxus.js) - decrement instead of
+    // marking him acted so settleToNextDecision keeps returning him as the
+    // acting character. stepBotTurn's own post-action re-check just below
+    // (line ~640) already naturally schedules another tick when this
+    // happens - no new bot-pacing function needed for strikes 2 and 3.
+    if (character.id === 'draxus' && character.special.bonusActionsRemaining > 0) {
+      character.special.bonusActionsRemaining -= 1;
+    }
+    if (!(character.id === 'draxus' && character.special.bonusActionsRemaining > 0)) {
+      markCharacterActed(room.game, acting);
+    }
   }
 
   // Broadcast this single bot action right away, then pause before the
@@ -1249,6 +1271,26 @@ function handleAction(room, sessionId, { characterId, actionId, targetId }) {
     });
     return;
   }
+  // Draxus's Deathless Fury bonus turn: his own onTurnStart already set
+  // bonusActionsRemaining to 3 (see draxus.js) - decrement it here instead
+  // of marking him acted, so settleToNextDecision keeps returning him as
+  // the acting character for strikes 2 and 3, reusing this exact same
+  // normal 'action' path each time (no new message type/handler needed).
+  const actedCharacter = room.game.characters[characterId];
+  if (actedCharacter.id === 'draxus' && actedCharacter.special.bonusActionsRemaining > 0) {
+    actedCharacter.special.bonusActionsRemaining -= 1;
+    if (actedCharacter.special.bonusActionsRemaining > 0) {
+      // More strikes owed this turn - re-arm the timer for the next one
+      // (same re-arm precedent as Soul Swap's own follow-up stage above)
+      // and broadcast normally WITHOUT marking him acted.
+      armTurnTimer(room, characterId);
+      broadcastGameState(room);
+      runBotTurnsIfAny(room);
+      return;
+    }
+    // Bonus sequence genuinely over (3rd strike just resolved) - fall
+    // through below to end his turn for real.
+  }
   markCharacterActed(room.game, characterId);
   // Broadcast the human's own move on its own FIRST, before any bot turns
   // start stepping - otherwise the very first broadcast a client sees after
@@ -1377,6 +1419,18 @@ function handleJesterBallChoice(room, sessionId, { characterId, choice, targetId
   if (choice === 'pass' && jb.passCount >= 5) return;
   if (choice === 'pass' && !isJesterBallPassTarget(room.game, characterId, targetId)) return;
   finishJesterBall(room.game, choice, targetId);
+  // Draxus's Deathless Fury bonus turn, forfeited: resolving the ball -
+  // Take OR Pass, either one - consumes his ENTIRE bonus turn per spec.
+  // Take normally does NOT call markCharacterActed (see finishJesterBall,
+  // gameFlow.js), letting the holder act again that same turn - that's
+  // exactly the behavior overridden here, ONLY while his bonus turn is
+  // active, so it never changes ball behavior for his own normal turns or
+  // anyone else's.
+  const character = room.game.characters[characterId];
+  if (character.id === 'draxus' && character.special.bonusActionsRemaining > 0) {
+    character.special.bonusActionsRemaining = 0;
+    markCharacterActed(room.game, characterId);
+  }
   broadcastGameState(room);
   runBotTurnsIfAny(room);
 }

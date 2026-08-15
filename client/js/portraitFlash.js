@@ -61,6 +61,12 @@ export function getPersistentPortrait(character) {
   if (character.id === 'melyssa' && character.special?.controlling) return v('assets/images/melyssa/mind_control_selection.jpg');
   if (character.id === 'velorya' && character.untargetable) return v('assets/images/velorya/hided.jpg');
   if (character.id === 'blade' && character.special?.rebirthUsed) return v('assets/images/blade/alive.jpg');
+  // Held from the moment Deathless Fury is cast until his own next
+  // onTurnStart clears deathproofActive (draxus.js) - persists across
+  // however many intervening turns the death-proof window spans, same
+  // "real serialized state, not a client timer" pattern as Melyssa's own
+  // held portrait above.
+  if (character.id === 'draxus' && character.special?.deathproofActive) return v('assets/images/draxus/immortality.jpg');
   return null;
 }
 
@@ -77,6 +83,7 @@ const IDLE_IMAGE = {
   akyros: 'assets/images/akyros/rose.jpg',
   melyssa: 'assets/images/melyssa/chess.jpg',
   kaelis: 'assets/images/kaelis/idle.jpg',
+  draxus: 'assets/images/draxus/idle.jpg',
 };
 
 // Call once per character at the moment their own turn starts (i.e. when
@@ -90,6 +97,13 @@ const IDLE_IMAGE = {
 // maintained checks that could drift apart.
 export function checkIdlePortrait(character) {
   if (character.isKO) return false;
+  // Draxus's persistent immortality.jpg portrait (getPersistentPortrait
+  // above) must never get stomped by a timed idle flash - setFlash's
+  // activeFlash entries sit ABOVE the persistent-portrait check in
+  // battleScreen.js's render priority, so an idle flash firing during his
+  // death-proof window would incorrectly hide the immortal portrait for
+  // its whole duration. Skip idle entirely while it's active.
+  if (character.id === 'draxus' && character.special?.deathproofActive) return false;
   const lastHearts = heartsAtLastTurnStart.has(character.id) ? heartsAtLastTurnStart.get(character.id) : null;
   const wasUntouched = lastHearts === null || character.hearts >= lastHearts;
   const isIdle = wasUntouched && character.hearts > character.maxHearts / 2;
@@ -243,6 +257,22 @@ export function handleLogEntryForFlash(entry, game) {
       break;
     case 'callAshka':
       setFlash(characterId, 'assets/images/kaelis/bird.jpg'); break;
+    case 'dyingBlow':
+      // Bonus-turn strikes (during his Deathless Fury payoff) flash a
+      // distinct immortal_strike image, layered on top of his persistent
+      // immortality.jpg portrait (getPersistentPortrait above) - a normal
+      // turn's single strike flashes normal_strike instead. Both share
+      // this one actionId/execute(), so the distinction has to come from
+      // the log entry's own isBonusStrike flag (draxus.js), not the
+      // action id itself.
+      if (!dodged && amountDealt > 0) {
+        setFlash(characterId, entry.isBonusStrike ? 'assets/images/draxus/immortal_strike.jpg' : 'assets/images/draxus/normal_strike.jpg');
+      }
+      break;
+    case 'deathlessFury':
+      // Cast-moment flash briefly reinforces the same image the
+      // persistent override (getPersistentPortrait) then holds.
+      setFlash(characterId, 'assets/images/draxus/immortality.jpg'); break;
     case 'chaosGamble':
       // 'lose' always flashes the miss portrait regardless of dodged (a
       // 0-damage roll can still report dodged:true against Akyros's first
