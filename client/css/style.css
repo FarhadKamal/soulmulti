@@ -190,7 +190,14 @@ input {
 .char-tile--ko { opacity: 0.4; }
 .char-tile--targetable { cursor: pointer; box-shadow: 0 0 0 3px #ff5e5e; }
 .char-portrait {
-  width: 100%; height: auto; border-radius: 6px;
+  /* max-height + object-fit: contain caps how tall a wide (~2.9:1) portrait
+     can get before it's scaled DOWN to fit (letterboxed, never cropped) -
+     without this, a 2x2 board of full-width uncropped images can run
+     taller than many laptop-height viewports, pushing the action panel
+     below .battle-scroll's visible area. 22vh keeps 2 stacked rows well
+     within a typical desktop/laptop window; the mobile media query below
+     tightens this further for phone screens. */
+  width: 100%; max-height: 22vh; object-fit: contain; border-radius: 6px;
   margin-bottom: 6px; display: block; background: #0d0d14;
 }
 .char-name { font-weight: 700; }
@@ -524,11 +531,9 @@ input {
   .battle { padding-left: 8px; padding-right: 8px; }
   .board { grid-template-columns: 1fr; gap: 5px; margin-bottom: 8px; }
   .char-tile { padding: 4px; }
-  /* object-fit: contain scales the whole wide image DOWN to fit within
-     this height, letterboxed if needed, never cropping any of it (unlike
-     object-fit: cover, which was removed project-wide earlier specifically
-     so nothing gets cut off). */
-  .char-portrait { max-height: 10vh; width: 100%; object-fit: contain; margin-bottom: 2px; }
+  /* Tighter than the base 22vh (see .char-portrait above) - phones need a
+     shorter cap since 4 rows stack instead of 2x2. */
+  .char-portrait { max-height: 10vh; margin-bottom: 2px; }
   .char-name { font-size: 0.85em; }
   .char-hearts { font-size: 0.7em; }
   .status-badge-row { margin-top: 2px; }
