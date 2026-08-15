@@ -156,4 +156,11 @@ export function handleLogEntryForEffects(entry, game) {
     if (streakCount >= 3) addEffect(targetId, 'shake', EFFECT_DURATION_MS.shake);
     addEffect(targetId, 'claw', EFFECT_DURATION_MS.claw, streakCount);
   }
+
+  // Grudge Strike: shake only on a revenge hit (amountDealt > 1) - her
+  // baseline hit is always exactly 1, so anything higher already means the
+  // grudge paid off, same signal Blood Hunt's streak-based gate uses.
+  if (actionId === 'grudgeStrike' && targetId && !dodged && amountDealt > 1) {
+    addEffect(targetId, 'shake', EFFECT_DURATION_MS.shake);
+  }
 }
