@@ -470,14 +470,17 @@ input {
 .victory-portraits {
   display: flex; flex-wrap: wrap; justify-content: center; gap: 16px; margin: 20px 0;
 }
-.victory-portrait-box { width: 140px; }
-.victory-portraits--single .victory-portrait-box { width: 240px; }
+.victory-portrait-box { width: 180px; }
+/* Single winner: no need to leave room for a neighbor, so scale close to
+   the full available column width instead of a small fixed px cap - reads
+   as a proper hero moment rather than a small thumbnail, on mobile too. */
+.victory-portraits--single .victory-portrait-box { width: min(360px, 100%); }
 /* Desktop: the .battle shell caps at 720px, so there's real room to grow
-   these beyond the small mobile-sized default - bumped up while still
-   comfortably fitting 2+ side by side within that column. */
+   the multi-winner case beyond the small mobile-sized default too - bumped
+   up while still comfortably fitting 2+ side by side within that column. */
 @media (min-width: 640px) {
-  .victory-portrait-box { width: 220px; }
-  .victory-portraits--single .victory-portrait-box { width: 380px; }
+  .victory-portrait-box { width: 260px; }
+  .victory-portraits--single .victory-portrait-box { width: min(460px, 100%); }
 }
 .victory-portrait-box img {
   width: 100%; height: auto; border-radius: 10px;
