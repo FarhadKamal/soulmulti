@@ -176,13 +176,9 @@ input {
 .char-tile--ko { opacity: 0.4; }
 .char-tile--targetable { cursor: pointer; box-shadow: 0 0 0 3px #ff5e5e; }
 .char-portrait {
-  width: 100%; aspect-ratio: 1 / 1; object-fit: cover; border-radius: 6px;
+  width: 100%; height: auto; border-radius: 6px;
   margin-bottom: 6px; display: block; background: #0d0d14;
 }
-/* Kaelis's koed art has her face right-of-center in the wide source image -
-   the default 50% center crop cuts her face off, showing only her fallen
-   torso/arm. Shift the crop right so her face is actually visible. */
-.char-portrait--kaelis-koed { object-position: 85% center; }
 .char-name { font-weight: 700; }
 .char-hearts { font-size: 0.9em; display: flex; flex-wrap: wrap; gap: 2px; }
 .heart-icon { font-size: 1.1em; line-height: 1; }
@@ -463,7 +459,7 @@ input {
 .victory-portrait-box { width: 140px; }
 .victory-portraits--single .victory-portrait-box { width: 240px; }
 .victory-portrait-box img {
-  width: 100%; aspect-ratio: 1 / 1; object-fit: cover; border-radius: 10px;
+  width: 100%; height: auto; border-radius: 10px;
   box-shadow: 0 0 0 3px #ffd75e, 0 0 20px 4px #ffd75e55;
 }
 .victory-portrait-label { margin-top: 8px; font-weight: 700; }
