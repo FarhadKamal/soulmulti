@@ -143,13 +143,6 @@ input {
    tiles sits flush against this scroll container's top edge and the badge
    gets clipped by its overflow boundary. */
 .battle-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding-top: 14px; }
-/* Sits below .battle-scroll as its own fixed-size flex child (never scrolls
-   away) - see battleScreen.js's actionHost comment for why this matters
-   specifically once the mobile board goes 1-tile-per-row and can outgrow
-   the viewport: the actual turn decision must stay reachable without a
-   scroll, same principle that already moved the log/chat into its own
-   drawer instead of sitting inline. */
-.action-host { flex: 0 0 auto; padding-top: 10px; }
 .round-info { text-align: center; opacity: 0.7; margin-bottom: 6px; flex: 0 0 auto; }
 .turn-timer {
   text-align: center; font-size: 0.9em; font-weight: 600; padding: 6px 10px;
@@ -523,30 +516,31 @@ input {
 .about-credit { font-size: 0.8em; opacity: 0.65; text-align: right; }
 
 /* Mobile: 1 hero per row (bigger portraits than a 2-up grid could show),
-   roomier tap targets, denser spacing. The board can now genuinely exceed
-   the viewport height in a 4-player match - that's fine, since it lives in
-   .battle-scroll (scrolls independently) and .action-host (the actual
-   decision buttons) is pinned below it as its own fixed-size flex child,
-   never part of that scroll - see battleScreen.js's actionHost comment. */
+   sized and spaced tightly enough that the whole board PLUS the action
+   panel below it fit in a single ordinary scroll (.battle-scroll) within a
+   typical phone viewport - no separate pinned/sticky panel, just small
+   enough that everything comfortably fits without needing one. */
 @media (max-width: 480px) {
   .battle { padding-left: 8px; padding-right: 8px; }
-  .board { grid-template-columns: 1fr; gap: 6px; }
-  .char-tile { padding: 5px; }
-  /* Capped so 4 stacked tiles + name/hearts + the turn status bar above
-     actually fit a typical phone viewport without scrolling to see every
-     character - object-fit: contain scales the whole wide image DOWN to
-     fit within this height, letterboxed if needed, never cropping any of
-     it (unlike object-fit: cover, which was removed project-wide earlier
-     specifically so nothing gets cut off). */
-  .char-portrait { max-height: 13vh; width: 100%; object-fit: contain; margin-bottom: 3px; }
-  .char-name { font-size: 0.9em; }
-  .char-hearts { font-size: 0.75em; }
-  button { padding: 10px 14px; }
+  .board { grid-template-columns: 1fr; gap: 5px; margin-bottom: 8px; }
+  .char-tile { padding: 4px; }
+  /* object-fit: contain scales the whole wide image DOWN to fit within
+     this height, letterboxed if needed, never cropping any of it (unlike
+     object-fit: cover, which was removed project-wide earlier specifically
+     so nothing gets cut off). */
+  .char-portrait { max-height: 10vh; width: 100%; object-fit: contain; margin-bottom: 2px; }
+  .char-name { font-size: 0.85em; }
+  .char-hearts { font-size: 0.7em; }
+  .status-badge-row { margin-top: 2px; }
+  .status-badge { font-size: 0.65em; padding: 1px 6px; }
+  button { padding: 8px 12px; }
   .fullscreen-btn, .exit-icon-btn, .about-icon-btn, .hard-refresh-btn { padding: 0; }
   .lobby h1 { font-size: 1.2em; margin: 2px 0 6px; }
   .entry-form { gap: 12px; }
   .character-grid { gap: 6px; }
-  .action-panel { padding: 10px; }
+  .action-panel { padding: 8px; }
+  .action-panel-title { font-size: 0.9em; margin-bottom: 6px; }
+  .action-btn-row { gap: 6px; }
   .drawer-panel { max-height: 50vh; }
 }
 
