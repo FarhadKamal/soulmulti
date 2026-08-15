@@ -266,8 +266,14 @@ function playLogEntrySound(entry, game) {
   playActionSound(entry.actionId);
   // Layered on top of the effect sound just played above, never replacing
   // it (see voice.js's playMoveVoice) - a no-op for any character/action
-  // that isn't one of the 4 recorded signature moves so far.
-  playMoveVoice(entry.characterId, entry.actionId);
+  // that isn't one of the recorded signature moves so far. Kaelis's
+  // grudgeStrike is the one exception: her line is reserved for an actual
+  // revenge hit (amountDealt > 1, same signal the shake effect in
+  // actionEffects.js already uses) - a plain baseline poke with nothing
+  // owed stays silent rather than playing the same line every time.
+  if (entry.actionId !== 'grudgeStrike' || entry.amountDealt > 1) {
+    playMoveVoice(entry.characterId, entry.actionId);
+  }
   if (entry.koTriggered) setTimeout(() => playKoedFor(entry.targetCharacterId), 200);
 }
 
