@@ -143,6 +143,13 @@ input {
    tiles sits flush against this scroll container's top edge and the badge
    gets clipped by its overflow boundary. */
 .battle-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding-top: 14px; }
+/* Sits below .battle-scroll as its own fixed-size flex child (never scrolls
+   away) - see battleScreen.js's actionHost comment for why this matters
+   specifically once the mobile board goes 1-tile-per-row and can outgrow
+   the viewport: the actual turn decision must stay reachable without a
+   scroll, same principle that already moved the log/chat into its own
+   drawer instead of sitting inline. */
+.action-host { flex: 0 0 auto; padding-top: 10px; }
 .round-info { text-align: center; opacity: 0.7; margin-bottom: 6px; flex: 0 0 auto; }
 .turn-timer {
   text-align: center; font-size: 0.9em; font-weight: 600; padding: 6px 10px;
@@ -515,12 +522,15 @@ input {
 .about-text { margin: 0 0 10px; font-size: 0.9em; line-height: 1.6; font-style: italic; opacity: 0.9; }
 .about-credit { font-size: 0.8em; opacity: 0.65; text-align: right; }
 
-/* Mobile: 2-column board, roomier tap targets, denser spacing so the fixed
-   shell (see .lobby/.battle above) has the best shot at fitting everything
-   important above the drawer without its own internal scroll kicking in. */
+/* Mobile: 1 hero per row (bigger portraits than a 2-up grid could show),
+   roomier tap targets, denser spacing. The board can now genuinely exceed
+   the viewport height in a 4-player match - that's fine, since it lives in
+   .battle-scroll (scrolls independently) and .action-host (the actual
+   decision buttons) is pinned below it as its own fixed-size flex child,
+   never part of that scroll - see battleScreen.js's actionHost comment. */
 @media (max-width: 480px) {
   .battle { padding-left: 8px; padding-right: 8px; }
-  .board { grid-template-columns: 1fr 1fr; gap: 6px; }
+  .board { grid-template-columns: 1fr; gap: 8px; }
   .char-tile { padding: 6px; }
   button { padding: 10px 14px; }
   .fullscreen-btn, .exit-icon-btn, .about-icon-btn, .hard-refresh-btn { padding: 0; }

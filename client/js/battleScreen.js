@@ -170,22 +170,34 @@ export function renderBattle(root, state) {
   const jb = game.jesterBall;
   const isMyBallDecision = isMyTurn && jb && jb.holderCharacterId === actingCharacterId;
 
+  // Pinned below the scrollable board (own flex child of .battle, see
+  // .action-host in style.css) rather than inside .battle-scroll - on
+  // mobile, where the board is now 1 tile per row (see .board's mobile
+  // media query) and can genuinely be taller than the viewport, this keeps
+  // the actual decision (buttons/target prompt) always visible without
+  // requiring a scroll on every single turn. Desktop/tablet just sees this
+  // as a normal flex child sitting right below the board either way, no
+  // visual difference from before since .board never needed the extra
+  // scroll room there.
+  const actionHost = document.createElement('div');
+  actionHost.className = 'action-host';
   if (isMyBallDecision) {
-    scroll.appendChild(renderJesterBallPrompt(game, actingCharacterId, armedAction, state));
+    actionHost.appendChild(renderJesterBallPrompt(game, actingCharacterId, armedAction, state));
   } else if (isMyTurn && state.awaitingMindControlAction) {
-    scroll.appendChild(renderMindControlActionPanel(game, actingCharacterId, state));
+    actionHost.appendChild(renderMindControlActionPanel(game, actingCharacterId, state));
   } else if (isMyTurn) {
-    scroll.appendChild(renderActionPanel(actingCharacterId, usableActions, armedAction, state));
+    actionHost.appendChild(renderActionPanel(actingCharacterId, usableActions, armedAction, state));
   } else {
     const waiting = document.createElement('div');
     waiting.className = 'waiting-note';
     waiting.textContent = actingCharacterId
       ? `Waiting for ${CHARACTERS[actingCharacterId].name}'s turn...`
       : 'Waiting...';
-    scroll.appendChild(waiting);
+    actionHost.appendChild(waiting);
   }
 
   wrap.appendChild(scroll);
+  wrap.appendChild(actionHost);
   wrap.appendChild(renderLogChatDrawer(game.log, state.rerender));
 
   root.appendChild(wrap);
