@@ -1,4 +1,18 @@
 * { box-sizing: border-box; }
+/* Slim, dark-themed scrollbar for every internal scroll region (lobby,
+   battle, chat, match log, etc.) instead of the browser's default chunky
+   light-gray track, which clashes hard against this dark UI on desktop
+   Chrome/Edge (Firefox picks up scrollbar-color; WebKit browsers need the
+   ::-webkit-scrollbar rules below). Purely cosmetic - doesn't change
+   whether/when a region actually scrolls. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #3a3a4e #1c1c2c;
+}
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-track { background: #1c1c2c; }
+*::-webkit-scrollbar-thumb { background: #3a3a4e; border-radius: 4px; }
+*::-webkit-scrollbar-thumb:hover { background: #4a4a62; }
 html, body {
   margin: 0;
   font-family: system-ui, sans-serif;
