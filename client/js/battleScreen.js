@@ -143,7 +143,12 @@ export function renderBattle(root, state) {
   // the instant a frozen turn is actually skipped even though the freeze is
   // still conceptually active until Chronox's own next turn resolves it.
   const athena = Object.values(game.characters).find((c) => c.id === 'athena');
-  const cursedId = athena ? athena.special.curseTargetCharacterId : null;
+  // !athena.isKO guard: server already clears curseTargetCharacterId the
+  // instant Athena is KO'd (damagePipeline.js), but this check is kept
+  // here too as a defensive belt-and-braces match to Chronox's own
+  // freezeActive check just below, which is inherently already false once
+  // he's KO'd (his freeze cleanup runs in that same server-side block).
+  const cursedId = athena && !athena.isKO ? athena.special.curseTargetCharacterId : null;
   const chronox = Object.values(game.characters).find((c) => c.id === 'chronox');
   const frozenId = chronox && chronox.special.freezeActive ? chronox.special.freezeTargetId : null;
   const puppetHighlightId = state.awaitingMindControlAction ? state.mindControlPuppetId : null;
@@ -353,7 +358,7 @@ function renderFrozenBoard(game, { showVictorious = false } = {}) {
   board.className = 'board';
   const ballHolderId = game.jesterBall ? game.jesterBall.holderCharacterId : null;
   const athena = Object.values(game.characters).find((c) => c.id === 'athena');
-  const cursedId = athena ? athena.special.curseTargetCharacterId : null;
+  const cursedId = athena && !athena.isKO ? athena.special.curseTargetCharacterId : null;
   const chronox = Object.values(game.characters).find((c) => c.id === 'chronox');
   const frozenId = chronox && chronox.special.freezeActive ? chronox.special.freezeTargetId : null;
   // Only meaningful during the 'victory' stage AND once a winner actually

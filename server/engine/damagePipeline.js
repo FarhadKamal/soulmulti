@@ -128,6 +128,16 @@ export function applyDamage(game, log, {
       target.special.freezeTargetId = null;
       log.push({ type: 'freeze-end', targetCharacterId: frozenId });
     }
+    // Athena's curse ends the instant she's KO'd - no one left to trigger
+    // the mirror (the trigger itself is keyed off damage landing ON her,
+    // which her own isKO guard at the top of this function already blocks
+    // going forward), but curseTargetCharacterId itself was otherwise never
+    // cleared, leaving the client's cursed-mark visual (battleScreen.js)
+    // and bot AI's isCursedByLiveAthena-style checks with stale state to
+    // read even though the mirror can genuinely never fire again.
+    if (target.id === 'athena' && target.special.curseTargetCharacterId) {
+      target.special.curseTargetCharacterId = null;
+    }
   }
 
   // Melyssa's reactive shield: whenever damage actually reaches her hearts
