@@ -530,8 +530,17 @@ input {
    never part of that scroll - see battleScreen.js's actionHost comment. */
 @media (max-width: 480px) {
   .battle { padding-left: 8px; padding-right: 8px; }
-  .board { grid-template-columns: 1fr; gap: 8px; }
-  .char-tile { padding: 6px; }
+  .board { grid-template-columns: 1fr; gap: 6px; }
+  .char-tile { padding: 5px; }
+  /* Capped so 4 stacked tiles + name/hearts + the turn status bar above
+     actually fit a typical phone viewport without scrolling to see every
+     character - object-fit: contain scales the whole wide image DOWN to
+     fit within this height, letterboxed if needed, never cropping any of
+     it (unlike object-fit: cover, which was removed project-wide earlier
+     specifically so nothing gets cut off). */
+  .char-portrait { max-height: 13vh; width: 100%; object-fit: contain; margin-bottom: 3px; }
+  .char-name { font-size: 0.9em; }
+  .char-hearts { font-size: 0.75em; }
   button { padding: 10px 14px; }
   .fullscreen-btn, .exit-icon-btn, .about-icon-btn, .hard-refresh-btn { padding: 0; }
   .lobby h1 { font-size: 1.2em; margin: 2px 0 6px; }
