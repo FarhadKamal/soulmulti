@@ -700,12 +700,18 @@ function grudgedTarget(game, character, targetIds) {
   return tied.length === 1 ? tied[0] : (biggestThreatTarget(game, character, tied) || pickRandom(tied));
 }
 
+// Kaelis's own cast threshold for Call Ashka - deliberately 1 higher than
+// the shared LOW_HEARTS_THRESHOLD (3) used elsewhere (Athena/Velorya/
+// Melyssa's own critical-health checks). Her heal is spread out over 3
+// turns rather than landing all at once, so she needs to start it earlier
+// to have any chance of the later ticks actually saving her.
+const KAELIS_ASHKA_THRESHOLD = 4;
+
 function chooseKaelisMove(character, game, usable) {
   const byId = Object.fromEntries(usable.map((a) => [a.actionId, a]));
-  // Cast Call Ashka when critical, same LOW_HEARTS_THRESHOLD used elsewhere
-  // (e.g. Melyssa's own Zerathys-rescue check) - securing the heal-over-
-  // turns before it's too late outranks a normal Grudge Strike that turn.
-  if (byId.callAshka && character.hearts <= LOW_HEARTS_THRESHOLD) {
+  // Cast Call Ashka when critical - securing the heal-over-turns before
+  // it's too late outranks a normal Grudge Strike that turn.
+  if (byId.callAshka && character.hearts <= KAELIS_ASHKA_THRESHOLD) {
     return { actionId: 'callAshka', targetId: null };
   }
   const targets = validTargetsFor(game, character, 'grudgeStrike');
