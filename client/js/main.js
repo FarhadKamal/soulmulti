@@ -70,6 +70,13 @@ function playInjuredVoiceIfNewlyHurt(game) {
     const prev = lastKnownHearts.has(character.id) ? lastKnownHearts.get(character.id) : null;
     lastKnownHearts.set(character.id, character.hearts);
     if (character.isKO || prev === null) continue;
+    // Draxus's death-proof floor (damagePipeline.js) can drop him to 1
+    // heart while special.deathproofActive is true - his portrait
+    // correctly stays on immortality.jpg the whole window (see
+    // getPersistentPortrait in portraitFlash.js), but this heart-based
+    // check has no such gate, so it would otherwise still fire his
+    // "injured" voice line under the same hit. Skip it here to match.
+    if (character.id === 'draxus' && character.special?.deathproofActive) continue;
     const isInjuredNow = character.hearts <= character.maxHearts / 2;
     const wasInjuredBefore = prev <= character.maxHearts / 2;
     if (isInjuredNow && !wasInjuredBefore) playInjuredVoice(character.id);
