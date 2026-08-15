@@ -472,6 +472,13 @@ input {
 }
 .victory-portrait-box { width: 140px; }
 .victory-portraits--single .victory-portrait-box { width: 240px; }
+/* Desktop: the .battle shell caps at 720px, so there's real room to grow
+   these beyond the small mobile-sized default - bumped up while still
+   comfortably fitting 2+ side by side within that column. */
+@media (min-width: 640px) {
+  .victory-portrait-box { width: 220px; }
+  .victory-portraits--single .victory-portrait-box { width: 380px; }
+}
 .victory-portrait-box img {
   width: 100%; height: auto; border-radius: 10px;
   box-shadow: 0 0 0 3px #ffd75e, 0 0 20px 4px #ffd75e55;
