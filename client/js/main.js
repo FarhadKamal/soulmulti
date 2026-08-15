@@ -242,6 +242,11 @@ function playLogEntrySound(entry, game) {
     // entry type). The CAST turn's own heal (a real 'special' entry with
     // actionId: 'callAshka') already gets its sound via that generic path.
     playSound('bird_heal');
+    // Same "thank you, Ashka" line as the cast itself (reuses
+    // ACTION_VOICE_LINES.kaelis.callAshka via playMoveVoice's normal
+    // actionId lookup) - she thanks the bird every time it actually heals
+    // her, not just on the initial summon.
+    playMoveVoice('kaelis', 'callAshka');
     return;
   }
   if (entry.type !== 'attack' && entry.type !== 'special' && entry.type !== 'setup') return;
