@@ -136,7 +136,7 @@ input {
 }
 .turn-timer--urgent { background: #5c1a1a; color: #ffb3b3; }
 .board {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  display: grid; grid-template-columns: repeat(2, 1fr);
   gap: 10px; margin-bottom: 16px;
 }
 .char-tile {
