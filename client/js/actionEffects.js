@@ -15,6 +15,7 @@ const EFFECT_DURATION_MS = {
   vortex: 650,
   axechop: 550,
   eyeburst: 750,
+  tendrils: 1000,
   smoke: 1600,
   revive: 1300,
   divine: 1100,
@@ -139,9 +140,16 @@ export function handleLogEntryForEffects(entry, game) {
   // icon (cursed-mark, style.css) with a radial purple shockwave ring, so
   // it reads as "the same eye that will now watch them" rather than a
   // generic unrelated impact mark. Distinct motion from every other
-  // effect: snap-in-huge-then-shrink, not radiate/spin/pop/slam.
+  // effect: snap-in-huge-then-shrink, not radiate/spin/pop/slam. Layered
+  // with curling curse-tendrils that snake outward and wrap partway around
+  // the tile edge right after the flash - an organic curling motion (vines/
+  // smoke reaching out and gripping), extending the flash-instant into a
+  // "taking hold" beat, still the same purple palette.
   if (entry.type === 'curse') {
-    if (!isKO(entry.targetCharacterId)) addEffect(entry.targetCharacterId, 'eyeburst', EFFECT_DURATION_MS.eyeburst);
+    if (!isKO(entry.targetCharacterId)) {
+      addEffect(entry.targetCharacterId, 'eyeburst', EFFECT_DURATION_MS.eyeburst);
+      addEffect(entry.targetCharacterId, 'tendrils', EFFECT_DURATION_MS.tendrils);
+    }
     return;
   }
 

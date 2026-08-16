@@ -511,6 +511,22 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
     shatter.innerHTML = `<span class="shatter-core"></span>${chips}`;
     tile.appendChild(shatter);
   }
+  if (effects.has('tendrils') && !character.isKO) {
+    // Curse tendrils: curling purple vine/smoke shapes that snake in from
+    // the tile edges and wrap partway around, right after the eye-burst
+    // flash - an organic curling motion, distinct from every other
+    // effect's straight/radial/spin/pop/slam language. SVG paths for a
+    // genuine curl (not achievable with plain CSS border-radius tricks).
+    const tendrils = document.createElement('div');
+    tendrils.className = 'curse-tendrils';
+    tendrils.innerHTML = `
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none">
+        <path class="tendril-path tendril-path--1" d="M -5,20 Q 30,10 35,35 Q 40,60 20,55" />
+        <path class="tendril-path tendril-path--2" d="M 105,30 Q 70,25 68,50 Q 66,75 85,72" />
+        <path class="tendril-path tendril-path--3" d="M 50,105 Q 45,75 65,65 Q 85,55 78,35" />
+      </svg>`;
+    tile.appendChild(tendrils);
+  }
   if (effects.has('eyeburst') && !character.isKO) {
     // Athena's Curse Strike: a big eye-flash burst the instant the curse
     // takes hold - a scaled-up version of the persistent cursed-mark's 👁

@@ -421,6 +421,34 @@ input {
   100% { opacity: 0; scale: 1.05; }
 }
 
+/* Athena's Curse Strike (part 2): curling tendrils that snake in from the
+   tile edges right after the eye-burst flash - drawn as SVG paths with a
+   dash-offset "draw-in" animation for a genuine organic curl, since plain
+   CSS shapes can't curve like this. Same purple palette as the eye-burst/
+   cursed-mark. */
+.curse-tendrils {
+  position: absolute; inset: 0; pointer-events: none; z-index: 4;
+  overflow: hidden; border-radius: inherit;
+}
+.curse-tendrils svg { width: 100%; height: 100%; }
+.tendril-path {
+  fill: none; stroke: #a855f7; stroke-width: 1.6;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 3px rgba(155, 77, 255, 0.9));
+  stroke-dasharray: 100; stroke-dashoffset: 100;
+  opacity: 0;
+  animation: tile-tendril-curl 1s ease-out forwards;
+}
+.tendril-path--1 { animation-delay: 0.05s; }
+.tendril-path--2 { animation-delay: 0.18s; }
+.tendril-path--3 { animation-delay: 0.3s; }
+@keyframes tile-tendril-curl {
+  0% { opacity: 0; stroke-dashoffset: 100; }
+  15% { opacity: 1; }
+  60% { stroke-dashoffset: 0; opacity: 1; }
+  100% { stroke-dashoffset: 0; opacity: 0; }
+}
+
 /* Athena's Curse Strike: a big eye-flash burst the instant the curse takes
    hold - a scaled-up version of the persistent cursed-mark's 👁 icon
    (same purple palette), plus a radial shockwave ring. Snap-in-huge-then-
