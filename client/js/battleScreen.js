@@ -547,6 +547,22 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
     choke.innerHTML = '<span></span>';
     tile.appendChild(choke);
   }
+  if (effects.has('ghosthand') && !character.isKO) {
+    // Layered with the choke-ring: translucent purple ghost-hand silhouettes
+    // grip the portrait's left and right edges - makes explicit WHOSE grip
+    // is choking the puppet (Melyssa's unseen control), which the ring
+    // alone doesn't convey.
+    const hands = document.createElement('div');
+    hands.className = 'ghost-hands';
+    hands.innerHTML = `
+      <svg class="ghost-hand ghost-hand--left" viewBox="0 0 40 60">
+        <path d="M 40,10 C 30,8 22,14 20,24 C 19,20 14,18 12,22 C 10,26 12,32 15,34 C 12,34 9,38 11,42 C 13,46 18,46 21,44 C 20,48 23,52 27,51 C 31,50 32,46 31,42 L 40,50 Z" />
+      </svg>
+      <svg class="ghost-hand ghost-hand--right" viewBox="0 0 40 60">
+        <path d="M 0,10 C 10,8 18,14 20,24 C 21,20 26,18 28,22 C 30,26 28,32 25,34 C 28,34 31,38 29,42 C 27,46 22,46 19,44 C 20,48 17,52 13,51 C 9,50 8,46 9,42 L 0,50 Z" />
+      </svg>`;
+    tile.appendChild(hands);
+  }
   if (effects.has('lightning') && !character.isKO) {
     // Zerathys's Thunder Wrath (and Soul Swap Wrath, which shares the same
     // actionId): a jagged lightning bolt flashing down onto the target -

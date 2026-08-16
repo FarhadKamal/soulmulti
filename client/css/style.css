@@ -527,6 +527,34 @@ input {
   100% { opacity: 0; scale: 0.35; }
 }
 
+/* Melyssa's Self Choke (part 2): translucent purple ghost-hand silhouettes
+   slide in from the left/right edges and grip the portrait, alongside the
+   choke-ring - makes explicit whose invisible grip is doing the choking. */
+.ghost-hands {
+  position: absolute; inset: 0; pointer-events: none; z-index: 5;
+  overflow: hidden; border-radius: inherit;
+}
+.ghost-hand {
+  position: absolute; top: 30%; width: 20%; height: 45%;
+  fill: rgba(155, 77, 255, 0.55);
+  filter: drop-shadow(0 0 4px rgba(155, 77, 255, 0.7));
+  opacity: 0;
+}
+.ghost-hand--left { left: -4%; animation: tile-ghosthand-grip-left 0.7s ease-out forwards; }
+.ghost-hand--right { right: -4%; animation: tile-ghosthand-grip-right 0.7s ease-out forwards; }
+@keyframes tile-ghosthand-grip-left {
+  0% { opacity: 0; translate: -30% 0; }
+  30% { opacity: 0.9; translate: 4% 0; }
+  70% { opacity: 0.85; translate: 0 0; }
+  100% { opacity: 0; translate: -6% 0; }
+}
+@keyframes tile-ghosthand-grip-right {
+  0% { opacity: 0; translate: 30% 0; }
+  30% { opacity: 0.9; translate: -4% 0; }
+  70% { opacity: 0.85; translate: 0 0; }
+  100% { opacity: 0; translate: 6% 0; }
+}
+
 /* Zerathys's Thunder Wrath / Soul Swap Wrath: a jagged lightning bolt
    flashing down onto the target - distinct from every other effect (nothing
    else does a literal bolt). Drawn as zigzag SVG paths (genuine sharp

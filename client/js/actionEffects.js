@@ -19,6 +19,7 @@ const EFFECT_DURATION_MS = {
   invertflash: 350,
   lightning: 500,
   choke: 700,
+  ghosthand: 700,
   smoke: 1600,
   revive: 1300,
   divine: 1100,
@@ -213,11 +214,15 @@ export function handleLogEntryForEffects(entry, game) {
   // puppet, per server/index.js's executeSelfChoke). A contracting loop
   // that snaps shut, distinct from every other effect's expanding/
   // radiating/spinning-outward motion - reads as an invisible grip
-  // tightening, matching her mind-control/puppet-strings theme. Always
-  // deals exactly 1 unshielded damage per executeSelfChoke, so no dodge/
-  // amount gating needed beyond confirming it actually landed.
+  // tightening, matching her mind-control/puppet-strings theme. Layered
+  // with a translucent ghost-hand gripping the portrait's sides at the same
+  // moment - the ring alone doesn't say WHOSE grip it is, the hand makes it
+  // explicit that it's Melyssa's unseen control. Always deals exactly 1
+  // unshielded damage per executeSelfChoke, so no dodge/amount gating
+  // needed beyond confirming it actually landed.
   if (actionId === 'selfChoke' && targetId && amountDealt > 0) {
     addEffect(targetId, 'choke', EFFECT_DURATION_MS.choke);
+    addEffect(targetId, 'ghosthand', EFFECT_DURATION_MS.ghosthand);
   }
 
   // Cyclone Punch: a spinning violet vortex ring on any landed hit, reading
