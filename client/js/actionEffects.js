@@ -14,6 +14,7 @@ const EFFECT_DURATION_MS = {
   pow: 750,
   vortex: 650,
   axechop: 550,
+  eyeburst: 750,
   smoke: 1600,
   revive: 1300,
   divine: 1100,
@@ -130,6 +131,17 @@ export function handleLogEntryForEffects(entry, game) {
   // healed (not already full/KO'd), same "no misleading sparkle" guard.
   if (entry.type === 'jester-ball-return') {
     if (entry.healed > 0 && !entry.wasKO) addEffect(entry.boingoId, 'divine', EFFECT_DURATION_MS.divine);
+    return;
+  }
+
+  // Athena's Curse Strike: a big eye-flash burst on the TARGET the instant
+  // the curse takes hold - a scaled-up version of the existing pulsing 👁
+  // icon (cursed-mark, style.css) with a radial purple shockwave ring, so
+  // it reads as "the same eye that will now watch them" rather than a
+  // generic unrelated impact mark. Distinct motion from every other
+  // effect: snap-in-huge-then-shrink, not radiate/spin/pop/slam.
+  if (entry.type === 'curse') {
+    if (!isKO(entry.targetCharacterId)) addEffect(entry.targetCharacterId, 'eyeburst', EFFECT_DURATION_MS.eyeburst);
     return;
   }
 

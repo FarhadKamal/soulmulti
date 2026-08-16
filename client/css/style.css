@@ -421,6 +421,42 @@ input {
   100% { opacity: 0; scale: 1.05; }
 }
 
+/* Athena's Curse Strike: a big eye-flash burst the instant the curse takes
+   hold - a scaled-up version of the persistent cursed-mark's 👁 icon
+   (same purple palette), plus a radial shockwave ring. Snap-in-huge-then-
+   shrink motion, distinct from every other effect's radiate/spin/pop/slam. */
+.eye-burst {
+  position: absolute; inset: 0; pointer-events: none; z-index: 4;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden; border-radius: inherit;
+}
+.eye-burst-ring {
+  position: absolute; width: 20%; height: 20%; border-radius: 50%;
+  border: 3px solid #c084fc;
+  box-shadow: 0 0 14px 2px rgba(155, 77, 255, 0.7);
+  opacity: 0;
+  animation: tile-eyeburst-ring 0.75s ease-out forwards;
+}
+@keyframes tile-eyeburst-ring {
+  0% { opacity: 0; scale: 0.4; }
+  25% { opacity: 0.9; }
+  100% { opacity: 0; scale: 3.2; }
+}
+.eye-burst-icon {
+  position: relative; font-size: 2.1rem;
+  color: #d9a8ff;
+  text-shadow: 0 0 16px rgba(155, 77, 255, 0.95), 0 0 4px rgba(0, 0, 0, 0.6);
+  opacity: 0;
+  animation: tile-eyeburst-icon 0.75s cubic-bezier(0.2, 0.9, 0.3, 1.1) forwards;
+}
+@keyframes tile-eyeburst-icon {
+  0% { opacity: 0; scale: 0.2; }
+  30% { opacity: 1; scale: 1.3; }
+  55% { scale: 1; }
+  80% { opacity: 1; }
+  100% { opacity: 0; scale: 0.85; }
+}
+
 /* Draxus's Dying Blow: a downward axe-chop wedge that slams straight down
    and embeds (a directional slam-and-stick motion, unlike every other
    effect's radiate/spin/pop) - matches his axe rather than reusing claw/

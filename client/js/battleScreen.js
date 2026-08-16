@@ -511,6 +511,16 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
     shatter.innerHTML = `<span class="shatter-core"></span>${chips}`;
     tile.appendChild(shatter);
   }
+  if (effects.has('eyeburst') && !character.isKO) {
+    // Athena's Curse Strike: a big eye-flash burst the instant the curse
+    // takes hold - a scaled-up version of the persistent cursed-mark's 👁
+    // icon, plus a radial purple shockwave ring. Snap-in-huge-then-shrink
+    // motion, distinct from every other effect's radiate/spin/pop/slam.
+    const eyeburst = document.createElement('div');
+    eyeburst.className = 'eye-burst';
+    eyeburst.innerHTML = '<span class="eye-burst-ring"></span><span class="eye-burst-icon">👁</span>';
+    tile.appendChild(eyeburst);
+  }
   if (effects.has('axechop') && !character.isKO) {
     // Draxus's Dying Blow: a downward axe-chop wedge that slams straight
     // down and embeds (directional slam, unlike every other effect's
