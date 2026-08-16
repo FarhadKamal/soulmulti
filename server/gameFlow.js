@@ -12,6 +12,19 @@ import {
   hasCharacterActedThisTurn, charactersActingThisTurn, resolveJesterBall, endTurn,
 } from './engine/turnEngine.js';
 
+// Zeroes out a stalled Draxus bonus turn (see draxus.js's onTurnStart) when
+// getActingCharacterId itself ends his turn via markCharacterActed below,
+// bypassing index.js's normal post-executeAction decrement entirely - e.g.
+// he's frozen mid-bonus-turn, or every remaining enemy is KO'd/untargetable
+// so he has no legal target left for a strike he still owed. Without this,
+// bonusActionsRemaining would leak a stale >0 value into his next real
+// turn, wrongly making him look like he still owes strikes from last round.
+function clearStalledBonusTurn(character) {
+  if (character.id === 'draxus' && character.special.bonusActionsRemaining > 0) {
+    character.special.bonusActionsRemaining = 0;
+  }
+}
+
 // Advances game.log/state past every character who has nothing to legally
 // do right now (frozen, no valid targets) and returns the id of the next
 // character who actually needs a real decision - or null if the whole
@@ -28,6 +41,7 @@ export function getActingCharacterId(game) {
       } else {
         game.log.push({ type: 'passive', characterId: character.id, text: `${CHARACTERS[character.id].name} is frozen and skips their turn.` });
       }
+      clearStalledBonusTurn(character);
       markCharacterActed(game, character.id);
       continue;
     }
@@ -37,6 +51,7 @@ export function getActingCharacterId(game) {
     }
     if (!isBallHolder && getUsableActions(character, game).length === 0) {
       game.log.push({ type: 'passive', characterId: character.id, text: `${CHARACTERS[character.id].name} has no valid targets and skips their turn.` });
+      clearStalledBonusTurn(character);
       markCharacterActed(game, character.id);
       continue;
     }
