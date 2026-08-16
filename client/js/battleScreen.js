@@ -548,19 +548,44 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
     tile.appendChild(choke);
   }
   if (effects.has('ghosthand') && !character.isKO) {
-    // Layered with the choke-ring: translucent purple ghost-hand silhouettes
-    // grip the portrait's left and right edges - makes explicit WHOSE grip
-    // is choking the puppet (Melyssa's unseen control), which the ring
-    // alone doesn't convey.
+    // Layered with the choke-ring: translucent purple SKELETON hand
+    // silhouettes grip the portrait's left and right edges - drawn as
+    // stroked bone segments + joint dots (not a filled blob, which read as
+    // an unrecognizable mitten shape) so individual finger bones are
+    // legible even at tile size. Makes explicit WHOSE grip is choking the
+    // puppet (Melyssa's unseen control), which the ring alone doesn't
+    // convey. Right hand is the left hand's paths mirrored horizontally
+    // (translate+scale) rather than a hand-authored duplicate, so both
+    // stay in sync if the shape is ever tuned.
+    const boneHand = (mirror) => `
+      <g${mirror ? ' transform="translate(40,0) scale(-1,1)"' : ''}>
+        <path class="hand-bone" d="M 6,52 L 8,34" />
+        <path class="hand-bone" d="M 8,34 L 6,22 L 4,14" />
+        <path class="hand-bone" d="M 12,50 L 14,28" />
+        <path class="hand-bone" d="M 14,28 L 13,14 L 12,4" />
+        <path class="hand-bone" d="M 19,49 L 20,26" />
+        <path class="hand-bone" d="M 20,26 L 20,10 L 20,0" />
+        <path class="hand-bone" d="M 26,50 L 26,29" />
+        <path class="hand-bone" d="M 26,29 L 27,15 L 28,6" />
+        <path class="hand-bone" d="M 32,52 L 33,37" />
+        <path class="hand-bone" d="M 33,37 L 35,27 L 37,20" />
+        <circle class="hand-joint" cx="8" cy="34" r="1.6" />
+        <circle class="hand-joint" cx="6" cy="22" r="1.4" />
+        <circle class="hand-joint" cx="14" cy="28" r="1.6" />
+        <circle class="hand-joint" cx="13" cy="14" r="1.4" />
+        <circle class="hand-joint" cx="20" cy="26" r="1.6" />
+        <circle class="hand-joint" cx="20" cy="10" r="1.4" />
+        <circle class="hand-joint" cx="26" cy="29" r="1.6" />
+        <circle class="hand-joint" cx="27" cy="15" r="1.4" />
+        <circle class="hand-joint" cx="33" cy="37" r="1.6" />
+        <circle class="hand-joint" cx="35" cy="27" r="1.4" />
+        <path class="hand-palm" d="M 6,52 C 12,58 26,58 32,52 L 33,37 C 26,42 12,42 8,37 Z" />
+      </g>`;
     const hands = document.createElement('div');
     hands.className = 'ghost-hands';
     hands.innerHTML = `
-      <svg class="ghost-hand ghost-hand--left" viewBox="0 0 40 60">
-        <path d="M 40,10 C 30,8 22,14 20,24 C 19,20 14,18 12,22 C 10,26 12,32 15,34 C 12,34 9,38 11,42 C 13,46 18,46 21,44 C 20,48 23,52 27,51 C 31,50 32,46 31,42 L 40,50 Z" />
-      </svg>
-      <svg class="ghost-hand ghost-hand--right" viewBox="0 0 40 60">
-        <path d="M 0,10 C 10,8 18,14 20,24 C 21,20 26,18 28,22 C 30,26 28,32 25,34 C 28,34 31,38 29,42 C 27,46 22,46 19,44 C 20,48 17,52 13,51 C 9,50 8,46 9,42 L 0,50 Z" />
-      </svg>`;
+      <svg class="ghost-hand ghost-hand--left" viewBox="0 0 40 60">${boneHand(false)}</svg>
+      <svg class="ghost-hand ghost-hand--right" viewBox="0 0 40 60">${boneHand(true)}</svg>`;
     tile.appendChild(hands);
   }
   if (effects.has('lightning') && !character.isKO) {

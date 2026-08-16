@@ -527,18 +527,28 @@ input {
   100% { opacity: 0; scale: 0.35; }
 }
 
-/* Melyssa's Self Choke (part 2): translucent purple ghost-hand silhouettes
-   slide in from the left/right edges and grip the portrait, alongside the
-   choke-ring - makes explicit whose invisible grip is doing the choking. */
+/* Melyssa's Self Choke (part 2): translucent purple SKELETON hands slide in
+   from the left/right edges and grip the portrait, alongside the choke-ring
+   - drawn as stroked bone segments + joint dots (a filled silhouette read
+   as an unrecognizable blob, not a hand) so individual finger bones are
+   legible even at tile size. Makes explicit whose invisible grip is doing
+   the choking. */
 .ghost-hands {
   position: absolute; inset: 0; pointer-events: none; z-index: 5;
   overflow: hidden; border-radius: inherit;
 }
 .ghost-hand {
-  position: absolute; top: 30%; width: 20%; height: 45%;
-  fill: rgba(155, 77, 255, 0.55);
-  filter: drop-shadow(0 0 4px rgba(155, 77, 255, 0.7));
+  position: absolute; top: 28%; width: 22%; height: 48%;
+  filter: drop-shadow(0 0 4px rgba(155, 77, 255, 0.8));
   opacity: 0;
+}
+.hand-bone {
+  fill: none; stroke: #d9b3ff; stroke-width: 2; stroke-linecap: round;
+}
+.hand-joint { fill: #c084fc; }
+.hand-palm {
+  fill: rgba(155, 77, 255, 0.28);
+  stroke: #d9b3ff; stroke-width: 1.5;
 }
 .ghost-hand--left { left: -4%; animation: tile-ghosthand-grip-left 0.7s ease-out forwards; }
 .ghost-hand--right { right: -4%; animation: tile-ghosthand-grip-right 0.7s ease-out forwards; }
