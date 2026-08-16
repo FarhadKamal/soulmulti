@@ -363,6 +363,39 @@ input {
   100% { opacity: 0; transform: rotate(18deg) scaleY(1); }
 }
 
+/* Kaelis's Grudge Strike is a hammer, not claws - impact-crack clusters
+   (angular spiderweb fractures) instead of curved scratch lines, grey/white
+   like stone/armor damage rather than the claw-scratch's red. Each span is
+   one cluster's worth of jagged crack lines built from conic gradients so
+   they read as fractures radiating from an impact point, not slashes. */
+.crack-shatter {
+  position: absolute; inset: 0; pointer-events: none; z-index: 4;
+  overflow: hidden; border-radius: inherit;
+}
+.crack-shatter span {
+  position: absolute; top: 50%; width: 34%; height: 34%;
+  transform-origin: center;
+  background:
+    conic-gradient(from 0deg,
+      transparent 0deg, rgba(230, 230, 235, 0.95) 2deg, transparent 4deg,
+      transparent 40deg, rgba(230, 230, 235, 0.9) 43deg, transparent 46deg,
+      transparent 95deg, rgba(230, 230, 235, 0.95) 98deg, transparent 101deg,
+      transparent 150deg, rgba(230, 230, 235, 0.85) 153deg, transparent 156deg,
+      transparent 205deg, rgba(230, 230, 235, 0.9) 208deg, transparent 211deg,
+      transparent 260deg, rgba(230, 230, 235, 0.95) 263deg, transparent 266deg,
+      transparent 320deg, rgba(230, 230, 235, 0.85) 323deg, transparent 326deg,
+      transparent 360deg);
+  filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.6));
+  opacity: 0; scale: 0.3;
+  animation: tile-crack-burst 0.6s ease-out forwards;
+}
+@keyframes tile-crack-burst {
+  0% { opacity: 0; scale: 0.2; }
+  20% { opacity: 1; scale: 1; }
+  70% { opacity: 1; scale: 1.05; }
+  100% { opacity: 0; scale: 1.05; }
+}
+
 .smoke-burst {
   position: absolute; inset: 0; pointer-events: none; z-index: 4;
   overflow: hidden; border-radius: inherit;

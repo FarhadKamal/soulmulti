@@ -9,17 +9,18 @@ const EFFECT_DURATION_MS = {
   shake: 500,
   dodge: 500,
   claw: 600,
+  crack: 600,
   smoke: 1600,
   revive: 1300,
   divine: 1100,
 };
 
 // Per-character currently-active one-shot effects, keyed by characterId ->
-// { effects: Set<'hit'|'shake'|'dodge'|'claw'|'smoke'|'revive'|'divine'>,
-//   clawCount, timers: Map }. Multiple effects CAN overlap on one character
-// (e.g. a killing Shadow Execution hit-flashes AND shakes AND claws all at
-// once) - unlike portraitFlash's single active image, these are independent
-// layers, matching the main game's separate flashCharacterIds/
+// { effects: Set<'hit'|'shake'|'dodge'|'claw'|'crack'|'smoke'|'revive'|'divine'>,
+//   clawCount, crackCount, timers: Map }. Multiple effects CAN overlap on one
+// character (e.g. a killing Shadow Execution hit-flashes AND shakes AND
+// claws all at once) - unlike portraitFlash's single active image, these are
+// independent layers, matching the main game's separate flashCharacterIds/
 // shakeCharacterIds/clawCharacterIds/etc. sets.
 const activeEffects = new Map();
 
@@ -28,14 +29,15 @@ export function registerEffectRerender(fn) {
   onEffectExpired = fn;
 }
 
-function addEffect(characterId, effect, durationMs, clawCount) {
+function addEffect(characterId, effect, durationMs, count) {
   let entry = activeEffects.get(characterId);
   if (!entry) {
-    entry = { effects: new Set(), clawCount: 3, timers: new Map() };
+    entry = { effects: new Set(), clawCount: 3, crackCount: 1, timers: new Map() };
     activeEffects.set(characterId, entry);
   }
   entry.effects.add(effect);
-  if (effect === 'claw' && clawCount) entry.clawCount = clawCount;
+  if (effect === 'claw' && count) entry.clawCount = count;
+  if (effect === 'crack' && count) entry.crackCount = count;
 
   const existingTimer = entry.timers.get(effect);
   if (existingTimer) clearTimeout(existingTimer);
@@ -53,6 +55,10 @@ export function getActiveEffects(characterId) {
 
 export function getClawCount(characterId) {
   return activeEffects.get(characterId)?.clawCount ?? 3;
+}
+
+export function getCrackCount(characterId) {
+  return activeEffects.get(characterId)?.crackCount ?? 1;
 }
 
 // Applies the general "damage actually landed" hit-flash - same gate as the
@@ -117,7 +123,7 @@ export function handleLogEntryForEffects(entry, game) {
   }
 
   if (entry.type !== 'attack' && entry.type !== 'special') return;
-  const { characterId, actionId, targetId, dodged, amountDealt, streak, flip, outcome } = entry;
+  const { characterId, actionId, targetId, dodged, amountDealt, streak, flip, outcome, grudgeCount } = entry;
 
   applyHitFlash(targetId, amountDealt);
 
@@ -157,11 +163,16 @@ export function handleLogEntryForEffects(entry, game) {
     addEffect(targetId, 'claw', EFFECT_DURATION_MS.claw, streakCount);
   }
 
-  // Grudge Strike: shake only on a revenge hit (amountDealt > 1) - her
-  // baseline hit is always exactly 1, so anything higher already means the
-  // grudge paid off, same signal Blood Hunt's streak-based gate uses.
-  if (actionId === 'grudgeStrike' && targetId && !dodged && amountDealt > 1) {
-    addEffect(targetId, 'shake', EFFECT_DURATION_MS.shake);
+  // Grudge Strike: her hammer leaves impact-crack marks (not claw scratches
+  // - she doesn't have claws) scaled to how many grudge points paid off on
+  // this hit, same "escalating stack" story Blood Hunt's claw count tells,
+  // just in blunt-impact language instead of scratch language. Fires on any
+  // landed hit (even her un-grudged baseline, which still leaves one small
+  // crack) - shake stays gated on amountDealt > 1 (a real revenge payoff),
+  // unchanged from before.
+  if (actionId === 'grudgeStrike' && targetId && !dodged && amountDealt > 0) {
+    addEffect(targetId, 'crack', EFFECT_DURATION_MS.crack, 1 + (grudgeCount || 0));
+    if (amountDealt > 1) addEffect(targetId, 'shake', EFFECT_DURATION_MS.shake);
   }
 
   // Dying Blow: shake only at his top damage tier (amountDealt === 3, his

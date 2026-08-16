@@ -3,7 +3,7 @@ import { send } from './net.js';
 import { renderChatPanel } from './chatPanel.js';
 import { playUiClick } from './sound.js';
 import { getFlashSrc, getPersistentPortrait } from './portraitFlash.js';
-import { getActiveEffects, getClawCount } from './actionEffects.js';
+import { getActiveEffects, getClawCount, getCrackCount } from './actionEffects.js';
 import { renderFullscreenButton } from './fullscreen.js';
 import { v, hardRefresh } from './assetVersion.js';
 
@@ -456,6 +456,23 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
       `<span style="left:${(100 / (count + 1)) * (i + 1)}%; animation-delay:${i * 0.08}s"></span>`
     ).join('');
     tile.appendChild(claw);
+  }
+  if (effects.has('crack') && !character.isKO) {
+    // Scattered impact points (not a lined-up strip like claw-scratch) -
+    // each cluster lands somewhere different on the tile, matching a
+    // hammer hitting different spots rather than one continuous slash.
+    const crack = document.createElement('div');
+    crack.className = 'crack-shatter';
+    const count = Math.max(1, Math.min(getCrackCount(character.id), 6));
+    const positions = [
+      { left: 30, top: 30 }, { left: 62, top: 22 }, { left: 45, top: 55 },
+      { left: 18, top: 60 }, { left: 70, top: 58 }, { left: 50, top: 15 },
+    ];
+    crack.innerHTML = Array.from({ length: count }, (_, i) => {
+      const pos = positions[i % positions.length];
+      return `<span style="left:${pos.left}%; top:${pos.top}%; animation-delay:${i * 0.07}s"></span>`;
+    }).join('');
+    tile.appendChild(crack);
   }
   if (effects.has('smoke') && !character.isKO) {
     const smoke = document.createElement('div');
