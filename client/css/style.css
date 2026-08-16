@@ -421,6 +421,52 @@ input {
   100% { opacity: 0; scale: 1.05; }
 }
 
+/* Chronox's Cyclone Punch: a spinning violet vortex ring that spirals
+   INWARD (shrinking while rotating, opposite motion from the outward-
+   exploding crack/shatter effects) - reads as temporal/cosmic energy
+   rather than a physical impact. Built from a conic-gradient ring with a
+   brighter "comet head" segment so the spin direction is visible, plus
+   small tick marks (a subtle time-theme nod, not a literal clock face).
+   'big' (heads) adds a second inner ring spinning the opposite way. */
+.vortex-burst {
+  position: absolute; inset: 0; pointer-events: none; z-index: 4;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden; border-radius: inherit;
+}
+.vortex-burst .vortex-ring {
+  position: absolute; border-radius: 50%;
+  background: conic-gradient(from 0deg,
+    transparent 0deg, transparent 260deg,
+    #c084fc 300deg, #f3e8ff 330deg, #a855f7 355deg, transparent 360deg);
+  -webkit-mask: radial-gradient(circle, transparent 62%, #000 64%, #000 78%, transparent 80%);
+  mask: radial-gradient(circle, transparent 62%, #000 64%, #000 78%, transparent 80%);
+  filter: drop-shadow(0 0 6px rgba(168, 85, 247, 0.85));
+  opacity: 0;
+}
+.vortex-burst--small .vortex-ring--outer {
+  width: 55%; height: 55%;
+  animation: tile-vortex-spin-in 0.65s ease-in forwards;
+}
+.vortex-burst--big .vortex-ring--outer {
+  width: 75%; height: 75%;
+  animation: tile-vortex-spin-in 0.65s ease-in forwards;
+}
+.vortex-burst--big .vortex-ring--inner {
+  width: 42%; height: 42%;
+  animation: tile-vortex-spin-in-reverse 0.65s ease-in forwards;
+  animation-delay: 0.05s;
+}
+@keyframes tile-vortex-spin-in {
+  0% { opacity: 0; scale: 1.6; rotate: 0deg; }
+  20% { opacity: 1; }
+  100% { opacity: 0; scale: 0.3; rotate: 420deg; }
+}
+@keyframes tile-vortex-spin-in-reverse {
+  0% { opacity: 0; scale: 1.4; rotate: 0deg; }
+  20% { opacity: 1; }
+  100% { opacity: 0; scale: 0.25; rotate: -380deg; }
+}
+
 /* Boingo's Chaos Gamble: comic-book "POW!"/"BAM!" text burst instead of an
    impact-crack mark - fits his clownish theme. Bold jagged yellow/white
    lettering, comic-outline via layered text-shadow, pops in with a slight

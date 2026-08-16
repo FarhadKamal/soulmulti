@@ -12,18 +12,20 @@ const EFFECT_DURATION_MS = {
   crack: 600,
   bigshatter: 700,
   pow: 750,
+  vortex: 650,
   smoke: 1600,
   revive: 1300,
   divine: 1100,
 };
 
 // Per-character currently-active one-shot effects, keyed by characterId ->
-// { effects: Set<'hit'|'shake'|'dodge'|'claw'|'crack'|'pow'|'smoke'|'revive'|'divine'>,
-//   clawCount, crackCount, powSize, timers: Map }. Multiple effects CAN
-// overlap on one character (e.g. a killing Shadow Execution hit-flashes AND
-// shakes AND claws all at once) - unlike portraitFlash's single active
-// image, these are independent layers, matching the main game's separate
-// flashCharacterIds/shakeCharacterIds/clawCharacterIds/etc. sets.
+// { effects: Set<'hit'|'shake'|'dodge'|'claw'|'crack'|'pow'|'vortex'|'smoke'|
+//   'revive'|'divine'>, clawCount, crackCount, powSize, vortexSize,
+//   timers: Map }. Multiple effects CAN overlap on one character (e.g. a
+// killing Shadow Execution hit-flashes AND shakes AND claws all at once) -
+// unlike portraitFlash's single active image, these are independent layers,
+// matching the main game's separate flashCharacterIds/shakeCharacterIds/
+// clawCharacterIds/etc. sets.
 const activeEffects = new Map();
 
 let onEffectExpired = () => {};
@@ -34,13 +36,14 @@ export function registerEffectRerender(fn) {
 function addEffect(characterId, effect, durationMs, param) {
   let entry = activeEffects.get(characterId);
   if (!entry) {
-    entry = { effects: new Set(), clawCount: 3, crackCount: 1, powSize: 'small', timers: new Map() };
+    entry = { effects: new Set(), clawCount: 3, crackCount: 1, powSize: 'small', vortexSize: 'small', timers: new Map() };
     activeEffects.set(characterId, entry);
   }
   entry.effects.add(effect);
   if (effect === 'claw' && param) entry.clawCount = param;
   if (effect === 'crack' && param) entry.crackCount = param;
   if (effect === 'pow' && param) entry.powSize = param;
+  if (effect === 'vortex' && param) entry.vortexSize = param;
 
   const existingTimer = entry.timers.get(effect);
   if (existingTimer) clearTimeout(existingTimer);
@@ -62,6 +65,10 @@ export function getClawCount(characterId) {
 
 export function getPowSize(characterId) {
   return activeEffects.get(characterId)?.powSize ?? 'small';
+}
+
+export function getVortexSize(characterId) {
+  return activeEffects.get(characterId)?.vortexSize ?? 'small';
 }
 
 export function getCrackCount(characterId) {
@@ -141,9 +148,19 @@ export function handleLogEntryForEffects(entry, game) {
     addEffect(characterId, 'divine', EFFECT_DURATION_MS.divine);
   }
 
-  // Cyclone Punch: shake on a heads flip that wasn't dodged.
-  if (actionId === 'cyclonePunch' && flip === 'heads' && !dodged) {
-    addEffect(targetId, 'shake', EFFECT_DURATION_MS.shake);
+  // Cyclone Punch: a spinning violet vortex ring on any landed hit, reading
+  // as temporal/cosmic energy rather than a physical impact mark (matches
+  // his time/space theme, distinct from every other character's punch/claw/
+  // crack language). Tails (1 dmg) gets a single small quick-spin ring;
+  // heads (2 dmg, also shakes) gets a bigger ring plus a second inner ring
+  // counter-spinning for a more chaotic "cyclone" feel.
+  if (actionId === 'cyclonePunch' && !dodged && amountDealt > 0) {
+    if (flip === 'heads') {
+      addEffect(targetId, 'shake', EFFECT_DURATION_MS.shake);
+      addEffect(targetId, 'vortex', EFFECT_DURATION_MS.vortex, 'big');
+    } else {
+      addEffect(targetId, 'vortex', EFFECT_DURATION_MS.vortex, 'small');
+    }
   }
 
   // Chaos Gamble: shake on a 'win' roll that wasn't dodged. Also a comic-

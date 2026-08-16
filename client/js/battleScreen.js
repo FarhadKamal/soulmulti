@@ -3,7 +3,7 @@ import { send } from './net.js';
 import { renderChatPanel } from './chatPanel.js';
 import { playUiClick } from './sound.js';
 import { getFlashSrc, getPersistentPortrait } from './portraitFlash.js';
-import { getActiveEffects, getClawCount, getCrackCount, getPowSize } from './actionEffects.js';
+import { getActiveEffects, getClawCount, getCrackCount, getPowSize, getVortexSize } from './actionEffects.js';
 import { renderFullscreenButton } from './fullscreen.js';
 import { v, hardRefresh } from './assetVersion.js';
 
@@ -510,6 +510,19 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
     }).join('');
     shatter.innerHTML = `<span class="shatter-core"></span>${chips}`;
     tile.appendChild(shatter);
+  }
+  if (effects.has('vortex') && !character.isKO) {
+    // Chronox's Cyclone Punch: a spinning violet vortex ring reading as
+    // temporal/cosmic energy rather than a physical impact mark - matches
+    // his time/space theme, distinct from every other character's punch/
+    // claw/crack/text language. 'big' (heads, 2 dmg) gets a second inner
+    // ring counter-spinning for a more chaotic cyclone feel.
+    const size = getVortexSize(character.id);
+    const vortex = document.createElement('div');
+    vortex.className = `vortex-burst vortex-burst--${size}`;
+    vortex.innerHTML = '<span class="vortex-ring vortex-ring--outer"></span>' +
+      (size === 'big' ? '<span class="vortex-ring vortex-ring--inner"></span>' : '');
+    tile.appendChild(vortex);
   }
   if (effects.has('pow') && !character.isKO) {
     // Boingo's Chaos Gamble: comic-book text burst instead of the crack/
