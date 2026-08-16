@@ -3,7 +3,7 @@ import { send } from './net.js';
 import { renderChatPanel } from './chatPanel.js';
 import { playUiClick } from './sound.js';
 import { getFlashSrc, getPersistentPortrait } from './portraitFlash.js';
-import { getActiveEffects, getClawCount, getCrackCount } from './actionEffects.js';
+import { getActiveEffects, getClawCount, getCrackCount, getPowSize } from './actionEffects.js';
 import { renderFullscreenButton } from './fullscreen.js';
 import { v, hardRefresh } from './assetVersion.js';
 
@@ -510,6 +510,18 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
     }).join('');
     shatter.innerHTML = `<span class="shatter-core"></span>${chips}`;
     tile.appendChild(shatter);
+  }
+  if (effects.has('pow') && !character.isKO) {
+    // Boingo's Chaos Gamble: comic-book text burst instead of the crack/
+    // claw impact language everyone else uses - matches his clownish,
+    // chaotic theme. 'big' (a 'win' roll) shows POW! with motion lines;
+    // 'small' (a 'draw') shows a plain, smaller BAM!.
+    const size = getPowSize(character.id);
+    const pow = document.createElement('div');
+    pow.className = `pow-burst pow-burst--${size}`;
+    pow.innerHTML = `<span class="pow-text">${size === 'big' ? 'POW!' : 'BAM!'}</span>` +
+      (size === 'big' ? '<span class="pow-line pow-line--1"></span><span class="pow-line pow-line--2"></span><span class="pow-line pow-line--3"></span>' : '');
+    tile.appendChild(pow);
   }
   if (effects.has('smoke') && !character.isKO) {
     const smoke = document.createElement('div');

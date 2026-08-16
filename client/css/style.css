@@ -421,6 +421,51 @@ input {
   100% { opacity: 0; scale: 1.05; }
 }
 
+/* Boingo's Chaos Gamble: comic-book "POW!"/"BAM!" text burst instead of an
+   impact-crack mark - fits his clownish theme. Bold jagged yellow/white
+   lettering, comic-outline via layered text-shadow, pops in with a slight
+   rotation then scales/fades out. 'big' (win) gets motion-line spikes
+   behind the text; 'small' (draw) is the same text, smaller, no lines. */
+.pow-burst {
+  position: absolute; inset: 0; pointer-events: none; z-index: 5;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden; border-radius: inherit;
+}
+.pow-burst .pow-text {
+  position: relative;
+  font-family: 'Arial Black', Impact, sans-serif;
+  font-weight: 900; letter-spacing: 1px;
+  color: #fff566;
+  -webkit-text-stroke: 2px #8a1f0a;
+  text-shadow: 3px 3px 0 #8a1f0a, -1px -1px 0 #8a1f0a, 0 0 14px rgba(255, 200, 40, 0.8);
+  opacity: 0;
+  animation: tile-pow-pop 0.75s cubic-bezier(0.2, 0.8, 0.3, 1.1) forwards;
+}
+.pow-burst--big .pow-text { font-size: 1.9rem; transform: rotate(-8deg); }
+.pow-burst--small .pow-text { font-size: 1.25rem; transform: rotate(-5deg); }
+@keyframes tile-pow-pop {
+  0% { opacity: 0; scale: 0.2; }
+  35% { opacity: 1; scale: 1.15; }
+  55% { scale: 1; }
+  80% { opacity: 1; }
+  100% { opacity: 0; scale: 1.05; }
+}
+.pow-burst .pow-line {
+  position: absolute; height: 4px; width: 26%;
+  background: linear-gradient(to right, transparent, #fff566, transparent);
+  opacity: 0;
+  animation: tile-pow-line 0.75s ease-out forwards;
+}
+.pow-burst .pow-line--1 { top: 28%; left: 4%; transform: rotate(-18deg); animation-delay: 0.05s; }
+.pow-burst .pow-line--2 { bottom: 26%; right: 4%; transform: rotate(-18deg); animation-delay: 0.12s; }
+.pow-burst .pow-line--3 { top: 52%; left: -2%; width: 20%; transform: rotate(6deg); animation-delay: 0.18s; }
+@keyframes tile-pow-line {
+  0% { opacity: 0; }
+  30% { opacity: 1; }
+  75% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
 /* Tharox's Titan Smash / Glory Smash: one big, centered, dense radial
    shatter - same crack-fracture visual family as Kaelis's, scaled way up
    and symmetric (not scattered clusters) to read as a single overwhelming

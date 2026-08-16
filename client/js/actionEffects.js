@@ -11,18 +11,19 @@ const EFFECT_DURATION_MS = {
   claw: 600,
   crack: 600,
   bigshatter: 700,
+  pow: 750,
   smoke: 1600,
   revive: 1300,
   divine: 1100,
 };
 
 // Per-character currently-active one-shot effects, keyed by characterId ->
-// { effects: Set<'hit'|'shake'|'dodge'|'claw'|'crack'|'smoke'|'revive'|'divine'>,
-//   clawCount, crackCount, timers: Map }. Multiple effects CAN overlap on one
-// character (e.g. a killing Shadow Execution hit-flashes AND shakes AND
-// claws all at once) - unlike portraitFlash's single active image, these are
-// independent layers, matching the main game's separate flashCharacterIds/
-// shakeCharacterIds/clawCharacterIds/etc. sets.
+// { effects: Set<'hit'|'shake'|'dodge'|'claw'|'crack'|'pow'|'smoke'|'revive'|'divine'>,
+//   clawCount, crackCount, powSize, timers: Map }. Multiple effects CAN
+// overlap on one character (e.g. a killing Shadow Execution hit-flashes AND
+// shakes AND claws all at once) - unlike portraitFlash's single active
+// image, these are independent layers, matching the main game's separate
+// flashCharacterIds/shakeCharacterIds/clawCharacterIds/etc. sets.
 const activeEffects = new Map();
 
 let onEffectExpired = () => {};
@@ -30,15 +31,16 @@ export function registerEffectRerender(fn) {
   onEffectExpired = fn;
 }
 
-function addEffect(characterId, effect, durationMs, count) {
+function addEffect(characterId, effect, durationMs, param) {
   let entry = activeEffects.get(characterId);
   if (!entry) {
-    entry = { effects: new Set(), clawCount: 3, crackCount: 1, timers: new Map() };
+    entry = { effects: new Set(), clawCount: 3, crackCount: 1, powSize: 'small', timers: new Map() };
     activeEffects.set(characterId, entry);
   }
   entry.effects.add(effect);
-  if (effect === 'claw' && count) entry.clawCount = count;
-  if (effect === 'crack' && count) entry.crackCount = count;
+  if (effect === 'claw' && param) entry.clawCount = param;
+  if (effect === 'crack' && param) entry.crackCount = param;
+  if (effect === 'pow' && param) entry.powSize = param;
 
   const existingTimer = entry.timers.get(effect);
   if (existingTimer) clearTimeout(existingTimer);
@@ -56,6 +58,10 @@ export function getActiveEffects(characterId) {
 
 export function getClawCount(characterId) {
   return activeEffects.get(characterId)?.clawCount ?? 3;
+}
+
+export function getPowSize(characterId) {
+  return activeEffects.get(characterId)?.powSize ?? 'small';
 }
 
 export function getCrackCount(characterId) {
@@ -140,9 +146,19 @@ export function handleLogEntryForEffects(entry, game) {
     addEffect(targetId, 'shake', EFFECT_DURATION_MS.shake);
   }
 
-  // Chaos Gamble: shake on a 'win' roll that wasn't dodged.
-  if (actionId === 'chaosGamble' && outcome === 'win' && !dodged) {
-    addEffect(targetId, 'shake', EFFECT_DURATION_MS.shake);
+  // Chaos Gamble: shake on a 'win' roll that wasn't dodged. Also a comic-
+  // book "POW!"/"BAM!" text burst on any roll that actually connects (win
+  // or draw, never 'lose' - that's a miss, nothing lands) - bigger text +
+  // motion lines on a win, a smaller plain burst on a draw. Matches
+  // Boingo's clownish theme instead of reusing the crack/claw impact
+  // language every other character uses.
+  if (actionId === 'chaosGamble' && !dodged) {
+    if (outcome === 'win') {
+      addEffect(targetId, 'shake', EFFECT_DURATION_MS.shake);
+      addEffect(targetId, 'pow', EFFECT_DURATION_MS.pow, 'big');
+    } else if (outcome === 'draw') {
+      addEffect(targetId, 'pow', EFFECT_DURATION_MS.pow, 'small');
+    }
   }
 
   // Landed-hit shake: Titan Smash / Glory Smash hitting their target. These
