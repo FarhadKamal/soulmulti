@@ -501,6 +501,32 @@ input {
   100% { opacity: 0; scale: 0.85; }
 }
 
+/* Melyssa's Self Choke, victim (puppet) side: a constricting violet ring
+   that starts wide and contracts inward around the portrait before
+   snapping tight and fading - a genuinely new contracting-loop motion,
+   distinct from every other effect's expanding/radiating/spinning-outward
+   language. Reads as an invisible grip tightening, same purple palette as
+   the hypnotic-ripple/puppet-glow effects. */
+.choke-ring {
+  position: absolute; inset: 0; pointer-events: none; z-index: 4;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden; border-radius: inherit;
+}
+.choke-ring span {
+  position: absolute; width: 90%; height: 55%; border-radius: 50%;
+  border: 4px solid #9b4dff;
+  box-shadow: 0 0 10px 1px rgba(155, 77, 255, 0.75), inset 0 0 8px rgba(155, 77, 255, 0.4);
+  opacity: 0;
+  animation: tile-choke-constrict 0.7s cubic-bezier(0.7, 0, 0.85, 1) forwards;
+}
+@keyframes tile-choke-constrict {
+  0% { opacity: 0; scale: 1.6; }
+  20% { opacity: 1; scale: 1.3; }
+  60% { opacity: 1; scale: 0.55; }
+  80% { opacity: 1; scale: 0.4; }
+  100% { opacity: 0; scale: 0.35; }
+}
+
 /* Zerathys's Thunder Wrath / Soul Swap Wrath: a jagged lightning bolt
    flashing down onto the target - distinct from every other effect (nothing
    else does a literal bolt). Drawn as zigzag SVG paths (genuine sharp

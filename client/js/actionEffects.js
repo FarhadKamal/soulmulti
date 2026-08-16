@@ -18,6 +18,7 @@ const EFFECT_DURATION_MS = {
   tendrils: 1000,
   invertflash: 350,
   lightning: 500,
+  choke: 700,
   smoke: 1600,
   revive: 1300,
   divine: 1100,
@@ -204,6 +205,19 @@ export function handleLogEntryForEffects(entry, game) {
   if (actionId === 'thunderWrath' && targetId && !dodged && amountDealt > 0) {
     addEffect(targetId, 'lightning', EFFECT_DURATION_MS.lightning, amountDealt);
     if (amountDealt === 3) addEffect(targetId, 'shake', EFFECT_DURATION_MS.shake);
+  }
+
+  // Self Choke: a constricting violet ring closes in around the puppet's
+  // OWN portrait (the "victim" here is the puppet Melyssa is forcing to
+  // hurt themselves, not an enemy she struck directly - targetId is the
+  // puppet, per server/index.js's executeSelfChoke). A contracting loop
+  // that snaps shut, distinct from every other effect's expanding/
+  // radiating/spinning-outward motion - reads as an invisible grip
+  // tightening, matching her mind-control/puppet-strings theme. Always
+  // deals exactly 1 unshielded damage per executeSelfChoke, so no dodge/
+  // amount gating needed beyond confirming it actually landed.
+  if (actionId === 'selfChoke' && targetId && amountDealt > 0) {
+    addEffect(targetId, 'choke', EFFECT_DURATION_MS.choke);
   }
 
   // Cyclone Punch: a spinning violet vortex ring on any landed hit, reading

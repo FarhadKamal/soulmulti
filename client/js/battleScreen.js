@@ -537,6 +537,16 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
     eyeburst.innerHTML = '<span class="eye-burst-ring"></span><span class="eye-burst-icon">👁</span>';
     tile.appendChild(eyeburst);
   }
+  if (effects.has('choke') && !character.isKO) {
+    // Melyssa's Self Choke: a constricting violet ring closes in around the
+    // puppet's own portrait and snaps shut - a contracting loop, distinct
+    // from every other effect's expanding/radiating/outward motion, reading
+    // as an invisible grip tightening (matches her mind-control theme).
+    const choke = document.createElement('div');
+    choke.className = 'choke-ring';
+    choke.innerHTML = '<span></span>';
+    tile.appendChild(choke);
+  }
   if (effects.has('lightning') && !character.isKO) {
     // Zerathys's Thunder Wrath (and Soul Swap Wrath, which shares the same
     // actionId): a jagged lightning bolt flashing down onto the target -
