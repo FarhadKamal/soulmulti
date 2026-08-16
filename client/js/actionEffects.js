@@ -146,9 +146,11 @@ export function handleLogEntryForEffects(entry, game) {
   // smoke reaching out and gripping), extending the flash-instant into a
   // "taking hold" beat, still the same purple palette.
   if (entry.type === 'curse') {
-    if (!isKO(entry.targetCharacterId)) {
-      addEffect(entry.targetCharacterId, 'eyeburst', EFFECT_DURATION_MS.eyeburst);
-      addEffect(entry.targetCharacterId, 'tendrils', EFFECT_DURATION_MS.tendrils);
+    // Server pushes this as { type: 'curse', characterId, targetId } (see
+    // athena.js's curseStrike.execute) - targetId, not targetCharacterId.
+    if (!isKO(entry.targetId)) {
+      addEffect(entry.targetId, 'eyeburst', EFFECT_DURATION_MS.eyeburst);
+      addEffect(entry.targetId, 'tendrils', EFFECT_DURATION_MS.tendrils);
     }
     return;
   }
