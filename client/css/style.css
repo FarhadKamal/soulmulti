@@ -421,6 +421,54 @@ input {
   100% { opacity: 0; scale: 1.05; }
 }
 
+/* Draxus's Dying Blow: a downward axe-chop wedge that slams straight down
+   and embeds (a directional slam-and-stick motion, unlike every other
+   effect's radiate/spin/pop) - matches his axe rather than reusing claw/
+   crack/vortex language. A V-shaped wedge falls from above the tile and
+   stops dead at the impact point with a brief glow-hold, rust/ember
+   colored to match his molten portrait palette. Size/thickness scales with
+   his damage tier (1/2/3, driven by his own current hearts); tier 3 also
+   spreads a ground-crack line sideways from the impact. */
+.axe-chop {
+  position: absolute; inset: 0; pointer-events: none; z-index: 4;
+  overflow: hidden; border-radius: inherit;
+}
+.axe-chop-wedge {
+  position: absolute; left: 50%; top: 8%;
+  width: 0; height: 0;
+  border-left: 10px solid transparent;
+  border-right: 10px solid transparent;
+  border-top: 46px solid #c0431f;
+  filter: drop-shadow(0 0 6px rgba(255, 110, 40, 0.85));
+  opacity: 0;
+  animation: tile-axechop-slam 0.55s cubic-bezier(0.6, 0, 0.9, 1) forwards;
+}
+.axe-chop--tier1 .axe-chop-wedge { transform: translateX(-50%) scale(0.7); }
+.axe-chop--tier2 .axe-chop-wedge { transform: translateX(-50%) scale(0.9); }
+.axe-chop--tier3 .axe-chop-wedge {
+  transform: translateX(-50%) scale(1.15);
+  border-top-color: #ff5a1f;
+}
+@keyframes tile-axechop-slam {
+  0% { opacity: 0; translate: 0 -60%; }
+  35% { opacity: 1; translate: 0 42%; }
+  55% { opacity: 1; translate: 0 40%; }
+  100% { opacity: 0; translate: 0 40%; }
+}
+.axe-chop-groundline {
+  position: absolute; left: 50%; top: 58%; width: 4px; height: 3px;
+  background: linear-gradient(to right, transparent, #ff8a3d, #ffcf9a, #ff8a3d, transparent);
+  box-shadow: 0 0 6px rgba(255, 140, 60, 0.9);
+  opacity: 0;
+  animation: tile-axechop-groundline 0.55s ease-out forwards;
+  animation-delay: 0.22s;
+}
+@keyframes tile-axechop-groundline {
+  0% { opacity: 0; width: 4px; transform: translateX(-50%); }
+  30% { opacity: 1; }
+  100% { opacity: 0; width: 80%; transform: translateX(-50%); }
+}
+
 /* Chronox's Cyclone Punch: a spinning violet vortex ring that spirals
    INWARD (shrinking while rotating, opposite motion from the outward-
    exploding crack/shatter effects) - reads as temporal/cosmic energy

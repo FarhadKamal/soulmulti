@@ -3,7 +3,7 @@ import { send } from './net.js';
 import { renderChatPanel } from './chatPanel.js';
 import { playUiClick } from './sound.js';
 import { getFlashSrc, getPersistentPortrait } from './portraitFlash.js';
-import { getActiveEffects, getClawCount, getCrackCount, getPowSize, getVortexSize } from './actionEffects.js';
+import { getActiveEffects, getClawCount, getCrackCount, getPowSize, getVortexSize, getAxechopTier } from './actionEffects.js';
 import { renderFullscreenButton } from './fullscreen.js';
 import { v, hardRefresh } from './assetVersion.js';
 
@@ -510,6 +510,19 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
     }).join('');
     shatter.innerHTML = `<span class="shatter-core"></span>${chips}`;
     tile.appendChild(shatter);
+  }
+  if (effects.has('axechop') && !character.isKO) {
+    // Draxus's Dying Blow: a downward axe-chop wedge that slams straight
+    // down and embeds (directional slam, unlike every other effect's
+    // radiate/spin/pop motion) - matches his axe. Tier 1-3 scales wedge
+    // size/thickness; tier 3 (his 3/2/1-hearts, most desperate hits) also
+    // adds a ground-crack line spreading sideways from the impact point.
+    const tier = getAxechopTier(character.id);
+    const chop = document.createElement('div');
+    chop.className = `axe-chop axe-chop--tier${tier}`;
+    chop.innerHTML = '<span class="axe-chop-wedge"></span>' +
+      (tier === 3 ? '<span class="axe-chop-groundline"></span>' : '');
+    tile.appendChild(chop);
   }
   if (effects.has('vortex') && !character.isKO) {
     // Chronox's Cyclone Punch: a spinning violet vortex ring reading as

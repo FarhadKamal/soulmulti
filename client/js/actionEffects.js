@@ -13,19 +13,20 @@ const EFFECT_DURATION_MS = {
   bigshatter: 700,
   pow: 750,
   vortex: 650,
+  axechop: 550,
   smoke: 1600,
   revive: 1300,
   divine: 1100,
 };
 
 // Per-character currently-active one-shot effects, keyed by characterId ->
-// { effects: Set<'hit'|'shake'|'dodge'|'claw'|'crack'|'pow'|'vortex'|'smoke'|
-//   'revive'|'divine'>, clawCount, crackCount, powSize, vortexSize,
-//   timers: Map }. Multiple effects CAN overlap on one character (e.g. a
-// killing Shadow Execution hit-flashes AND shakes AND claws all at once) -
-// unlike portraitFlash's single active image, these are independent layers,
-// matching the main game's separate flashCharacterIds/shakeCharacterIds/
-// clawCharacterIds/etc. sets.
+// { effects: Set<'hit'|'shake'|'dodge'|'claw'|'crack'|'pow'|'vortex'|
+//   'axechop'|'smoke'|'revive'|'divine'>, clawCount, crackCount, powSize,
+//   vortexSize, axechopTier, timers: Map }. Multiple effects CAN overlap on
+// one character (e.g. a killing Shadow Execution hit-flashes AND shakes AND
+// claws all at once) - unlike portraitFlash's single active image, these
+// are independent layers, matching the main game's separate
+// flashCharacterIds/shakeCharacterIds/clawCharacterIds/etc. sets.
 const activeEffects = new Map();
 
 let onEffectExpired = () => {};
@@ -36,7 +37,7 @@ export function registerEffectRerender(fn) {
 function addEffect(characterId, effect, durationMs, param) {
   let entry = activeEffects.get(characterId);
   if (!entry) {
-    entry = { effects: new Set(), clawCount: 3, crackCount: 1, powSize: 'small', vortexSize: 'small', timers: new Map() };
+    entry = { effects: new Set(), clawCount: 3, crackCount: 1, powSize: 'small', vortexSize: 'small', axechopTier: 1, timers: new Map() };
     activeEffects.set(characterId, entry);
   }
   entry.effects.add(effect);
@@ -44,6 +45,7 @@ function addEffect(characterId, effect, durationMs, param) {
   if (effect === 'crack' && param) entry.crackCount = param;
   if (effect === 'pow' && param) entry.powSize = param;
   if (effect === 'vortex' && param) entry.vortexSize = param;
+  if (effect === 'axechop' && param) entry.axechopTier = param;
 
   const existingTimer = entry.timers.get(effect);
   if (existingTimer) clearTimeout(existingTimer);
@@ -65,6 +67,10 @@ export function getClawCount(characterId) {
 
 export function getPowSize(characterId) {
   return activeEffects.get(characterId)?.powSize ?? 'small';
+}
+
+export function getAxechopTier(characterId) {
+  return activeEffects.get(characterId)?.axechopTier ?? 1;
 }
 
 export function getVortexSize(characterId) {
@@ -214,10 +220,15 @@ export function handleLogEntryForEffects(entry, game) {
     if (amountDealt > 1) addEffect(targetId, 'shake', EFFECT_DURATION_MS.shake);
   }
 
-  // Dying Blow: shake only at his top damage tier (amountDealt === 3, his
-  // 3/2/1-hearts tier) - a routine 1 or 2 damage hit doesn't shake, only
-  // his hardest-hitting, most-desperate strikes do.
-  if (actionId === 'dyingBlow' && targetId && !dodged && amountDealt === 3) {
-    addEffect(targetId, 'shake', EFFECT_DURATION_MS.shake);
+  // Dying Blow: a downward axe-chop wedge on any landed hit - a directional
+  // slam-and-embed motion (unlike every other effect's radiate/spin/pop),
+  // matching his axe rather than reusing claw/crack/vortex language. Scales
+  // with his damage tier (1/2/3, driven by his OWN current hearts, not a
+  // stored count like grudge/streak): tier 3 (his 3/2/1-hearts, most
+  // desperate tier) adds a spreading ground-crack line and shakes, matching
+  // the existing top-tier-only shake gate.
+  if (actionId === 'dyingBlow' && targetId && !dodged && amountDealt > 0) {
+    addEffect(targetId, 'axechop', EFFECT_DURATION_MS.axechop, amountDealt);
+    if (amountDealt === 3) addEffect(targetId, 'shake', EFFECT_DURATION_MS.shake);
   }
 }
