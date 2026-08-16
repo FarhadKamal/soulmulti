@@ -396,6 +396,56 @@ input {
   100% { opacity: 0; scale: 1.05; }
 }
 
+/* Tharox's Titan Smash / Glory Smash: one big, centered, dense radial
+   shatter - same crack-fracture visual family as Kaelis's, scaled way up
+   and symmetric (not scattered clusters) to read as a single overwhelming
+   blow rather than an escalating stack. Bright center flash + bigger
+   crack lines + a couple of chunky debris chips flying outward. */
+.big-shatter {
+  position: absolute; inset: 0; pointer-events: none; z-index: 4;
+  overflow: hidden; border-radius: inherit;
+  display: flex; align-items: center; justify-content: center;
+}
+.big-shatter .shatter-core {
+  position: absolute; width: 70%; height: 70%;
+  background:
+    radial-gradient(circle, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.15) 30%, transparent 55%),
+    conic-gradient(from 0deg,
+      transparent 0deg, rgba(235, 235, 240, 1) 3deg, transparent 7deg,
+      transparent 30deg, rgba(235, 235, 240, 0.95) 34deg, transparent 38deg,
+      transparent 65deg, rgba(235, 235, 240, 1) 69deg, transparent 73deg,
+      transparent 100deg, rgba(235, 235, 240, 0.9) 104deg, transparent 108deg,
+      transparent 135deg, rgba(235, 235, 240, 0.95) 139deg, transparent 143deg,
+      transparent 170deg, rgba(235, 235, 240, 1) 174deg, transparent 178deg,
+      transparent 200deg, rgba(235, 235, 240, 0.9) 204deg, transparent 208deg,
+      transparent 235deg, rgba(235, 235, 240, 0.95) 239deg, transparent 243deg,
+      transparent 270deg, rgba(235, 235, 240, 1) 274deg, transparent 278deg,
+      transparent 305deg, rgba(235, 235, 240, 0.9) 309deg, transparent 313deg,
+      transparent 340deg, rgba(235, 235, 240, 0.95) 344deg, transparent 348deg,
+      transparent 360deg);
+  filter: drop-shadow(0 0 6px rgba(0, 0, 0, 0.7));
+  opacity: 0; scale: 0.15;
+  animation: tile-bigshatter-burst 0.7s ease-out forwards;
+}
+.big-shatter .shatter-chip {
+  position: absolute; width: 10%; height: 10%;
+  background: linear-gradient(135deg, rgba(220, 220, 225, 0.95), rgba(150, 150, 155, 0.7));
+  clip-path: polygon(20% 0%, 100% 30%, 70% 100%, 0% 70%);
+  opacity: 0;
+  animation: tile-shatter-chip 0.7s ease-out forwards;
+}
+@keyframes tile-bigshatter-burst {
+  0% { opacity: 0; scale: 0.15; }
+  18% { opacity: 1; scale: 1.1; }
+  75% { opacity: 1; scale: 1.15; }
+  100% { opacity: 0; scale: 1.15; }
+}
+@keyframes tile-shatter-chip {
+  0% { opacity: 0; transform: translate(0, 0) rotate(0deg) scale(0.6); }
+  25% { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--chip-x, 40px), var(--chip-y, -30px)) rotate(180deg) scale(0.4); }
+}
+
 .smoke-burst {
   position: absolute; inset: 0; pointer-events: none; z-index: 4;
   overflow: hidden; border-radius: inherit;

@@ -10,6 +10,7 @@ const EFFECT_DURATION_MS = {
   dodge: 500,
   claw: 600,
   crack: 600,
+  bigshatter: 700,
   smoke: 1600,
   revive: 1300,
   divine: 1100,
@@ -144,9 +145,14 @@ export function handleLogEntryForEffects(entry, game) {
     addEffect(targetId, 'shake', EFFECT_DURATION_MS.shake);
   }
 
-  // Landed-hit shake: Titan Smash / Glory Smash hitting their target.
+  // Landed-hit shake: Titan Smash / Glory Smash hitting their target. These
+  // two also get one big, centered radial shatter burst - a bigger, denser,
+  // single-impact version of Kaelis's scattered crack clusters (same visual
+  // family, just scaled up for "one overwhelming blow" instead of an
+  // escalating stack) - NOT his plain 'smash', only these two heavy hits.
   if ((actionId === 'titanSmash' || actionId === 'glorySmash') && targetId && !dodged && amountDealt > 0) {
     addEffect(targetId, 'shake', EFFECT_DURATION_MS.shake);
+    addEffect(targetId, 'bigshatter', EFFECT_DURATION_MS.bigshatter);
   }
 
   // Shadow Execution: shake + claw marks (always 3) on the target.

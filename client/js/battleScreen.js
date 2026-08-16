@@ -474,6 +474,19 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
     }).join('');
     tile.appendChild(crack);
   }
+  if (effects.has('bigshatter') && !character.isKO) {
+    const shatter = document.createElement('div');
+    shatter.className = 'big-shatter';
+    const chipAngles = [20, 90, 160, 230, 300];
+    const chips = chipAngles.map((deg) => {
+      const rad = (deg * Math.PI) / 180;
+      const x = Math.round(Math.cos(rad) * 45);
+      const y = Math.round(Math.sin(rad) * 45);
+      return `<span class="shatter-chip" style="left:${50 + Math.cos(rad) * 12}%; top:${50 + Math.sin(rad) * 12}%; --chip-x:${x}px; --chip-y:${y}px;"></span>`;
+    }).join('');
+    shatter.innerHTML = `<span class="shatter-core"></span>${chips}`;
+    tile.appendChild(shatter);
+  }
   if (effects.has('smoke') && !character.isKO) {
     const smoke = document.createElement('div');
     smoke.className = 'smoke-burst';
