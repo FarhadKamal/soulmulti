@@ -22,6 +22,8 @@ const EFFECT_DURATION_MS = {
   ghosthand: 700,
   crescent: 450,
   moonstreak: 400,
+  shadowstrike: 650,
+  darkslash: 350,
   smoke: 1600,
   revive: 1300,
   divine: 1100,
@@ -45,7 +47,7 @@ export function registerEffectRerender(fn) {
 function addEffect(characterId, effect, durationMs, param) {
   let entry = activeEffects.get(characterId);
   if (!entry) {
-    entry = { effects: new Set(), clawCount: 3, crackCount: 1, powSize: 'small', vortexSize: 'small', axechopTier: 1, lightningTier: 1, timers: new Map() };
+    entry = { effects: new Set(), clawCount: 3, crackCount: 1, powSize: 'small', vortexSize: 'small', axechopTier: 1, lightningTier: 1, darkslashVariant: 'plain', timers: new Map() };
     activeEffects.set(characterId, entry);
   }
   entry.effects.add(effect);
@@ -55,6 +57,7 @@ function addEffect(characterId, effect, durationMs, param) {
   if (effect === 'vortex' && param) entry.vortexSize = param;
   if (effect === 'axechop' && param) entry.axechopTier = param;
   if (effect === 'lightning' && param) entry.lightningTier = param;
+  if (effect === 'darkslash' && param) entry.darkslashVariant = param;
 
   const existingTimer = entry.timers.get(effect);
   if (existingTimer) clearTimeout(existingTimer);
@@ -84,6 +87,10 @@ export function getAxechopTier(characterId) {
 
 export function getLightningTier(characterId) {
   return activeEffects.get(characterId)?.lightningTier ?? 1;
+}
+
+export function getDarkslashVariant(characterId) {
+  return activeEffects.get(characterId)?.darkslashVariant ?? 'plain';
 }
 
 export function getVortexSize(characterId) {
@@ -176,7 +183,7 @@ export function handleLogEntryForEffects(entry, game) {
   }
 
   if (entry.type !== 'attack' && entry.type !== 'special') return;
-  const { characterId, actionId, targetId, dodged, amountDealt, streak, flip, outcome, grudgeCount, isNewTarget } = entry;
+  const { characterId, actionId, targetId, dodged, amountDealt, streak, flip, outcome, grudgeCount, isNewTarget, wasMarked } = entry;
 
   applyHitFlash(targetId, amountDealt);
 
@@ -293,10 +300,23 @@ export function handleLogEntryForEffects(entry, game) {
     addEffect(targetId, 'crack', EFFECT_DURATION_MS.crack, 1);
   }
 
-  // Shadow Execution: shake + claw marks (always 3) on the target.
+  // Shadow Execution: previously reused Blade's claw-scratch, which made it
+  // visually read as a claw attack rather than an assassin's kit - replaced
+  // with a dissolving shadow-strike: a dark blade shape stabs in then
+  // dissolves into wisps of black smoke, reading as "struck from the
+  // shadows, then vanished," matching her cloaked/mark-and-strike theme.
   if (actionId === 'shadowExecution' && targetId && !dodged && amountDealt > 0) {
     addEffect(targetId, 'shake', EFFECT_DURATION_MS.shake);
-    addEffect(targetId, 'claw', EFFECT_DURATION_MS.claw, 3);
+    addEffect(targetId, 'shadowstrike', EFFECT_DURATION_MS.shadowstrike);
+  }
+
+  // Fatal Slash: a quick, light dark slash-line (straight, not curved like
+  // Velorya's crescent) flickering in and out - a routine repeatable
+  // strike, deliberately lighter than Shadow Execution's dissolve. The
+  // marked/2-dmg version adds a small red mark-glint at the strike point,
+  // referencing the revealed hidden mark; unmarked/1-dmg is just the slash.
+  if (actionId === 'fatalSlash' && targetId && !dodged && amountDealt > 0) {
+    addEffect(targetId, 'darkslash', EFFECT_DURATION_MS.darkslash, wasMarked ? 'marked' : 'plain');
   }
 
   // Blood Hunt: claw marks scaled to streak count, shake only once the

@@ -605,6 +605,81 @@ input {
   100% { opacity: 0; translate: 160% 40%; }
 }
 
+/* Akyros's Shadow Execution: a dark blade shape stabs in then dissolves
+   into wisps of black smoke - reads as "struck from the shadows, then
+   vanished," replacing the old borrowed claw-scratch (which read as a
+   Blade attack). Distinct dissolve-into-particles motion, nothing else
+   in the roster does this. */
+.shadow-strike {
+  position: absolute; inset: 0; pointer-events: none; z-index: 4;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden; border-radius: inherit;
+}
+.shadow-blade {
+  position: absolute; width: 4px; height: 60%;
+  background: linear-gradient(to bottom, transparent, #1a1a24 15%, #3a3a4a 50%, #1a1a24 85%, transparent);
+  filter: drop-shadow(0 0 5px rgba(0, 0, 0, 0.8));
+  opacity: 0;
+  animation: tile-shadowblade-stab 0.65s ease-out forwards;
+}
+@keyframes tile-shadowblade-stab {
+  0% { opacity: 0; rotate: -25deg; translate: -30% 0; scale: 0.6 1; }
+  25% { opacity: 1; rotate: -25deg; translate: 0 0; scale: 1 1; }
+  55% { opacity: 1; rotate: -25deg; }
+  100% { opacity: 0; scale: 1.3 0.7; }
+}
+.shadow-wisp {
+  position: absolute; width: 14%; height: 14%; border-radius: 50%;
+  background: radial-gradient(circle, rgba(50, 50, 65, 0.75) 0%, rgba(30, 30, 40, 0.4) 60%, transparent 80%);
+  filter: blur(2px);
+  opacity: 0;
+  animation: tile-shadow-wisp 0.65s ease-out forwards;
+}
+.shadow-wisp--1 { left: 40%; top: 45%; animation-delay: 0.3s; }
+.shadow-wisp--2 { left: 55%; top: 40%; animation-delay: 0.36s; }
+.shadow-wisp--3 { left: 47%; top: 58%; animation-delay: 0.42s; }
+@keyframes tile-shadow-wisp {
+  0% { opacity: 0; translate: 0 0; scale: 0.6; }
+  30% { opacity: 0.85; }
+  100% { opacity: 0; translate: 0 -25%; scale: 1.6; }
+}
+
+/* Akyros's Fatal Slash: a quick, light straight dark slash-line flickering
+   in/out - lighter than Shadow Execution's dissolve, for a routine
+   repeatable strike. 'marked' variant adds a small red mark-glint. */
+.dark-slash {
+  position: absolute; inset: 0; pointer-events: none; z-index: 4;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden; border-radius: inherit;
+}
+.dark-slash-line {
+  position: absolute; width: 65%; height: 3px;
+  background: linear-gradient(to right, transparent, #2a2a38, #4a4a5c, #2a2a38, transparent);
+  filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.7));
+  opacity: 0;
+  animation: tile-darkslash-flicker 0.35s ease-out forwards;
+}
+@keyframes tile-darkslash-flicker {
+  0% { opacity: 0; rotate: -20deg; scale: 0.5 1; }
+  35% { opacity: 1; rotate: -20deg; scale: 1.05 1; }
+  60% { opacity: 0.4; }
+  75% { opacity: 0.9; }
+  100% { opacity: 0; }
+}
+.mark-glint {
+  position: absolute; width: 14%; height: 14%; border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 60, 60, 0.9) 0%, rgba(200, 30, 30, 0.5) 55%, transparent 75%);
+  box-shadow: 0 0 8px 1px rgba(255, 40, 40, 0.7);
+  opacity: 0;
+  animation: tile-markglint-flash 0.35s ease-out forwards;
+  animation-delay: 0.08s;
+}
+@keyframes tile-markglint-flash {
+  0% { opacity: 0; scale: 0.3; }
+  40% { opacity: 1; scale: 1.1; }
+  100% { opacity: 0; scale: 1.3; }
+}
+
 /* Zerathys's Thunder Wrath / Soul Swap Wrath: a jagged lightning bolt
    flashing down onto the target - distinct from every other effect (nothing
    else does a literal bolt). Drawn as zigzag SVG paths (genuine sharp

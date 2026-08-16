@@ -3,7 +3,7 @@ import { send } from './net.js';
 import { renderChatPanel } from './chatPanel.js';
 import { playUiClick } from './sound.js';
 import { getFlashSrc, getPersistentPortrait } from './portraitFlash.js';
-import { getActiveEffects, getClawCount, getCrackCount, getPowSize, getVortexSize, getAxechopTier, getLightningTier } from './actionEffects.js';
+import { getActiveEffects, getClawCount, getCrackCount, getPowSize, getVortexSize, getAxechopTier, getLightningTier, getDarkslashVariant } from './actionEffects.js';
 import { renderFullscreenButton } from './fullscreen.js';
 import { v, hardRefresh } from './assetVersion.js';
 
@@ -605,6 +605,31 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
     crescent.className = 'moon-crescent';
     crescent.innerHTML = '<svg viewBox="0 0 60 60"><path d="M 44,6 A 26,26 0 1 0 44,54 A 20,20 0 1 1 44,6 Z" /></svg>';
     tile.appendChild(crescent);
+  }
+  if (effects.has('shadowstrike') && !character.isKO) {
+    // Akyros's Shadow Execution: a dark blade shape stabs in from the side
+    // then dissolves into wisps of black smoke - replaces the old borrowed
+    // claw-scratch (which read as a Blade attack), matching her cloaked
+    // shadow-assassin theme instead.
+    const strike = document.createElement('div');
+    strike.className = 'shadow-strike';
+    strike.innerHTML = '<span class="shadow-blade"></span>' +
+      '<span class="shadow-wisp shadow-wisp--1"></span>' +
+      '<span class="shadow-wisp shadow-wisp--2"></span>' +
+      '<span class="shadow-wisp shadow-wisp--3"></span>';
+    tile.appendChild(strike);
+  }
+  if (effects.has('darkslash') && !character.isKO) {
+    // Akyros's Fatal Slash: a quick, light straight dark slash-line
+    // flickering in/out - lighter than Shadow Execution's dissolve, for a
+    // routine repeatable strike. 'marked' variant (2 dmg, hit a revealed
+    // hidden mark) adds a small red mark-glint at the strike point.
+    const variant = getDarkslashVariant(character.id);
+    const slash = document.createElement('div');
+    slash.className = `dark-slash dark-slash--${variant}`;
+    slash.innerHTML = '<span class="dark-slash-line"></span>' +
+      (variant === 'marked' ? '<span class="mark-glint"></span>' : '');
+    tile.appendChild(slash);
   }
   if (effects.has('lightning') && !character.isKO) {
     // Zerathys's Thunder Wrath (and Soul Swap Wrath, which shares the same
