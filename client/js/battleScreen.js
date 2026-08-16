@@ -497,6 +497,12 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
     portrait.src = persistentSrc;
   } else if (character.isKO) {
     portrait.src = v(`assets/koed/${character.id}.jpg`);
+  } else if (character.id === 'draxus' && character.special?.deathproofActive) {
+    // Belt-and-braces: persistentSrc above already covers this, but a
+    // reported-live case still showed injured.jpg during his death-proof
+    // window, so guard the injured branch directly rather than relying
+    // solely on priority ordering.
+    portrait.src = v('assets/images/draxus/immortality.jpg');
   } else if (character.hearts <= character.maxHearts / 2) {
     portrait.src = v(`assets/injured/${character.id}.jpg`);
   } else {
