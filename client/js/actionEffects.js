@@ -16,7 +16,7 @@ const EFFECT_DURATION_MS = {
   axechop: 550,
   eyeburst: 750,
   tendrils: 1000,
-  soulflicker: 900,
+  invertflash: 350,
   smoke: 1600,
   revive: 1300,
   divine: 1100,
@@ -177,15 +177,15 @@ export function handleLogEntryForEffects(entry, game) {
     addEffect(characterId, 'divine', EFFECT_DURATION_MS.divine);
   }
 
-  // Soul Swap: a translucent ghost-double peels off the VICTIM's portrait
-  // and drifts upward/away before snapping back - reads as "something was
-  // briefly pulled out of you," matching the swap mechanic (their hearts
-  // literally trade places with Zerathys's) rather than reusing any damage/
-  // heal impact language, since this isn't damage at all. No isKO guard
-  // needed beyond the usual - a swap can leave either side at very low
-  // hearts but never KOs on its own.
+  // Soul Swap: a quick color-invert flash directly on the VICTIM's own
+  // portrait (photo-negative look, snapping back to normal) - reads as
+  // "something was yanked out of you," matching the swap mechanic (their
+  // hearts literally trade places with Zerathys's) rather than reusing any
+  // damage/heal impact language, since this isn't damage at all. No isKO
+  // guard needed beyond the usual - a swap can leave either side at very
+  // low hearts but never KOs on its own.
   if (actionId === 'soulSwap' && targetId && !isKO(targetId)) {
-    addEffect(targetId, 'soulflicker', EFFECT_DURATION_MS.soulflicker);
+    addEffect(targetId, 'invertflash', EFFECT_DURATION_MS.invertflash);
   }
 
   // Cyclone Punch: a spinning violet vortex ring on any landed hit, reading

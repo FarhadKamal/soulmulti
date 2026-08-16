@@ -627,22 +627,15 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
     portrait.src = v(`assets/portraits/${character.id}.jpg`);
   }
   portrait.alt = def.name;
-  tile.appendChild(portrait);
-
-  if (effects.has('soulflicker') && !character.isKO) {
-    // Soul Swap: a translucent ghost-double of the victim's OWN current
-    // portrait peels off and drifts upward/away before snapping back -
-    // reads as "your soul was briefly pulled loose," matching that Soul
-    // Swap trades heart values rather than dealing damage. Clones the
-    // real portrait src (not a generic shape) so the ghost is recognizably
-    // "a copy of you," cyan-tinted to read as ethereal rather than a
-    // literal duplicate.
-    const ghost = document.createElement('img');
-    ghost.className = 'soul-ghost';
-    ghost.src = portrait.src;
-    ghost.alt = '';
-    tile.appendChild(ghost);
+  // Soul Swap: a quick color-invert flash directly on the victim's own
+  // portrait (photo-negative look, snapping back to normal) - reads as
+  // "something was yanked out of you," matching that Soul Swap trades
+  // heart values rather than dealing damage. Applied as a class on the
+  // real portrait element itself, no cloned ghost image needed.
+  if (effects.has('invertflash') && !character.isKO) {
+    portrait.classList.add('portrait-invert-flash');
   }
+  tile.appendChild(portrait);
 
   const name = document.createElement('div');
   name.className = 'char-name';
