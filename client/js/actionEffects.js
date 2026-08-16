@@ -17,6 +17,7 @@ const EFFECT_DURATION_MS = {
   eyeburst: 750,
   tendrils: 1000,
   invertflash: 350,
+  lightning: 500,
   smoke: 1600,
   revive: 1300,
   divine: 1100,
@@ -40,7 +41,7 @@ export function registerEffectRerender(fn) {
 function addEffect(characterId, effect, durationMs, param) {
   let entry = activeEffects.get(characterId);
   if (!entry) {
-    entry = { effects: new Set(), clawCount: 3, crackCount: 1, powSize: 'small', vortexSize: 'small', axechopTier: 1, timers: new Map() };
+    entry = { effects: new Set(), clawCount: 3, crackCount: 1, powSize: 'small', vortexSize: 'small', axechopTier: 1, lightningTier: 1, timers: new Map() };
     activeEffects.set(characterId, entry);
   }
   entry.effects.add(effect);
@@ -49,6 +50,7 @@ function addEffect(characterId, effect, durationMs, param) {
   if (effect === 'pow' && param) entry.powSize = param;
   if (effect === 'vortex' && param) entry.vortexSize = param;
   if (effect === 'axechop' && param) entry.axechopTier = param;
+  if (effect === 'lightning' && param) entry.lightningTier = param;
 
   const existingTimer = entry.timers.get(effect);
   if (existingTimer) clearTimeout(existingTimer);
@@ -74,6 +76,10 @@ export function getPowSize(characterId) {
 
 export function getAxechopTier(characterId) {
   return activeEffects.get(characterId)?.axechopTier ?? 1;
+}
+
+export function getLightningTier(characterId) {
+  return activeEffects.get(characterId)?.lightningTier ?? 1;
 }
 
 export function getVortexSize(characterId) {
@@ -186,6 +192,18 @@ export function handleLogEntryForEffects(entry, game) {
   // low hearts but never KOs on its own.
   if (actionId === 'soulSwap' && targetId && !isKO(targetId)) {
     addEffect(targetId, 'invertflash', EFFECT_DURATION_MS.invertflash);
+  }
+
+  // Thunder Wrath (and Soul Swap Wrath, which delegates straight into this
+  // same execute() and logs the identical actionId - one trigger covers
+  // both automatically): a jagged lightning-bolt strike flashing down onto
+  // the target, distinct from every other effect (nothing else does a
+  // literal bolt). Scales with amountDealt (his charge-tier damage, 1/2/3):
+  // tier 1 = single thin bolt; tier 3 = branching bolts plus shake, echoing
+  // how his charge-up payoff should feel like the biggest hit in the kit.
+  if (actionId === 'thunderWrath' && targetId && !dodged && amountDealt > 0) {
+    addEffect(targetId, 'lightning', EFFECT_DURATION_MS.lightning, amountDealt);
+    if (amountDealt === 3) addEffect(targetId, 'shake', EFFECT_DURATION_MS.shake);
   }
 
   // Cyclone Punch: a spinning violet vortex ring on any landed hit, reading

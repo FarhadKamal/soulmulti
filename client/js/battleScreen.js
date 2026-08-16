@@ -3,7 +3,7 @@ import { send } from './net.js';
 import { renderChatPanel } from './chatPanel.js';
 import { playUiClick } from './sound.js';
 import { getFlashSrc, getPersistentPortrait } from './portraitFlash.js';
-import { getActiveEffects, getClawCount, getCrackCount, getPowSize, getVortexSize, getAxechopTier } from './actionEffects.js';
+import { getActiveEffects, getClawCount, getCrackCount, getPowSize, getVortexSize, getAxechopTier, getLightningTier } from './actionEffects.js';
 import { renderFullscreenButton } from './fullscreen.js';
 import { v, hardRefresh } from './assetVersion.js';
 
@@ -536,6 +536,27 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
     eyeburst.className = 'eye-burst';
     eyeburst.innerHTML = '<span class="eye-burst-ring"></span><span class="eye-burst-icon">👁</span>';
     tile.appendChild(eyeburst);
+  }
+  if (effects.has('lightning') && !character.isKO) {
+    // Zerathys's Thunder Wrath (and Soul Swap Wrath, which shares the same
+    // actionId): a jagged lightning bolt flashing down onto the target -
+    // distinct from every other effect, nothing else does a literal bolt.
+    // Scales with his charge tier: tier 1 = single thin bolt, tier 2 = two
+    // bolts, tier 3 = three branching bolts converging on the strike point
+    // plus a brighter core flash and the existing shake.
+    const tier = getLightningTier(character.id);
+    const bolt = document.createElement('div');
+    bolt.className = `lightning-strike lightning-strike--tier${tier}`;
+    const boltPaths = [
+      'M 46,0 L 40,35 L 52,35 L 38,80',
+      'M 60,0 L 66,30 L 54,32 L 64,75',
+      'M 34,0 L 44,28 L 32,30 L 46,72',
+    ];
+    const bolts = boltPaths.slice(0, tier).map((d, i) =>
+      `<path class="lightning-path" style="animation-delay:${i * 0.04}s" d="${d}" />`
+    ).join('');
+    bolt.innerHTML = `<svg viewBox="0 0 100 100" preserveAspectRatio="none">${bolts}</svg><span class="lightning-core"></span>`;
+    tile.appendChild(bolt);
   }
   if (effects.has('axechop') && !character.isKO) {
     // Draxus's Dying Blow: a downward axe-chop wedge that slams straight
