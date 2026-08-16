@@ -629,6 +629,21 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
   portrait.alt = def.name;
   tile.appendChild(portrait);
 
+  if (effects.has('soulflicker') && !character.isKO) {
+    // Soul Swap: a translucent ghost-double of the victim's OWN current
+    // portrait peels off and drifts upward/away before snapping back -
+    // reads as "your soul was briefly pulled loose," matching that Soul
+    // Swap trades heart values rather than dealing damage. Clones the
+    // real portrait src (not a generic shape) so the ghost is recognizably
+    // "a copy of you," cyan-tinted to read as ethereal rather than a
+    // literal duplicate.
+    const ghost = document.createElement('img');
+    ghost.className = 'soul-ghost';
+    ghost.src = portrait.src;
+    ghost.alt = '';
+    tile.appendChild(ghost);
+  }
+
   const name = document.createElement('div');
   name.className = 'char-name';
   name.textContent = def.name;
