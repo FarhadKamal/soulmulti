@@ -588,6 +588,24 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
       <svg class="ghost-hand ghost-hand--right" viewBox="0 0 40 60">${boneHand(true)}</svg>`;
     tile.appendChild(hands);
   }
+  if (effects.has('moonstreak') && !character.isKO) {
+    // Moonstep, isNewTarget case: a silver afterimage streak arrives from
+    // off-tile just before the crescent slash - reads as "she just
+    // repositioned here," rendered first (below) so the crescent lands on
+    // top of it a beat later via its own animation-delay.
+    const streak = document.createElement('div');
+    streak.className = 'moon-streak';
+    tile.appendChild(streak);
+  }
+  if (effects.has('crescent') && !character.isKO) {
+    // Velorya's Lunar Strike / Moonstep: a thin curved silver crescent-moon
+    // slash flashing at the impact point - matches her moon/night theme,
+    // distinct from every other effect (nothing else does a crescent arc).
+    const crescent = document.createElement('div');
+    crescent.className = 'moon-crescent';
+    crescent.innerHTML = '<svg viewBox="0 0 60 60"><path d="M 44,6 A 26,26 0 1 0 44,54 A 20,20 0 1 1 44,6 Z" /></svg>';
+    tile.appendChild(crescent);
+  }
   if (effects.has('lightning') && !character.isKO) {
     // Zerathys's Thunder Wrath (and Soul Swap Wrath, which shares the same
     // actionId): a jagged lightning bolt flashing down onto the target -

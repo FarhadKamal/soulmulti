@@ -565,6 +565,46 @@ input {
   100% { opacity: 0; translate: 6% 0; }
 }
 
+/* Velorya's Lunar Strike / Moonstep: a thin curved silver crescent-moon
+   slash flashing once at the impact point - matches her moon/night theme,
+   distinct from every other effect (nothing else does a crescent arc).
+   Rotates slightly while scaling in then fading, like a blade catching
+   moonlight as it swings through. */
+.moon-crescent {
+  position: absolute; inset: 0; pointer-events: none; z-index: 4;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden; border-radius: inherit;
+}
+.moon-crescent svg {
+  width: 55%; height: 55%;
+  fill: #e8ecff;
+  filter: drop-shadow(0 0 6px rgba(200, 210, 255, 0.9));
+  opacity: 0;
+  animation: tile-crescent-slash 0.45s ease-out forwards;
+}
+@keyframes tile-crescent-slash {
+  0% { opacity: 0; rotate: -35deg; scale: 0.5; }
+  30% { opacity: 1; rotate: 5deg; scale: 1.1; }
+  60% { opacity: 1; rotate: 0deg; scale: 1; }
+  100% { opacity: 0; rotate: 10deg; scale: 1.05; }
+}
+
+/* Moonstep, isNewTarget case: a silver afterimage streak sweeping across
+   the tile just before the crescent lands - reads as "she just
+   repositioned here" for the bonus-damage hit specifically. */
+.moon-streak {
+  position: absolute; top: 20%; left: -20%; width: 60%; height: 12%;
+  background: linear-gradient(to right, transparent, rgba(230, 235, 255, 0.85), transparent);
+  filter: blur(1px) drop-shadow(0 0 5px rgba(200, 210, 255, 0.7));
+  opacity: 0;
+  animation: tile-moon-streak 0.4s ease-out forwards;
+}
+@keyframes tile-moon-streak {
+  0% { opacity: 0; translate: 0 0; }
+  25% { opacity: 0.9; }
+  100% { opacity: 0; translate: 160% 40%; }
+}
+
 /* Zerathys's Thunder Wrath / Soul Swap Wrath: a jagged lightning bolt
    flashing down onto the target - distinct from every other effect (nothing
    else does a literal bolt). Drawn as zigzag SVG paths (genuine sharp

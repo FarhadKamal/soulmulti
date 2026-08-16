@@ -20,6 +20,8 @@ const EFFECT_DURATION_MS = {
   lightning: 500,
   choke: 700,
   ghosthand: 700,
+  crescent: 450,
+  moonstreak: 400,
   smoke: 1600,
   revive: 1300,
   divine: 1100,
@@ -174,7 +176,7 @@ export function handleLogEntryForEffects(entry, game) {
   }
 
   if (entry.type !== 'attack' && entry.type !== 'special') return;
-  const { characterId, actionId, targetId, dodged, amountDealt, streak, flip, outcome, grudgeCount } = entry;
+  const { characterId, actionId, targetId, dodged, amountDealt, streak, flip, outcome, grudgeCount, isNewTarget } = entry;
 
   applyHitFlash(targetId, amountDealt);
 
@@ -206,6 +208,23 @@ export function handleLogEntryForEffects(entry, game) {
   if (actionId === 'thunderWrath' && targetId && !dodged && amountDealt > 0) {
     addEffect(targetId, 'lightning', EFFECT_DURATION_MS.lightning, amountDealt);
     if (amountDealt === 3) addEffect(targetId, 'shake', EFFECT_DURATION_MS.shake);
+  }
+
+  // Lunar Strike: a quick crescent-moon slash flashing at the impact point
+  // - a thin curved silver blade-arc, matching her moon/night theme,
+  // distinct from every other effect (nothing else does a crescent).
+  if (actionId === 'lunarStrike' && targetId && !dodged && amountDealt > 0) {
+    addEffect(targetId, 'crescent', EFFECT_DURATION_MS.crescent);
+  }
+
+  // Moonstep: the same crescent slash, but when isNewTarget is true (she
+  // switched targets, dealing the bonus 2 dmg instead of 1) it's preceded
+  // by a brief silver afterimage streak arriving from off-tile - a visual
+  // tell for "she just repositioned here," distinguishing the bonus hit
+  // from striking the same target again in place.
+  if (actionId === 'moonstep' && targetId && !dodged && amountDealt > 0) {
+    addEffect(targetId, 'crescent', EFFECT_DURATION_MS.crescent);
+    if (isNewTarget) addEffect(targetId, 'moonstreak', EFFECT_DURATION_MS.moonstreak);
   }
 
   // Self Choke: a constricting violet ring closes in around the puppet's
@@ -263,6 +282,15 @@ export function handleLogEntryForEffects(entry, game) {
   if ((actionId === 'titanSmash' || actionId === 'glorySmash') && targetId && !dodged && amountDealt > 0) {
     addEffect(targetId, 'shake', EFFECT_DURATION_MS.shake);
     addEffect(targetId, 'bigshatter', EFFECT_DURATION_MS.bigshatter);
+  }
+
+  // Plain Smash: a single small crack cluster (reuses Kaelis's crack-shatter
+  // system at a fixed count of 1, no shake) - same visual family as Titan
+  // Smash/Glory Smash's big-shatter burst, deliberately smaller/lesser to
+  // signal "an ordinary hit," preserving the escalation from smash -> his
+  // two heavy special hits.
+  if (actionId === 'smash' && targetId && !dodged && amountDealt > 0) {
+    addEffect(targetId, 'crack', EFFECT_DURATION_MS.crack, 1);
   }
 
   // Shadow Execution: shake + claw marks (always 3) on the target.
