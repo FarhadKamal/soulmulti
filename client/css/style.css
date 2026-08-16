@@ -177,6 +177,31 @@ input {
   background: #a855f7; color: #fff; font-size: 0.65em; font-weight: 700;
   padding: 2px 6px; border-radius: 4px; letter-spacing: 0.5px;
 }
+
+/* Hypnotic ripple: looping concentric rings pulsing outward from the
+   puppet's portrait center, for the ENTIRE control window (unlike the
+   one-shot hit-reaction effects like claw/crack) - same violet as
+   char-tile--puppet's glow, reading as "still under her control" through
+   the puppet's own puppeted action, not just the selection instant. */
+.hypnotic-ripple {
+  position: absolute; inset: 0; pointer-events: none; z-index: 4;
+  overflow: hidden; border-radius: inherit;
+  display: flex; align-items: center; justify-content: center;
+}
+.hypnotic-ripple span {
+  position: absolute; width: 30%; height: 30%; border-radius: 50%;
+  border: 2px solid #c084fc;
+  box-shadow: 0 0 10px 1px #a855f799;
+  opacity: 0;
+  animation: tile-hypnotic-pulse 2.2s ease-out infinite;
+}
+.hypnotic-ripple span:nth-child(2) { animation-delay: 0.7s; }
+.hypnotic-ripple span:nth-child(3) { animation-delay: 1.4s; }
+@keyframes tile-hypnotic-pulse {
+  0% { opacity: 0; scale: 0.3; }
+  15% { opacity: 0.9; }
+  100% { opacity: 0; scale: 2.6; }
+}
 .char-tile--mine { background: #22283a; }
 /* Winning side's tile during the game-over 'victory' stage - grows and
    glows gold in place, with the portrait already swapped to victory art

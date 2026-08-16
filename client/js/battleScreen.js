@@ -152,6 +152,17 @@ export function renderBattle(root, state) {
   const chronox = Object.values(game.characters).find((c) => c.id === 'chronox');
   const frozenId = chronox && chronox.special.freezeActive ? chronox.special.freezeTargetId : null;
   const puppetHighlightId = state.awaitingMindControlAction ? state.mindControlPuppetId : null;
+  // Broader than puppetHighlightId (which only covers the selection-click
+  // moment): character.special.controlling is real server state that spans
+  // the whole Mind Control sequence (selection through the puppeted action
+  // and any nested follow-up - same window getPersistentPortrait's own
+  // controlling check uses for Melyssa's own portrait). Drives the
+  // hypnotic-ripple effect on the PUPPET's tile so it's visible the entire
+  // time they're under control, not just the instant she picks them.
+  const melyssa = Object.values(game.characters).find((c) => c.id === 'melyssa');
+  const activePuppetId = melyssa && !melyssa.isKO && melyssa.special?.controlling
+    ? melyssa.special.puppetCharacterId
+    : null;
   Object.values(game.characters).forEach((character) => {
     board.appendChild(renderCharacterTile(character, {
       isActing: character.id === actingCharacterId,
@@ -161,7 +172,8 @@ export function renderBattle(root, state) {
       isHoldingBall: character.id === ballHolderId,
       isCursed: character.id === cursedId,
       isFrozenVisual: character.id === frozenId,
-      isPuppet: character.id === puppetHighlightId,
+      isPuppet: character.id === puppetHighlightId || character.id === activePuppetId,
+      isHypnotized: character.id === activePuppetId,
     }));
   });
   scroll.appendChild(board);
@@ -411,7 +423,7 @@ function renderVictoryPortraits(game) {
   return container;
 }
 
-function renderCharacterTile(character, { isActing, isMine, isTargetable, onTargetClick, isHoldingBall, isCursed, isFrozenVisual, isVictorious, isPuppet }) {
+function renderCharacterTile(character, { isActing, isMine, isTargetable, onTargetClick, isHoldingBall, isCursed, isFrozenVisual, isVictorious, isPuppet, isHypnotized }) {
   const def = CHARACTERS[character.id];
   const tile = document.createElement('div');
   tile.className = 'char-tile';
@@ -419,6 +431,18 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
   // Melyssa's current Mind Control puppet - highlighted alongside her own
   // acting tile so both halves of the mechanic are visible at once.
   if (isPuppet && !character.isKO) tile.classList.add('char-tile--puppet');
+  // Looping hypnotic-ripple pulse for the whole control window (unlike the
+  // one-shot claw/crack effects), driven off real server state
+  // (melyssa.special.controlling + puppetCharacterId), not just the
+  // selection-click moment - so the puppet visibly reads as "under
+  // control" through their own puppeted action too.
+  if (isHypnotized && !character.isKO) {
+    tile.classList.add('char-tile--hypnotized');
+    const ripple = document.createElement('div');
+    ripple.className = 'hypnotic-ripple';
+    ripple.innerHTML = '<span></span><span></span><span></span>';
+    tile.appendChild(ripple);
+  }
   if (isMine) tile.classList.add('char-tile--mine');
   if (character.isKO) tile.classList.add('char-tile--ko');
   if (isCursed && !character.isKO) tile.classList.add('cursed-mark');

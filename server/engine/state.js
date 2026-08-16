@@ -22,10 +22,13 @@ function baseSpecialFor(id) {
       // controlling: true for the entire duration of a Mind Control
       // sequence (from puppet selection through the puppeted action, and
       // any nested follow-up) - drives portraitFlash.js's held
-      // "mind_control_selection.jpg" portrait client-side. Cleared by
-      // finishMelyssaTurn (server/index.js) at the exact 3 points a Mind
-      // Control turn is truly over.
-      return { controlling: false };
+      // "mind_control_selection.jpg" portrait client-side. puppetCharacterId
+      // is who's currently being controlled, set alongside controlling
+      // (melyssa.js's mindControl.execute) - drives the puppet's own
+      // hypnotic-ripple tile effect client-side for that same window. Both
+      // cleared by finishMelyssaTurn (server/index.js) at the exact 3
+      // points a Mind Control turn is truly over.
+      return { controlling: false, puppetCharacterId: null };
     case 'kaelis':
       // grudgeCounts: per-attacker hit counter (Map<characterId, number>),
       // incremented in damagePipeline.js's applyDamage every time that

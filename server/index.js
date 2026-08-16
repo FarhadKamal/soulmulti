@@ -378,6 +378,7 @@ function executeSelfChoke(game, melyssaId, puppetId) {
 function finishMelyssaTurn(game, melyssaId) {
   markCharacterActed(game, melyssaId);
   game.characters[melyssaId].special.controlling = false;
+  game.characters[melyssaId].special.puppetCharacterId = null;
 }
 
 // Shared broadcast shape for every "Melyssa is mid-Mind-Control, waiting on

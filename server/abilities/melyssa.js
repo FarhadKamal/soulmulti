@@ -18,6 +18,14 @@ export const actions = {
     isLegal: () => true, // unlimited, no cooldown, no usedSpecial gate
     execute(character, targetId, game, log) {
       character.special.controlling = true;
+      // Real serialized state (survives sanitizeGameForBroadcast untouched,
+      // same as every other plain .special field) so clients can identify
+      // WHO the current puppet is for the whole sequence, not just at the
+      // selection instant - room.melyssaControl (server/index.js) covers
+      // the same window server-side, but was never broadcast past the
+      // initial awaitingMindControlAction moment. Cleared in
+      // finishMelyssaTurn alongside controlling.
+      character.special.puppetCharacterId = targetId;
       log.push({ type: 'mind-control-select', characterId: character.id, targetId });
       return { puppetCharacterId: targetId };
     },
