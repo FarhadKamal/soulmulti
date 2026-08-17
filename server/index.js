@@ -620,10 +620,43 @@ function stepBotTurn(room) {
       return;
     }
     if (move) {
+      // Snapshot BEFORE executing: if this hit lands on Draxus while his
+      // Deathless Fury window is active, broadcastGameState's internal
+      // settleToNextDecision (called below) can silently fast-forward
+      // straight through his own onTurnStart in this SAME tick when it's
+      // his turn next - collapsing "the hit landed" and "the window ends,
+      // 3 strikes granted" into one broadcast. The match log then shows
+      // them as two separate lines, but the player only ever saw ONE
+      // combined snapshot where the portrait had already flipped to
+      // injured.jpg - reported as "the portrait changes one log line too
+      // early" even though the state itself was technically already
+      // correct for that (later) instant. Insert one extra paced beat here
+      // so the hit is genuinely visible on its own first.
+      const draxus = room.game.characters['draxus'];
+      const hitDraxusMidWindow = move.targetId === 'draxus'
+        && draxus && !draxus.isKO && draxus.special.deathproofActive;
+
       executeAction(room.game, acting, move.actionId, move.targetId);
       if (move.actionId === 'soulSwap') {
         const wrathTarget = chooseSoulSwapWrathTarget(character, room.game);
         if (wrathTarget) executeAction(room.game, acting, 'soulSwapWrath', wrathTarget);
+      }
+
+      if (hitDraxusMidWindow && draxus.special.deathproofActive) {
+        // Still active right after the hit (the floor caught it, as
+        // expected) - broadcast this exact moment RAW, without letting
+        // settleToNextDecision advance any further, then pause before the
+        // normal settling broadcast (which is where his onTurnStart may
+        // fire) continues as usual.
+        broadcastRoom(room, 'game-state', {
+          game: sanitizeGameForBroadcast(room.game),
+          actingCharacterId: acting,
+          usableActions: [],
+          turnDeadline: null,
+          humanCount: room.seats.filter((s) => s.kind === 'human').length,
+        });
+        setTimeout(() => stepBotTurn(room), BOT_ACTION_DELAY_MS);
+        return;
       }
     }
     // Draxus's Deathless Fury bonus turn: his own onTurnStart already set
@@ -1254,7 +1287,39 @@ function handleAction(room, sessionId, { characterId, actionId, targetId }) {
     return;
   }
 
+  // Snapshot BEFORE executing: same collapse risk as stepBotTurn's own
+  // guard below - if this action hits Draxus while his Deathless Fury
+  // window is active, and it happens to become his own turn next,
+  // broadcastGameState's internal settleToNextDecision would fast-forward
+  // through his onTurnStart in this SAME broadcast, silently ending the
+  // window and granting his bonus strikes before the client ever saw the
+  // hit landing on its own. See the matching comment in stepBotTurn for
+  // the full reasoning.
+  const draxusBeforeAction = room.game.characters['draxus'];
+  const hitDraxusMidWindow = targetId === 'draxus'
+    && draxusBeforeAction && !draxusBeforeAction.isKO && draxusBeforeAction.special.deathproofActive;
+
   executeAction(room.game, characterId, actionId, targetId);
+
+  if (hitDraxusMidWindow && draxusBeforeAction.special.deathproofActive && actionId !== 'soulSwap') {
+    // Still active right after the hit (the floor caught it) - broadcast
+    // this exact moment raw, without letting settleToNextDecision advance
+    // any further, then let the normal flow (including any bot turns)
+    // continue after a beat.
+    broadcastRoom(room, 'game-state', {
+      game: sanitizeGameForBroadcast(room.game),
+      actingCharacterId: characterId,
+      usableActions: [],
+      turnDeadline: null,
+      humanCount: room.seats.filter((s) => s.kind === 'human').length,
+    });
+    setTimeout(() => {
+      markCharacterActed(room.game, characterId);
+      broadcastGameState(room);
+      runBotTurnsIfAny(room);
+    }, BOT_ACTION_DELAY_MS);
+    return;
+  }
 
   if (actionId === 'soulSwap') {
     // Soul Swap doesn't mark the character acted yet - the free follow-up
