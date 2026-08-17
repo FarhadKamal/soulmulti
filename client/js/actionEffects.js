@@ -24,6 +24,7 @@ const EFFECT_DURATION_MS = {
   moonstreak: 400,
   shadowstrike: 650,
   darkslash: 350,
+  icecrash: 550,
   smoke: 1600,
   revive: 1300,
   divine: 1100,
@@ -203,6 +204,17 @@ export function handleLogEntryForEffects(entry, game) {
   // low hearts but never KOs on its own.
   if (actionId === 'soulSwap' && targetId && !isKO(targetId)) {
     addEffect(targetId, 'invertflash', EFFECT_DURATION_MS.invertflash);
+  }
+
+  // Time Freeze: a one-shot crystalline ice-encasement burst on the VICTIM
+  // the instant it lands - crashing shards that snap into place, then
+  // settle into the existing persistent ice-frozen glow (battleScreen.js's
+  // isFrozenVisual/.ice-frozen, driven off real ongoing state) for the rest
+  // of the freeze duration. This is just the landing MOMENT; no damage is
+  // dealt so amountDealt is irrelevant here, unlike every other effect on
+  // this switch.
+  if (actionId === 'timeFreeze' && targetId && !isKO(targetId)) {
+    addEffect(targetId, 'icecrash', EFFECT_DURATION_MS.icecrash);
   }
 
   // Thunder Wrath (and Soul Swap Wrath, which delegates straight into this

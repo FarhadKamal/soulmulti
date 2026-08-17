@@ -620,6 +620,20 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
     crescent.innerHTML = '<svg viewBox="0 0 60 60"><path d="M 44,6 A 26,26 0 1 0 44,54 A 20,20 0 1 1 44,6 Z" /></svg>';
     tile.appendChild(crescent);
   }
+  if (effects.has('icecrash') && !character.isKO) {
+    // Chronox's Time Freeze: crystalline ice shards crash in from multiple
+    // angles and snap into place around the target the instant the freeze
+    // lands - a one-shot landing moment, distinct from the persistent
+    // .ice-frozen shimmer/snowflake (isFrozenVisual) that continues for the
+    // rest of the freeze duration.
+    const ice = document.createElement('div');
+    ice.className = 'ice-crash';
+    ice.innerHTML = '<span class="ice-shard ice-shard--1"></span>' +
+      '<span class="ice-shard ice-shard--2"></span>' +
+      '<span class="ice-shard ice-shard--3"></span>' +
+      '<span class="ice-shard ice-shard--4"></span>';
+    tile.appendChild(ice);
+  }
   if (effects.has('shadowstrike') && !character.isKO) {
     // Akyros's Shadow Execution: a dark blade shape stabs in from the side
     // then dissolves into wisps of black smoke - replaces the old borrowed
