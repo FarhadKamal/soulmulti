@@ -647,7 +647,13 @@ function stepBotTurn(room) {
         // expected) - broadcast this exact moment RAW, without letting
         // settleToNextDecision advance any further, then pause before the
         // normal settling broadcast (which is where his onTurnStart may
-        // fire) continues as usual.
+        // fire) continues as usual. Must still mark the attacker acted
+        // here (normally done below, at the bottom of this else-branch) -
+        // skipping it left the SAME character acting again indefinitely,
+        // since settleToNextDecision would keep returning them as not yet
+        // having acted this round (live-reported regression: "Chronox
+        // keeps hitting me").
+        markCharacterActed(room.game, acting);
         broadcastRoom(room, 'game-state', {
           game: sanitizeGameForBroadcast(room.game),
           actingCharacterId: acting,
