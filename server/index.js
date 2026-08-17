@@ -237,11 +237,16 @@ function sanitizeGameForBroadcast(game) {
       character.special.marks = [];
     }
   }
-  // Sets don't survive JSON.stringify - convert what's left to arrays.
+  // Sets/Maps don't survive JSON.stringify (a Map serializes to {}, silently
+  // dropping every entry) - convert what's left to arrays/plain objects.
+  // Kaelis's grudgeCounts (Map<attackerCharacterId, number>) needs this to
+  // ever reach the client at all - previously it always broadcast as {},
+  // making the per-enemy grudge badge (battleScreen.js) impossible.
   for (const character of Object.values(clone.characters)) {
     if (character.special) {
       for (const [k, v] of Object.entries(character.special)) {
         if (v instanceof Set) character.special[k] = [...v];
+        else if (v instanceof Map) character.special[k] = Object.fromEntries(v);
       }
     }
   }

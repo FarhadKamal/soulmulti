@@ -364,6 +364,19 @@ input {
   animation: tile-ball-wobble 1.2s ease-in-out infinite;
   pointer-events: none; z-index: 5;
 }
+
+/* Kaelis's per-enemy grudge badge - opposite corner from the Jester Ball
+   icon so they never collide. Small and static (no animation loop) since
+   this is a persistent stat readout, not a reactive moment - stays
+   readable without competing for attention with actual action effects. */
+.grudge-badge {
+  position: absolute; top: 6px; right: 8px;
+  background: rgba(185, 28, 28, 0.85); color: #fff;
+  font-size: 0.75em; font-weight: 700;
+  padding: 2px 6px; border-radius: 10px;
+  box-shadow: 0 0 6px rgba(185, 28, 28, 0.6);
+  pointer-events: none; z-index: 5;
+}
 @keyframes tile-ball-wobble {
   0%, 100% { transform: rotate(-8deg) scale(1); }
   50% { transform: rotate(8deg) scale(1.08); }

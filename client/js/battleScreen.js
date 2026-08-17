@@ -163,6 +163,19 @@ export function renderBattle(root, state) {
   const activePuppetId = melyssa && !melyssa.isKO && melyssa.special?.controlling
     ? melyssa.special.puppetCharacterId
     : null;
+  // Kaelis's per-attacker grudge count (server/abilities/kaelis.js) - a
+  // small badge on each ENEMY's own tile, not Kaelis's, since the count is
+  // a per-relationship number ("how much grudge does she hold against ME
+  // specifically") rather than something that fits on her tile without N
+  // separate rows for N enemies in a 4-player match. Only shown for
+  // characters with a real count > 0 against them - 0 is the no-signal
+  // default, and the badge should vanish the instant Grudge Strike lands
+  // and resets it, reading as "the debt was just paid."
+  const kaelis = Object.values(game.characters).find((c) => c.id === 'kaelis');
+  const grudgeCountFor = (characterId) => {
+    if (!kaelis || kaelis.isKO || kaelis.id === characterId) return 0;
+    return kaelis.special?.grudgeCounts?.[characterId] || 0;
+  };
   Object.values(game.characters).forEach((character) => {
     board.appendChild(renderCharacterTile(character, {
       isActing: character.id === actingCharacterId,
@@ -170,6 +183,7 @@ export function renderBattle(root, state) {
       isTargetable: !!armedAction && armedAction.validTargetIds.includes(character.id),
       onTargetClick: () => onTargetPicked(character.id, state),
       isHoldingBall: character.id === ballHolderId,
+      grudgeCount: grudgeCountFor(character.id),
       isCursed: character.id === cursedId,
       isFrozenVisual: character.id === frozenId,
       isPuppet: character.id === puppetHighlightId || character.id === activePuppetId,
@@ -423,7 +437,7 @@ function renderVictoryPortraits(game) {
   return container;
 }
 
-function renderCharacterTile(character, { isActing, isMine, isTargetable, onTargetClick, isHoldingBall, isCursed, isFrozenVisual, isVictorious, isPuppet, isHypnotized }) {
+function renderCharacterTile(character, { isActing, isMine, isTargetable, onTargetClick, isHoldingBall, isCursed, isFrozenVisual, isVictorious, isPuppet, isHypnotized, grudgeCount }) {
   const def = CHARACTERS[character.id];
   const tile = document.createElement('div');
   tile.className = 'char-tile';
@@ -708,6 +722,19 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
     ball.textContent = '💣';
     ball.title = 'Holding the Jester Ball';
     tile.appendChild(ball);
+  }
+
+  if (grudgeCount > 0 && !character.isKO) {
+    // Persistent per-enemy badge showing how much grudge Kaelis currently
+    // holds against THIS character specifically - one number per tile
+    // (never a per-enemy breakdown, which wouldn't fit), gated to only
+    // render when there's a real count to show. Vanishes the instant a
+    // landed Grudge Strike resets it to 0.
+    const grudge = document.createElement('div');
+    grudge.className = 'grudge-badge';
+    grudge.textContent = `🗡${grudgeCount}`;
+    grudge.title = `Kaelis's grudge: ${grudgeCount} (her next Grudge Strike on you deals ${1 + grudgeCount})`;
+    tile.appendChild(grudge);
   }
 
   const portrait = document.createElement('img');
