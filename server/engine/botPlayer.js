@@ -411,9 +411,28 @@ function chooseChronoxMove(character, game, usable) {
 
 function chooseAkyrosMove(character, game, usable) {
   const byId = Object.fromEntries(usable.map((a) => [a.actionId, a]));
-  const markedTargets = validTargetsFor(game, character, 'shadowExecution');
-
-  const fatalTargets = validTargetsFor(game, character, 'fatalSlash');
+  let markedTargets = validTargetsFor(game, character, 'shadowExecution');
+  let fatalTargets = validTargetsFor(game, character, 'fatalSlash');
+  // Mirror Reflect avoidance: unlike Athena's curse (handled below via
+  // athenaIsCursingRisk), most of this function picks a target directly
+  // from markedTargets/fatalTargets rather than routing through
+  // pickDefaultTarget, so that helper's own avoidance never sees these
+  // picks. Strip Rowan from both pools up front whenever hitting him
+  // wouldn't be lethal and a safer alternative exists - Shadow Execution
+  // ignores shield for a flat 3, Fatal Slash's marked bonus is 2, so check
+  // each action's own would-be damage against his current hearts/shield
+  // before excluding him from ITS pool specifically.
+  if (isMirrorReflectActive(game) && (markedTargets.includes('rowan') || fatalTargets.includes('rowan'))) {
+    const rowan = game.characters['rowan'];
+    const shadowWouldKill = rowan.hearts <= 3;
+    const fatalWouldKill = rowan.hearts <= Math.max(0, 2 - rowan.shield);
+    if (!shadowWouldKill && markedTargets.length > 1) {
+      markedTargets = markedTargets.filter((tid) => tid !== 'rowan');
+    }
+    if (!fatalWouldKill && fatalTargets.length > 1) {
+      fatalTargets = fatalTargets.filter((tid) => tid !== 'rowan');
+    }
+  }
   // Self-curse-mirror handling: while Athena is cursing Akyros, every point
   // of damage he lands on her mirrors straight back onto him (the mirror
   // still passes through his shield normally, unlike Shadow Execution's own
