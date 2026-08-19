@@ -246,11 +246,78 @@ function renderEntryForm() {
   botShowTitle.textContent = 'Watch bots play';
   botShowSection.appendChild(botShowTitle);
   const botShowBtn = document.createElement('button');
-  botShowBtn.textContent = 'Start Watching';
+  botShowBtn.textContent = 'Start Watching (Random 4)';
   botShowBtn.onclick = () => send('create-bot-show-room', { name: currentName() });
   nameRequiredButtons.push(botShowBtn); // reuses the same name-required disable wiring as the training grid
   botShowSection.appendChild(botShowBtn);
   form.appendChild(botShowSection);
+
+  // Custom-pick variant: same spectacle room as above, but the viewer
+  // chooses exactly which 4 characters face off instead of a random draw.
+  // Click-to-toggle grid (same interaction shape as the training grid
+  // above), capped at 4 selections - reusing the ordered array itself as
+  // the selection order also fixes which seat each pick lands in server-
+  // side, though that's not visible/meaningful to the viewer.
+  const customBotShowSection = document.createElement('div');
+  customBotShowSection.className = 'bot-show-section custom-bot-show-section';
+  const customBotShowTitle = document.createElement('h2');
+  customBotShowTitle.textContent = 'Watch bots play (your picks)';
+  customBotShowSection.appendChild(customBotShowTitle);
+
+  const customBotShowHint = document.createElement('div');
+  customBotShowHint.className = 'name-hint';
+  customBotShowSection.appendChild(customBotShowHint);
+
+  const selectedCharacterIds = [];
+  const customBotShowGrid = document.createElement('div');
+  customBotShowGrid.className = 'character-grid';
+  const customBotShowBtn = document.createElement('button');
+  customBotShowBtn.textContent = 'Start Watching (Custom 4)';
+  customBotShowBtn.onclick = () => {
+    if (selectedCharacterIds.length !== 4) return;
+    send('create-bot-show-room-custom', { name: currentName(), characterIds: [...selectedCharacterIds] });
+  };
+
+  function updateCustomBotShowUI() {
+    const count = selectedCharacterIds.length;
+    customBotShowHint.textContent = `Pick exactly 4 characters (${count}/4 selected).`;
+    customBotShowBtn.disabled = !currentName() || count !== 4;
+    [...customBotShowGrid.children].forEach((btn) => {
+      const isSelected = selectedCharacterIds.includes(btn.dataset.characterId);
+      btn.classList.toggle('character-grid-btn--selected', isSelected);
+      // A 5th pick is blocked (button disabled) once 4 are already chosen,
+      // but an already-selected button must stay clickable so it can still
+      // be toggled back OFF - only the UNselected ones lock up at the cap.
+      btn.disabled = !isSelected && count >= 4;
+    });
+  }
+
+  Object.values(CHARACTERS).forEach((def) => {
+    const btn = document.createElement('button');
+    btn.textContent = def.name;
+    btn.style.borderColor = def.color;
+    btn.dataset.characterId = def.id;
+    btn.onclick = () => {
+      const idx = selectedCharacterIds.indexOf(def.id);
+      if (idx !== -1) {
+        selectedCharacterIds.splice(idx, 1);
+      } else if (selectedCharacterIds.length < 4) {
+        selectedCharacterIds.push(def.id);
+      }
+      updateCustomBotShowUI();
+    };
+    customBotShowGrid.appendChild(btn);
+  });
+  customBotShowSection.appendChild(customBotShowGrid);
+  customBotShowSection.appendChild(customBotShowBtn);
+  form.appendChild(customBotShowSection);
+  updateCustomBotShowUI();
+  // currentName() can change (name input edited after this point), so the
+  // custom button's disabled state needs the same live re-check the other
+  // name-required buttons get - reusing nameRequiredButtons' existing hook
+  // isn't enough on its own since this button ALSO gates on the 4-pick
+  // count, so it gets its own listener that re-runs the combined check.
+  nameInput.addEventListener('input', updateCustomBotShowUI);
 
   updateNameValidity();
   return form;

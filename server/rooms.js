@@ -96,6 +96,13 @@ export function createRoom(roomType) {
     // too, not just seat.spectatorId - a plain Set since a 'bots4' room in
     // practice has exactly one viewer, but nothing stops more from watching.
     spectatorIds: new Set(),
+    // Only set for a 'bots4' room created via the custom-pick flow (see
+    // handleCreateBotShowRoom in index.js) - an ordered array of exactly
+    // seatCount character ids the viewer chose, so startFreshBotShowMatch
+    // can seat those same characters again on every auto-restart instead
+    // of drifting back to a fully random lineup. Left null for the normal
+    // "Start Watching" random flow.
+    pinnedCharacterIds: null,
   };
   rooms.set(code, room);
   return room;

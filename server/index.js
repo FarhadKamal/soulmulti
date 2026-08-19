@@ -854,6 +854,35 @@ function handleCreateBotShowRoom(ws, sessionId, { name }) {
   runBotTurnsIfAny(room);
 }
 
+// Same spectacle room as handleCreateBotShowRoom above, but the viewer picks
+// which 4 characters face off instead of getting a fully random lineup.
+// characterIds must be exactly 4 distinct, valid ids - any fewer/invalid
+// picks and the client should have disabled the button, so this is a
+// defensive reject rather than a partial-fill (silently substituting random
+// picks for an incomplete selection would surprise someone who thought they
+// picked all 4 themselves). Stored on room.pinnedCharacterIds so every
+// auto-restart (broadcastGameState's 'bots4' branch) reseats the SAME 4
+// characters again, not a fresh random draw each time.
+function handleCreateBotShowRoomCustom(ws, sessionId, { name, characterIds }) {
+  const cleanName = sanitizeName(name);
+  if (!cleanName) return send(ws, 'error', { message: 'A name is required.' });
+  if (!Array.isArray(characterIds) || characterIds.length !== 4) {
+    return send(ws, 'error', { message: 'Pick exactly 4 characters.' });
+  }
+  const distinct = new Set(characterIds);
+  if (distinct.size !== 4 || characterIds.some((id) => !CHARACTER_IDS.includes(id))) {
+    return send(ws, 'error', { message: 'Pick 4 distinct, valid characters.' });
+  }
+  const room = createRoom('bots4');
+  room.pinnedCharacterIds = [...characterIds];
+  room.spectatorIds.add(sessionId);
+  startFreshBotShowMatch(room);
+  send(ws, 'room-created', { code: room.code });
+  broadcastLobby(room);
+  broadcastGameState(room);
+  runBotTurnsIfAny(room);
+}
+
 // training4: human picks ONE character, dropped into a 4-player FFA with 3
 // REAL bot-controlled characters (chooseBotMove etc. - not scripted), each
 // randomly assigned exactly like bots4's fillSeatWithBot. The only behavior
@@ -897,17 +926,28 @@ function handleCreateTrainingRoom(ws, sessionId, { name, characterId }) {
   runBotTurnsIfAny(room);
 }
 
-// Resets all 4 seats to freshly bot-filled (new random distinct
-// characters, same as a first-time creation) and starts a brand new game -
+// Resets all 4 seats to freshly bot-filled and starts a brand new game -
 // shared by the initial creation above and the auto-restart loop in
-// broadcastGameState, so both paths produce an identical fresh match.
+// broadcastGameState, so both paths produce an identical fresh match. When
+// room.pinnedCharacterIds is set (custom-pick bot-show, see
+// handleCreateBotShowRoomCustom), seats the SAME 4 characters again every
+// time instead of drawing a fresh random distinct set - otherwise identical
+// to the random flow.
 function startFreshBotShowMatch(room) {
   for (const seat of room.seats) {
     seat.kind = 'empty';
     seat.characterIds = [];
     seat.name = null;
   }
-  for (const seat of room.seats) fillSeatWithBot(room, seat);
+  if (room.pinnedCharacterIds) {
+    room.seats.forEach((seat, i) => {
+      seat.kind = 'bot';
+      seat.name = 'Bot';
+      seat.characterIds = [room.pinnedCharacterIds[i]];
+    });
+  } else {
+    for (const seat of room.seats) fillSeatWithBot(room, seat);
+  }
   const playerPicks = room.seats.map((s) => ({
     id: `bot-${s.index}`,
     name: s.name,
@@ -1587,6 +1627,7 @@ wss.on('connection', (ws) => {
 
     if (type === 'create-room') return handleCreateRoom(ws, sessionId, payload);
     if (type === 'create-bot-show-room') return handleCreateBotShowRoom(ws, sessionId, payload);
+    if (type === 'create-bot-show-room-custom') return handleCreateBotShowRoomCustom(ws, sessionId, payload);
     if (type === 'create-training-room') return handleCreateTrainingRoom(ws, sessionId, payload);
     if (type === 'join-room') return handleJoinRoom(ws, sessionId, payload);
     if (type === 'reconnect') return handleReconnect(ws, sessionId, payload);
