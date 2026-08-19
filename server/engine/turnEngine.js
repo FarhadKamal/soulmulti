@@ -268,6 +268,14 @@ export function beginCharacterTurn(character, game, log) {
   tickSilenceIfAny(character, game, log);
   const mod = ABILITY_MODULES[character.id];
   if (mod?.onTurnStart) mod.onTurnStart(character, game, log);
+  // Poison's tick above deals REAL damage outside the normal executeAction/
+  // finalizeAction path (which is the only place applyEndOfActionChecks
+  // normally runs) - if that tick was the killing blow on the last
+  // opponent, the match needs to end right here, or it never does at all.
+  // Confirmed live: everyone showed KO on the board but the game kept
+  // waiting on a stale "next turn," since player.isEliminated/game.phase
+  // were never recomputed after a poison-tick kill.
+  applyEndOfActionChecks(game);
 }
 
 export function executeAction(game, characterId, actionId, targetId, extra) {
