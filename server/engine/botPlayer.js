@@ -830,13 +830,11 @@ function chooseRowanMove(character, game, usable) {
   if (byId.mirrorReflect && character.hearts <= LOW_HEARTS_THRESHOLD) {
     return { actionId: 'mirrorReflect', targetId: null };
   }
-  // Arcane Study has no downside beyond its own cooldown - prefer it
-  // whenever it's available and there's no more urgent play, so he
-  // naturally builds out his toolkit over the course of a match instead of
-  // only ever throwing Wand Strikes.
-  if (byId.arcaneStudy) {
-    return { actionId: 'arcaneStudy', targetId: null };
-  }
+  // Already-discovered spells take priority over MORE studying - Arcane
+  // Study only pays off once its reveal actually resolves next turn, while
+  // a known spell does something useful right now. Confirmed via a real
+  // match report: the bot kept re-casting Arcane Study turn after turn even
+  // with a full kit already discovered, instead of actually using it.
   // Silence Lock on whoever still has their own special banked - denies
   // the single biggest threat a character can pose.
   if (byId.silenceLock) {
@@ -863,6 +861,13 @@ function chooseRowanMove(character, game, usable) {
       const targetId = biggestThreatTarget(game, character, targets) || pickRandom(targets);
       return { actionId: 'poisonCloud', targetId };
     }
+  }
+  // Nothing currently discovered is worth using this turn (either nothing's
+  // been found yet, or every known spell above had no valid/fresh target) -
+  // Arcane Study has no downside beyond its own cooldown, so fall back to
+  // building out the toolkit instead of just throwing a plain Wand Strike.
+  if (byId.arcaneStudy) {
+    return { actionId: 'arcaneStudy', targetId: null };
   }
   const targets = validTargetsFor(game, character, 'wandStrike');
   const targetId = biggestThreatTarget(game, character, targets)
