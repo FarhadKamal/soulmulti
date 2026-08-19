@@ -18,6 +18,7 @@ const EFFECT_DURATION_MS = {
   tendrils: 1000,
   invertflash: 350,
   lightning: 500,
+  wildlightning: 500,
   choke: 700,
   ghosthand: 700,
   crescent: 450,
@@ -25,10 +26,20 @@ const EFFECT_DURATION_MS = {
   shadowstrike: 650,
   darkslash: 350,
   icecrash: 550,
+  poisoncloud: 1200,
+  mirrorshard: 600,
+  silencelock: 750,
   smoke: 1600,
   revive: 1300,
   divine: 1100,
 };
+
+// How long the mirror-shard counter-hit effect waits before it even starts,
+// so it visibly plays AFTER the attacker's own strike effect (queued in the
+// same processNewLogEntries pass) rather than layering on top of it from
+// the same instant - see the 'mirror-reflect' handler below for the full
+// reasoning.
+const MIRROR_SEQUENCE_DELAY_MS = 550;
 
 // Per-character currently-active one-shot effects, keyed by characterId ->
 // { effects: Set<'hit'|'shake'|'dodge'|'claw'|'crack'|'pow'|'vortex'|
@@ -48,7 +59,7 @@ export function registerEffectRerender(fn) {
 function addEffect(characterId, effect, durationMs, param) {
   let entry = activeEffects.get(characterId);
   if (!entry) {
-    entry = { effects: new Set(), clawCount: 3, crackCount: 1, powSize: 'small', vortexSize: 'small', axechopTier: 1, lightningTier: 1, darkslashVariant: 'plain', timers: new Map() };
+    entry = { effects: new Set(), clawCount: 3, crackCount: 1, powSize: 'small', vortexSize: 'small', axechopTier: 1, lightningTier: 1, wildlightningTier: 1, darkslashVariant: 'plain', timers: new Map() };
     activeEffects.set(characterId, entry);
   }
   entry.effects.add(effect);
@@ -58,6 +69,7 @@ function addEffect(characterId, effect, durationMs, param) {
   if (effect === 'vortex' && param) entry.vortexSize = param;
   if (effect === 'axechop' && param) entry.axechopTier = param;
   if (effect === 'lightning' && param) entry.lightningTier = param;
+  if (effect === 'wildlightning' && param) entry.wildlightningTier = param;
   if (effect === 'darkslash' && param) entry.darkslashVariant = param;
 
   const existingTimer = entry.timers.get(effect);
@@ -88,6 +100,10 @@ export function getAxechopTier(characterId) {
 
 export function getLightningTier(characterId) {
   return activeEffects.get(characterId)?.lightningTier ?? 1;
+}
+
+export function getWildLightningTier(characterId) {
+  return activeEffects.get(characterId)?.wildlightningTier ?? 1;
 }
 
 export function getDarkslashVariant(characterId) {
@@ -183,16 +199,81 @@ export function handleLogEntryForEffects(entry, game) {
     return;
   }
 
+  // Rowan's Mirror Reflect counter-hit, same reasoning as curse-mirror
+  // above - its own log-entry type, but the attacker who just got 3
+  // reflected damage still deserves the standard hit-flash. Without this,
+  // the reflect landed correctly server-side but had NO visible
+  // confirmation at all (no flash/shake/sound), which is exactly what was
+  // reported live: "Velorya hit him and did not take damage" - she DID,
+  // it just wasn't shown.
+  //
+  // Sequencing (explicit request): the ATTACKER's own strike animation
+  // (already queued from the earlier 'attack'/'special' log entry this
+  // same processNewLogEntries pass - see main.js) must visibly finish
+  // FIRST, and only THEN should the mirror-shard counter-hit appear -
+  // not simultaneously. addEffect() itself starts an effect immediately
+  // (its setTimeout only controls the FADE-OUT, not a start delay), so a
+  // deliberate setTimeout wrapper here is what actually creates that gap.
+  // MIRROR_SEQUENCE_DELAY_MS is roughly one typical strike effect's own
+  // duration, giving it room to read before the shard burst starts.
+  if (entry.type === 'mirror-reflect') {
+    applyHitFlash(entry.toCharacterId, entry.amount);
+    if (entry.amount > 0) addEffect(entry.toCharacterId, 'shake', EFFECT_DURATION_MS.shake);
+    setTimeout(() => {
+      addEffect(entry.toCharacterId, 'mirrorshard', EFFECT_DURATION_MS.mirrorshard);
+      onEffectExpired();
+    }, MIRROR_SEQUENCE_DELAY_MS);
+    return;
+  }
+
+  // Rowan's Poison Cloud, ongoing ticks: its own dedicated log-entry type
+  // (turnEngine.js's tickPoisonIfAny), fired on the POISONED character's
+  // own turn start, not Rowan's - so this can't live in the generic
+  // attack/special switch below, which is keyed on the ACTOR. Re-fires the
+  // same green toxic-cloud effect every single tick (not just the cast
+  // moment), per explicit request - the poison should visibly "reanimate"
+  // each turn it deals damage, not just once when first applied.
+  if (entry.type === 'poison-tick') {
+    if (!isKO(entry.targetCharacterId) && entry.amountDealt > 0) {
+      addEffect(entry.targetCharacterId, 'poisoncloud', EFFECT_DURATION_MS.poisoncloud);
+      applyHitFlash(entry.targetCharacterId, entry.amountDealt);
+    }
+    return;
+  }
+
   if (entry.type !== 'attack' && entry.type !== 'special') return;
   const { characterId, actionId, targetId, dodged, amountDealt, streak, flip, outcome, grudgeCount, isNewTarget, wasMarked } = entry;
 
   applyHitFlash(targetId, amountDealt);
 
-  // Self-buff golden glow: Divine Restore and Glory Smash both self-heal
-  // the caster - only if the buff actually landed (caster not KO'd, same
-  // "no misleading sparkle on a KO'd character" reasoning as the main game).
-  if ((actionId === 'divineRestore' || actionId === 'glorySmash') && !isKO(characterId)) {
+  // Self-buff golden glow: Divine Restore, Glory Smash, and Rowan's Purify
+  // all self-heal the caster - only if the buff actually landed (caster
+  // not KO'd, same "no misleading sparkle on a KO'd character" reasoning
+  // as the main game). Purify heals to full AND cleanses every negative
+  // status, so this same golden glow fits doubly well - it already reads
+  // as "something good just happened to you."
+  if ((actionId === 'divineRestore' || actionId === 'glorySmash' || actionId === 'purify') && !isKO(characterId)) {
     addEffect(characterId, 'divine', EFFECT_DURATION_MS.divine);
+  }
+
+  // Rowan's Poison Cloud, CAST moment: deals no direct damage itself
+  // (it's pure setup - applyHitFlash above correctly no-ops since
+  // amountDealt is 0/undefined here), but the target should still see the
+  // green toxic cloud settle onto them right away, not wait for the first
+  // tick. Every subsequent tick re-fires the same effect - see the
+  // dedicated 'poison-tick' handler above.
+  if (actionId === 'poisonCloud' && targetId && !isKO(targetId)) {
+    addEffect(targetId, 'poisoncloud', EFFECT_DURATION_MS.poisoncloud);
+  }
+
+  // Rowan's Silence Lock, cast moment: glowing chains swing in from
+  // opposite sides and meet at a padlock shape that snaps shut - matches
+  // the ability's own name/theme ("your power is sealed away"), distinct
+  // from every other effect (nothing else does chains/binding). Deals no
+  // direct damage itself, so this is the only visible confirmation the
+  // cast landed.
+  if (actionId === 'silenceLock' && targetId && !isKO(targetId)) {
+    addEffect(targetId, 'silencelock', EFFECT_DURATION_MS.silencelock);
   }
 
   // Soul Swap: a quick color-invert flash directly on the VICTIM's own
@@ -261,6 +342,21 @@ export function handleLogEntryForEffects(entry, game) {
   if (actionId === 'selfChoke' && targetId && amountDealt > 0) {
     addEffect(targetId, 'choke', EFFECT_DURATION_MS.choke);
     addEffect(targetId, 'ghosthand', EFFECT_DURATION_MS.ghosthand);
+  }
+
+  // Rowan's Wild Lightning: reuses Zerathys's Thunder Wrath bolt-strike
+  // structure (same jagged SVG bolt paths + core flash shape, see
+  // battleScreen.js's 'wildlightning' branch), recolored to a wild
+  // violet/gold mix so the two are visually distinguishable even though
+  // they share the same "literal lightning bolt" language. His damage is
+  // a genuinely random 1-7 roll (not a fixed charge tier like Zerathys's),
+  // so it's bucketed into 3 visual tiers: 1-2 dmg = 1 bolt, 3-5 dmg = 2
+  // bolts, 6-7 dmg = 3 bolts + shake, matching the same "biggest hit gets
+  // the most dramatic version" reasoning as the original.
+  if (actionId === 'wildLightning' && targetId && !dodged && amountDealt > 0) {
+    const tier = amountDealt >= 6 ? 3 : amountDealt >= 3 ? 2 : 1;
+    addEffect(targetId, 'wildlightning', EFFECT_DURATION_MS.wildlightning, tier);
+    if (tier === 3) addEffect(targetId, 'shake', EFFECT_DURATION_MS.shake);
   }
 
   // Cyclone Punch: a spinning violet vortex ring on any landed hit, reading

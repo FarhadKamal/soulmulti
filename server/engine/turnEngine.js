@@ -224,10 +224,19 @@ function tickPoisonIfAny(character, game, log) {
     (c) => c.special?.poisonTargets?.has(character.id)
   );
   if (!caster) return;
+  // ignoresUntargetable: true - the poison was already applied while the
+  // target WAS targetable; going untargetable afterward (e.g. Velorya's
+  // Lunar Eclipse) shouldn't let already-active ticks skip, same reasoning
+  // as Athena's curse-mirror bypassing untargetable for the same class of
+  // "this effect already landed, a later dodge doesn't retroactively
+  // cancel it" situation. Confirmed bug report: poison silently stopped
+  // ticking (not cured, just permanently no-op) the moment the victim went
+  // untargetable, with no way to ever resume even after Eclipse ended.
   const result = applyDamage(game, log, {
     sourceCharacterId: caster.id,
     targetCharacterId: character.id,
     amount: 1,
+    ignoresUntargetable: true,
   });
   log.push({ type: 'poison-tick', casterId: caster.id, targetCharacterId: character.id, ...result });
 }

@@ -639,6 +639,133 @@ input {
   100% { opacity: 0; translate: 160% 40%; }
 }
 
+/* Rowan's Poison Cloud: a swirling green toxic mist settles over the
+   target - re-fires on the cast AND every subsequent damage tick, so it
+   visibly "reanimates" each turn rather than showing only once. Several
+   offset wisp shapes drift and swirl (not a single static blob), plus a
+   couple of small bubbles rising, for a living/churning feel. */
+.poison-cloud-fx {
+  position: absolute; inset: 0; pointer-events: none; z-index: 4;
+  overflow: hidden; border-radius: inherit;
+}
+.poison-wisp {
+  position: absolute; width: 45%; height: 45%; border-radius: 50%;
+  background: radial-gradient(circle, rgba(60, 200, 90, 0.55) 0%, rgba(40, 160, 70, 0.3) 55%, transparent 78%);
+  filter: blur(3px);
+  opacity: 0;
+  animation: tile-poison-swirl 1.2s ease-in-out forwards;
+}
+.poison-wisp--1 { left: 8%; top: 30%; animation-delay: 0s; }
+.poison-wisp--2 { left: 45%; top: 10%; width: 38%; height: 38%; animation-delay: 0.15s; }
+.poison-wisp--3 { left: 55%; top: 45%; animation-delay: 0.3s; }
+.poison-wisp--4 { left: 20%; top: 50%; width: 34%; height: 34%; animation-delay: 0.1s; }
+@keyframes tile-poison-swirl {
+  0% { opacity: 0; transform: translate(0, 6%) scale(0.7); }
+  25% { opacity: 0.9; transform: translate(-2%, -2%) scale(1); }
+  60% { opacity: 0.75; transform: translate(3%, -6%) scale(1.08); }
+  100% { opacity: 0; transform: translate(0, -14%) scale(1.15); }
+}
+.poison-bubble {
+  position: absolute; width: 8%; height: 8%; border-radius: 50%;
+  background: radial-gradient(circle, rgba(140, 255, 160, 0.85) 0%, rgba(60, 200, 90, 0.4) 70%, transparent 90%);
+  opacity: 0;
+  animation: tile-poison-bubble-rise 1.2s ease-out forwards;
+}
+.poison-bubble--1 { left: 30%; bottom: 15%; animation-delay: 0.2s; }
+.poison-bubble--2 { left: 60%; bottom: 20%; animation-delay: 0.5s; }
+@keyframes tile-poison-bubble-rise {
+  0% { opacity: 0; transform: translateY(0) scale(0.5); }
+  30% { opacity: 0.9; }
+  100% { opacity: 0; transform: translateY(-45%) scale(1); }
+}
+
+/* Rowan's Mirror Reflect counter-hit: small glass/mirror shard fragments
+   burst outward from the impact point on the attacker, silver/violet
+   tinted (reflection language, distinct from Kaelis's grey stone cracks
+   or Tharox's white shatter) - reads as "your attack shattered against a
+   mirror." A bright glint flash accompanies the burst. Fires with a
+   deliberate delay after the attacker's own strike effect (see
+   actionEffects.js's MIRROR_SEQUENCE_DELAY_MS), so the two never overlap. */
+.mirror-shard-burst {
+  position: absolute; inset: 0; pointer-events: none; z-index: 6;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden; border-radius: inherit;
+}
+.mirror-shard-burst::before {
+  content: ''; position: absolute; width: 30%; height: 30%; border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.95) 0%, rgba(200, 170, 255, 0.5) 55%, transparent 78%);
+  opacity: 0;
+  animation: tile-mirror-glint 0.35s ease-out forwards;
+}
+@keyframes tile-mirror-glint {
+  0% { opacity: 0; scale: 0.3; }
+  35% { opacity: 1; scale: 1.2; }
+  100% { opacity: 0; scale: 1.5; }
+}
+.mirror-shard {
+  position: absolute; width: 10px; height: 14px;
+  background: linear-gradient(135deg, rgba(230, 220, 255, 0.95), rgba(160, 130, 220, 0.6));
+  clip-path: polygon(50% 0%, 100% 35%, 78% 100%, 15% 85%, 0% 30%);
+  filter: drop-shadow(0 0 3px rgba(200, 170, 255, 0.8));
+  opacity: 0;
+  animation: tile-mirror-shard-fly 0.55s ease-out forwards;
+}
+@keyframes tile-mirror-shard-fly {
+  0% { opacity: 0; translate: 0 0; scale: 0.4; }
+  20% { opacity: 1; scale: 1; }
+  100% { opacity: 0; translate: var(--shard-x) var(--shard-y); scale: 0.5; }
+}
+
+/* Rowan's Silence Lock, cast moment: two glowing indigo chain arcs swing in
+   from opposite edges and meet at a padlock in the center that pops/snaps
+   into place - matches the ability's own name/theme ("your power is sealed
+   away"), distinct from every other effect (nothing else does chains). */
+.silence-lock-fx {
+  position: absolute; inset: 0; pointer-events: none; z-index: 6;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden; border-radius: inherit;
+}
+.lock-chain {
+  position: absolute; top: 50%; width: 40%; height: 6px;
+  background: repeating-linear-gradient(90deg,
+    rgba(120, 80, 200, 0.9) 0px, rgba(180, 140, 255, 0.9) 6px,
+    rgba(120, 80, 200, 0.9) 8px, transparent 8px, transparent 12px);
+  filter: drop-shadow(0 0 4px rgba(150, 100, 230, 0.8));
+  opacity: 0;
+}
+.lock-chain--left {
+  left: -42%;
+  animation: tile-lock-chain-swing-left 0.5s ease-out forwards;
+}
+.lock-chain--right {
+  right: -42%;
+  animation: tile-lock-chain-swing-right 0.5s ease-out forwards;
+}
+@keyframes tile-lock-chain-swing-left {
+  0% { opacity: 0; translate: -30% 0; rotate: -25deg; }
+  50% { opacity: 1; }
+  100% { opacity: 1; translate: 0 0; rotate: 0deg; }
+}
+@keyframes tile-lock-chain-swing-right {
+  0% { opacity: 0; translate: 30% 0; rotate: 25deg; }
+  50% { opacity: 1; }
+  100% { opacity: 1; translate: 0 0; rotate: 0deg; }
+}
+.lock-padlock {
+  position: relative; font-size: 1.8rem;
+  filter: drop-shadow(0 0 6px rgba(150, 100, 230, 0.9));
+  opacity: 0;
+  animation: tile-lock-snap 0.75s cubic-bezier(0.3, 0, 0.4, 1.4) forwards;
+  animation-delay: 0.4s;
+}
+@keyframes tile-lock-snap {
+  0% { opacity: 0; scale: 0.3; }
+  30% { opacity: 1; scale: 1.4; }
+  55% { scale: 0.9; }
+  75% { scale: 1.05; }
+  100% { opacity: 0; scale: 1; }
+}
+
 /* Chronox's Time Freeze: crystalline ice shards crash in from the corners
    and snap into place around the target the instant the freeze lands - a
    one-shot landing moment (crash-and-lock motion, distinct from every
@@ -784,6 +911,21 @@ input {
 }
 .lightning-strike--tier3 .lightning-core {
   background: radial-gradient(circle, rgba(255, 255, 255, 1) 0%, rgba(150, 220, 255, 0.75) 50%, transparent 78%);
+}
+
+/* Rowan's Wild Lightning: same bolt-strike structure as Zerathys's Thunder
+   Wrath above, recolored to a wild violet/gold mix (instead of white/cyan)
+   so the two read as related but distinct spells - fitting "Wild" in the
+   name with a less orderly, more chaotic color clash. */
+.wild-lightning-strike .lightning-path {
+  stroke: #f3e8ff;
+  filter: drop-shadow(0 0 5px rgba(200, 120, 255, 0.95)) drop-shadow(0 0 10px rgba(255, 200, 60, 0.6));
+}
+.wild-lightning-strike .lightning-core {
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.95) 0%, rgba(210, 140, 255, 0.65) 45%, transparent 75%);
+}
+.wild-lightning-strike.lightning-strike--tier3 .lightning-core {
+  background: radial-gradient(circle, rgba(255, 255, 255, 1) 0%, rgba(230, 170, 255, 0.8) 45%, rgba(255, 200, 60, 0.4) 65%, transparent 80%);
 }
 
 /* Draxus's Dying Blow: a downward axe-chop wedge that slams straight down

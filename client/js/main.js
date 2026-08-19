@@ -186,6 +186,14 @@ function playLogEntrySound(entry, game) {
     if (entry.koTriggered) setTimeout(() => playKoedFor(entry.toCharacterId), 200);
     return;
   }
+  if (entry.type === 'mirror-reflect') {
+    // Same reasoning as curse-mirror above - no dedicated sound of its
+    // own, just the KO'd sound if the reflect happens to finish someone
+    // off. The visible confirmation (hit-flash/shake) is handled in
+    // actionEffects.js's handleLogEntryForEffects.
+    if (entry.koTriggered) setTimeout(() => playKoedFor(entry.toCharacterId), 200);
+    return;
+  }
   if (entry.type === 'jester-ball-pass') {
     playSound('kick');
     return;

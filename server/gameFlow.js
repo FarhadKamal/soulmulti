@@ -34,6 +34,20 @@ export function getActingCharacterId(game) {
   for (const character of acting) {
     if (hasCharacterActedThisTurn(game, character.id)) continue;
     const isBallHolder = game.jesterBall && game.jesterBall.holderCharacterId === character.id;
+    // Fire this character's OWN turn-start hooks before checking whether
+    // they're frozen this round - their turn is genuinely starting even if
+    // it then gets skipped, and several onTurnStart-driven effects need
+    // that to happen regardless (Rowan's Mirror Reflect window/Arcane
+    // Study reveal/poison+silence ticks, Draxus's death-proof window,
+    // Chronox's own shield reset). Previously this was gated INSIDE the
+    // "not frozen" branch below, so a frozen character's onTurnStart never
+    // fired at all that round - confirmed live: Mirror Reflect stayed
+    // active indefinitely (never cleared) whenever Rowan's own turn got
+    // skipped by a freeze, since the hook that clears it never ran.
+    if (!game.turnStartFiredFor.has(character.id)) {
+      game.turnStartFiredFor.add(character.id);
+      beginCharacterTurn(character, game, game.log);
+    }
     if (consumeSkipIfFrozen(character)) {
       if (isBallHolder) {
         game.log.push({ type: 'passive', characterId: character.id, text: `${CHARACTERS[character.id].name} is frozen and can't resolve the Jester Ball - it bursts on them!` });
@@ -44,10 +58,6 @@ export function getActingCharacterId(game) {
       clearStalledBonusTurn(character);
       markCharacterActed(game, character.id);
       continue;
-    }
-    if (!game.turnStartFiredFor.has(character.id)) {
-      game.turnStartFiredFor.add(character.id);
-      beginCharacterTurn(character, game, game.log);
     }
     if (!isBallHolder && getUsableActions(character, game).length === 0) {
       game.log.push({ type: 'passive', characterId: character.id, text: `${CHARACTERS[character.id].name} has no valid targets and skips their turn.` });

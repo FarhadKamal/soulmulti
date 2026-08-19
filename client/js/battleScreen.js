@@ -3,7 +3,7 @@ import { send } from './net.js';
 import { renderChatPanel } from './chatPanel.js';
 import { playUiClick } from './sound.js';
 import { getFlashSrc, getPersistentPortrait } from './portraitFlash.js';
-import { getActiveEffects, getClawCount, getCrackCount, getPowSize, getVortexSize, getAxechopTier, getLightningTier, getDarkslashVariant } from './actionEffects.js';
+import { getActiveEffects, getClawCount, getCrackCount, getPowSize, getVortexSize, getAxechopTier, getLightningTier, getWildLightningTier, getDarkslashVariant } from './actionEffects.js';
 import { renderFullscreenButton } from './fullscreen.js';
 import { v, hardRefresh } from './assetVersion.js';
 
@@ -651,6 +651,55 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
       '<span class="ice-shard ice-shard--4"></span>';
     tile.appendChild(ice);
   }
+  if (effects.has('poisoncloud') && !character.isKO) {
+    // Rowan's Poison Cloud: a swirling green toxic mist settles over the
+    // target - fires on the initial cast AND re-fires on every subsequent
+    // tick (per explicit request: the effect should "reanimate" each turn
+    // it deals damage, not just once). Several offset bubble/wisp shapes
+    // rather than a single blob, so it reads as a living cloud rather than
+    // a static overlay.
+    const cloud = document.createElement('div');
+    cloud.className = 'poison-cloud-fx';
+    cloud.innerHTML = '<span class="poison-wisp poison-wisp--1"></span>' +
+      '<span class="poison-wisp poison-wisp--2"></span>' +
+      '<span class="poison-wisp poison-wisp--3"></span>' +
+      '<span class="poison-wisp poison-wisp--4"></span>' +
+      '<span class="poison-bubble poison-bubble--1"></span>' +
+      '<span class="poison-bubble poison-bubble--2"></span>';
+    tile.appendChild(cloud);
+  }
+  if (effects.has('mirrorshard') && !character.isKO) {
+    // Rowan's Mirror Reflect counter-hit: small glass/mirror shard
+    // fragments burst outward from the impact point on the ATTACKER who
+    // just got hit back - reads as "your own attack shattered against a
+    // mirror and came back at you," distinct from the generic hit-flash/
+    // shake alone. Deliberately delayed to start AFTER the attacker's own
+    // strike effect (see actionEffects.js's MIRROR_SEQUENCE_DELAY_MS).
+    const shards = document.createElement('div');
+    shards.className = 'mirror-shard-burst';
+    const shardAngles = [15, 80, 150, 210, 280, 335];
+    shards.innerHTML = shardAngles.map((deg, i) => {
+      const rad = (deg * Math.PI) / 180;
+      const x = Math.round(Math.cos(rad) * 42);
+      const y = Math.round(Math.sin(rad) * 42);
+      return `<span class="mirror-shard" style="--shard-x:${x}px; --shard-y:${y}px; animation-delay:${i * 0.03}s; rotate:${deg}deg;"></span>`;
+    }).join('');
+    tile.appendChild(shards);
+  }
+  if (effects.has('silencelock') && !character.isKO) {
+    // Rowan's Silence Lock, cast moment: two glowing chain arcs swing in
+    // from opposite sides and meet at a padlock shape in the center that
+    // flashes/snaps shut - matches the ability's own name/theme, distinct
+    // from every other effect (nothing else does chains/binding). The
+    // persistent .silence-badge (🔒) carries the ongoing "still locked"
+    // signal after this one-shot lands.
+    const lock = document.createElement('div');
+    lock.className = 'silence-lock-fx';
+    lock.innerHTML = '<span class="lock-chain lock-chain--left"></span>' +
+      '<span class="lock-chain lock-chain--right"></span>' +
+      '<span class="lock-padlock">🔒</span>';
+    tile.appendChild(lock);
+  }
   if (effects.has('shadowstrike') && !character.isKO) {
     // Akyros's Shadow Execution: a dark blade shape stabs in from the side
     // then dissolves into wisps of black smoke - replaces the old borrowed
@@ -696,6 +745,26 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
     ).join('');
     bolt.innerHTML = `<svg viewBox="0 0 100 100" preserveAspectRatio="none">${bolts}</svg><span class="lightning-core"></span>`;
     tile.appendChild(bolt);
+  }
+  if (effects.has('wildlightning') && !character.isKO) {
+    // Rowan's Wild Lightning: same bolt-strike structure as Zerathys's
+    // Thunder Wrath above (reused deliberately), recolored via the
+    // .wild-lightning-strike modifier class so the two read as related but
+    // distinct spells. Tier bucketed from his random 1-7 damage roll (see
+    // actionEffects.js) rather than a fixed charge tier.
+    const wildTier = getWildLightningTier(character.id);
+    const wildBolt = document.createElement('div');
+    wildBolt.className = `lightning-strike wild-lightning-strike lightning-strike--tier${wildTier}`;
+    const wildBoltPaths = [
+      'M 46,0 L 40,35 L 52,35 L 38,80',
+      'M 60,0 L 66,30 L 54,32 L 64,75',
+      'M 34,0 L 44,28 L 32,30 L 46,72',
+    ];
+    const wildBolts = wildBoltPaths.slice(0, wildTier).map((d, i) =>
+      `<path class="lightning-path" style="animation-delay:${i * 0.04}s" d="${d}" />`
+    ).join('');
+    wildBolt.innerHTML = `<svg viewBox="0 0 100 100" preserveAspectRatio="none">${wildBolts}</svg><span class="lightning-core"></span>`;
+    tile.appendChild(wildBolt);
   }
   if (effects.has('axechop') && !character.isKO) {
     // Draxus's Dying Blow: a downward axe-chop wedge that slams straight
@@ -783,9 +852,12 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
 
   if (silencedTurns > 0 && !character.isKO) {
     // Rowan's Silence Lock - bottom-right, same reasoning as poison above.
+    // Lock icon (matches the ability's own name/theme - "your power is
+    // sealed away") rather than a mute-speaker icon, which read as "can't
+    // speak" instead of "special ability locked."
     const silence = document.createElement('div');
     silence.className = 'silence-badge';
-    silence.textContent = `🔇${silencedTurns}`;
+    silence.textContent = `🔒${silencedTurns}`;
     silence.title = `Silenced by Rowan - cannot use their special ability for ${silencedTurns} more of their own turn(s)`;
     tile.appendChild(silence);
   }
