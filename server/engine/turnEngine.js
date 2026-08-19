@@ -240,6 +240,14 @@ function tickPoisonIfAny(character, game, log) {
     isPoisonTick: true,
   });
   log.push({ type: 'poison-tick', casterId: caster.id, targetCharacterId: character.id, ...result });
+  // Same deferred-log-entry handling as finalizeAction: applyDamage returns
+  // curse-mirror/rebirth entries on the result rather than pushing them
+  // itself, so a poison tick that kills a cursed Athena (mirroring damage
+  // onto her cursed target) needs this path to push them too, or that
+  // mirror hit happens with no corresponding log line at all.
+  if (result.rebirthLogEntry) log.push(result.rebirthLogEntry);
+  if (result.mirrorLogEntry) log.push(result.mirrorLogEntry);
+  if (result.mirrorResult?.rebirthLogEntry) log.push(result.mirrorResult.rebirthLogEntry);
 }
 
 // Rowan's Silence Lock, same victim-turn-tick shape as poison above.

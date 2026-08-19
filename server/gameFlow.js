@@ -48,6 +48,20 @@ export function getActingCharacterId(game) {
       game.turnStartFiredFor.add(character.id);
       beginCharacterTurn(character, game, game.log);
     }
+    // beginCharacterTurn can itself deal lethal damage (a poison tick, or a
+    // curse-mirror chained off one) - `acting` was snapshotted before this
+    // ran, so a character who just died here is still in the loop as a
+    // stale, pre-death object. Without this check, the loop falls through
+    // to consumeSkipIfFrozen/getUsableActions on an already-KO'd character
+    // and can return their id as if they still need a decision - confirmed
+    // live: the board showed everyone but Rowan as KO, yet the game stayed
+    // stuck on "Waiting for Athena's turn" because her own poison tick (or
+    // the curse-mirror it triggered) killed her inside this exact call.
+    if (character.isKO) {
+      clearStalledBonusTurn(character);
+      markCharacterActed(game, character.id);
+      continue;
+    }
     if (consumeSkipIfFrozen(character)) {
       if (isBallHolder) {
         game.log.push({ type: 'passive', characterId: character.id, text: `${CHARACTERS[character.id].name} is frozen and can't resolve the Jester Ball - it bursts on them!` });

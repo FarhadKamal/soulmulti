@@ -68,6 +68,10 @@ export function applyDamage(game, log, {
   target.hearts = Math.max(0, target.hearts - amt);
   result.amountDealt = amt;
 
+  // Set below if this hit KOs a cursed Athena - captures curseTargetCharacterId
+  // before the KO branch clears it, so the killing blow can still mirror.
+  let preClearCursedId = null;
+
   // Rowan's Mirror Reflect: any direct (non-mirrored) hit that lands real
   // damage on him while it's active, and that he SURVIVES (target.hearts
   // already reflects the reduction above, so > 0 here means he's still
@@ -190,13 +194,21 @@ export function applyDamage(game, log, {
       log.push({ type: 'freeze-end', targetCharacterId: frozenId });
     }
     // Athena's curse ends the instant she's KO'd - no one left to trigger
-    // the mirror (the trigger itself is keyed off damage landing ON her,
-    // which her own isKO guard at the top of this function already blocks
-    // going forward), but curseTargetCharacterId itself was otherwise never
-    // cleared, leaving the client's cursed-mark visual (battleScreen.js)
-    // and bot AI's isCursedByLiveAthena-style checks with stale state to
-    // read even though the mirror can genuinely never fire again.
+    // the mirror going forward (her own isKO guard at the top of this
+    // function blocks any FUTURE hit from ever reading it again), but
+    // curseTargetCharacterId itself was otherwise never cleared, leaving the
+    // client's cursed-mark visual (battleScreen.js) and bot AI's
+    // isCursedByLiveAthena-style checks with stale state to read.
+    // preClearCursedId below captures the value BEFORE this clear so the
+    // mirror-trigger block further down (which runs after this KO branch,
+    // in the same applyDamage call) still sees who was cursed - the killing
+    // blow itself landed while she was alive and should still mirror, only
+    // hits AFTER her death shouldn't. Confirmed bug: without capturing this,
+    // the exact hit that killed a cursed Athena silently dropped its own
+    // mirror, since curseTargetCharacterId was already null by the time the
+    // mirror check ran.
     if (target.id === 'athena' && target.special.curseTargetCharacterId) {
+      preClearCursedId = target.special.curseTargetCharacterId;
       target.special.curseTargetCharacterId = null;
     }
     // Rowan's own death ends every effect HE cast on anyone else
@@ -263,7 +275,7 @@ export function applyDamage(game, log, {
   // own log entries - otherwise it lands in the log BEFORE the attack line
   // that caused it, since applyDamage() runs before the caller's own push.
   if (target.id === 'athena' && !isMirror && result.amountDealt > 0) {
-    const cursedId = target.special.curseTargetCharacterId;
+    const cursedId = target.special.curseTargetCharacterId ?? preClearCursedId;
     if (cursedId && game.characters[cursedId] && !game.characters[cursedId].isKO) {
       result.mirrorResult = applyDamage(game, log, {
         sourceCharacterId,
