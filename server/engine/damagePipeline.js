@@ -24,6 +24,7 @@ export function applyDamage(game, log, {
   ignoresShield = false,
   ignoresUntargetable = false,
   isMirror = false,
+  isPoisonTick = false,
 }) {
   const target = game.characters[targetCharacterId];
   const result = {
@@ -244,7 +245,14 @@ export function applyDamage(game, log, {
   // Gated identically to Athena's own curse-trigger check just below
   // (!isMirror && result.amountDealt > 0) - a fully shield-absorbed or
   // mirrored hit does not count as "attacking her" for this purpose.
-  if (target.id === 'kaelis' && !isMirror && result.amountDealt > 0 && sourceCharacterId !== 'kaelis') {
+  // isPoisonTick is also excluded: Poison Cloud is a single cast ("one
+  // attack") that then deals passive recurring damage on the victim's own
+  // turns with no further action from Rowan - only the initial cast should
+  // register as a grudge-worthy attack, not every tick afterward. Confirmed
+  // bug report: a Kaelis poisoned by Rowan was racking up a fresh grudge
+  // point on every single tick, turning one cast into an ever-growing
+  // Grudge Strike far beyond what "one hit" should earn.
+  if (target.id === 'kaelis' && !isMirror && !isPoisonTick && result.amountDealt > 0 && sourceCharacterId !== 'kaelis') {
     const counts = target.special.grudgeCounts;
     counts.set(sourceCharacterId, (counts.get(sourceCharacterId) || 0) + 1);
   }

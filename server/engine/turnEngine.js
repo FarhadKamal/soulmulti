@@ -237,6 +237,7 @@ function tickPoisonIfAny(character, game, log) {
     targetCharacterId: character.id,
     amount: 1,
     ignoresUntargetable: true,
+    isPoisonTick: true,
   });
   log.push({ type: 'poison-tick', casterId: caster.id, targetCharacterId: character.id, ...result });
 }

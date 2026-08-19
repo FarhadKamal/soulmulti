@@ -79,6 +79,18 @@ function isCursedByLiveAthena(game, character) {
   return !!athena;
 }
 
+// True if Rowan is alive and his Mirror Reflect window is currently active -
+// landing any non-lethal direct hit on him while it's up deals 3 damage
+// straight back to the attacker. Same avoidance shape as
+// isCursedByLiveAthena: steer bots away from hitting him unless he's the
+// only legal target or the hit would kill him outright (a kill ends the
+// threat regardless of the reflect, so it's still worth it - same reasoning
+// already applied to Athena's curse mirror).
+function isMirrorReflectActive(game) {
+  const rowan = game.characters['rowan'];
+  return !!(rowan && !rowan.isKO && rowan.special?.mirrorReflectActive);
+}
+
 const LOW_HEARTS_THRESHOLD = 3;
 
 // Focus-fire: prefer whichever legal target is already the MOST hurt
@@ -151,6 +163,18 @@ function pickDefaultTarget(game, character, actionId, minDamage = null) {
   if (minDamage !== null) {
     const unarmored = pool.filter((tid) => game.characters[tid].shield < minDamage);
     if (unarmored.length > 0) pool = unarmored;
+  }
+  // Avoid hitting a Mirror-Reflect-active Rowan with a non-lethal hit -
+  // unless he's the only option left, or the hit would kill him outright
+  // (see isMirrorReflectActive above for the reasoning).
+  if (isMirrorReflectActive(game) && pool.includes('rowan')) {
+    const rowanTarget = game.characters['rowan'];
+    const wouldKillRowan = minDamage !== null
+      && rowanTarget.hearts <= Math.max(0, minDamage - rowanTarget.shield);
+    if (!wouldKillRowan) {
+      const nonRowanSafe = pool.filter((tid) => tid !== 'rowan');
+      if (nonRowanSafe.length > 0) pool = nonRowanSafe;
+    }
   }
   // Hitting Athena while she's cursing someone else lands damage on both of
   // them for the price of one action - take that free value over any other
@@ -546,6 +570,16 @@ function chooseBladeMove(character, game, usable) {
       const nextStreakDamage = character.special.streakCount + 1;
       const otherTargets = targets.filter((tid) => tid !== 'athena');
       if (character.hearts <= nextStreakDamage && otherTargets.length > 0) {
+        return { actionId: 'bloodHunt', targetId: pickDefaultTarget(game, character, 'bloodHunt') };
+      }
+    }
+    // A streak locked onto a Mirror-Reflect-active Rowan takes 3 reflect
+    // damage on every single consecutive hit, same compounding-risk shape
+    // as the Athena guard just above - break off unless he's the only
+    // living target left.
+    if (streakTarget === 'rowan' && isMirrorReflectActive(game)) {
+      const otherTargets = targets.filter((tid) => tid !== 'rowan');
+      if (otherTargets.length > 0) {
         return { actionId: 'bloodHunt', targetId: pickDefaultTarget(game, character, 'bloodHunt') };
       }
     }

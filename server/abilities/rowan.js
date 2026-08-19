@@ -66,6 +66,18 @@ export const actions = {
     execute(character, targetId, game, log) {
       character.special.usedSpells.add('poisonCloud');
       character.special.poisonTargets.add(targetId);
+      // Poison Cloud deals no direct damage on cast (applyDamage is never
+      // called here), so Kaelis's grudge counter - which normally increments
+      // inside applyDamage whenever a real hit lands on her - would never
+      // register this as an attack at all. The cast itself IS the one
+      // attack that should count (the recurring ticks afterward are
+      // deliberately excluded via applyDamage's isPoisonTick flag), so
+      // increment it here to match "one cast = one grudge point."
+      if (targetId === 'kaelis') {
+        const target = game.characters[targetId];
+        const counts = target.special.grudgeCounts;
+        counts.set(character.id, (counts.get(character.id) || 0) + 1);
+      }
       log.push({ type: 'special', characterId: character.id, actionId: 'poisonCloud', targetId });
       return {};
     },
@@ -90,7 +102,13 @@ export const actions = {
         }
         if (c.special?.marks?.has(character.id)) c.special.marks.delete(character.id);
         if (c.special?.revealedMarks?.has(character.id)) c.special.revealedMarks.delete(character.id);
-        if (c.special?.grudgeCounts?.has(character.id)) c.special.grudgeCounts.delete(character.id);
+        // grudgeCounts is deliberately NOT cleared here - it's Kaelis's own
+        // offensive resource (how many times has THIS attacker hit her),
+        // not a debuff placed ON Rowan. Purify only cleanses negative
+        // statuses actually afflicting Rowan himself; wiping her grudge
+        // would let him erase her tracked retaliation damage for free just
+        // by healing up, which isn't what Purify is for. Confirmed bug
+        // report: Purify was resetting Kaelis's grudge on Rowan to 0.
         if (c.special?.poisonTargets?.has(character.id)) c.special.poisonTargets.delete(character.id);
         if (c.special?.silenceTargets?.has(character.id)) c.special.silenceTargets.delete(character.id);
         if (c.special?.streakTargetId === character.id) {
