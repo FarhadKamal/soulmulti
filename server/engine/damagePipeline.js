@@ -80,11 +80,13 @@ export function applyDamage(game, log, {
   // reduce anything). Modeled directly on Athena's own curse-mirror below:
   // a nested applyDamage call with isMirror: true, which both prevents
   // Akyros's Dodge from applying to the reflected hit and prevents
-  // infinite mirror recursion. The active flag itself is NOT cleared here
-  // (stays active for the rest of the window, in case more than one hit
-  // lands before Rowan's own next turn clears it via his onTurnStart).
+  // infinite mirror recursion. Confirmed ruling: Mirror Reflect stays
+  // active indefinitely across any number of Rowan's own turns - it does
+  // NOT auto-clear at his next turn start (rowan.js's onTurnStart no longer
+  // touches it) - only ending once it actually fires, right here.
   if (target.id === 'rowan' && target.special.mirrorReflectActive && !isMirror
     && result.amountDealt > 0 && target.hearts > 0 && sourceCharacterId !== 'rowan') {
+    target.special.mirrorReflectActive = false;
     result.mirrorReflectResult = applyDamage(game, log, {
       sourceCharacterId: target.id,
       targetCharacterId: sourceCharacterId,

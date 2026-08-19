@@ -13,9 +13,13 @@ function pickUndiscoveredSpell(character) {
 
 // Fires once at the start of Rowan's own turn (turnEngine.js's
 // beginCharacterTurn, gated by game.turnStartFiredFor). Resolves the
-// one-turn-delayed Arcane Study reveal, clears its cooldown, and ends any
-// still-active Mirror Reflect window - all three are "active until my own
-// next turn starts" effects, same shape as Draxus's deathproofActive.
+// one-turn-delayed Arcane Study reveal and clears its cooldown - both are
+// "active until my own next turn starts" effects, same shape as Draxus's
+// deathproofActive. Mirror Reflect is NOT cleared here - confirmed ruling:
+// it stays active indefinitely across any number of Rowan's own turns,
+// only ending once it actually lands a reflect off an incoming hit (see
+// damagePipeline.js's mirror-trigger block, which clears the flag itself
+// right after firing).
 export function onTurnStart(character, game, log) {
   if (character.special.arcaneStudyPending) {
     const spellId = pickUndiscoveredSpell(character);
@@ -27,9 +31,6 @@ export function onTurnStart(character, game, log) {
   }
   if (character.special.arcaneStudyOnCooldown) {
     character.special.arcaneStudyOnCooldown = false;
-  }
-  if (character.special.mirrorReflectActive) {
-    character.special.mirrorReflectActive = false;
   }
 }
 
@@ -102,13 +103,11 @@ export const actions = {
         }
         if (c.special?.marks?.has(character.id)) c.special.marks.delete(character.id);
         if (c.special?.revealedMarks?.has(character.id)) c.special.revealedMarks.delete(character.id);
-        // grudgeCounts is deliberately NOT cleared here - it's Kaelis's own
-        // offensive resource (how many times has THIS attacker hit her),
-        // not a debuff placed ON Rowan. Purify only cleanses negative
-        // statuses actually afflicting Rowan himself; wiping her grudge
-        // would let him erase her tracked retaliation damage for free just
-        // by healing up, which isn't what Purify is for. Confirmed bug
-        // report: Purify was resetting Kaelis's grudge on Rowan to 0.
+        // Confirmed ruling: grudge accumulated against Rowan counts as a
+        // status he can cleanse on himself via Purify, same as every other
+        // negative status here - clears whatever hit-count Kaelis has
+        // tallied against him back to 0.
+        if (c.special?.grudgeCounts?.has(character.id)) c.special.grudgeCounts.delete(character.id);
         if (c.special?.poisonTargets?.has(character.id)) c.special.poisonTargets.delete(character.id);
         if (c.special?.silenceTargets?.has(character.id)) c.special.silenceTargets.delete(character.id);
         if (c.special?.streakTargetId === character.id) {
