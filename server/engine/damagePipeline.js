@@ -3,6 +3,20 @@
 // absorption, Akyros's Dodge, Blade's Rebirth, and Athena's curse mirror
 // are all handled in one place instead of duplicated per character.
 
+// True if ANY character currently has characterId locked under their own
+// Silence Lock (Rowan's special.silenceTargets Map) - written generically
+// (scans every character's .special rather than assuming Rowan specifically)
+// so any future silence-capable character needs no changes here. Lives here
+// (not turnEngine.js, which imports it) rather than the reverse, since this
+// file has zero imports of its own and turnEngine.js already imports
+// applyDamage from here - keeping the dependency one-directional avoids a
+// circular import between the two.
+export function isSilenced(character, game) {
+  return Object.values(game.characters).some(
+    (c) => c.special?.silenceTargets?.has(character.id)
+  );
+}
+
 export function applyDamage(game, log, {
   sourceCharacterId,
   targetCharacterId,
@@ -214,7 +228,10 @@ export function applyDamage(game, log, {
   // since applyDamage's own early isKO guard blocks any future hit from
   // ever reading it again).
   if (target.id === 'melyssa' && !target.isKO) {
-    target.shield = result.amountDealt;
+    // Rowan's Silence Lock suppresses every shield source while active
+    // (see isSilenced above) - including this reactive one, so a silenced
+    // Melyssa gets 0 here instead of the normal leaked-damage amount.
+    target.shield = isSilenced(target, game) ? 0 : result.amountDealt;
     target.shieldDecaying = true;
   }
 
@@ -273,6 +290,11 @@ export function applyHeal(game, targetCharacterId, amount) {
 export function applyShield(game, targetCharacterId, amount, { decaying = false } = {}) {
   const target = game.characters[targetCharacterId];
   if (!target || target.isKO) return;
+  // Rowan's Silence Lock blocks every shield source while active, not just
+  // his special-ability lock - a silenced Athena/Tharox still casts Divine
+  // Restore/Glory Smash normally (those aren't blocked by isLegal), but the
+  // shield portion of it simply does nothing while silenced.
+  if (isSilenced(target, game)) return;
   target.shield += amount;
   if (decaying) target.shieldDecaying = true;
 }

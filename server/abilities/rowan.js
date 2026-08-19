@@ -60,8 +60,11 @@ export const actions = {
   poisonCloud: {
     label: 'Poison Cloud',
     needsTarget: true,
-    isLegal: (character) => character.special.discoveredSpells.has('poisonCloud'),
+    special: true,
+    isLegal: (character) => character.special.discoveredSpells.has('poisonCloud')
+      && !character.special.usedSpells.has('poisonCloud'),
     execute(character, targetId, game, log) {
+      character.special.usedSpells.add('poisonCloud');
       character.special.poisonTargets.add(targetId);
       log.push({ type: 'special', characterId: character.id, actionId: 'poisonCloud', targetId });
       return {};
@@ -70,8 +73,11 @@ export const actions = {
   purify: {
     label: 'Purify',
     needsTarget: false,
-    isLegal: (character) => character.special.discoveredSpells.has('purify'),
+    special: true,
+    isLegal: (character) => character.special.discoveredSpells.has('purify')
+      && !character.special.usedSpells.has('purify'),
     execute(character, targetId, game, log) {
+      character.special.usedSpells.add('purify');
       // Clears every negative status any OTHER character has placed on
       // Rowan - scanned generically rather than a hardcoded per-character
       // list, so this stays correct if a future character adds a new kind
@@ -101,8 +107,11 @@ export const actions = {
   wildLightning: {
     label: 'Wild Lightning',
     needsTarget: true,
-    isLegal: (character) => character.special.discoveredSpells.has('wildLightning'),
+    special: true,
+    isLegal: (character) => character.special.discoveredSpells.has('wildLightning')
+      && !character.special.usedSpells.has('wildLightning'),
     execute(character, targetId, game, log) {
+      character.special.usedSpells.add('wildLightning');
       const amount = 1 + Math.floor(Math.random() * 7); // 1-7 inclusive
       const result = applyDamage(game, log, { sourceCharacterId: character.id, targetCharacterId: targetId, amount });
       log.push({ type: 'special', characterId: character.id, actionId: 'wildLightning', targetId, ...result });
@@ -112,8 +121,11 @@ export const actions = {
   mirrorReflect: {
     label: 'Mirror Reflect',
     needsTarget: false,
-    isLegal: (character) => character.special.discoveredSpells.has('mirrorReflect'),
+    special: true,
+    isLegal: (character) => character.special.discoveredSpells.has('mirrorReflect')
+      && !character.special.usedSpells.has('mirrorReflect'),
     execute(character, targetId, game, log) {
+      character.special.usedSpells.add('mirrorReflect');
       character.special.mirrorReflectActive = true;
       log.push({ type: 'special', characterId: character.id, actionId: 'mirrorReflect' });
       return {};
@@ -122,9 +134,18 @@ export const actions = {
   silenceLock: {
     label: 'Silence Lock',
     needsTarget: true,
-    isLegal: (character) => character.special.discoveredSpells.has('silenceLock'),
+    special: true,
+    isLegal: (character) => character.special.discoveredSpells.has('silenceLock')
+      && !character.special.usedSpells.has('silenceLock'),
     execute(character, targetId, game, log) {
+      character.special.usedSpells.add('silenceLock');
       character.special.silenceTargets.set(targetId, 2);
+      // Also strips any shield the target already has, on top of blocking
+      // every shield source (passive resets like Chrono Guard, and any
+      // active shield-granting move) for the whole silence duration - see
+      // isSilenced's call sites in damagePipeline.js/chronox.js.
+      const target = game.characters[targetId];
+      if (target) target.shield = 0;
       log.push({ type: 'special', characterId: character.id, actionId: 'silenceLock', targetId });
       return {};
     },

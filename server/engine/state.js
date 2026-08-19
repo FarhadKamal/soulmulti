@@ -68,6 +68,11 @@ function baseSpecialFor(id) {
       // Lock - decremented on that target's own turn start, deleted at 0.
       // mirrorReflectActive: true from cast until his own next
       // onTurnStart clears it - checked in damagePipeline.js's applyDamage.
+      // usedSpells: Set<spellId> - each of the 5 discovered spells is
+      // one-time-use, same as any other special ability (usedSpecial's
+      // shape), just tracked per-spell instead of a single shared boolean
+      // since he can have several discovered spells at once but each is
+      // independently spent the moment it's first cast.
       return {
         discoveredSpells: new Set(),
         arcaneStudyPending: false,
@@ -75,6 +80,7 @@ function baseSpecialFor(id) {
         mirrorReflectActive: false,
         poisonTargets: new Set(),
         silenceTargets: new Map(),
+        usedSpells: new Set(),
       };
     default:
       return {};

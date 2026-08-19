@@ -167,12 +167,9 @@ const ACTION_VOICE_LINES = {
   // main.js's dedicated isBonusStrike branch instead of the generic
   // playMoveVoice dispatch every other actionId uses.
   draxus: { deathlessFury: 'immortality' },
-  // arcaneStudy stays voice-silent (no dedicated line exists on disk -
-  // confirmed with the user) - nothing visibly happens the turn it's cast
-  // anyway (the reveal lands on his NEXT turn instead), so silence here
-  // matches that "nothing to announce yet" moment.
   rowan: {
     wandStrike: 'wand_strike',
+    arcaneStudy: 'arcane_study',
     poisonCloud: 'cloud_poison',
     purify: 'purify',
     wildLightning: 'lightning',

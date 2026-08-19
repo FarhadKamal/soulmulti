@@ -1,10 +1,17 @@
-import { applyDamage } from '../engine/damagePipeline.js';
+import { applyDamage, isSilenced } from '../engine/damagePipeline.js';
 import { flipCoin } from '../engine/random.js';
 
 export function onTurnStart(character, game, log) {
   // Chrono Guard: shield RESETS to exactly 1 each turn - does not stack.
-  character.shield = 1;
-  log.push({ type: 'passive', characterId: character.id, text: `${character.id}'s shield resets to 1 (Chrono Guard)` });
+  // Rowan's Silence Lock suppresses this entirely while active (blocks
+  // every shield source, not just special abilities) - a silenced Chronox
+  // gets 0 here instead of the usual reset-to-1.
+  if (isSilenced(character, game)) {
+    character.shield = 0;
+  } else {
+    character.shield = 1;
+    log.push({ type: 'passive', characterId: character.id, text: `${character.id}'s shield resets to 1 (Chrono Guard)` });
+  }
 
   // Time Freeze: flat 2-round duration, no coin flip. Casting already skips
   // the target's next turn (round 1); this extends it for 1 more round,

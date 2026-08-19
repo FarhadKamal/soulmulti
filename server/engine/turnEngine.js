@@ -1,5 +1,5 @@
 import { cloneGame } from './state.js';
-import { applyDamage } from './damagePipeline.js';
+import { applyDamage, isSilenced } from './damagePipeline.js';
 import * as chronox from '../abilities/chronox.js';
 import * as tharox from '../abilities/tharox.js';
 import * as zerathys from '../abilities/zerathys.js';
@@ -17,16 +17,6 @@ const ABILITY_MODULES = { chronox, tharox, zerathys, akyros, velorya, boingo, bl
 
 export function getAbilityModule(characterId) {
   return ABILITY_MODULES[characterId];
-}
-
-// True if ANY character currently has characterId locked under their own
-// Silence Lock (Rowan's special.silenceTargets Map) - written generically
-// (scans every character's .special rather than assuming Rowan specifically)
-// so any future silence-capable character needs no changes here.
-function isSilenced(character, game) {
-  return Object.values(game.characters).some(
-    (c) => c.special?.silenceTargets?.has(character.id)
-  );
 }
 
 export function getLegalActions(character, game) {
