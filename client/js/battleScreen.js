@@ -176,6 +176,21 @@ export function renderBattle(root, state) {
     if (!kaelis || kaelis.isKO || kaelis.id === characterId) return 0;
     return kaelis.special?.grudgeCounts?.[characterId] || 0;
   };
+  // Rowan's Poison Cloud / Silence Lock - same "badge on the VICTIM's own
+  // tile, not the caster's" reasoning as Kaelis's grudge badge above (a
+  // per-relationship status, not something that fits on Rowan's own tile).
+  // poisonTargets arrives as a plain array (Set -> array, sanitizeGame
+  // ForBroadcast in index.js); silenceTargets arrives as a plain object
+  // (Map -> Object.fromEntries, same conversion).
+  const rowan = Object.values(game.characters).find((c) => c.id === 'rowan');
+  const isPoisonedFor = (characterId) => {
+    if (!rowan || rowan.isKO || rowan.id === characterId) return false;
+    return !!rowan.special?.poisonTargets?.includes(characterId);
+  };
+  const silencedTurnsFor = (characterId) => {
+    if (!rowan || rowan.isKO || rowan.id === characterId) return 0;
+    return rowan.special?.silenceTargets?.[characterId] || 0;
+  };
   Object.values(game.characters).forEach((character) => {
     board.appendChild(renderCharacterTile(character, {
       isActing: character.id === actingCharacterId,
@@ -184,6 +199,8 @@ export function renderBattle(root, state) {
       onTargetClick: () => onTargetPicked(character.id, state),
       isHoldingBall: character.id === ballHolderId,
       grudgeCount: grudgeCountFor(character.id),
+      isPoisoned: isPoisonedFor(character.id),
+      silencedTurns: silencedTurnsFor(character.id),
       isCursed: character.id === cursedId,
       isFrozenVisual: character.id === frozenId,
       isPuppet: character.id === puppetHighlightId || character.id === activePuppetId,
@@ -437,7 +454,7 @@ function renderVictoryPortraits(game) {
   return container;
 }
 
-function renderCharacterTile(character, { isActing, isMine, isTargetable, onTargetClick, isHoldingBall, isCursed, isFrozenVisual, isVictorious, isPuppet, isHypnotized, grudgeCount }) {
+function renderCharacterTile(character, { isActing, isMine, isTargetable, onTargetClick, isHoldingBall, isCursed, isFrozenVisual, isVictorious, isPuppet, isHypnotized, grudgeCount, isPoisoned, silencedTurns }) {
   const def = CHARACTERS[character.id];
   const tile = document.createElement('div');
   tile.className = 'char-tile';
@@ -751,6 +768,28 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
     tile.appendChild(grudge);
   }
 
+  if (isPoisoned && !character.isKO) {
+    // Rowan's Poison Cloud - same per-relationship-badge reasoning as
+    // Kaelis's grudge badge above, positioned bottom-left so it never
+    // collides with it (both could theoretically be active on the same
+    // target at once). No count/duration shown since the DoT has no fixed
+    // duration - it's purely a yes/no "currently poisoned" signal.
+    const poison = document.createElement('div');
+    poison.className = 'poison-badge';
+    poison.textContent = '☠';
+    poison.title = "Poisoned by Rowan's Poison Cloud - loses 1 heart at the start of every turn until cured or Rowan is KO'd";
+    tile.appendChild(poison);
+  }
+
+  if (silencedTurns > 0 && !character.isKO) {
+    // Rowan's Silence Lock - bottom-right, same reasoning as poison above.
+    const silence = document.createElement('div');
+    silence.className = 'silence-badge';
+    silence.textContent = `🔇${silencedTurns}`;
+    silence.title = `Silenced by Rowan - cannot use their special ability for ${silencedTurns} more of their own turn(s)`;
+    tile.appendChild(silence);
+  }
+
   const portrait = document.createElement('img');
   portrait.className = 'char-portrait';
   // Same priority as the main game's characterCard.js: victory art (once
@@ -881,6 +920,15 @@ function statusBadges(character) {
       }
       if (character.special.bonusActionsRemaining > 0) {
         badges.push({ text: `Bonus strikes: ${character.special.bonusActionsRemaining}`, cls: 'warn' });
+      }
+      break;
+    case 'rowan':
+      if (character.special.arcaneStudyPending) {
+        badges.push({ text: 'Studying...' });
+      }
+      badges.push({ text: `Spells: ${character.special.discoveredSpells.length}/5` });
+      if (character.special.mirrorReflectActive) {
+        badges.push({ text: 'Mirror active', cls: 'warn' });
       }
       break;
   }
@@ -1280,6 +1328,16 @@ const ACTION_LABELS = {
   selfChoke: 'Self Choke',
   grudgeStrike: 'Grudge Strike', callAshka: 'Call Ashka',
   dyingBlow: 'Dying Blow', deathlessFury: 'Deathless Fury',
+  wandStrike: 'Wand Strike', arcaneStudy: 'Arcane Study',
+  poisonCloud: 'Poison Cloud', purify: 'Purify', wildLightning: 'Wild Lightning',
+  mirrorReflect: 'Mirror Reflect', silenceLock: 'Silence Lock',
+};
+
+// Rowan's 5 discoverable spells - used by describeLogEntry's
+// 'spell-discovered' case to show a real name instead of the raw id.
+const SPELL_NAMES = {
+  poisonCloud: 'Poison Cloud', purify: 'Purify', wildLightning: 'Wild Lightning',
+  mirrorReflect: 'Mirror Reflect', silenceLock: 'Silence Lock',
 };
 function actionLabel(actionId) {
   return ACTION_LABELS[actionId] || actionId;
@@ -1322,6 +1380,16 @@ function describeLogEntry(entry) {
       return `${name(entry.fromCharacterId)} passed the Jester Ball to ${name(entry.toCharacterId)}`;
     case 'jester-ball-return':
       return `Jester Ball returned to ${name(entry.boingoId)}${entry.healed ? ` - healed ${entry.healed}` : ''}`;
+    case 'spell-discovered':
+      return entry.spellId
+        ? `${name(entry.characterId)} discovered a new spell: ${SPELL_NAMES[entry.spellId] || entry.spellId}!`
+        : `${name(entry.characterId)}'s Arcane Study found nothing new.`;
+    case 'poison-tick':
+      return `${name(entry.targetCharacterId)} takes ${entry.amountDealt} poison damage${entry.koTriggered ? ' - KO!' : ''}`;
+    case 'silence-end':
+      return `${name(entry.targetCharacterId)}'s Silence Lock wears off`;
+    case 'mirror-reflect':
+      return `${name(entry.fromCharacterId)}'s Mirror Reflect deals ${entry.amount} damage back to ${name(entry.toCharacterId)}${entry.koTriggered ? ' - KO!' : ''}`;
     case 'passive':
       return entry.text;
     default:

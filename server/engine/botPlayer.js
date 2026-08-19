@@ -742,6 +742,81 @@ function chooseDraxusMove(character, game, usable) {
   return { actionId: 'dyingBlow', targetId };
 }
 
+// True if any OTHER character currently has a negative status placed on
+// Rowan (mirrors the same generic scan purify.execute itself does in
+// rowan.js, just checking presence rather than clearing) - used to decide
+// whether a discovered Purify is worth casting right now.
+function rowanHasNegativeStatus(game, character) {
+  return Object.values(game.characters).some((c) => {
+    if (c.id === character.id) return false;
+    const s = c.special;
+    if (!s) return false;
+    if (s.curseTargetCharacterId === character.id) return true;
+    if (s.freezeActive && s.freezeTargetId === character.id) return true;
+    if (s.marks?.has(character.id)) return true;
+    if (s.grudgeCounts?.has(character.id)) return true;
+    if (s.poisonTargets?.has(character.id)) return true;
+    if (s.silenceTargets?.has(character.id)) return true;
+    if (s.streakTargetId === character.id) return true;
+    return false;
+  });
+}
+
+function chooseRowanMove(character, game, usable) {
+  const byId = Object.fromEntries(usable.map((a) => [a.actionId, a]));
+  // Purify first if he's carrying any negative status or is badly hurt -
+  // full-heal-and-cleanse is strictly worth taking over anything else once
+  // it's actually needed, same "safety valve takes priority" reasoning as
+  // Kaelis's Call Ashka / Athena's Divine Restore gating elsewhere here.
+  if (byId.purify && (rowanHasNegativeStatus(game, character) || character.hearts <= LOW_HEARTS_THRESHOLD)) {
+    return { actionId: 'purify', targetId: null };
+  }
+  // Mirror Reflect as a defensive panic button once meaningfully hurt -
+  // banks a counter-punish against whatever hits him next, same "cast
+  // before it's too late" timing as Draxus's own Deathless Fury check.
+  if (byId.mirrorReflect && character.hearts <= LOW_HEARTS_THRESHOLD) {
+    return { actionId: 'mirrorReflect', targetId: null };
+  }
+  // Arcane Study has no downside beyond its own cooldown - prefer it
+  // whenever it's available and there's no more urgent play, so he
+  // naturally builds out his toolkit over the course of a match instead of
+  // only ever throwing Wand Strikes.
+  if (byId.arcaneStudy) {
+    return { actionId: 'arcaneStudy', targetId: null };
+  }
+  // Silence Lock on whoever still has their own special banked - denies
+  // the single biggest threat a character can pose.
+  if (byId.silenceLock) {
+    const targets = validTargetsFor(game, character, 'silenceLock')
+      .filter((tid) => !game.characters[tid].usedSpecial);
+    if (targets.length > 0) {
+      const targetId = biggestThreatTarget(game, character, targets) || pickRandom(targets);
+      return { actionId: 'silenceLock', targetId };
+    }
+  }
+  // Wild Lightning next - highest damage ceiling of anything in the kit.
+  if (byId.wildLightning) {
+    const targets = validTargetsFor(game, character, 'wildLightning');
+    const targetId = biggestThreatTarget(game, character, targets)
+      || lowestHeartsTarget(game, targets) || pickRandom(targets);
+    return { actionId: 'wildLightning', targetId };
+  }
+  // Poison Cloud on a fresh (not-yet-poisoned) target - no point stacking
+  // it on someone already ticking.
+  if (byId.poisonCloud) {
+    const targets = validTargetsFor(game, character, 'poisonCloud')
+      .filter((tid) => !character.special.poisonTargets.has(tid));
+    if (targets.length > 0) {
+      const targetId = biggestThreatTarget(game, character, targets) || pickRandom(targets);
+      return { actionId: 'poisonCloud', targetId };
+    }
+  }
+  const targets = validTargetsFor(game, character, 'wandStrike');
+  const targetId = biggestThreatTarget(game, character, targets)
+    || lowestHeartsTarget(game, targets) || pickRandom(targets);
+  return { actionId: 'wandStrike', targetId };
+}
+
 const MOVE_CHOOSERS = {
   tharox: chooseTharoxMove,
   zerathys: chooseZerathysMove,
@@ -754,6 +829,7 @@ const MOVE_CHOOSERS = {
   melyssa: chooseMelyssaMove,
   kaelis: chooseKaelisMove,
   draxus: chooseDraxusMove,
+  rowan: chooseRowanMove,
 };
 
 // Fallback for characters without bot logic yet: picks a random usable

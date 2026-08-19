@@ -1,4 +1,5 @@
 import { cloneGame } from './state.js';
+import { applyDamage } from './damagePipeline.js';
 import * as chronox from '../abilities/chronox.js';
 import * as tharox from '../abilities/tharox.js';
 import * as zerathys from '../abilities/zerathys.js';
@@ -10,18 +11,30 @@ import * as athena from '../abilities/athena.js';
 import * as melyssa from '../abilities/melyssa.js';
 import * as kaelis from '../abilities/kaelis.js';
 import * as draxus from '../abilities/draxus.js';
+import * as rowan from '../abilities/rowan.js';
 
-const ABILITY_MODULES = { chronox, tharox, zerathys, akyros, velorya, boingo, blade, athena, melyssa, kaelis, draxus };
+const ABILITY_MODULES = { chronox, tharox, zerathys, akyros, velorya, boingo, blade, athena, melyssa, kaelis, draxus, rowan };
 
 export function getAbilityModule(characterId) {
   return ABILITY_MODULES[characterId];
 }
 
+// True if ANY character currently has characterId locked under their own
+// Silence Lock (Rowan's special.silenceTargets Map) - written generically
+// (scans every character's .special rather than assuming Rowan specifically)
+// so any future silence-capable character needs no changes here.
+function isSilenced(character, game) {
+  return Object.values(game.characters).some(
+    (c) => c.special?.silenceTargets?.has(character.id)
+  );
+}
+
 export function getLegalActions(character, game) {
   const mod = ABILITY_MODULES[character.id];
   if (!mod) return [];
+  const silenced = isSilenced(character, game);
   return Object.entries(mod.actions)
-    .filter(([, def]) => !def.hidden && def.isLegal(character, game))
+    .filter(([, def]) => !def.hidden && def.isLegal(character, game) && !(silenced && def.special))
     .map(([actionId, def]) => ({ actionId, ...def }));
 }
 
@@ -207,8 +220,53 @@ export function getUsablePuppetActions(puppetCharacter, game) {
   });
 }
 
+// Rowan's Poison Cloud ticks on the POISONED character's own turn start,
+// not the caster's - unlike every other recurring effect in the game
+// (Chronox's freeze, Kaelis's Ashka heal, Draxus's own window), which all
+// fire on the CASTER's turn. Written generically (scans every character's
+// .special.poisonTargets rather than assuming Rowan specifically) so a
+// future poison-capable character needs no changes here. Routes through
+// applyDamage so shield/Rebirth/Mirror-Reflect interactions all stay
+// consistent with every other damage source.
+function tickPoisonIfAny(character, game, log) {
+  if (character.isKO) return;
+  const caster = Object.values(game.characters).find(
+    (c) => c.special?.poisonTargets?.has(character.id)
+  );
+  if (!caster) return;
+  const result = applyDamage(game, log, {
+    sourceCharacterId: caster.id,
+    targetCharacterId: character.id,
+    amount: 1,
+  });
+  log.push({ type: 'poison-tick', casterId: caster.id, targetCharacterId: character.id, ...result });
+}
+
+// Rowan's Silence Lock, same victim-turn-tick shape as poison above.
+// turnsRemaining starts at 2 (silenceLock.execute) and must still be
+// PRESENT in the map (so isSilenced/getLegalActions sees it) for both of
+// the target's next 2 turns - so this only DELETES an already-exhausted
+// (0) entry from a PRIOR tick, then decrements whatever's left. That way
+// a fresh turnsRemaining=2 entry survives this character's next two
+// affected turn-starts before finally being removed on the third.
+function tickSilenceIfAny(character, game, log) {
+  if (character.isKO) return;
+  for (const caster of Object.values(game.characters)) {
+    const turnsRemaining = caster.special?.silenceTargets?.get(character.id);
+    if (turnsRemaining === undefined) continue;
+    if (turnsRemaining <= 0) {
+      caster.special.silenceTargets.delete(character.id);
+      log.push({ type: 'silence-end', casterId: caster.id, targetCharacterId: character.id });
+      continue;
+    }
+    caster.special.silenceTargets.set(character.id, turnsRemaining - 1);
+  }
+}
+
 // Runs turn-start passives for a character (shield gain, freeze flip, shield decay).
 export function beginCharacterTurn(character, game, log) {
+  tickPoisonIfAny(character, game, log);
+  tickSilenceIfAny(character, game, log);
   const mod = ABILITY_MODULES[character.id];
   if (mod?.onTurnStart) mod.onTurnStart(character, game, log);
 }
@@ -238,6 +296,12 @@ export function finalizeAction(game, log, result, characterId, actionId, targetI
   if (result?.rebirthLogEntry) log.push(result.rebirthLogEntry);
   if (result?.mirrorLogEntry) log.push(result.mirrorLogEntry);
   if (result?.mirrorResult?.rebirthLogEntry) log.push(result.mirrorResult.rebirthLogEntry);
+  // Rowan's Mirror Reflect counter-hit, same deferred-log-entry reasoning
+  // as Athena's curse mirror above - applyDamage runs before the caller's
+  // own log.push() for the triggering attack, so pushing it there would
+  // land it BEFORE that attack's own line instead of after.
+  if (result?.mirrorReflectLogEntry) log.push(result.mirrorReflectLogEntry);
+  if (result?.mirrorReflectResult?.rebirthLogEntry) log.push(result.mirrorReflectResult.rebirthLogEntry);
   applyEndOfActionChecks(game);
   game.log.push(...log, { type: 'end-action', round: game.round, characterId, actionId, targetId, hearts: heartsSnapshot(game) });
 }

@@ -51,6 +51,31 @@ function baseSpecialFor(id) {
       // window above just ended - decremented in index.js's handleAction/
       // stepBotTurn instead of calling markCharacterActed, until it hits 0.
       return { deathproofActive: false, bonusActionsRemaining: 0 };
+    case 'rowan':
+      // discoveredSpells: which of the 5 spells Arcane Study has revealed so
+      // far this match (never re-drawn once discovered) - see rowan.js.
+      // arcaneStudyPending/arcaneStudyOnCooldown: set together on cast,
+      // both cleared by his own onTurnStart one turn later (the reveal
+      // happens then too) - same one-turn-delay shape as Draxus's
+      // deathproofActive window.
+      // poisonTargets: Set<targetCharacterId> currently affected by Poison
+      // Cloud - ticks 1 dmg on THAT character's own turn start (see
+      // turnEngine.js's tickPoisonIfAny), lives on Rowan (the caster) so
+      // his own death can clear it directly, matching every other
+      // caster-side effect in the codebase (Akyros's marks, Athena's
+      // curseTargetCharacterId, Chronox's freezeTargetId).
+      // silenceTargets: Map<targetCharacterId, turnsRemaining> for Silence
+      // Lock - decremented on that target's own turn start, deleted at 0.
+      // mirrorReflectActive: true from cast until his own next
+      // onTurnStart clears it - checked in damagePipeline.js's applyDamage.
+      return {
+        discoveredSpells: new Set(),
+        arcaneStudyPending: false,
+        arcaneStudyOnCooldown: false,
+        mirrorReflectActive: false,
+        poisonTargets: new Set(),
+        silenceTargets: new Map(),
+      };
     default:
       return {};
   }

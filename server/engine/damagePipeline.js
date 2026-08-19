@@ -53,6 +53,35 @@ export function applyDamage(game, log, {
   target.hearts = Math.max(0, target.hearts - amt);
   result.amountDealt = amt;
 
+  // Rowan's Mirror Reflect: any direct (non-mirrored) hit that lands real
+  // damage on him while it's active, and that he SURVIVES (target.hearts
+  // already reflects the reduction above, so > 0 here means he's still
+  // alive), automatically deals 3 damage back to the attacker - on top of
+  // Rowan still taking the original hit normally (this doesn't block/
+  // reduce anything). Modeled directly on Athena's own curse-mirror below:
+  // a nested applyDamage call with isMirror: true, which both prevents
+  // Akyros's Dodge from applying to the reflected hit and prevents
+  // infinite mirror recursion. The active flag itself is NOT cleared here
+  // (stays active for the rest of the window, in case more than one hit
+  // lands before Rowan's own next turn clears it via his onTurnStart).
+  if (target.id === 'rowan' && target.special.mirrorReflectActive && !isMirror
+    && result.amountDealt > 0 && target.hearts > 0 && sourceCharacterId !== 'rowan') {
+    result.mirrorReflectResult = applyDamage(game, log, {
+      sourceCharacterId: target.id,
+      targetCharacterId: sourceCharacterId,
+      amount: 3,
+      isMirror: true,
+    });
+    result.mirrorReflectLogEntry = {
+      type: 'mirror-reflect',
+      fromCharacterId: target.id,
+      toCharacterId: sourceCharacterId,
+      amount: 3,
+      koTriggered: result.mirrorReflectResult.koTriggered,
+      revived: result.mirrorReflectResult.revived,
+    };
+  }
+
   // Blade Rebirth: automatic, intercepts the KO the instant it would happen.
   if (target.id === 'blade' && target.hearts === 0 && !target.special.rebirthUsed) {
     target.hearts = 2;
@@ -102,6 +131,12 @@ export function applyDamage(game, log, {
     // character without needing changes here.
     const kaelis = Object.values(game.characters).find((c) => c.id === 'kaelis');
     if (kaelis) kaelis.special.grudgeCounts.delete(target.id);
+    // Rowan's Poison Cloud doesn't survive Rebirth either, same "comes back
+    // fresh" reasoning as the grudge-count clear above - otherwise the very
+    // next poison tick on his own turn would immediately start killing him
+    // again with no way to ever escape it.
+    const rowan = Object.values(game.characters).find((c) => c.id === 'rowan');
+    if (rowan) rowan.special.poisonTargets.delete(target.id);
     // Deferred (not pushed to `log` here) and returned on the result so
     // executeAction() can push it AFTER the triggering attack's own log
     // entry - otherwise it lands BEFORE that entry in the log, since this
@@ -148,6 +183,19 @@ export function applyDamage(game, log, {
     // read even though the mirror can genuinely never fire again.
     if (target.id === 'athena' && target.special.curseTargetCharacterId) {
       target.special.curseTargetCharacterId = null;
+    }
+    // Rowan's own death ends every effect HE cast on anyone else
+    // immediately - Poison Cloud stops ticking, Silence Lock's remaining
+    // turns are cleared (targets freed), and a still-pending Mirror
+    // Reflect window is cancelled. Does not undo damage already dealt by
+    // past ticks/reflects, only stops future ones (confirmed explicit
+    // design rule). Effects live on Rowan's own .special (matching every
+    // other caster-side effect in the codebase), so this is a direct
+    // clear, no cross-character scan needed.
+    if (target.id === 'rowan') {
+      target.special.poisonTargets.clear();
+      target.special.silenceTargets.clear();
+      target.special.mirrorReflectActive = false;
     }
   }
 

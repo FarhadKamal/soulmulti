@@ -126,6 +126,7 @@ const VOICE_LINES = {
   melyssa: { idle: 'idle', injured: 'injured', koed: 'koed', victory: 'victory' },
   kaelis: { idle: 'idle', injured: 'injured', koed: 'koed', victory: 'victory' },
   draxus: { idle: 'idle', injured: 'injured', koed: 'koed', victory: 'victory' },
+  rowan: { idle: 'idle', injured: 'injured', koed: 'koed', victory: 'victory' },
 };
 
 // actionId -> filename, per character - every action here plays its line
@@ -166,6 +167,18 @@ const ACTION_VOICE_LINES = {
   // main.js's dedicated isBonusStrike branch instead of the generic
   // playMoveVoice dispatch every other actionId uses.
   draxus: { deathlessFury: 'immortality' },
+  // arcaneStudy stays voice-silent (no dedicated line exists on disk -
+  // confirmed with the user) - nothing visibly happens the turn it's cast
+  // anyway (the reveal lands on his NEXT turn instead), so silence here
+  // matches that "nothing to announce yet" moment.
+  rowan: {
+    wandStrike: 'wand_strike',
+    poisonCloud: 'cloud_poison',
+    purify: 'purify',
+    wildLightning: 'lightning',
+    mirrorReflect: 'mirror',
+    silenceLock: 'silence_lock',
+  },
 };
 
 // Exact filenames on disk are capitalized (One.mp3/Two.mp3/Three.mp3),

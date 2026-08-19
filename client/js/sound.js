@@ -123,6 +123,13 @@ const ACTION_SOUND = {
   callAshka: 'bird_heal',
   dyingBlow: 'axe_strike',
   deathlessFury: 'deathless_fury',
+  wandStrike: 'wand_strike',
+  arcaneStudy: 'study',
+  poisonCloud: 'cloud',
+  purify: 'healing',
+  wildLightning: 'lightning',
+  mirrorReflect: 'mirror',
+  silenceLock: 'lock',
 };
 
 export function playActionSound(actionId) {

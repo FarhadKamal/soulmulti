@@ -84,6 +84,7 @@ const IDLE_IMAGE = {
   melyssa: 'assets/images/melyssa/chess.jpg',
   kaelis: 'assets/images/kaelis/idle.jpg',
   draxus: 'assets/images/draxus/idle.jpg',
+  rowan: 'assets/images/rowan/idle.jpg',
 };
 
 // Call once per character at the moment their own turn starts (i.e. when
@@ -285,6 +286,22 @@ export function handleLogEntryForFlash(entry, game) {
         else if (entry.outcome === 'draw') setFlash(characterId, 'assets/images/boingo/normalpunch.jpg');
       }
       break;
+    case 'wandStrike':
+      if (!dodged && amountDealt > 0) setFlash(characterId, 'assets/images/rowan/wand_strike.jpg');
+      break;
+    case 'arcaneStudy':
+      setFlash(characterId, 'assets/images/rowan/arcane_study.jpg'); break;
+    case 'poisonCloud':
+      setFlash(characterId, 'assets/images/rowan/poison_cloud.jpg'); break;
+    case 'purify':
+      setFlash(characterId, 'assets/images/rowan/purify.jpg'); break;
+    case 'wildLightning':
+      if (!dodged && amountDealt > 0) setFlash(characterId, 'assets/images/rowan/wild_lightning.jpg');
+      break;
+    case 'mirrorReflect':
+      setFlash(characterId, 'assets/images/rowan/mirror_reflect.jpg'); break;
+    case 'silenceLock':
+      setFlash(characterId, 'assets/images/rowan/silence_lock.jpg'); break;
     default:
       break;
   }

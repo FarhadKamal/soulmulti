@@ -58,6 +58,14 @@ const FLASH_IMAGES = [
   'assets/images/draxus/normal_strike.jpg',
   'assets/images/draxus/immortal_strike.jpg',
   'assets/images/draxus/immortality.jpg',
+  'assets/images/rowan/idle.jpg',
+  'assets/images/rowan/wand_strike.jpg',
+  'assets/images/rowan/arcane_study.jpg',
+  'assets/images/rowan/poison_cloud.jpg',
+  'assets/images/rowan/purify.jpg',
+  'assets/images/rowan/wild_lightning.jpg',
+  'assets/images/rowan/mirror_reflect.jpg',
+  'assets/images/rowan/silence_lock.jpg',
 ];
 
 let started = false;
