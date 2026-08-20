@@ -156,7 +156,7 @@ export const actions = {
       && !character.special.usedSpells.has('silenceLock'),
     execute(character, targetId, game, log) {
       character.special.usedSpells.add('silenceLock');
-      character.special.silenceTargets.set(targetId, 2);
+      character.special.silenceTargets.set(targetId, 3);
       // Also strips any shield the target already has, on top of blocking
       // every shield source (passive resets like Chrono Guard, and any
       // active shield-granting move) for the whole silence duration - see

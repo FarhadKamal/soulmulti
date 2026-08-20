@@ -795,39 +795,114 @@ function chooseDraxusMove(character, game, usable) {
   return { actionId: 'dyingBlow', targetId };
 }
 
-// True if any OTHER character currently has a negative status placed on
-// Rowan (mirrors the same generic scan purify.execute itself does in
-// rowan.js, just checking presence rather than clearing) - used to decide
-// whether a discovered Purify is worth casting right now.
-function rowanHasNegativeStatus(game, character) {
+// True if any OTHER character currently has an ACTIVELY HARMFUL status
+// placed on Rowan - one that's costing him something every turn it stays up
+// (poison ticks, an active silence lock, an active freeze, or Athena's
+// curse mirroring damage back at whoever hits her). Worth cleansing
+// regardless of his current health, same "the bleeding needs to stop
+// before it matters how much blood is left" reasoning as any other
+// immediate-threat check in this file.
+function rowanHasUrgentNegativeStatus(game, character) {
   return Object.values(game.characters).some((c) => {
     if (c.id === character.id) return false;
     const s = c.special;
     if (!s) return false;
     if (s.curseTargetCharacterId === character.id) return true;
     if (s.freezeActive && s.freezeTargetId === character.id) return true;
-    if (s.marks?.has(character.id)) return true;
-    if (s.grudgeCounts?.has(character.id)) return true;
     if (s.poisonTargets?.has(character.id)) return true;
     if (s.silenceTargets?.has(character.id)) return true;
-    if (s.streakTargetId === character.id) return true;
     return false;
   });
 }
 
+// True whenever a live Blade has his Blood Hunt streak locked onto Rowan
+// with real momentum behind it (2+ means his NEXT hit deals 3+, since
+// streakCount tracks the damage his last hit dealt and each consecutive
+// hit adds 1 more) - unlike a fresh 1-count streak, which is just a normal
+// attack and not yet worth reacting to specially. Purify wipes the streak-
+// lock outright (see purify.execute's streakTargetId clear in rowan.js),
+// forcing Blade back to a cold 1-damage opener next time he attacks
+// instead of letting the compounding damage keep snowballing.
+function rowanFacingGrowingBladeStreak(game, character) {
+  const blade = game.characters['blade'];
+  return !!(blade && !blade.isKO && blade.special.streakTargetId === character.id
+    && blade.special.streakCount >= 2);
+}
+
+// A minor status (Kaelis grudge count, Akyros mark, Blade's streak-lock)
+// costs Rowan nothing on its own right now - a mark does nothing until a
+// Fatal Slash/Shadow Execution actually lands, grudge only matters once
+// Kaelis retaliates - so it's deliberately NOT checked here at all.
+// Confirmed bug report: the bot was burning its one-time Purify at 6/7
+// hearts purely because a trivial status like this was present. It's still
+// worth cleansing eventually, but only as a side effect of Purify firing
+// for a REAL reason (badly hurt, or an actively harmful status above) -
+// never as its own trigger while he's healthy.
+
+// True whenever it's worth holding Poison Cloud/Silence Lock in reserve for
+// Chronox specifically, rather than spending them on whoever's convenient
+// right now. Chronox's permanent Chrono Guard shield (reset to 1 every one
+// of his own turns) fully absorbs Rowan's only reliable repeatable damage
+// (Wand Strike's flat 1, and a fully-shielded Wild Lightning roll of 1) -
+// if the match narrows down to just the two of them, a Rowan who already
+// burned poison/silence on someone else has no real way to ever land
+// meaningful damage on him. Only applies while a THIRD living enemy still
+// exists to eventually soak those two spells instead - once it's already a
+// Rowan-vs-Chronox 1v1, there's nothing left to save them for, so the
+// normal "use it now" priority takes back over via the isFinalDuel escape
+// hatch below. Also stands down once Chronox is already poisoned/silenced
+// (nothing left to reserve) or dead (nothing to reserve FOR).
+function shouldReserveForChronox(game, character) {
+  const chronox = game.characters['chronox'];
+  if (!chronox || chronox.isKO || chronox.untargetable) return false;
+  const others = livingEnemies(game, character).filter((c) => c.id !== 'chronox');
+  if (others.length === 0) return false; // already the 1v1 - nothing left to wait for
+  const alreadyPoisoned = character.special.poisonTargets.has('chronox');
+  const alreadySilenced = character.special.silenceTargets.has('chronox');
+  return !alreadyPoisoned || !alreadySilenced;
+}
+
+// True whenever a hurt, live Zerathys still has Soul Swap banked
+// (!usedSpecial) while Rowan himself is comfortably healthy - the exact
+// setup where Soul Swap is most dangerous to let sit: it trades hearts
+// pools outright, so a low Zerathys swapping into a high Rowan instantly
+// undoes however much damage Rowan has already landed on him. Locking it
+// down with Silence Lock removes that escape hatch entirely rather than
+// leaving it banked for whenever Zerathys decides to cash it in.
+function rowanFacingBankedSoulSwap(game, character) {
+  const zerathys = game.characters['zerathys'];
+  if (!zerathys || zerathys.isKO || zerathys.usedSpecial) return false;
+  return character.hearts > LOW_HEARTS_THRESHOLD && zerathys.hearts <= LOW_HEARTS_THRESHOLD;
+}
+
 function chooseRowanMove(character, game, usable) {
   const byId = Object.fromEntries(usable.map((a) => [a.actionId, a]));
-  // Purify first if he's carrying any negative status or is badly hurt -
-  // full-heal-and-cleanse is strictly worth taking over anything else once
-  // it's actually needed, same "safety valve takes priority" reasoning as
-  // Kaelis's Call Ashka / Athena's Divine Restore gating elsewhere here.
-  if (byId.purify && (rowanHasNegativeStatus(game, character) || character.hearts <= LOW_HEARTS_THRESHOLD)) {
+  const reserveForChronox = shouldReserveForChronox(game, character);
+  // Purify: cast immediately if he's carrying anything ACTIVELY harmful
+  // (poison, live silence/freeze, Athena's curse) regardless of health, or
+  // if he's simply badly hurt (heal-to-full is worth it on its own at that
+  // point, and it also happens to sweep up any lingering MINOR status like
+  // a grudge/mark/streak-lock for free). A merely minor status on its own,
+  // at high health, is NOT worth burning the one-time cast on by itself.
+  // Same "safety valve takes priority" reasoning as Kaelis's Call Ashka /
+  // Athena's Divine Restore gating elsewhere here.
+  const badlyHurt = character.hearts <= LOW_HEARTS_THRESHOLD;
+  if (byId.purify && (
+    rowanHasUrgentNegativeStatus(game, character)
+    || badlyHurt
+    || rowanFacingGrowingBladeStreak(game, character)
+  )) {
     return { actionId: 'purify', targetId: null };
   }
-  // Mirror Reflect as a defensive panic button once meaningfully hurt -
-  // banks a counter-punish against whatever hits him next, same "cast
-  // before it's too late" timing as Draxus's own Deathless Fury check.
-  if (byId.mirrorReflect && character.hearts <= LOW_HEARTS_THRESHOLD) {
+  // Mirror Reflect: cast it as soon as it's available and not already
+  // active, regardless of health - since the fix making it persist until
+  // it actually triggers (rather than expiring at his own next turn), there
+  // is zero downside to putting it up immediately rather than waiting for a
+  // "need it now" moment that might never come. Getting it up early also
+  // means bot AI's Mirror Reflect avoidance (isMirrorReflectActive in this
+  // file) kicks in sooner, visibly deterring other bots from attacking him
+  // for the rest of the match instead of only defending a single late hit.
+  if (byId.mirrorReflect && !character.special.mirrorReflectActive) {
     return { actionId: 'mirrorReflect', targetId: null };
   }
   // Already-discovered spells take priority over MORE studying - Arcane
@@ -836,16 +911,30 @@ function chooseRowanMove(character, game, usable) {
   // match report: the bot kept re-casting Arcane Study turn after turn even
   // with a full kit already discovered, instead of actually using it.
   // Silence Lock on whoever still has their own special banked - denies
-  // the single biggest threat a character can pose.
+  // the single biggest threat a character can pose. While reserving for
+  // Chronox, only cast this on HIM (if he's a legal target and not already
+  // silenced) - otherwise skip it entirely this turn rather than spending
+  // it on someone else, so it's still available once he's the one who
+  // matters.
   if (byId.silenceLock) {
     const targets = validTargetsFor(game, character, 'silenceLock')
       .filter((tid) => !game.characters[tid].usedSpecial);
-    if (targets.length > 0) {
+    if (reserveForChronox) {
+      if (targets.includes('chronox') && !character.special.silenceTargets.has('chronox')) {
+        return { actionId: 'silenceLock', targetId: 'chronox' };
+      }
+    } else if (targets.includes('zerathys') && !character.special.silenceTargets.has('zerathys')
+      && rowanFacingBankedSoulSwap(game, character)) {
+      return { actionId: 'silenceLock', targetId: 'zerathys' };
+    } else if (targets.length > 0) {
       const targetId = biggestThreatTarget(game, character, targets) || pickRandom(targets);
       return { actionId: 'silenceLock', targetId };
     }
   }
   // Wild Lightning next - highest damage ceiling of anything in the kit.
+  // Unaffected by the Chronox reserve - it still does real (if shield-
+  // reduced) damage to him, unlike Wand Strike, so there's no reason to
+  // hold it back the same way.
   if (byId.wildLightning) {
     const targets = validTargetsFor(game, character, 'wildLightning');
     const targetId = biggestThreatTarget(game, character, targets)
@@ -853,11 +942,17 @@ function chooseRowanMove(character, game, usable) {
     return { actionId: 'wildLightning', targetId };
   }
   // Poison Cloud on a fresh (not-yet-poisoned) target - no point stacking
-  // it on someone already ticking.
+  // it on someone already ticking. Same Chronox-reserve treatment as
+  // Silence Lock above: only cast it on him while reserving, skip
+  // otherwise rather than spending it on a target that doesn't need it.
   if (byId.poisonCloud) {
     const targets = validTargetsFor(game, character, 'poisonCloud')
       .filter((tid) => !character.special.poisonTargets.has(tid));
-    if (targets.length > 0) {
+    if (reserveForChronox) {
+      if (targets.includes('chronox')) {
+        return { actionId: 'poisonCloud', targetId: 'chronox' };
+      }
+    } else if (targets.length > 0) {
       const targetId = biggestThreatTarget(game, character, targets) || pickRandom(targets);
       return { actionId: 'poisonCloud', targetId };
     }

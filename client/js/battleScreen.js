@@ -691,7 +691,7 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
     // from opposite sides and meet at a padlock shape in the center that
     // flashes/snaps shut - matches the ability's own name/theme, distinct
     // from every other effect (nothing else does chains/binding). The
-    // persistent .silence-badge (🔒) carries the ongoing "still locked"
+    // persistent .silence-badge (⛓️) carries the ongoing "still locked"
     // signal after this one-shot lands.
     const lock = document.createElement('div');
     lock.className = 'silence-lock-fx';
@@ -852,12 +852,12 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
 
   if (silencedTurns > 0 && !character.isKO) {
     // Rowan's Silence Lock - bottom-right, same reasoning as poison above.
-    // Lock icon (matches the ability's own name/theme - "your power is
-    // sealed away") rather than a mute-speaker icon, which read as "can't
-    // speak" instead of "special ability locked."
+    // Chain icon (matches the cast animation's own chain-arc visual, see
+    // the .lock-chain elements further down) rather than a mute-speaker
+    // icon, which read as "can't speak" instead of "special ability locked."
     const silence = document.createElement('div');
     silence.className = 'silence-badge';
-    silence.textContent = `🔒${silencedTurns}`;
+    silence.textContent = `⛓️${silencedTurns}`;
     silence.title = `Silenced by Rowan - cannot use their special ability for ${silencedTurns} more of their own turn(s)`;
     tile.appendChild(silence);
   }
