@@ -875,6 +875,42 @@ function rowanFacingBankedSoulSwap(game, character) {
   return character.hearts > LOW_HEARTS_THRESHOLD && zerathys.hearts <= LOW_HEARTS_THRESHOLD;
 }
 
+// True whenever a low-health, live Draxus still has Deathless Fury banked
+// (!usedSpecial) - his real threat isn't the cast itself (it only floors
+// his NEXT hit at 1 heart instead of KO'ing him, no immediate damage), it's
+// the bonus 3-strike turn it grants right after: each Dying Blow deals up
+// to 3 damage depending on his OWN low hearts at the time, so a full bonus
+// turn can land as much as 9 damage in one go. Gated on his hearts already
+// being low, same as the real cast timing (he has no reason to pop it at
+// full health - Deathless Fury does nothing there), which also happens to
+// be exactly when his own Dying Blow damage tier is at its highest, making
+// the eventual bonus turn most dangerous. Silence Lock denies the special
+// action outright before he ever gets the chance to bank the death-proof
+// window and the strikes that follow it.
+function rowanFacingBankedDeathlessFury(game, character) {
+  const draxus = game.characters['draxus'];
+  if (!draxus || draxus.isKO || draxus.usedSpecial) return false;
+  return draxus.hearts <= LOW_HEARTS_THRESHOLD;
+}
+
+// True whenever a healthy, live, not-yet-poisoned Kaelis is a legal Poison
+// Cloud target - she's the one Poison Cloud can be cast on with essentially
+// no downside: the recurring ticks don't add to her grudge counter (only
+// the initial cast does, a single point - see the isPoisonTick exclusion
+// in damagePipeline.js/the one-time grudge add in poisonCloud.execute), so
+// starting the DoT early against her costs nothing extra and gets the most
+// total ticks out of it over the rest of the match. Gated on her being
+// healthy specifically because a low-health Kaelis is better served by a
+// more IMMEDIATE spell (Wild Lightning/a kill) - poison's slow bleed
+// matters most when there's a long runway of her own turns left for it to
+// tick through.
+function rowanFacingHealthyKaelis(game, character) {
+  const kaelis = game.characters['kaelis'];
+  if (!kaelis || kaelis.isKO || kaelis.untargetable) return false;
+  if (character.special.poisonTargets.has('kaelis')) return false;
+  return kaelis.hearts > LOW_HEARTS_THRESHOLD;
+}
+
 function chooseRowanMove(character, game, usable) {
   const byId = Object.fromEntries(usable.map((a) => [a.actionId, a]));
   const reserveForChronox = shouldReserveForChronox(game, character);
@@ -923,6 +959,9 @@ function chooseRowanMove(character, game, usable) {
       if (targets.includes('chronox') && !character.special.silenceTargets.has('chronox')) {
         return { actionId: 'silenceLock', targetId: 'chronox' };
       }
+    } else if (targets.includes('draxus') && !character.special.silenceTargets.has('draxus')
+      && rowanFacingBankedDeathlessFury(game, character)) {
+      return { actionId: 'silenceLock', targetId: 'draxus' };
     } else if (targets.includes('zerathys') && !character.special.silenceTargets.has('zerathys')
       && rowanFacingBankedSoulSwap(game, character)) {
       return { actionId: 'silenceLock', targetId: 'zerathys' };
@@ -952,6 +991,8 @@ function chooseRowanMove(character, game, usable) {
       if (targets.includes('chronox')) {
         return { actionId: 'poisonCloud', targetId: 'chronox' };
       }
+    } else if (targets.includes('kaelis') && rowanFacingHealthyKaelis(game, character)) {
+      return { actionId: 'poisonCloud', targetId: 'kaelis' };
     } else if (targets.length > 0) {
       const targetId = biggestThreatTarget(game, character, targets) || pickRandom(targets);
       return { actionId: 'poisonCloud', targetId };
