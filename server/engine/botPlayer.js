@@ -632,6 +632,18 @@ function chooseAthenaMove(character, game, usable) {
       );
       return { actionId: 'curseStrike', targetId: pickRandom(healthierOptions) || currentCursed };
     }
+    // Prefer whoever's actually been hitting her recently (same
+    // biggestThreatTarget signal every other character's targeting uses) -
+    // the curse only pays off once the cursed target lands a REAL hit on
+    // her, so cursing someone who's never attacked her at all (purely
+    // because they happen to have the most hearts) can sit there doing
+    // nothing for the whole match if they never do. Confirmed bug report:
+    // Athena kept curse-locking onto a character that had never once
+    // attacked her, purely on the max-hearts tiebreak below. Max-hearts is
+    // now only the fallback for when nobody's attacked her recently at all
+    // (early game, or everyone's been ignoring her).
+    const threatId = biggestThreatTarget(game, character, targets);
+    if (threatId) return { actionId: 'curseStrike', targetId: threatId };
     const maxHearts = Math.max(...targets.map((tid) => game.characters[tid].hearts));
     const tiedBest = targets.filter((tid) => game.characters[tid].hearts === maxHearts);
     const targetId = pickRandom(tiedBest);
@@ -1069,6 +1081,24 @@ export function chooseBotMove(character, game) {
 export function chooseBotMelyssaPuppetAction(puppetCharacter, game, melyssaId) {
   const jb = game.jesterBall;
   if (jb && jb.holderCharacterId === puppetCharacter.id) {
+    // chooseBotJesterBallMove decides Pass-vs-Take from the HOLDER's own
+    // interest (dodge the -4 by passing it off onto someone else) - backed
+    // by the same "puppeted decisions serve Melyssa, not the puppet"
+    // reasoning as the Zerathys/Blade overrides below. A pass just
+    // relocates the damage onto whoever the ball lands on next, which does
+    // nothing for Melyssa if her actual target was THIS puppet - forcing
+    // Take instead lands the -4 hit directly on the character she's
+    // puppeting, right now. Exception: Zerathys with a live Soul Swap combo
+    // pending already independently resolves to Take for a different (and
+    // better) reason - zerathysBallComboTarget primes an immediate heart-
+    // swap follow-up - so defer to the normal logic there rather than
+    // overriding it for no benefit. zerathysBallComboTarget's own
+    // heartsAfterTake<=0 guard means a genuinely suicidal Take is never
+    // chosen through that path either.
+    const zerathysComboPending = puppetCharacter.id === 'zerathys' && !!zerathysBallComboTarget(puppetCharacter, game);
+    if (!zerathysComboPending) {
+      return { kind: 'jesterBall', choice: 'take' };
+    }
     const move = chooseBotJesterBallMove(puppetCharacter, game);
     return { kind: 'jesterBall', choice: move.choice, targetId: move.targetId };
   }
