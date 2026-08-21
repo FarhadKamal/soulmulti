@@ -119,12 +119,17 @@ function baseSpecialFor(id) {
       // itself still plays on every recurring tick for the rest of the
       // match, same reasoning as not wanting a full sentence repeating
       // every single turn.
+      // everbloomTurnCount: increments every one of her own turns while
+      // Everbloom is active (whether or not that turn heals) - odd counts
+      // heal, even counts skip, so it heals every OTHER turn forever
+      // rather than every single turn (balance tune - see marin.js).
       return {
         discoveredSpells: new Set(),
         arcaneStudyPending: false,
         arcaneStudyOnCooldown: false,
         everbloomActive: false,
         everbloomFirstTickDone: false,
+        everbloomTurnCount: 0,
         veilChargesRemaining: 0,
         cleanSlateArmed: false,
         cleanSlateImmuneTurnsRemaining: 0,

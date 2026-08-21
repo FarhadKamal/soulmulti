@@ -39,21 +39,29 @@ export function onTurnStart(character, game, log) {
   if (character.special.arcaneStudyOnCooldown) {
     character.special.arcaneStudyOnCooldown = false;
   }
-  // Everbloom: +1 heart every one of her own turns, forever, once
-  // discovered - recurring for the rest of the match, not a one-time
-  // effect (same recurring shape as Rowan's Poison Cloud ticking every
-  // turn, just self-targeted so no cross-character scan is needed here).
+  // Everbloom: +1 heart every OTHER one of her own turns, forever, once
+  // discovered - heals on turn 1, 3, 5... since discovery, skips 2, 4, 6...
+  // Balance-tuned down from healing every single turn (unlimited sustain
+  // with zero downside felt too strong - see soulclash_marin_design memory)
+  // to half that rate while staying permanent, rather than a hard cutoff
+  // after N turns. everbloomTurnCount increments on every one of her own
+  // turns while active (whether or not this particular one heals), so the
+  // skip pattern is exact regardless of how many turns pass.
   if (character.special.everbloomActive && !character.isKO) {
-    // isFirstTick: true only for the very first heal (the same turn it was
-    // discovered) - client-side (main.js) uses this to play her spoken
-    // voice line just once, not on every recurring tick for the rest of
-    // the match, while the short sound effect itself still plays every
-    // time.
-    const isFirstTick = !character.special.everbloomFirstTickDone;
-    const healed = applyHeal(game, character.id, 1);
-    if (healed > 0) {
-      character.special.everbloomFirstTickDone = true;
-      log.push({ type: 'everbloom-tick', characterId: character.id, healed, isFirstTick });
+    character.special.everbloomTurnCount += 1;
+    const shouldHealThisTurn = character.special.everbloomTurnCount % 2 === 1;
+    if (shouldHealThisTurn) {
+      // isFirstTick: true only for the very first heal (the same turn it
+      // was discovered) - client-side (main.js) uses this to play her
+      // spoken voice line just once, not on every recurring tick for the
+      // rest of the match, while the short sound effect itself still plays
+      // every time it actually heals.
+      const isFirstTick = !character.special.everbloomFirstTickDone;
+      const healed = applyHeal(game, character.id, 1);
+      if (healed > 0) {
+        character.special.everbloomFirstTickDone = true;
+        log.push({ type: 'everbloom-tick', characterId: character.id, healed, isFirstTick });
+      }
     }
   }
   // Clean Slate's immunity window counts down on HER OWN turns once it's

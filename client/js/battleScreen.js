@@ -965,10 +965,15 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
   if (badges.length > 0) {
     const badgeRow = document.createElement('div');
     badgeRow.className = 'status-badge-row';
-    badges.forEach(({ text, cls }) => {
+    badges.forEach(({ text, cls, title }) => {
       const badge = document.createElement('span');
       badge.className = 'status-badge' + (cls ? ` status-badge--${cls}` : '');
       badge.textContent = text;
+      // Icon-only badges (e.g. Marin's passives) carry their full name here
+      // instead of in the visible text, so a hover still reveals what the
+      // icon means without cluttering the tile - optional, most badges
+      // elsewhere already say enough in their own text and skip this.
+      if (title) badge.title = title;
       badgeRow.appendChild(badge);
     });
     tile.appendChild(badgeRow);
@@ -1025,18 +1030,21 @@ function statusBadges(character) {
       if (character.special.everbloomActive) {
         // Permanent passive with no cast moment - same "give it an ongoing
         // badge, not just a per-tick flash" reasoning as Clean Slate below.
-        badges.push({ text: '🍃 Everbloom active' });
+        // Icon-only (no label text) - keeps the tile from getting cluttered
+        // once several of these badges stack up at once; each icon's
+        // meaning is established by its own discovery flash/voice line.
+        badges.push({ text: '🍃', title: 'Everbloom active - heals +1 every other of her own turns' });
       }
       if (character.special.veilChargesRemaining > 0) {
-        badges.push({ text: `🌀 Veil charges: ${character.special.veilChargesRemaining}` });
+        badges.push({ text: `🌀 ${character.special.veilChargesRemaining}`, title: 'Threefold Veil - dodge charges remaining' });
       }
       if (character.special.piercingWandActive) {
         // Permanent passive, one-shot discovery flash only - same "no
         // ongoing confirmation otherwise" reasoning as Everbloom above.
-        badges.push({ text: '🗡️ Piercing Wand' });
+        badges.push({ text: '🗡️', title: 'Piercing Wand - Wand Strike ignores shield' });
       }
       if (character.special.wandMasteryActive) {
-        badges.push({ text: '⭐ Wand Mastery' });
+        badges.push({ text: '⭐', title: 'Wand Mastery - Wand Strike deals 2 damage' });
       }
       if (character.special.cleanSlateArmed) {
         // Discovered but hasn't fired yet - a purely reactive, one-time
@@ -1046,10 +1054,10 @@ function statusBadges(character) {
         // without this, the only confirmation was a flash at the exact
         // instant it triggers (easy to miss) plus a log line - no ongoing
         // "this is active and waiting" indicator like every other spell.
-        badges.push({ text: '🕯️ Clean Slate ready' });
+        badges.push({ text: '🕯️', title: 'Clean Slate ready - will cleanse and grant immunity on the next negative status' });
       }
       if (character.special.cleanSlateImmuneTurnsRemaining > 0) {
-        badges.push({ text: `Clean Slate: ${character.special.cleanSlateImmuneTurnsRemaining} turns`, cls: 'warn' });
+        badges.push({ text: `🕯️ ${character.special.cleanSlateImmuneTurnsRemaining}`, cls: 'warn', title: 'Clean Slate immunity - turns remaining' });
       }
       break;
   }
