@@ -1022,8 +1022,31 @@ function statusBadges(character) {
         badges.push({ text: 'Studying...' });
       }
       badges.push({ text: `Spells: ${character.special.discoveredSpells.length}/5` });
+      if (character.special.everbloomActive) {
+        // Permanent passive with no cast moment - same "give it an ongoing
+        // badge, not just a per-tick flash" reasoning as Clean Slate below.
+        badges.push({ text: '🍃 Everbloom active' });
+      }
       if (character.special.veilChargesRemaining > 0) {
-        badges.push({ text: `Veil charges: ${character.special.veilChargesRemaining}` });
+        badges.push({ text: `🌀 Veil charges: ${character.special.veilChargesRemaining}` });
+      }
+      if (character.special.piercingWandActive) {
+        // Permanent passive, one-shot discovery flash only - same "no
+        // ongoing confirmation otherwise" reasoning as Everbloom above.
+        badges.push({ text: '🗡️ Piercing Wand' });
+      }
+      if (character.special.wandMasteryActive) {
+        badges.push({ text: '⭐ Wand Mastery' });
+      }
+      if (character.special.cleanSlateArmed) {
+        // Discovered but hasn't fired yet - a purely reactive, one-time
+        // trigger (see tryTriggerCleanSlate in damagePipeline.js) with no
+        // cast moment of its own, so this is the ONLY persistent signal
+        // it's loaded at all before it actually goes off. Confirmed report:
+        // without this, the only confirmation was a flash at the exact
+        // instant it triggers (easy to miss) plus a log line - no ongoing
+        // "this is active and waiting" indicator like every other spell.
+        badges.push({ text: '🕯️ Clean Slate ready' });
       }
       if (character.special.cleanSlateImmuneTurnsRemaining > 0) {
         badges.push({ text: `Clean Slate: ${character.special.cleanSlateImmuneTurnsRemaining} turns`, cls: 'warn' });
