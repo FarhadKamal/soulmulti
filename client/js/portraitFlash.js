@@ -355,5 +355,11 @@ export function handleDodgeForFlash(entry, game) {
   if (entry.type !== 'dodge') return;
   const target = game.characters[entry.targetCharacterId];
   if (!target || target.isKO) return;
-  setFlash(entry.targetCharacterId, 'assets/images/akyros/dodge.jpg');
+  // Shared log entry type/shape (damagePipeline.js's applyDamage pushes the
+  // same 'dodge' entry for both Akyros's per-attacker dodge and Marin's
+  // Threefold Veil flat 3-charge pool) - the image differs per character,
+  // same reasoning as wandStrike/arcaneStudy's shared-action-id branching
+  // below in this file.
+  const src = target.id === 'marin' ? 'assets/images/marin/threefold.jpg' : 'assets/images/akyros/dodge.jpg';
+  setFlash(target.id, src);
 }
