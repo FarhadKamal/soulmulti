@@ -224,8 +224,16 @@ export function handleLogEntryForFlash(entry, game) {
     // (can fire in this same broadcast, would double up), Clean Slate stays
     // silent/unflashed until it actually fires later.
     if (entry.characterId === 'marin' && !isKO('marin')) {
+      // Threefold Veil's discovery gets its OWN dedicated image
+      // (threefold_discovery.jpg - calm, eyes closed, the ward settling
+      // into place) rather than reusing threefold.jpg (an active dodge in
+      // motion) - both used to share one image, which made a discovery
+      // announcement visually indistinguishable from a real dodge and led
+      // directly to a live miscount report ("saw 4 dodges" when only 3
+      // charges/real dodges had actually happened - one of the 4 was this
+      // discovery flash).
       const MARIN_DISCOVERY_FLASH = {
-        threefoldVeil: 'assets/images/marin/threefold.jpg',
+        threefoldVeil: 'assets/images/marin/threefold_discovery.jpg',
         piercingWand: 'assets/images/marin/piercing_wand.jpg',
         wandMastery: 'assets/images/marin/wand_mastery.jpg',
       };

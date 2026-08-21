@@ -181,7 +181,15 @@ const ACTION_VOICE_LINES = {
     wandStrike: 'wand_strike',
     arcaneStudy: 'study',
     everbloom: 'everbloom',
-    threefoldVeil: 'threefold',
+    // threefoldVeil is her DISCOVERY line ("Steady... this will help.") -
+    // threefoldDodge (below, played directly from the 'dodge' log-entry
+    // handler, not through this actionId lookup) is the separate "Not
+    // today." line for an actual dodge trigger. Used to share one entry,
+    // which meant the sharp dodge line played at the calm discovery
+    // moment and no line at all played on a real dodge - split after a
+    // live report ("saw 4 dodges" - one was actually the discovery).
+    threefoldVeil: 'threefold_discover',
+    threefoldDodge: 'threefold',
     cleanSlate: 'clean_slate',
     piercingWand: 'piercing',
     wandMastery: 'mastery',

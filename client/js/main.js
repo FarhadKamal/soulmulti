@@ -186,6 +186,15 @@ function playLaughVoiceIfAlive(characterId, game) {
 function playLogEntrySound(entry, game) {
   if (entry.type === 'dodge') {
     playDodge();
+    // Marin's Threefold Veil dodge gets its own spoken line on top of the
+    // generic dodge sound - a no-op for Akyros's own dodge (same shared
+    // 'dodge' entry type/shape, but he has no threefoldDodge line to look
+    // up). See voice.js's ACTION_VOICE_LINES.marin comment for why this is
+    // a separate key from threefoldVeil (that one's reserved for the
+    // discovery moment, not the dodge itself).
+    if (entry.targetCharacterId === 'marin' && !game.characters.marin?.isKO) {
+      playMoveVoice('marin', 'threefoldDodge');
+    }
     return;
   }
   if (entry.type === 'rebirth') {
