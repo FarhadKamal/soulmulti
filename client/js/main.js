@@ -277,6 +277,49 @@ function playLogEntrySound(entry, game) {
     playMoveVoice('kaelis', 'callAshka');
     return;
   }
+  if (entry.type === 'spell-discovered') {
+    // Rowan's own discoveries stay voice-silent (his spells are cast
+    // separately later - the CAST is where his flash/voice/sound lives, not
+    // the reveal). Marin's 5 spells auto-activate the instant they're
+    // revealed - there is no later cast moment for any of them - so THIS is
+    // the trigger point for 3 of the 5 (Threefold Veil, Piercing Wand,
+    // Wand Mastery - simple "now active forever" announcements with no
+    // separate first-use moment of their own). Everbloom and Clean Slate
+    // are deliberately EXCLUDED here even though they're also Marin's -
+    // Everbloom gets its own sound from its first everbloom-tick entry
+    // (which can fire in this SAME broadcast, since onTurnStart both
+    // reveals and immediately heals on the turn of discovery - a second
+    // sound here would double up), and Clean Slate stays silent until it
+    // actually fires later (clean-slate-trigger) - discovery just arms it,
+    // nothing happened yet worth announcing.
+    if (entry.characterId === 'marin' && entry.spellId
+      && entry.spellId !== 'everbloom' && entry.spellId !== 'cleanSlate') {
+      playActionSound(entry.spellId === 'piercingWand' || entry.spellId === 'wandMastery' ? 'wandDiscover' : entry.spellId);
+      playMoveVoice('marin', entry.spellId);
+    }
+    return;
+  }
+  if (entry.type === 'everbloom-tick') {
+    // Recurring, once per one of Marin's own turns for the rest of the
+    // match once discovered - same "fires every time, not just once"
+    // shape as Rowan's poison-tick, just self-targeted and healing instead
+    // of damaging. The short sound effect plays on every single tick (kept
+    // deliberately light - see sound.js's own 'everbloom' file), but the
+    // spoken "Still blooming" voice line is reserved for the FIRST tick
+    // only, matching how discovery's own voice line works for her other
+    // passives - a full sentence repeating every turn for the rest of a
+    // long match would wear out fast in a way the short chime doesn't.
+    if (entry.healed > 0) {
+      playActionSound('everbloom');
+      if (entry.isFirstTick) playMoveVoice('marin', 'everbloom');
+    }
+    return;
+  }
+  if (entry.type === 'clean-slate-trigger') {
+    playActionSound('cleanSlate');
+    playMoveVoice('marin', 'cleanSlate');
+    return;
+  }
   if (entry.type !== 'attack' && entry.type !== 'special' && entry.type !== 'setup') return;
 
   // A dodged hit already got its own 'dodge' log entry (and playDodge()
@@ -289,6 +332,16 @@ function playLogEntrySound(entry, game) {
   if (entry.actionId === 'cyclonePunch') playCoin();
   if (entry.actionId === 'chaosGamble' && entry.outcome === 'lose') {
     playSound('miss');
+    return;
+  }
+  // Marin's Arcane Study cast uses her own quiet notification sound
+  // (silent_study.wav) rather than Rowan's shared book-page sound
+  // (arcaneStudy -> 'study' in ACTION_SOUND) - ACTION_SOUND is a flat
+  // actionId-keyed map with no per-character branching, so this one
+  // shared action id needs an explicit override here instead.
+  if (entry.actionId === 'arcaneStudy' && entry.characterId === 'marin') {
+    playSound('silent_study.wav');
+    playMoveVoice('marin', 'arcaneStudy');
     return;
   }
   playActionSound(entry.actionId);

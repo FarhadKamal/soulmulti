@@ -1,4 +1,4 @@
-import { applyDamage, applyHeal } from '../engine/damagePipeline.js';
+import { applyDamage, applyHeal, tryTriggerCleanSlate } from '../engine/damagePipeline.js';
 
 // The full discoverable spell pool - Arcane Study draws one of whichever
 // aren't in special.discoveredSpells yet, so each ever appears at most once
@@ -66,6 +66,14 @@ export const actions = {
       && !character.special.usedSpells.has('poisonCloud'),
     execute(character, targetId, game, log) {
       character.special.usedSpells.add('poisonCloud');
+      const poisonTarget = game.characters[targetId];
+      // Marin's Clean Slate: consumes/blocks the poison itself - the cast
+      // still spends Rowan's one-time use of this spell, it just never
+      // actually starts ticking on her.
+      if (tryTriggerCleanSlate(poisonTarget, game, log)) {
+        log.push({ type: 'special', characterId: character.id, actionId: 'poisonCloud', targetId, blocked: true });
+        return {};
+      }
       character.special.poisonTargets.add(targetId);
       // Poison Cloud deals no direct damage on cast (applyDamage is never
       // called here), so Kaelis's grudge counter - which normally increments
@@ -156,12 +164,19 @@ export const actions = {
       && !character.special.usedSpells.has('silenceLock'),
     execute(character, targetId, game, log) {
       character.special.usedSpells.add('silenceLock');
+      const target = game.characters[targetId];
+      // Marin's Clean Slate: consumes/blocks the silence itself - the cast
+      // still spends Rowan's one-time use of this spell, it just never
+      // actually locks her special ability away.
+      if (tryTriggerCleanSlate(target, game, log)) {
+        log.push({ type: 'special', characterId: character.id, actionId: 'silenceLock', targetId, blocked: true });
+        return {};
+      }
       character.special.silenceTargets.set(targetId, 3);
       // Also strips any shield the target already has, on top of blocking
       // every shield source (passive resets like Chrono Guard, and any
       // active shield-granting move) for the whole silence duration - see
       // isSilenced's call sites in damagePipeline.js/chronox.js.
-      const target = game.characters[targetId];
       if (target) target.shield = 0;
       log.push({ type: 'special', characterId: character.id, actionId: 'silenceLock', targetId });
       return {};

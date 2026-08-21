@@ -1,4 +1,4 @@
-import { applyDamage, isSilenced } from '../engine/damagePipeline.js';
+import { applyDamage, isSilenced, tryTriggerCleanSlate } from '../engine/damagePipeline.js';
 import { flipCoin } from '../engine/random.js';
 
 export function onTurnStart(character, game, log) {
@@ -55,10 +55,16 @@ export const actions = {
     isLegal: (character) => !character.usedSpecial,
     execute(character, targetId, game, log) {
       character.usedSpecial = true;
+      const target = game.characters[targetId];
+      // Marin's Clean Slate: consumes/blocks the freeze itself - the cast
+      // still spends his special, it just never actually freezes her.
+      if (tryTriggerCleanSlate(target, game, log)) {
+        log.push({ type: 'special', characterId: character.id, actionId: 'timeFreeze', targetId, blocked: true });
+        return { targetCharacterId: targetId };
+      }
       character.special.freezeActive = true;
       character.special.freezeTargetId = targetId;
       character.special.freezeSkipsApplied = 1;
-      const target = game.characters[targetId];
       if (target) target.skipNextTurn = true;
       log.push({ type: 'special', characterId: character.id, actionId: 'timeFreeze', targetId });
       return { targetCharacterId: targetId };

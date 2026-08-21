@@ -12,8 +12,9 @@ import * as melyssa from '../abilities/melyssa.js';
 import * as kaelis from '../abilities/kaelis.js';
 import * as draxus from '../abilities/draxus.js';
 import * as rowan from '../abilities/rowan.js';
+import * as marin from '../abilities/marin.js';
 
-const ABILITY_MODULES = { chronox, tharox, zerathys, akyros, velorya, boingo, blade, athena, melyssa, kaelis, draxus, rowan };
+const ABILITY_MODULES = { chronox, tharox, zerathys, akyros, velorya, boingo, blade, athena, melyssa, kaelis, draxus, rowan, marin };
 
 export function getAbilityModule(characterId) {
   return ABILITY_MODULES[characterId];

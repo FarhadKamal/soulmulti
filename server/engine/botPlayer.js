@@ -1023,6 +1023,25 @@ function chooseRowanMove(character, game, usable) {
   return { actionId: 'wandStrike', targetId };
 }
 
+// Marin's entire kit auto-activates the instant Arcane Study reveals it -
+// unlike Rowan, there is no separate cast decision for any of her 5
+// spells, so there's nothing to weigh against Arcane Study the way
+// Rowan's chooser weighs "use a known spell now vs. study for another."
+// The only real decisions left are: study whenever there's still
+// something to discover (always worth it, no downside beyond the 1-turn
+// cooldown - identical reasoning to Rowan's own "no downside" Arcane
+// Study fallback), and who Wand Strike hits otherwise.
+function chooseMarinMove(character, game, usable) {
+  const byId = Object.fromEntries(usable.map((a) => [a.actionId, a]));
+  if (byId.arcaneStudy) {
+    return { actionId: 'arcaneStudy', targetId: null };
+  }
+  const targets = validTargetsFor(game, character, 'wandStrike');
+  const targetId = biggestThreatTarget(game, character, targets)
+    || lowestHeartsTarget(game, targets) || pickRandom(targets);
+  return { actionId: 'wandStrike', targetId };
+}
+
 const MOVE_CHOOSERS = {
   tharox: chooseTharoxMove,
   zerathys: chooseZerathysMove,
@@ -1036,6 +1055,7 @@ const MOVE_CHOOSERS = {
   kaelis: chooseKaelisMove,
   draxus: chooseDraxusMove,
   rowan: chooseRowanMove,
+  marin: chooseMarinMove,
 };
 
 // Fallback for characters without bot logic yet: picks a random usable

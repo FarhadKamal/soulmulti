@@ -85,6 +85,7 @@ const IDLE_IMAGE = {
   kaelis: 'assets/images/kaelis/idle.jpg',
   draxus: 'assets/images/draxus/idle.jpg',
   rowan: 'assets/images/rowan/idle.jpg',
+  marin: 'assets/images/marin/idle.jpg',
 };
 
 // Call once per character at the moment their own turn starts (i.e. when
@@ -212,6 +213,40 @@ export function handleLogEntryForFlash(entry, game) {
     if (!isKO(entry.characterId)) setFlash(entry.characterId, 'assets/images/kaelis/bird.jpg');
     return;
   }
+  if (entry.type === 'spell-discovered') {
+    // Marin's 5 spells auto-activate the instant they're revealed - unlike
+    // Rowan (whose discoveries stay flash-silent, since HIS spells are cast
+    // separately later - that later cast is where his own flash lives),
+    // this dedicated type IS the one moment worth flashing for 3 of her 5
+    // (Threefold Veil, Piercing Wand, Wand Mastery). Everbloom/Clean Slate
+    // are excluded here for the same reasoning as their sound handling in
+    // main.js - Everbloom gets its flash from its own first tick instead
+    // (can fire in this same broadcast, would double up), Clean Slate stays
+    // silent/unflashed until it actually fires later.
+    if (entry.characterId === 'marin' && !isKO('marin')) {
+      const MARIN_DISCOVERY_FLASH = {
+        threefoldVeil: 'assets/images/marin/threefold.jpg',
+        piercingWand: 'assets/images/marin/piercing_wand.jpg',
+        wandMastery: 'assets/images/marin/wand_mastery.jpg',
+      };
+      const src = MARIN_DISCOVERY_FLASH[entry.spellId];
+      if (src) setFlash('marin', src);
+    }
+    return;
+  }
+  if (entry.type === 'everbloom-tick') {
+    // Recurring - re-fires every one of Marin's own turns for the rest of
+    // the match once discovered, same "not just a one-shot cast flash"
+    // shape as Rowan's Poison Cloud tile effect re-firing every damage
+    // tick (see actionEffects.js's own poison-tick handling for the
+    // client-side precedent this follows).
+    if (entry.healed > 0 && !isKO(entry.characterId)) setFlash(entry.characterId, 'assets/images/marin/everbloom.jpg');
+    return;
+  }
+  if (entry.type === 'clean-slate-trigger') {
+    if (!isKO(entry.characterId)) setFlash(entry.characterId, 'assets/images/marin/clean_slate.jpg');
+    return;
+  }
 
   if (entry.type !== 'attack' && entry.type !== 'special' && entry.type !== 'setup') return;
   const { characterId, actionId, dodged, amountDealt } = entry;
@@ -287,10 +322,17 @@ export function handleLogEntryForFlash(entry, game) {
       }
       break;
     case 'wandStrike':
-      if (!dodged && amountDealt > 0) setFlash(characterId, 'assets/images/rowan/wand_strike.jpg');
+      // Shared action id (Rowan and Marin both have a Wand Strike) - the
+      // image folder differs per character, everything else about the
+      // trigger condition is identical.
+      if (!dodged && amountDealt > 0) {
+        setFlash(characterId, characterId === 'marin' ? 'assets/images/marin/wand_strike.jpg' : 'assets/images/rowan/wand_strike.jpg');
+      }
       break;
     case 'arcaneStudy':
-      setFlash(characterId, 'assets/images/rowan/arcane_study.jpg'); break;
+      // Same shared-action-id reasoning as wandStrike above.
+      setFlash(characterId, characterId === 'marin' ? 'assets/images/marin/arcane_study.jpg' : 'assets/images/rowan/arcane_study.jpg');
+      break;
     case 'poisonCloud':
       setFlash(characterId, 'assets/images/rowan/poison_cloud.jpg'); break;
     case 'purify':

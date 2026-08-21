@@ -127,6 +127,7 @@ const VOICE_LINES = {
   kaelis: { idle: 'idle', injured: 'injured', koed: 'koed', victory: 'victory' },
   draxus: { idle: 'idle', injured: 'injured', koed: 'koed', victory: 'victory' },
   rowan: { idle: 'idle', injured: 'injured', koed: 'koed', victory: 'victory' },
+  marin: { idle: 'idle', injured: 'injured', koed: 'koed', victory: 'victory' },
 };
 
 // actionId -> filename, per character - every action here plays its line
@@ -175,6 +176,15 @@ const ACTION_VOICE_LINES = {
     wildLightning: 'lightning',
     mirrorReflect: 'mirror',
     silenceLock: 'silence_lock',
+  },
+  marin: {
+    wandStrike: 'wand_strike',
+    arcaneStudy: 'study',
+    everbloom: 'everbloom',
+    threefoldVeil: 'threefold',
+    cleanSlate: 'clean_slate',
+    piercingWand: 'piercing',
+    wandMastery: 'mastery',
   },
 };
 

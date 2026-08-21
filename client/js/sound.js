@@ -7,9 +7,13 @@ import { v } from './assetVersion.js';
 
 const cache = {};
 
+// name may include its own extension (e.g. 'everbloom.wav', needed for
+// Marin's 2 non-mp3 sound effects) - defaults to appending .mp3 when it
+// doesn't, matching every existing call site's behavior unchanged.
 function get(name) {
+  const file = /\.\w+$/.test(name) ? name : `${name}.mp3`;
   if (!cache[name]) {
-    cache[name] = new Audio(v(`assets/sounds/${name}.mp3`));
+    cache[name] = new Audio(v(`assets/sounds/${file}`));
   }
   return cache[name];
 }
@@ -130,6 +134,15 @@ const ACTION_SOUND = {
   wildLightning: 'lightning',
   mirrorReflect: 'mirror',
   silenceLock: 'lock',
+  // Marin: all 5 fire once, at the moment each is discovered (see
+  // main.js's 'spell-discovered' handler) - none of them are cast
+  // separately later, unlike Rowan's kit. Piercing Wand and Wand Mastery
+  // deliberately share one sound (wandDiscover -> wand_discover.mp3), both
+  // being permanent "the wand just got better" announcements.
+  everbloom: 'everbloom.wav',
+  threefoldVeil: 'magic_dodge.wav',
+  cleanSlate: 'cleanSlate',
+  wandDiscover: 'wand_discover',
 };
 
 export function playActionSound(actionId) {

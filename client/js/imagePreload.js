@@ -66,6 +66,14 @@ const FLASH_IMAGES = [
   'assets/images/rowan/wild_lightning.jpg',
   'assets/images/rowan/mirror_reflect.jpg',
   'assets/images/rowan/silence_lock.jpg',
+  'assets/images/marin/idle.jpg',
+  'assets/images/marin/wand_strike.jpg',
+  'assets/images/marin/arcane_study.jpg',
+  'assets/images/marin/everbloom.jpg',
+  'assets/images/marin/threefold.jpg',
+  'assets/images/marin/clean_slate.jpg',
+  'assets/images/marin/piercing_wand.jpg',
+  'assets/images/marin/wand_mastery.jpg',
 ];
 
 let started = false;

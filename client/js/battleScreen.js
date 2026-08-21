@@ -1017,6 +1017,18 @@ function statusBadges(character) {
         badges.push({ text: 'Mirror active', cls: 'warn' });
       }
       break;
+    case 'marin':
+      if (character.special.arcaneStudyPending) {
+        badges.push({ text: 'Studying...' });
+      }
+      badges.push({ text: `Spells: ${character.special.discoveredSpells.length}/5` });
+      if (character.special.veilChargesRemaining > 0) {
+        badges.push({ text: `Veil charges: ${character.special.veilChargesRemaining}` });
+      }
+      if (character.special.cleanSlateImmuneTurnsRemaining > 0) {
+        badges.push({ text: `Clean Slate: ${character.special.cleanSlateImmuneTurnsRemaining} turns`, cls: 'warn' });
+      }
+      break;
   }
   return badges;
 }
@@ -1417,13 +1429,18 @@ const ACTION_LABELS = {
   wandStrike: 'Wand Strike', arcaneStudy: 'Arcane Study',
   poisonCloud: 'Poison Cloud', purify: 'Purify', wildLightning: 'Wild Lightning',
   mirrorReflect: 'Mirror Reflect', silenceLock: 'Silence Lock',
+  everbloom: 'Everbloom', threefoldVeil: 'Threefold Veil', cleanSlate: 'Clean Slate',
+  piercingWand: 'Piercing Wand', wandMastery: 'Wand Mastery',
 };
 
-// Rowan's 5 discoverable spells - used by describeLogEntry's
-// 'spell-discovered' case to show a real name instead of the raw id.
+// Rowan's and Marin's discoverable spells, shared by describeLogEntry's
+// 'spell-discovered' case to show a real name instead of the raw id - the
+// two characters' spell ids never collide, so one flat lookup covers both.
 const SPELL_NAMES = {
   poisonCloud: 'Poison Cloud', purify: 'Purify', wildLightning: 'Wild Lightning',
   mirrorReflect: 'Mirror Reflect', silenceLock: 'Silence Lock',
+  everbloom: 'Everbloom', threefoldVeil: 'Threefold Veil', cleanSlate: 'Clean Slate',
+  piercingWand: 'Piercing Wand', wandMastery: 'Wand Mastery',
 };
 function actionLabel(actionId) {
   return ACTION_LABELS[actionId] || actionId;
@@ -1437,13 +1454,13 @@ function describeLogEntry(entry) {
     case 'attack':
       return `${name(entry.characterId)} used ${actionLabel(entry.actionId)} on ${name(entry.targetId)}${entry.amountDealt != null ? ` - ${entry.amountDealt} damage` : ''}${entry.koTriggered ? ' - KO!' : ''}`;
     case 'special':
-      return `${name(entry.characterId)} used their SPECIAL: ${actionLabel(entry.actionId)}${entry.targetId ? ` on ${name(entry.targetId)}` : ''}`;
+      return `${name(entry.characterId)} used their SPECIAL: ${actionLabel(entry.actionId)}${entry.targetId ? ` on ${name(entry.targetId)}` : ''}${entry.blocked ? ' - blocked by Clean Slate!' : ''}`;
     case 'setup':
       return `${name(entry.characterId)} used ${actionLabel(entry.actionId)}${entry.chargeCount ? ` (${entry.chargeCount}/2)` : ''}`;
     case 'hidden-mark':
       return `${name(entry.characterId)} placed a Hidden Mark`;
     case 'curse':
-      return `${name(entry.characterId)} cast Curse Strike on ${name(entry.targetId)}`;
+      return `${name(entry.characterId)} cast Curse Strike on ${name(entry.targetId)}${entry.blocked ? ' - blocked by Clean Slate!' : ''}`;
     case 'curse-mirror':
       return `Curse mirrors ${entry.amount} damage to ${name(entry.toCharacterId)}${entry.koTriggered ? ' - KO!' : ''}`;
     case 'ashka-heal':
@@ -1476,6 +1493,12 @@ function describeLogEntry(entry) {
       return `${name(entry.targetCharacterId)}'s Silence Lock wears off`;
     case 'mirror-reflect':
       return `${name(entry.fromCharacterId)}'s Mirror Reflect deals ${entry.amount} damage back to ${name(entry.toCharacterId)}${entry.koTriggered ? ' - KO!' : ''}`;
+    case 'everbloom-tick':
+      return `${name(entry.characterId)}'s Everbloom heals +${entry.healed}`;
+    case 'clean-slate-trigger':
+      return `${name(entry.characterId)}'s Clean Slate activates - cleansed and protected!`;
+    case 'clean-slate-immunity-end':
+      return `${name(entry.characterId)}'s Clean Slate protection fades`;
     case 'passive':
       return entry.text;
     default:

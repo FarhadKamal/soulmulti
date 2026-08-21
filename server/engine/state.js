@@ -82,6 +82,55 @@ function baseSpecialFor(id) {
         silenceTargets: new Map(),
         usedSpells: new Set(),
       };
+    case 'marin':
+      // discoveredSpells/arcaneStudyPending/arcaneStudyOnCooldown: identical
+      // shape/reasoning to Rowan's own fields above (same Arcane Study
+      // mechanic, shared chassis). Unlike Rowan's kit (situational tools he
+      // chooses WHEN to deploy), every one of Marin's 5 spells auto-
+      // activates the instant it's discovered - no separate cast action
+      // exists for any of them (see marin.js: only wandStrike/arcaneStudy
+      // appear in her actions map).
+      // everbloomActive: true forever once discovered - checked each of her
+      // own onTurnStart calls (marin.js) to heal +1.
+      // veilChargesRemaining: starts at 3 the instant Threefold Veil is
+      // discovered, decremented by 1 each time it actually blocks a hit
+      // (damagePipeline.js's applyDamage, same dodge-shape as Akyros's own
+      // dodge check but a flat shared pool instead of per-attacker) - once
+      // it hits 0 the passive is simply spent, no recharge.
+      // cleanSlateArmed: true the instant discovered, flips to false the
+      // moment it actually fires (reactive one-time trigger - see
+      // tryTriggerCleanSlate/isImmuneToNegativeStatus in damagePipeline.js,
+      // called from each of the 5 status-application ability files).
+      // Distinguishes "discovered, still waiting to trigger" from "already
+      // spent."
+      // cleanSlateImmuneTurnsRemaining: set to 3 the instant it fires,
+      // decremented on each of her own turn-starts (marin.js's
+      // onTurnStart), same victim-turn-tick shape as Rowan's silence
+      // countdown but self-targeted so no cross-character scan is needed.
+      // piercingWandActive/wandMasteryActive: true forever once discovered,
+      // both checked directly inside wandStrike's own execute (marin.js) to
+      // fold their effects (ignoresShield / +1 damage) into every future
+      // Wand Strike - confirmed stacking (both apply together with no
+      // conflict), and the button stays labeled "Wand Strike" regardless of
+      // which/how many of these are unlocked.
+      // everbloomFirstTickDone: flips true after Everbloom's very first
+      // heal tick - lets the client (main.js) play her spoken voice line
+      // only once (the moment it starts) while the short sound effect
+      // itself still plays on every recurring tick for the rest of the
+      // match, same reasoning as not wanting a full sentence repeating
+      // every single turn.
+      return {
+        discoveredSpells: new Set(),
+        arcaneStudyPending: false,
+        arcaneStudyOnCooldown: false,
+        everbloomActive: false,
+        everbloomFirstTickDone: false,
+        veilChargesRemaining: 0,
+        cleanSlateArmed: false,
+        cleanSlateImmuneTurnsRemaining: 0,
+        piercingWandActive: false,
+        wandMasteryActive: false,
+      };
     default:
       return {};
   }

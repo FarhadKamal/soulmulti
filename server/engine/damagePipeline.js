@@ -17,6 +17,75 @@ export function isSilenced(character, game) {
   );
 }
 
+// True if character currently has any of the 5 genuine debuff-style
+// negative statuses another character has placed on them (Athena's curse,
+// Chronox's freeze, Akyros's Hidden Mark, Rowan's Poison Cloud, Rowan's
+// Silence Lock) - deliberately excludes Blade's streak-lock and Kaelis's
+// grudge count, since both are the ATTACKER's own tracked resource rather
+// than a status placed ON the victim (same ruling already established for
+// what Rowan's Purify treats as "urgent" vs. what it merely sweeps up as a
+// side effect - see rowanHasUrgentNegativeStatus in botPlayer.js). Used by
+// Marin's Clean Slate: both its reactive trigger condition (fires the
+// first time this becomes true) and, while her immunity window is active,
+// to block these 5 specific status-applications from landing on her at all
+// (see the isImmuneToNegativeStatus carve-outs in each ability file below).
+export function hasNegativeStatus(character, game) {
+  return Object.values(game.characters).some((c) => {
+    if (c.id === character.id) return false;
+    const s = c.special;
+    if (!s) return false;
+    if (s.curseTargetCharacterId === character.id) return true;
+    if (s.freezeActive && s.freezeTargetId === character.id) return true;
+    if (s.marks?.has(character.id)) return true;
+    if (s.poisonTargets?.has(character.id)) return true;
+    if (s.silenceTargets?.has(character.id)) return true;
+    return false;
+  });
+}
+
+// True while Marin's Clean Slate immunity window is actively blocking new
+// negative statuses from landing on her (see marin.js's onTurnStart for the
+// countdown). Checked at each of the 5 status-application sites below
+// (curseStrike, timeFreeze, hiddenMark, poisonCloud, silenceLock) - the
+// underlying ACTION/damage still resolves normally, only the status side
+// effect is suppressed, so she isn't made untargetable by these abilities
+// entirely (a curse/freeze/mark/poison cast into her during the window
+// still needs to be a legal move that simply has no lasting effect, not an
+// illegal one - same reasoning as why this lives inside each ability's own
+// execute rather than as a blanket isValidTarget rejection).
+export function isImmuneToNegativeStatus(character, game) {
+  return character.id === 'marin' && character.special?.cleanSlateImmuneTurnsRemaining > 0;
+}
+
+// Called at each of the 5 status-application sites (curseStrike, timeFreeze,
+// hiddenMark, poisonCloud, silenceLock) right before the status would be
+// written onto the target. Returns true if Marin's Clean Slate consumed
+// this attempt - the caller must then skip applying its own status (the
+// underlying damage/action itself, if any, still resolves normally, only
+// the status side effect is suppressed). Two separate cases handled here:
+// - Armed and dormant (cleanSlateArmed, first negative status ever): fires
+//   for the first time, consuming the arm and starting the 3-turn immunity
+//   window - this attempt itself never lands, since Clean Slate reacts
+//   fast enough to cleanse "as it happens."
+// - Already fired and immune (cleanSlateImmuneTurnsRemaining > 0): simply
+//   blocks every further attempt for the rest of the window, same as
+//   isImmuneToNegativeStatus's own check.
+// A character who is neither armed nor immune (spell not yet discovered,
+// or the one-time trigger already spent and its window expired) returns
+// false here every time, letting statuses land normally - matching every
+// other character's baseline behavior.
+export function tryTriggerCleanSlate(target, game, log) {
+  if (target.id !== 'marin') return false;
+  if (isImmuneToNegativeStatus(target, game)) return true;
+  if (target.special?.cleanSlateArmed) {
+    target.special.cleanSlateArmed = false;
+    target.special.cleanSlateImmuneTurnsRemaining = 3;
+    log.push({ type: 'clean-slate-trigger', characterId: target.id });
+    return true;
+  }
+  return false;
+}
+
 export function applyDamage(game, log, {
   sourceCharacterId,
   targetCharacterId,
@@ -56,6 +125,19 @@ export function applyDamage(game, log, {
       log.push({ type: 'dodge', attackerId: sourceCharacterId, targetCharacterId });
       return result;
     }
+  }
+
+  // Marin's Threefold Veil: a flat pool of exactly 3 dodge charges against
+  // ANY hit from anyone, unlike Akyros's dodge (tracked per-attacker,
+  // dodges each unique attacker once) - here every consecutive hit consumes
+  // the shared pool regardless of who's attacking, until all 3 are spent
+  // (no recharge). Same !isMirror exclusion as Akyros above - a mirrored
+  // hit (Athena's curse-mirror) always bypasses dodge.
+  if (target.id === 'marin' && !isMirror && target.special.veilChargesRemaining > 0) {
+    target.special.veilChargesRemaining -= 1;
+    result.dodged = true;
+    log.push({ type: 'dodge', attackerId: sourceCharacterId, targetCharacterId });
+    return result;
   }
 
   if (!ignoresShield && target.shield > 0) {
