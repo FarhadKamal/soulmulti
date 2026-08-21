@@ -568,6 +568,20 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
     eyeburst.innerHTML = '<span class="eye-burst-ring"></span><span class="eye-burst-icon">👁</span>';
     tile.appendChild(eyeburst);
   }
+  if (effects.has('cursesnap') && !character.isKO) {
+    // Athena's curse-mirror trigger: a small eye flashes open at the
+    // impact point and one thin tendril whips in and instantly recoils -
+    // fast and sharp, distinct from the cast's own slow curling
+    // eyeburst+tendrils ("taking hold" vs. "struck back at you").
+    const snap = document.createElement('div');
+    snap.className = 'curse-snap-fx';
+    snap.innerHTML = `
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none">
+        <path class="curse-snap-whip" d="M 50,-5 Q 55,30 50,50 Q 45,70 50,105" />
+      </svg>
+      <span class="curse-snap-eye">👁</span>`;
+    tile.appendChild(snap);
+  }
   if (effects.has('choke') && !character.isKO) {
     // Melyssa's Self Choke: a constricting violet ring closes in around the
     // puppet's own portrait and snaps shut - a contracting loop, distinct

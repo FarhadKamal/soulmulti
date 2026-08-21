@@ -32,6 +32,7 @@ const EFFECT_DURATION_MS = {
   smoke: 1600,
   revive: 1300,
   divine: 1100,
+  cursesnap: 500,
 };
 
 // How long the mirror-shard counter-hit effect waits before it even starts,
@@ -196,6 +197,14 @@ export function handleLogEntryForEffects(entry, game) {
   // result.mirrorResult.
   if (entry.type === 'curse-mirror') {
     applyHitFlash(entry.toCharacterId, entry.amount);
+    // "Eye snap-back": distinct from the cast's own eyeburst+tendrils
+    // (slow curl, "taking hold") - fast and sharp instead, reading as "the
+    // curse struck back at you" rather than "you're now cursed." Skipped
+    // on a KO the same way every other impact effect here is - no point
+    // animating a hit on a tile about to render as knocked out.
+    if (!isKO(entry.toCharacterId)) {
+      addEffect(entry.toCharacterId, 'cursesnap', EFFECT_DURATION_MS.cursesnap);
+    }
     return;
   }
 

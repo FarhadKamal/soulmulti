@@ -537,6 +537,47 @@ input {
   100% { opacity: 0; scale: 0.85; }
 }
 
+/* Athena's curse-mirror trigger: a single thin tendril whips in from the
+   top edge and instantly recoils back out (draws in fast, then reverses -
+   not a hold-and-fade like the cast's own tendrils), paired with a quick
+   eye flash at the point of impact. Sharp and momentary, distinct from the
+   cast's slower "taking hold" curl. Same purple palette throughout. */
+.curse-snap-fx {
+  position: absolute; inset: 0; pointer-events: none; z-index: 4;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden; border-radius: inherit;
+}
+.curse-snap-fx svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.curse-snap-whip {
+  fill: none; stroke: #a855f7; stroke-width: 2.2;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 4px rgba(155, 77, 255, 0.95));
+  stroke-dasharray: 110; stroke-dashoffset: 110;
+  opacity: 0;
+  animation: tile-curse-whip-snap 0.42s cubic-bezier(0.3, 0, 0.2, 1) forwards;
+}
+@keyframes tile-curse-whip-snap {
+  0% { opacity: 0; stroke-dashoffset: 110; }
+  12% { opacity: 1; }
+  45% { stroke-dashoffset: 0; opacity: 1; }
+  70% { stroke-dashoffset: 0; opacity: 1; }
+  100% { stroke-dashoffset: -110; opacity: 0; }
+}
+.curse-snap-eye {
+  position: relative; font-size: 1.5rem;
+  color: #d9a8ff;
+  text-shadow: 0 0 12px rgba(155, 77, 255, 0.95), 0 0 4px rgba(0, 0, 0, 0.6);
+  opacity: 0;
+  animation: tile-curse-snap-eye 0.5s cubic-bezier(0.3, 0, 0.3, 1.2) forwards;
+}
+@keyframes tile-curse-snap-eye {
+  0% { opacity: 0; scale: 0.3; }
+  25% { opacity: 1; scale: 1.15; }
+  45% { scale: 0.95; }
+  75% { opacity: 1; }
+  100% { opacity: 0; scale: 0.8; }
+}
+
 /* Melyssa's Self Choke, victim (puppet) side: a constricting violet ring
    that starts wide and contracts inward around the portrait before
    snapping tight and fading - a genuinely new contracting-loop motion,
