@@ -1004,6 +1004,25 @@ function handleFillBot(room, sessionId, { seatIndex }) {
   broadcastLobby(room);
 }
 
+// Same as handleFillBot, but the owner picks the bot's character(s)
+// themselves instead of getting a random draw - for a 2p seat (picksPerSeat
+// 2) this fills only the FIRST slot with the chosen character and still
+// random-fills any remaining slot(s), same partial-random behavior
+// fillSeatWithBot already has for an owner who only picked some of their
+// own characters before hitting a "fill the rest" flow elsewhere.
+function handleFillBotWithCharacter(room, sessionId, { seatIndex, characterId }) {
+  if (sessionId !== room.ownerId) return;
+  const seat = room.seats[seatIndex];
+  if (!seat || seat.kind !== 'empty') return;
+  if (!CHARACTER_IDS.includes(characterId)) return;
+  if (!availableCharacterIds(room).includes(characterId)) return; // taken elsewhere
+  seat.kind = 'bot';
+  seat.name = seat.name || 'Bot';
+  seat.characterIds.push(characterId);
+  fillSeatWithBot(room, seat); // tops up any remaining picksPerSeat slots randomly
+  broadcastLobby(room);
+}
+
 // Owner can undo a bot-fill back to an empty seat (e.g. they meant to
 // leave it open for a friend to join) - only while still in the lobby, a
 // bot seat mid/post-match can't un-fill since it's already playing a role
@@ -1646,6 +1665,7 @@ wss.on('connection', (ws) => {
       case 'pick-character': return handlePickCharacter(room, sessionId, payload);
       case 'unpick-character': return handleUnpickCharacter(room, sessionId, payload);
       case 'fill-bot': return handleFillBot(room, sessionId, payload);
+      case 'fill-bot-with-character': return handleFillBotWithCharacter(room, sessionId, payload);
       case 'remove-bot': return handleRemoveBot(room, sessionId, payload);
       case 'kick-player': return handleKickPlayer(room, sessionId, payload);
       case 'reorder-seats': return handleReorderSeats(room, sessionId, payload);

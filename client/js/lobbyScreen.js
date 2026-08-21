@@ -20,6 +20,11 @@ let aboutOpen = false;
 // PREVIOUS room's seat list can never linger into a new one.
 let confirmingKickSeatIndex = null;
 
+// Which seat index (if any) has its "choose the bot's character" grid
+// expanded - same module-state/reset-on-room-change reasoning as
+// confirmingKickSeatIndex above.
+let choosingBotSeatIndex = null;
+
 // Renders the pre-match lobby: room type choice -> create/join -> seat
 // list + character picking -> start. `room` is null until a create-room or
 // join-room response/lobby-update has arrived at least once.
@@ -333,6 +338,7 @@ function renderRoomLobby(room, topControls, rerender) {
   if (confirmingKickRoomCode !== room.code) {
     confirmingKickRoomCode = room.code;
     confirmingKickSeatIndex = null;
+    choosingBotSeatIndex = null;
   }
   const wrap = document.createElement('div');
   wrap.className = 'room-lobby';
@@ -446,6 +452,18 @@ function renderRoomLobby(room, topControls, rerender) {
       botBtn.textContent = 'Fill with Bot';
       botBtn.onclick = () => send('fill-bot', { seatIndex: seat.index });
       actions.appendChild(botBtn);
+      // "Choose..." toggles an inline character grid for THIS seat (same
+      // no-popup, inline-expand convention as the kick confirmation above)
+      // rather than a random draw - picking one sends fill-bot-with-character
+      // and collapses the picker; the random "Fill with Bot" button above
+      // stays available for whoever doesn't care which character it gets.
+      const chooseBtn = document.createElement('button');
+      chooseBtn.textContent = choosingBotSeatIndex === seat.index ? 'Choose... ▴' : 'Choose... ▾';
+      chooseBtn.onclick = () => {
+        choosingBotSeatIndex = choosingBotSeatIndex === seat.index ? null : seat.index;
+        rerender();
+      };
+      actions.appendChild(chooseBtn);
     }
     if (seat.kind === 'bot' && room.youAreOwner) {
       const removeBtn = document.createElement('button');
@@ -490,6 +508,24 @@ function renderRoomLobby(room, topControls, rerender) {
     row.appendChild(actions);
 
     seatList.appendChild(row);
+
+    if (seat.kind === 'empty' && room.youAreOwner && choosingBotSeatIndex === seat.index) {
+      const chooseGrid = document.createElement('div');
+      chooseGrid.className = 'character-grid bot-choose-grid';
+      Object.values(CHARACTERS).forEach((def) => {
+        const available = room.availableCharacterIds.includes(def.id);
+        const btn = document.createElement('button');
+        btn.textContent = def.name;
+        btn.disabled = !available;
+        btn.style.borderColor = def.color;
+        btn.onclick = () => {
+          send('fill-bot-with-character', { seatIndex: seat.index, characterId: def.id });
+          choosingBotSeatIndex = null;
+        };
+        chooseGrid.appendChild(btn);
+      });
+      seatList.appendChild(chooseGrid);
+    }
   });
   wrap.appendChild(seatList);
 
