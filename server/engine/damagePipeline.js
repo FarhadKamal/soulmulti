@@ -27,8 +27,10 @@ export function isSilenced(character, game) {
 // side effect - see rowanHasUrgentNegativeStatus in botPlayer.js). Used by
 // Marin's Clean Slate: both its reactive trigger condition (fires the
 // first time this becomes true) and, while her immunity window is active,
-// to block these 5 specific status-applications from landing on her at all
+// to block these 4 specific status-applications from landing on her at all
 // (see the isImmuneToNegativeStatus carve-outs in each ability file below).
+// Deliberately does NOT cover Poison Cloud - confirmed scope decision, she's
+// still vulnerable to Rowan's poison same as anyone else.
 export function hasNegativeStatus(character, game) {
   return Object.values(game.characters).some((c) => {
     if (c.id === character.id) return false;
@@ -37,7 +39,6 @@ export function hasNegativeStatus(character, game) {
     if (s.curseTargetCharacterId === character.id) return true;
     if (s.freezeActive && s.freezeTargetId === character.id) return true;
     if (s.marks?.has(character.id)) return true;
-    if (s.poisonTargets?.has(character.id)) return true;
     if (s.silenceTargets?.has(character.id)) return true;
     return false;
   });
@@ -45,20 +46,21 @@ export function hasNegativeStatus(character, game) {
 
 // True while Marin's Clean Slate immunity window is actively blocking new
 // negative statuses from landing on her (see marin.js's onTurnStart for the
-// countdown). Checked at each of the 5 status-application sites below
-// (curseStrike, timeFreeze, hiddenMark, poisonCloud, silenceLock) - the
-// underlying ACTION/damage still resolves normally, only the status side
-// effect is suppressed, so she isn't made untargetable by these abilities
-// entirely (a curse/freeze/mark/poison cast into her during the window
-// still needs to be a legal move that simply has no lasting effect, not an
-// illegal one - same reasoning as why this lives inside each ability's own
-// execute rather than as a blanket isValidTarget rejection).
+// countdown). Checked at each of the 4 status-application sites below
+// (curseStrike, timeFreeze, hiddenMark, silenceLock - NOT poisonCloud, a
+// confirmed scope decision) - the underlying ACTION/damage still resolves
+// normally, only the status side effect is suppressed, so she isn't made
+// untargetable by these abilities entirely (a curse/freeze/mark cast into
+// her during the window still needs to be a legal move that simply has no
+// lasting effect, not an illegal one - same reasoning as why this lives
+// inside each ability's own execute rather than as a blanket isValidTarget
+// rejection).
 export function isImmuneToNegativeStatus(character, game) {
   return character.id === 'marin' && character.special?.cleanSlateImmuneTurnsRemaining > 0;
 }
 
-// Called at each of the 5 status-application sites (curseStrike, timeFreeze,
-// hiddenMark, poisonCloud, silenceLock) right before the status would be
+// Called at each of the 4 status-application sites (curseStrike, timeFreeze,
+// hiddenMark, silenceLock) right before the status would be
 // written onto the target. Returns true if Marin's Clean Slate consumed
 // this attempt - the caller must then skip applying its own status (the
 // underlying damage/action itself, if any, still resolves normally, only

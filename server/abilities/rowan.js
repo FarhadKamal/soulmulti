@@ -66,14 +66,11 @@ export const actions = {
       && !character.special.usedSpells.has('poisonCloud'),
     execute(character, targetId, game, log) {
       character.special.usedSpells.add('poisonCloud');
-      const poisonTarget = game.characters[targetId];
-      // Marin's Clean Slate: consumes/blocks the poison itself - the cast
-      // still spends Rowan's one-time use of this spell, it just never
-      // actually starts ticking on her.
-      if (tryTriggerCleanSlate(poisonTarget, game, log)) {
-        log.push({ type: 'special', characterId: character.id, actionId: 'poisonCloud', targetId, blocked: true });
-        return {};
-      }
+      // Marin's Clean Slate deliberately does NOT cover Poison Cloud -
+      // confirmed scope change: she's still vulnerable to it, same as
+      // anyone else. (Clean Slate still covers Curse Strike, Time Freeze,
+      // Hidden Mark, and Silence Lock - see hasNegativeStatus/
+      // tryTriggerCleanSlate in damagePipeline.js.)
       character.special.poisonTargets.add(targetId);
       // Poison Cloud deals no direct damage on cast (applyDamage is never
       // called here), so Kaelis's grudge counter - which normally increments
