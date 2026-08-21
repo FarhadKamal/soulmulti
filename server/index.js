@@ -830,9 +830,15 @@ function handleJoinRoom(ws, sessionId, { code, name }) {
 // (matches BOT_ACTION_DELAY_MS's own "give a human a beat to read this"
 // reasoning) AND to let the winner's victory voice line finish playing
 // (client-side, playVictoryVoice - see main.js's game-over handling)
-// before the board resets out from under them. Bumped from an initial 6s,
-// which cut voice lines off mid-line.
-const BOT_SHOW_RESTART_DELAY_MS = 12000;
+// before the board resets out from under them. Must also clear the
+// client's own bots4-specific freeze+victory reveal (2.5s + 6s = 8.5s,
+// see main.js's startGameOverSequence) before the banner even appears, on
+// top of actual time to read it - this delay is measured from when
+// game-over first arrives, not from when the banner shows. Bumped from an
+// initial 6s (then 12s), which cut the reveal/voice lines short and reset
+// the board almost as soon as the banner appeared. Reported directly: the
+// auto-looping spectacle cut to the win screen and reset too fast to enjoy.
+const BOT_SHOW_RESTART_DELAY_MS = 20000;
 
 // "Watch 4 bots play" - a pure spectacle room with no human seat at all.
 // The connecting session is added to room.spectatorIds (never a seat - see

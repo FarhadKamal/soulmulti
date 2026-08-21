@@ -93,11 +93,24 @@ let gameOverSequenceStarted = false;
 // on the live board first (so the winning action's own flash/shake/
 // portrait effect is actually seen, matching actionEffects.js's own
 // 1600ms-ish timers rather than being cut away from instantly), then show
-// victory art, then finally the Match Over banner. ~1.2s + ~3.8s, same
-// total as the main game's own two-stage delay.
+// victory art, then finally the Match Over banner. ~1.2s + ~3.8s for a
+// normal human match, same total as the main game's own two-stage delay.
+// A bots4 spectacle room gets a longer reveal on both stages - nobody's
+// waiting to take their next turn there, so there's no cost to lingering
+// longer on the finishing hit and the victory art before cutting to the
+// banner (which itself also gets a longer stay via BOT_SHOW_RESTART_DELAY_MS
+// server-side - see index.js). Reported directly: the auto-looping bot
+// show cut to the win screen too fast to actually enjoy the ending.
+const GAME_OVER_FREEZE_MS = 1200;
+const GAME_OVER_VICTORY_MS = 3800;
+const BOT_SHOW_GAME_OVER_FREEZE_MS = 2500;
+const BOT_SHOW_GAME_OVER_VICTORY_MS = 6000;
 function startGameOverSequence(game) {
   if (gameOverSequenceStarted) return;
   gameOverSequenceStarted = true;
+  const isBotShow = state.room?.roomType === 'bots4';
+  const freezeMs = isBotShow ? BOT_SHOW_GAME_OVER_FREEZE_MS : GAME_OVER_FREEZE_MS;
+  const victoryMs = isBotShow ? BOT_SHOW_GAME_OVER_VICTORY_MS : GAME_OVER_VICTORY_MS;
   state.gameOverStage = 'freeze';
   setTimeout(() => {
     if (state.screen !== 'battle') return; // torn down (left the room) mid-sequence
@@ -128,8 +141,8 @@ function startGameOverSequence(game) {
         .find(hasVoice);
       if (!voiceCharacterId || !playVictoryVoice(voiceCharacterId)) playVictory();
       rerender();
-    }, 3800);
-  }, 1200);
+    }, victoryMs);
+  }, freezeMs);
 }
 
 function processNewLogEntries(game) {
