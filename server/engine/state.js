@@ -3,7 +3,11 @@ const MAX_HEARTS = 7;
 function baseSpecialFor(id) {
   switch (id) {
     case 'chronox':
-      return { freezeActive: false, freezeTargetId: null, freezeSkipsApplied: 0 };
+      // hasActedOnce: gates Time Freeze off his very first turn (see
+      // chronox.js's timeFreeze.isLegal) - same pattern as Velorya's own
+      // hasActedOnce for Moonstep. Set true inside cyclonePunch/timeFreeze's
+      // own execute, same as any real action counting as "he's acted."
+      return { freezeActive: false, freezeTargetId: null, freezeSkipsApplied: 0, hasActedOnce: false };
     case 'tharox':
       return { hasCharge: false };
     case 'zerathys':

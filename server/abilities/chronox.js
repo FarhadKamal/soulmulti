@@ -37,6 +37,7 @@ export const actions = {
     needsTarget: true,
     isLegal: () => true,
     execute(character, targetId, game, log) {
+      character.special.hasActedOnce = true;
       const flip = flipCoin();
       const amount = flip === 'heads' ? 2 : 1;
       const result = applyDamage(game, log, {
@@ -52,9 +53,13 @@ export const actions = {
     label: 'Time Freeze',
     needsTarget: true,
     special: true,
-    isLegal: (character) => !character.usedSpecial,
+    // Not available on his very first turn - user-requested delay so he
+    // can't open the match with an immediate freeze before anyone else has
+    // even had a turn. Same hasActedOnce pattern as Velorya's Moonstep.
+    isLegal: (character) => !character.usedSpecial && character.special.hasActedOnce,
     execute(character, targetId, game, log) {
       character.usedSpecial = true;
+      character.special.hasActedOnce = true;
       const target = game.characters[targetId];
       // Marin's Clean Slate: consumes/blocks the freeze itself - the cast
       // still spends his special, it just never actually freezes her.
