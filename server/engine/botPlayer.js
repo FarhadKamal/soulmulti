@@ -874,6 +874,28 @@ function shouldReserveForChronox(game, character) {
   return !alreadyPoisoned || !alreadySilenced;
 }
 
+// True whenever it's worth holding Poison Cloud in reserve for Marin
+// specifically, rather than spending it on whoever's convenient right now.
+// Her kit is essentially all permanent upside with no downside anywhere
+// (Everbloom/Threefold Veil/Piercing Wand/Wand Mastery all auto-activate
+// for free, Clean Slate cleanses most status effects at no cost) - a
+// straight 1v1 against her is genuinely tough for Rowan since Wand Strike
+// alone rarely outraces her free sustain/defense. Poison Cloud is his one
+// reliable answer that Clean Slate can no longer touch (confirmed scope
+// decision - Clean Slate does not cover Poison Cloud), so it's worth
+// saving specifically for her rather than burning it on a lesser threat.
+// Same reserve shape as Chronox above: only applies while a THIRD living
+// enemy still exists to soak it instead - once it's already a Rowan-vs-
+// Marin 1v1, there's nothing left to wait for, so normal priority takes
+// over. Stands down once she's already poisoned or dead.
+function shouldReserveForMarin(game, character) {
+  const marin = game.characters['marin'];
+  if (!marin || marin.isKO || marin.untargetable) return false;
+  const others = livingEnemies(game, character).filter((c) => c.id !== 'marin');
+  if (others.length === 0) return false; // already the 1v1 - nothing left to wait for
+  return !character.special.poisonTargets.has('marin');
+}
+
 // True whenever a hurt, live Zerathys still has Soul Swap banked
 // (!usedSpecial) while Rowan himself is comfortably healthy - the exact
 // setup where Soul Swap is most dangerous to let sit: it trades hearts
@@ -926,6 +948,7 @@ function rowanFacingHealthyKaelis(game, character) {
 function chooseRowanMove(character, game, usable) {
   const byId = Object.fromEntries(usable.map((a) => [a.actionId, a]));
   const reserveForChronox = shouldReserveForChronox(game, character);
+  const reserveForMarin = shouldReserveForMarin(game, character);
   // Purify: cast immediately if he's carrying anything ACTIVELY harmful
   // (poison, live silence/freeze, Athena's curse) regardless of health, or
   // if he's simply badly hurt (heal-to-full is worth it on its own at that
@@ -1002,6 +1025,10 @@ function chooseRowanMove(character, game, usable) {
     if (reserveForChronox) {
       if (targets.includes('chronox')) {
         return { actionId: 'poisonCloud', targetId: 'chronox' };
+      }
+    } else if (reserveForMarin) {
+      if (targets.includes('marin')) {
+        return { actionId: 'poisonCloud', targetId: 'marin' };
       }
     } else if (targets.includes('kaelis') && rowanFacingHealthyKaelis(game, character)) {
       return { actionId: 'poisonCloud', targetId: 'kaelis' };

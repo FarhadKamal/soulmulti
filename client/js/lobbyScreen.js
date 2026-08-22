@@ -144,7 +144,7 @@ function renderAboutPanel() {
   panel.className = 'about-panel';
   const text = document.createElement('p');
   text.className = 'about-text';
-  text.textContent = 'Somewhere between time, shadow, and thunder, nine souls were born — not from myth, but from restless nights of imagination. Soul Clash was never meant to be just a game. It began as a question: what if the forces we can\'t control — time, chaos, fate — could be given a face, a name, a fight? Created in silence, released into the world by one mind, this is only the beginning of the Clash.';
+  text.textContent = 'Somewhere between time, shadow, and thunder, souls were born — not from myth, but from restless nights of imagination. Soul Clash was never meant to be just a game. It began as a question: what if the forces we can\'t control — time, chaos, fate — could be given a face, a name, a fight? Created in silence, released into the world by one mind, this is only the beginning of the Clash.';
   panel.appendChild(text);
   const credit = document.createElement('div');
   credit.className = 'about-credit';
