@@ -17,18 +17,18 @@ export function isSilenced(character, game) {
   );
 }
 
-// True if character currently has any of the 5 genuine debuff-style
+// True if character currently has any of the 4 genuine debuff-style
 // negative statuses another character has placed on them (Athena's curse,
-// Chronox's freeze, Akyros's Hidden Mark, Rowan's Poison Cloud, Rowan's
-// Silence Lock) - deliberately excludes Blade's streak-lock and Kaelis's
-// grudge count, since both are the ATTACKER's own tracked resource rather
-// than a status placed ON the victim (same ruling already established for
-// what Rowan's Purify treats as "urgent" vs. what it merely sweeps up as a
-// side effect - see rowanHasUrgentNegativeStatus in botPlayer.js). Used by
-// Marin's Clean Slate: both its reactive trigger condition (fires the
-// first time this becomes true) and, while her immunity window is active,
-// to block these 4 specific status-applications from landing on her at all
-// (see the isImmuneToNegativeStatus carve-outs in each ability file below).
+// Chronox's freeze, Akyros's Hidden Mark, Rowan's Silence Lock) -
+// deliberately excludes Blade's streak-lock and Kaelis's grudge count,
+// since both are the ATTACKER's own tracked resource rather than a status
+// placed ON the victim (same ruling already established for what Rowan's
+// Purify treats as "urgent" vs. what it merely sweeps up as a side effect -
+// see rowanHasUrgentNegativeStatus in botPlayer.js). Used by Marin's Clean
+// Slate: both its reactive trigger condition (fires the first time this
+// becomes true) and, while her immunity window is active, to block these 4
+// specific status-applications from landing on her at all (see the
+// isImmuneToNegativeStatus carve-outs in each ability file below).
 // Deliberately does NOT cover Poison Cloud - confirmed scope decision, she's
 // still vulnerable to Rowan's poison same as anyone else.
 export function hasNegativeStatus(character, game) {
@@ -42,6 +42,36 @@ export function hasNegativeStatus(character, game) {
     if (s.silenceTargets?.has(character.id)) return true;
     return false;
   });
+}
+
+// Actually clears every one of the 4 covered statuses currently active on
+// `character`, wherever they live on the CASTER's own .special (matches the
+// scan shape of hasNegativeStatus above). Used by Clean Slate's discovery-
+// time cleanse (marin.js's onTurnStart) - confirmed bug: Clean Slate's
+// reactive trigger only ever intercepted a NEW status-application attempt,
+// never checked or cleared a status that was already active on her from
+// BEFORE Clean Slate was even discovered, so an old curse cast several
+// turns earlier stayed silently active and eventually mirrored damage back
+// on her long after "cleansed and protected!" had already logged. Mirrors
+// Rowan's own Purify cleanse logic (per-status clearing pattern) but scoped
+// to just the 4 statuses Clean Slate actually covers, not every status in
+// the game.
+export function clearNegativeStatuses(character, game, log) {
+  for (const c of Object.values(game.characters)) {
+    if (c.id === character.id) continue;
+    const s = c.special;
+    if (!s) continue;
+    if (s.curseTargetCharacterId === character.id) s.curseTargetCharacterId = null;
+    if (s.freezeActive && s.freezeTargetId === character.id) {
+      s.freezeActive = false;
+      s.freezeTargetId = null;
+      character.skipNextTurn = false;
+      log.push({ type: 'freeze-end', targetCharacterId: character.id });
+    }
+    if (s.marks?.has(character.id)) s.marks.delete(character.id);
+    if (s.revealedMarks?.has(character.id)) s.revealedMarks.delete(character.id);
+    if (s.silenceTargets?.has(character.id)) s.silenceTargets.delete(character.id);
+  }
 }
 
 // True while Marin's Clean Slate immunity window is actively blocking new

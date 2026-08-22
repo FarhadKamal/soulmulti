@@ -1,4 +1,4 @@
-import { applyDamage, applyHeal } from '../engine/damagePipeline.js';
+import { applyDamage, applyHeal, hasNegativeStatus, clearNegativeStatuses } from '../engine/damagePipeline.js';
 
 // The full discoverable spell pool - Arcane Study draws one of whichever
 // aren't in special.discoveredSpells yet, so each ever appears at most once
@@ -21,6 +21,15 @@ function pickUndiscoveredSpell(character) {
 // revealed, and runs Everbloom's own recurring heal + Clean Slate's
 // immunity countdown.
 export function onTurnStart(character, game, log) {
+  // Set true below if Clean Slate's discovery-time retroactive cleanse
+  // just started the immunity window THIS SAME call - the countdown block
+  // further down runs unconditionally every onTurnStart, so without this
+  // guard a freshly-set 3-turn window would immediately get decremented to
+  // 2 in the same call it was set, one turn short of every other trigger
+  // path (a real status-cast-triggered cleanse starts on Marin's turn
+  // BEFORE the window counts down, since that trigger fires from inside a
+  // DIFFERENT character's own turn, not hers).
+  let immunityJustStartedThisCall = false;
   if (character.special.arcaneStudyPending) {
     const spellId = pickUndiscoveredSpell(character);
     character.special.arcaneStudyPending = false;
@@ -31,8 +40,25 @@ export function onTurnStart(character, game, log) {
       // cast action exists for any of them, unlike Rowan's kit.
       if (spellId === 'everbloom') character.special.everbloomActive = true;
       else if (spellId === 'threefoldVeil') character.special.veilChargesRemaining = 3;
-      else if (spellId === 'cleanSlate') character.special.cleanSlateArmed = true;
-      else if (spellId === 'piercingWand') character.special.piercingWandActive = true;
+      else if (spellId === 'cleanSlate') {
+        // Confirmed bug fix: Clean Slate's reactive trigger only ever
+        // caught a NEW status attempt going forward - it never checked
+        // whether she was already carrying one of the 4 covered statuses
+        // from BEFORE this exact discovery moment. If she is, cleanse it
+        // immediately right here and go straight to the immunity window
+        // (same as a real trigger) instead of leaving cleanSlateArmed true
+        // and waiting for a future attempt that may never come - a stale
+        // curse/freeze/mark/silence from turns ago would otherwise sit
+        // there completely invisible to Clean Slate forever.
+        if (hasNegativeStatus(character, game)) {
+          clearNegativeStatuses(character, game, log);
+          character.special.cleanSlateImmuneTurnsRemaining = 3;
+          immunityJustStartedThisCall = true;
+          log.push({ type: 'clean-slate-trigger', characterId: character.id });
+        } else {
+          character.special.cleanSlateArmed = true;
+        }
+      } else if (spellId === 'piercingWand') character.special.piercingWandActive = true;
       else if (spellId === 'wandMastery') character.special.wandMasteryActive = true;
     }
   }
@@ -68,7 +94,7 @@ export function onTurnStart(character, game, log) {
   // actually fired (cleanSlateArmed already false by then) - same
   // self-targeted countdown shape as Everbloom above, not a cross-character
   // scan like Rowan's silence tick since only she can ever be the target.
-  if (character.special.cleanSlateImmuneTurnsRemaining > 0) {
+  if (character.special.cleanSlateImmuneTurnsRemaining > 0 && !immunityJustStartedThisCall) {
     character.special.cleanSlateImmuneTurnsRemaining -= 1;
     if (character.special.cleanSlateImmuneTurnsRemaining === 0) {
       log.push({ type: 'clean-slate-immunity-end', characterId: character.id });
