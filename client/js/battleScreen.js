@@ -989,7 +989,12 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
 // unlike the timed action-flash portraits/tile effects above.
 function statusBadges(character) {
   const badges = [];
-  if (character.usedSpecial) badges.push({ text: 'Special used', cls: 'warn' });
+  // Boingo gets his own dedicated "Jester Ball: N/2" badge below instead of
+  // the generic one - he has 2 throws per match (see state.js's
+  // jesterBallsUsed), and usedSpecial only flips true once BOTH are spent,
+  // so the generic badge alone would only ever announce "fully out," never
+  // show he still has a throw in reserve after using just one.
+  if (character.usedSpecial && character.id !== 'boingo') badges.push({ text: 'Special used', cls: 'warn' });
   switch (character.id) {
     case 'tharox':
       if (character.special.hasCharge) badges.push({ text: 'Charge ready', cls: 'warn' });
@@ -1059,6 +1064,9 @@ function statusBadges(character) {
       if (character.special.cleanSlateImmuneTurnsRemaining > 0) {
         badges.push({ text: `🕯️ ${character.special.cleanSlateImmuneTurnsRemaining}`, cls: 'warn', title: 'Clean Slate immunity - turns remaining' });
       }
+      break;
+    case 'boingo':
+      badges.push({ text: `Jester Ball: ${character.special.jesterBallsUsed}/2` });
       break;
   }
   return badges;
