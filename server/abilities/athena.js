@@ -30,8 +30,12 @@ export const actions = {
     isLegal: (character) => !character.usedSpecial,
     execute(character, targetId, game, log) {
       character.usedSpecial = true;
-      applyHeal(game, character.id, 3);
-      applyShield(game, character.id, 2, { decaying: true });
+      // Buffed 3->4 heal, 2->3 shield (win-rate data showed her as one of
+      // the weakest performers). Shield no longer decays at her own next
+      // turn - now persists normally until actually consumed by incoming
+      // damage, same as any other non-decaying shield source.
+      applyHeal(game, character.id, 4);
+      applyShield(game, character.id, 3);
       log.push({ type: 'special', characterId: character.id, actionId: 'divineRestore' });
       return {};
     },
