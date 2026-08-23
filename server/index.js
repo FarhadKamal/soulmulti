@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { WebSocketServer } from 'ws';
 import { createServer } from 'http';
 import { randomUUID } from 'crypto';
@@ -6,6 +7,7 @@ import { join, extname, normalize } from 'path';
 import { fileURLToPath } from 'url';
 
 import { CHARACTER_IDS } from '../client/js/characters.js';
+import { recordMatchResult } from './matchStats.js';
 import { createGame } from './engine/state.js';
 import {
   getUsableActions, getUsablePuppetActions, executeAction, isValidTarget, isValidMindControlTarget,
@@ -418,6 +420,13 @@ function broadcastMindControlStage(room, melyssaId, puppetId, usableActions) {
 function broadcastGameState(room) {
   const acting = settleToNextDecision(room.game);
   if (room.game.phase === 'game-over') {
+    // Guard BEFORE flipping room.phase - this whole branch re-enters on
+    // every subsequent broadcastGameState call while the match stays
+    // game-over (e.g. the bots4 restart's own broadcastGameState re-call),
+    // so without this check recordMatchResult would fire repeatedly for
+    // the same finished match instead of exactly once at the real
+    // transition.
+    if (room.phase !== 'finished') recordMatchResult(room.game, room.roomType);
     room.phase = 'finished';
     clearTurnTimer(room);
     // 'bots4' has no human to click Return to Lobby/Start Match - the
