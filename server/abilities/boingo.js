@@ -33,9 +33,24 @@ export const actions = {
     label: 'Jester Ball',
     needsTarget: true,
     special: true,
-    isLegal: (character) => !character.usedSpecial,
+    // 2 total throws per match (buffed from 1 - see state.js's
+    // jesterBallsUsed comment) - also requires no ball currently in play,
+    // same as the original one-shot version (game.jesterBall must be null;
+    // enforced generically by getUsableActions checking the whole roster's
+    // legal actions against current state, no extra check needed here
+    // since a second jesterBall action attempt while one's already active
+    // would just never be reachable through the normal action list).
+    isLegal: (character) => character.special.jesterBallsUsed < 2,
     execute(character, targetId, game, log) {
-      character.usedSpecial = true;
+      character.special.jesterBallsUsed += 1;
+      // Only flips the shared usedSpecial flag once BOTH throws are spent -
+      // that flag is read generically elsewhere as "has this character's
+      // signature move been used at all" (see state.js's comment on
+      // jesterBallsUsed for the exact call sites) and none of them are
+      // Boingo-aware, so setting it early after just the FIRST throw would
+      // make those generic checks wrongly report him as fully spent while
+      // he still has a second ball banked.
+      if (character.special.jesterBallsUsed >= 2) character.usedSpecial = true;
       // passCount tracks how many times it's been PASSED since the throw
       // (the throw itself doesn't count) - up to 5 passes are allowed
       // before an un-intercepted pass auto-resolves as an explosion (see
