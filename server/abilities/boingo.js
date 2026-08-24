@@ -1,5 +1,16 @@
-import { applyDamage, applyHeal } from '../engine/damagePipeline.js';
+import { applyDamage, applyHeal, applyShield, decayShieldIfDue } from '../engine/damagePipeline.js';
 import { rollChaosGamble } from '../engine/random.js';
+
+// Shield decays at the start of his own next turn, same mechanic/pattern
+// as Tharox's Glory Smash and Athena's old Divine Restore shield - added
+// as part of the "win" outcome below (see chaosGamble's execute) so a
+// good roll leaves him with a little protection until his next turn,
+// rather than pure damage with no lasting benefit. Doesn't stack across
+// wins in practice: he only gets one Chaos Gamble roll per turn, and any
+// prior shield already decays before his own next turn's roll runs.
+export function onTurnStart(character, game, log) {
+  decayShieldIfDue(character);
+}
 
 export const actions = {
   chaosGamble: {
@@ -25,6 +36,10 @@ export const actions = {
         targetCharacterId: targetId,
         amount,
       });
+      // A "win" roll also grants +1 decaying shield - some small lasting
+      // benefit from a good roll instead of pure damage-and-done, expires
+      // at the start of his own next turn same as Tharox's shield.
+      if (outcome === 'win') applyShield(game, character.id, 1, { decaying: true });
       log.push({ type: 'attack', characterId: character.id, actionId: 'chaosGamble', targetId, outcome, ...result });
       return result;
     },
