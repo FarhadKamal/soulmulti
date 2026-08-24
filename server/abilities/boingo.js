@@ -34,13 +34,18 @@ export const actions = {
     needsTarget: true,
     special: true,
     // 2 total throws per match (buffed from 1 - see state.js's
-    // jesterBallsUsed comment) - also requires no ball currently in play,
-    // same as the original one-shot version (game.jesterBall must be null;
-    // enforced generically by getUsableActions checking the whole roster's
-    // legal actions against current state, no extra check needed here
-    // since a second jesterBall action attempt while one's already active
-    // would just never be reachable through the normal action list).
-    isLegal: (character) => character.special.jesterBallsUsed < 2,
+    // jesterBallsUsed comment) - ALSO requires no ball currently in play
+    // (game.jesterBall must be null). Confirmed live bug: the original
+    // 1-throw version never needed this check explicitly, since
+    // !character.usedSpecial already went false after the single throw
+    // regardless of whether a ball was active - but with 2 throws, nothing
+    // stopped Boingo from throwing a SECOND ball while the first was still
+    // live (only the current HOLDER is forced to resolve before acting;
+    // Boingo himself, once it's genuinely his own turn again, was never
+    // blocked from throwing again). A second throw would have silently
+    // overwritten game.jesterBall, losing track of the first ball's
+    // holder/passCount entirely.
+    isLegal: (character, game) => character.special.jesterBallsUsed < 2 && !game.jesterBall,
     execute(character, targetId, game, log) {
       character.special.jesterBallsUsed += 1;
       // Only flips the shared usedSpecial flag once BOTH throws are spent -
