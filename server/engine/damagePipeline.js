@@ -340,6 +340,21 @@ export function applyDamage(game, log, {
       target.special.silenceTargets.clear();
       target.special.mirrorReflectActive = false;
     }
+    // The Jester Ball is orphaned if its current holder dies from a hit
+    // that has nothing to do with the ball itself (e.g. a normal attack,
+    // not them choosing to Take it) - nothing else in the codebase ever
+    // notices a dead character is still "holding" it, since
+    // charactersActingThisTurn filters to living characters only, so the
+    // held-holder's own turn (where the take/pass choice would normally
+    // resolve it) simply never comes up again for the rest of the match.
+    // Confirmed live: Boingo's 2nd Jester Ball stayed permanently illegal
+    // (isLegal requires !game.jesterBall) because a KO'd Marin was still
+    // recorded as the holder from several turns earlier. Just clears the
+    // ball state here rather than resolving a real explosion - the
+    // holder's already dead, there's no one left to deal damage to.
+    if (game.jesterBall && game.jesterBall.holderCharacterId === target.id) {
+      game.jesterBall = null;
+    }
   }
 
   // Melyssa's reactive shield: whenever damage actually reaches her hearts
