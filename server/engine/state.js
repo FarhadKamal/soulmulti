@@ -212,6 +212,11 @@ export function createCharacter(defId, ownerId) {
     shieldDecaying: false,
     isKO: false,
     skipNextTurn: false,
+    // Grimtal's Skull Crack headache - deliberately separate from
+    // skipNextTurn (Chronox's Time Freeze), see turnEngine.js's
+    // resolveHeadacheIfDue/consumeSkipIfHeadache for why sharing one flag
+    // produced a wrong "is frozen" message for a headache-caused skip.
+    skipHeadacheTurn: false,
     usedSpecial: false,
     untargetable: false,
     special: baseSpecialFor(defId),

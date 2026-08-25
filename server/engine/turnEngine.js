@@ -242,7 +242,14 @@ function resolveHeadacheIfDue(character, game, log) {
   caster.special.headacheVictimId = null;
   caster.special.headacheRollPending = false;
   const skipped = Math.random() < 0.5;
-  if (skipped) character.skipNextTurn = true;
+  // Deliberately a SEPARATE flag from skipNextTurn (Chronox's Time Freeze),
+  // not a shared one - gameFlow.js's frozen-skip message is hardcoded to
+  // say "is frozen and skips their turn," which would be flatly wrong for
+  // a headache skip. Confirmed live: reusing skipNextTurn produced both
+  // "Tharox's headache flares up - turn skipped!" AND the freeze message
+  // back to back, even though no freeze was ever involved. See
+  // consumeSkipIfHeadache below for the matching dedicated consume path.
+  if (skipped) character.skipHeadacheTurn = true;
   log.push({ type: 'headache-roll', casterId: caster.id, targetCharacterId: character.id, skipped });
 }
 
@@ -400,6 +407,18 @@ export function endTurn(game) {
 export function consumeSkipIfFrozen(character) {
   if (character.skipNextTurn) {
     character.skipNextTurn = false;
+    return true;
+  }
+  return false;
+}
+
+// Grimtal's Skull Crack headache - same consume-and-clear shape as
+// consumeSkipIfFrozen above, but its own dedicated flag (see
+// resolveHeadacheIfDue) so gameFlow.js can show its own distinct skip
+// message instead of the freeze-specific one.
+export function consumeSkipIfHeadache(character) {
+  if (character.skipHeadacheTurn) {
+    character.skipHeadacheTurn = false;
     return true;
   }
   return false;

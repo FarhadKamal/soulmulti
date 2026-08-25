@@ -8,7 +8,7 @@
 // render off of the state + log the server broadcasts.
 import { CHARACTERS } from '../client/js/characters.js';
 import {
-  getUsableActions, beginCharacterTurn, consumeSkipIfFrozen, markCharacterActed,
+  getUsableActions, beginCharacterTurn, consumeSkipIfFrozen, consumeSkipIfHeadache, markCharacterActed,
   hasCharacterActedThisTurn, charactersActingThisTurn, resolveJesterBall, endTurn,
 } from './engine/turnEngine.js';
 
@@ -68,6 +68,23 @@ export function getActingCharacterId(game) {
         finishJesterBall(game, 'take', undefined);
       } else {
         game.log.push({ type: 'passive', characterId: character.id, text: `${CHARACTERS[character.id].name} is frozen and skips their turn.` });
+      }
+      clearStalledBonusTurn(character);
+      markCharacterActed(game, character.id);
+      continue;
+    }
+    // Grimtal's Skull Crack headache - own dedicated skip source/message,
+    // not the freeze branch above (see turnEngine.js's
+    // consumeSkipIfHeadache for why this needed its own flag). The
+    // 'headache-roll' log entry (pushed from beginCharacterTurn, just
+    // above this loop iteration) already announced the flare-up itself;
+    // this is the actual turn-skip consequence of that roll.
+    if (consumeSkipIfHeadache(character)) {
+      if (isBallHolder) {
+        game.log.push({ type: 'passive', characterId: character.id, text: `${CHARACTERS[character.id].name}'s headache is too much to resolve the Jester Ball - it bursts on them!` });
+        finishJesterBall(game, 'take', undefined);
+      } else {
+        game.log.push({ type: 'passive', characterId: character.id, text: `${CHARACTERS[character.id].name}'s headache is too much - they skip their turn.` });
       }
       clearStalledBonusTurn(character);
       markCharacterActed(game, character.id);
