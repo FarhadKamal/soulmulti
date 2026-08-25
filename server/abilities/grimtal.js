@@ -18,7 +18,15 @@ export const actions = {
     needsTarget: true,
     isLegal: () => true,
     execute(character, targetId, game, log) {
-      const amount = 1 + character.special.koCount;
+      // Scales with TOTAL characters KO'd on the board so far this match -
+      // any source counts (his own kills, another player's, a poison tick,
+      // a curse mirror, anything), not just kills he personally lands.
+      // Derived live from game state rather than a tracked counter, so
+      // there's no separate bookkeeping to keep in sync anywhere else in
+      // the codebase (no KO-branch special-case needed in
+      // damagePipeline.js, unlike the earlier own-kills-only version).
+      const totalKO = Object.values(game.characters).filter((c) => c.isKO).length;
+      const amount = 1 + totalKO;
       const result = applyDamage(game, log, { sourceCharacterId: character.id, targetCharacterId: targetId, amount });
       log.push({ type: 'attack', characterId: character.id, actionId: 'grimStrike', targetId, ...result });
       return result;

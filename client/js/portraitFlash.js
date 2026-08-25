@@ -162,13 +162,16 @@ function findThrowerFor() {
   return lastJesterBallThrowerId;
 }
 
-// Grimtal's power.jpg: queued (not fired immediately) whenever a Grim
-// Strike/Skull Crack lands a KO he personally earned - per explicit
-// request, this should play strictly AFTER his own strike flash has fully
-// finished, not layered on top of it. game is captured via closure at call
-// time rather than passed through the timer so a stale isKO check can't
-// read from an outdated snapshot.
-function queueGrimtalPowerFlash(characterId, game) {
+// Grimtal's power.jpg: queued (not fired immediately) whenever ANY
+// character on the board gets KO'd (his own damage now scales off the
+// total KO count, not just kills he personally lands) - the caller
+// (main.js's queueGrimtalPowerIfAlive) already checks he's alive and isn't
+// the one who died before calling this. Delayed so it plays strictly AFTER
+// whatever strike/flash is already showing has fully finished, not layered
+// on top of it. game is captured via closure at call time rather than
+// passed through the timer so a stale isKO check can't read from an
+// outdated snapshot.
+export function queueGrimtalPowerFlash(characterId, game) {
   setTimeout(() => {
     if (!game.characters[characterId]?.isKO) setFlash(characterId, 'assets/images/grimtal/power.jpg');
     onFlashExpired();
@@ -375,16 +378,10 @@ export function handleLogEntryForFlash(entry, game) {
     case 'silenceLock':
       setFlash(characterId, 'assets/images/rowan/silence_lock.jpg'); break;
     case 'grimStrike':
-      if (!dodged && amountDealt > 0) {
-        setFlash(characterId, 'assets/images/grimtal/normal_attack.jpg');
-        if (entry.koTriggered) queueGrimtalPowerFlash(characterId, game);
-      }
+      if (!dodged && amountDealt > 0) setFlash(characterId, 'assets/images/grimtal/normal_attack.jpg');
       break;
     case 'skullCrack':
-      if (!dodged && amountDealt > 0) {
-        setFlash(characterId, 'assets/images/grimtal/skull_crack.jpg');
-        if (entry.koTriggered) queueGrimtalPowerFlash(characterId, game);
-      }
+      if (!dodged && amountDealt > 0) setFlash(characterId, 'assets/images/grimtal/skull_crack.jpg');
       break;
     default:
       break;

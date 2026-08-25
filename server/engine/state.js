@@ -159,11 +159,10 @@ function baseSpecialFor(id) {
         wandMasteryActive: false,
       };
     case 'grimtal':
-      // koCount: how many characters GRIMTAL HIMSELF has personally KO'd -
-      // drives Grim Strike's own damage (1 + koCount), incremented directly
-      // inside applyDamage's KO branch (damagePipeline.js) rather than here,
-      // since any of his attacks (not just grimStrike) could land a killing
-      // blow. Does NOT increase from a KO some other character lands.
+      // Grim Strike's damage (1 + total KO'd characters on the board) is
+      // derived live from game state at cast time (grimtal.js) rather than
+      // tracked here - no counter needed, any death counts regardless of
+      // who/what caused it.
       // lastHitByThisCycle: Set<attackerCharacterId> - everyone who has
       // landed an attack on him since his own last turn ended (cleared at
       // the start of his own turn, turnEngine.js's beginCharacterTurn calls
@@ -185,7 +184,6 @@ function baseSpecialFor(id) {
       // other caster-side effect in the codebase (Akyros's marks, Athena's
       // curseTargetCharacterId, Rowan's poisonTargets).
       return {
-        koCount: 0,
         lastHitByThisCycle: new Set(),
         skullCrackUsed: 0,
         headacheVictimId: null,

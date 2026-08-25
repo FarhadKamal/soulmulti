@@ -409,18 +409,6 @@ export function applyDamage(game, log, {
     if (game.jesterBall && game.jesterBall.holderCharacterId === target.id) {
       game.jesterBall = null;
     }
-    // Grim Strike's own damage scales with how many KOs GRIMTAL HIMSELF has
-    // personally landed (1 + koCount) - confirmed ruling: only increases
-    // when HE lands the killing blow, not when anyone else does. Covers any
-    // of his attacks that lands a KO (not just grimStrike itself), matching
-    // "own kill count" rather than "grimStrike kill count" specifically.
-    // isMirror excluded since a mirrored/reflected kill isn't Grimtal's own
-    // attack landing - same reasoning as every other attacker-attribution
-    // check in this file.
-    if (sourceCharacterId === 'grimtal' && !isMirror) {
-      const grimtalChar = game.characters.grimtal;
-      if (grimtalChar && !grimtalChar.isKO) grimtalChar.special.koCount += 1;
-    }
     // Grimtal's own death ends Skull Crack's pending headache immediately -
     // no one left to have caused it, same "caster's death cancels their own
     // ongoing effects" rule as Rowan's poison/silence/mirror cleanup above.

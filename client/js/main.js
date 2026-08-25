@@ -6,7 +6,7 @@ import {
   startMenuMusic, startBattleMusic, stopMusic,
   playActionSound, playSound, playKO, playVictory, playDodge, playRebirth, playCoin,
 } from './sound.js';
-import { handleLogEntryForFlash, handleDodgeForFlash, checkIdlePortrait, registerFlashRerender } from './portraitFlash.js';
+import { handleLogEntryForFlash, handleDodgeForFlash, checkIdlePortrait, registerFlashRerender, queueGrimtalPowerFlash } from './portraitFlash.js';
 import { handleLogEntryForEffects, registerEffectRerender } from './actionEffects.js';
 import { preloadBattleImages } from './imagePreload.js';
 import { preloadBattleAudio } from './audioPreload.js';
@@ -168,8 +168,34 @@ function processNewLogEntries(game) {
 // (playKoedVoice returns true once it actually played something) - falls
 // back to the generic sound for any character without a recorded koed
 // line yet, same as every other voice/sound fallback in this file.
-function playKoedFor(characterId) {
+// game is threaded through here (rather than each call site handling its
+// own follow-ups) so the Grimtal power-surge hook below has exactly one
+// place to live, covering all 4 koTriggered sites in this file (curse-
+// mirror, mirror-reflect, jester-ball-take, generic attack/special) without
+// duplicating the check at each of them.
+function playKoedFor(characterId, game) {
   if (!playKoedVoice(characterId)) playKO();
+  queueGrimtalPowerIfAlive(game, characterId);
+}
+
+// Grimtal's power.jpg/power.mp3 follow-up: per updated design, Grim
+// Strike's damage now scales with the TOTAL number of characters KO'd on
+// the board, regardless of who/what caused each death - so the power-surge
+// animation/voice should fire on ANY KO in the match, not just one he
+// personally lands. A no-op if Grimtal isn't in this match or is already
+// KO'd himself (checked here AND again inside queueGrimtalPowerFlash's own
+// delayed timer, in case he dies during the delay window), and if the
+// character who just died IS Grimtal (his own death doesn't power himself
+// up).
+function queueGrimtalPowerIfAlive(game, koedCharacterId) {
+  const grimtal = game.characters.grimtal;
+  if (!grimtal || grimtal.isKO || koedCharacterId === 'grimtal') return;
+  queueGrimtalPowerFlash('grimtal', game);
+  // Relative to right now (playKoedFor just started the koed voice playing)
+  // rather than the original log-entry-processing moment - koed.mp3 runs
+  // ~1.6s, so waiting that long here lets it fully finish before power.mp3
+  // starts, same non-overlapping sequencing as before.
+  setTimeout(() => playMoveVoice('grimtal', 'power'), 1600);
 }
 
 // A KO'd character shouldn't have a voice line play for them - mirrors
@@ -224,7 +250,7 @@ function playLogEntrySound(entry, game) {
     return;
   }
   if (entry.type === 'curse-mirror') {
-    if (entry.koTriggered) setTimeout(() => playKoedFor(entry.toCharacterId), 200);
+    if (entry.koTriggered) setTimeout(() => playKoedFor(entry.toCharacterId, game), 200);
     return;
   }
   if (entry.type === 'mirror-reflect') {
@@ -232,7 +258,7 @@ function playLogEntrySound(entry, game) {
     // own, just the KO'd sound if the reflect happens to finish someone
     // off. The visible confirmation (hit-flash/shake) is handled in
     // actionEffects.js's handleLogEntryForEffects.
-    if (entry.koTriggered) setTimeout(() => playKoedFor(entry.toCharacterId), 200);
+    if (entry.koTriggered) setTimeout(() => playKoedFor(entry.toCharacterId, game), 200);
     return;
   }
   if (entry.type === 'jester-ball-pass') {
@@ -263,7 +289,7 @@ function playLogEntrySound(entry, game) {
       // playLaughVoiceIfAlive) a no-op if he was already KO'd earlier in
       // this same pass chain before it went on to explode on someone else.
       if (entry.targetCharacterId !== 'boingo') playLaughVoiceIfAlive('boingo', game);
-      if (entry.koTriggered) setTimeout(() => playKoedFor(entry.targetCharacterId), 200);
+      if (entry.koTriggered) setTimeout(() => playKoedFor(entry.targetCharacterId, game), 200);
     }
     return;
   }
@@ -391,15 +417,13 @@ function playLogEntrySound(entry, game) {
   if (entry.actionId === 'dyingBlow' && entry.isBonusStrike) {
     playDraxusStrikeVoice(entry.strikeNumber);
   }
-  if (entry.koTriggered) setTimeout(() => playKoedFor(entry.targetCharacterId), 200);
-  // Grimtal's power.mp3: per explicit request, plays only AFTER his koed
-  // victim's own koed.mp3 has fully finished, not overlapping/arbitrated
-  // against it. koed fires at the 200ms mark above and runs ~1.6s itself
-  // (matches power.jpg's own FLASH_DURATION_MS-based delay in
-  // portraitFlash.js, so the voice and the portrait swap land together).
-  if (entry.koTriggered && (entry.actionId === 'grimStrike' || entry.actionId === 'skullCrack')) {
-    setTimeout(() => playMoveVoice('grimtal', 'power'), 1800);
-  }
+  // Grimtal's power.mp3 (queued from playKoedFor via queueGrimtalPowerIfAlive
+  // below) plays only AFTER the koed victim's own koed.mp3 has fully
+  // finished, not overlapping/arbitrated against it - koed fires at the
+  // 200ms mark here and runs ~1.6s itself (matches power.jpg's own
+  // FLASH_DURATION_MS-based delay in portraitFlash.js, so the voice and the
+  // portrait swap land together).
+  if (entry.koTriggered) setTimeout(() => playKoedFor(entry.targetCharacterId, game), 200);
 }
 
 function mySeatCharacterIds() {
