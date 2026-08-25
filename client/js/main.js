@@ -185,7 +185,12 @@ function playLaughVoiceIfAlive(characterId, game) {
 
 function playLogEntrySound(entry, game) {
   if (entry.type === 'dodge') {
-    playDodge();
+    // Grimtal's Grim Ward uses the magic_dodge sound (same file as Marin's
+    // Threefold Veil discovery sound - see sound.js's ACTION_SOUND) instead
+    // of the plain generic dodge sound everyone else gets, per explicit
+    // request for a more distinct/weighty cue on his counter-dodge.
+    if (entry.targetCharacterId === 'grimtal') playSound('magic_dodge.wav');
+    else playDodge();
     // Marin's Threefold Veil dodge gets its own spoken line on top of the
     // generic dodge sound - a no-op for Akyros's own dodge (same shared
     // 'dodge' entry type/shape, but he has no threefoldDodge line to look
@@ -194,6 +199,12 @@ function playLogEntrySound(entry, game) {
     // discovery moment, not the dodge itself).
     if (entry.targetCharacterId === 'marin' && !game.characters.marin?.isKO) {
       playMoveVoice('marin', 'threefoldDodge');
+    }
+    // Grimtal's Grim Ward, same reasoning as Marin's threefoldDodge above -
+    // a spoken line on top of the generic dodge sound for this specific
+    // dodge source only.
+    if (entry.targetCharacterId === 'grimtal' && !game.characters.grimtal?.isKO) {
+      playMoveVoice('grimtal', 'grimWard');
     }
     return;
   }
@@ -412,9 +423,9 @@ onMessage((msg) => {
       // to do with this one (see clearChatMessages's own comment for the
       // bug this fixes).
       clearChatMessages();
-      // training4/bots4 rooms don't send a reconnectToken (see
-      // handleCreateRoom/handleJoinRoom in index.js - only real 2p/4p seat
-      // claims issue one), so this is naturally a no-op for those.
+      // bots4 rooms don't send a reconnectToken (see handleCreateRoom/
+      // handleJoinRoom in index.js - only real 2p/4p seat claims issue
+      // one), so this is naturally a no-op for those.
       if (msg.reconnectToken) {
         saveReconnectInfo({ roomCode: msg.code, seatIndex: msg.seatIndex, reconnectToken: msg.reconnectToken });
       }

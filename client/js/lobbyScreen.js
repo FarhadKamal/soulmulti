@@ -88,8 +88,8 @@ export function renderLobby(root, { room, error, connectionLost }, { onEnterMatc
   // grids and chat panel) lives inside its own scroll region, not the page
   // itself - the title/top-controls above stay a fixed header, matching
   // battleScreen.js's .battle-scroll shell. Without this, the entry form's
-  // stacked sections (create/join/training, the training one alone has an
-  // 8-button character grid) routinely ran taller than a phone screen.
+  // stacked sections (create/join/bot-show, several with a full character
+  // grid) routinely ran taller than a phone screen.
   const scroll = document.createElement('div');
   scroll.className = 'lobby-scroll';
 
@@ -225,25 +225,6 @@ function renderEntryForm() {
   joinSection.appendChild(codeInput);
   joinSection.appendChild(joinBtn);
   form.appendChild(joinSection);
-
-  const trainingSection = document.createElement('div');
-  trainingSection.className = 'training-section';
-  const trainingTitle = document.createElement('h2');
-  trainingTitle.textContent = 'Training (vs 3 bots)';
-  trainingSection.appendChild(trainingTitle);
-
-  const trainingGrid = document.createElement('div');
-  trainingGrid.className = 'character-grid';
-  Object.values(CHARACTERS).forEach((def) => {
-    const btn = document.createElement('button');
-    btn.textContent = def.name;
-    btn.style.borderColor = def.color;
-    btn.onclick = () => send('create-training-room', { name: currentName(), characterId: def.id });
-    nameRequiredButtons.push(btn); // reuses the same name-required disable wiring
-    trainingGrid.appendChild(btn);
-  });
-  trainingSection.appendChild(trainingGrid);
-  form.appendChild(trainingSection);
 
   const botShowSection = document.createElement('div');
   botShowSection.className = 'bot-show-section';

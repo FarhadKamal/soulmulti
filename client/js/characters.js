@@ -12,6 +12,7 @@ export const CHARACTERS = {
   draxus: { id: 'draxus', name: 'Draxus', role: 'Deathless Berserker', color: '#a35a1e' },
   rowan: { id: 'rowan', name: 'Rowan', role: 'Arcane Scholar', color: '#d4a017' },
   marin: { id: 'marin', name: 'Marin', role: 'Wandering Bloom', color: '#6fae5c' },
+  grimtal: { id: 'grimtal', name: 'Grimtal', role: 'Bounty Hunter', color: '#7a5230' },
 };
 
 export const CHARACTER_IDS = Object.keys(CHARACTERS);

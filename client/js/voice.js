@@ -128,6 +128,7 @@ const VOICE_LINES = {
   draxus: { idle: 'idle', injured: 'injured', koed: 'koed', victory: 'victory' },
   rowan: { idle: 'idle', injured: 'injured', koed: 'koed', victory: 'victory' },
   marin: { idle: 'idle', injured: 'injured', koed: 'koed', victory: 'victory' },
+  grimtal: { idle: 'idle', injured: 'injured', koed: 'koed', victory: 'victory' },
 };
 
 // actionId -> filename, per character - every action here plays its line
@@ -193,6 +194,16 @@ const ACTION_VOICE_LINES = {
     cleanSlate: 'clean_slate',
     piercingWand: 'piercing',
     wandMastery: 'mastery',
+  },
+  // grimWard is played directly from main.js's 'dodge' log-entry handler
+  // (same pattern as marin's threefoldDodge above), not through the
+  // generic bottom-of-switch playMoveVoice dispatch every normal actionId
+  // uses - Grim Ward has no actionId of its own, it's a passive triggered
+  // by the shared 'dodge' entry type.
+  grimtal: {
+    grimStrike: 'basic_strike',
+    grimWard: 'dodge',
+    skullCrack: 'skull',
   },
 };
 

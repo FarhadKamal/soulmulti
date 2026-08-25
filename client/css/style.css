@@ -86,7 +86,6 @@ input {
 .room-type-row { display: flex; gap: 10px; margin-top: 10px; }
 .room-type-row button { flex: 1; }
 .join-section { display: flex; flex-direction: column; gap: 10px; }
-.training-section { display: flex; flex-direction: column; gap: 10px; }
 .code-input { text-align: center; letter-spacing: 4px; font-size: 1.2em; }
 
 .room-code-row { display: flex; align-items: center; justify-content: center; gap: 12px; margin: 10px 0 20px; }
@@ -398,6 +397,18 @@ input {
   font-size: 0.75em; font-weight: 700;
   padding: 2px 6px; border-radius: 10px;
   box-shadow: 0 0 6px rgba(75, 0, 130, 0.6);
+  pointer-events: none; z-index: 5;
+}
+/* Grimtal's Skull Crack headache - persistent, one-shot-per-turn status
+   (cleared the instant the victim's own next turn resolves the roll), same
+   corner-badge language as poison/silence above. Centered top since both
+   bottom corners and top-right (grudge) are already spoken for. */
+.headache-badge {
+  position: absolute; top: 6px; left: 50%; translate: -50% 0;
+  background: rgba(90, 60, 160, 0.85); color: #fff;
+  font-size: 0.85em; font-weight: 700;
+  padding: 2px 6px; border-radius: 10px;
+  box-shadow: 0 0 6px rgba(90, 60, 160, 0.6);
   pointer-events: none; z-index: 5;
 }
 @keyframes tile-ball-wobble {
@@ -720,6 +731,32 @@ input {
   0% { opacity: 0; transform: translateY(0) scale(0.5); }
   30% { opacity: 0.9; }
   100% { opacity: 0; transform: translateY(-45%) scale(1); }
+}
+
+/* Grimtal's Skull Crack headache: unlike poison-cloud-fx's one-shot re-fire-
+   per-tick animation above, this is a genuinely PERSISTENT overlay - it has
+   to keep looping for however many other characters act in between, until
+   the victim's own next turn finally resolves the pending 50% roll. Three
+   small stars orbiting loosely around the head area, classic "seeing
+   stars" dazed cue. */
+.headache-fx {
+  position: absolute; inset: 0; pointer-events: none; z-index: 4;
+  overflow: hidden; border-radius: inherit;
+}
+.headache-star {
+  position: absolute; top: 8%; left: 50%;
+  font-size: 1.1em; color: #c9a8ff;
+  text-shadow: 0 0 6px rgba(180, 130, 255, 0.9);
+  transform-origin: 0 140%;
+  animation: tile-headache-orbit 1.8s linear infinite;
+}
+.headache-star--1 { animation-delay: 0s; }
+.headache-star--2 { animation-delay: -0.6s; }
+.headache-star--3 { animation-delay: -1.2s; }
+@keyframes tile-headache-orbit {
+  0% { transform: rotate(0deg) translateX(22px) rotate(0deg); opacity: 0.9; }
+  50% { opacity: 0.55; }
+  100% { transform: rotate(360deg) translateX(22px) rotate(-360deg); opacity: 0.9; }
 }
 
 /* Rowan's Mirror Reflect counter-hit: small glass/mirror shard fragments

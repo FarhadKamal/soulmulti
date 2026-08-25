@@ -37,6 +37,7 @@ const SOUND_EFFECT_FILES = [
   'axe_strike.mp3', 'deathless_fury.mp3',
   'wand_strike.mp3', 'study.mp3', 'cloud.mp3', 'healing.mp3', 'lightning.mp3', 'mirror.mp3', 'lock.mp3',
   'everbloom.wav', 'magic_dodge.wav', 'silent_study.wav', 'cleanSlate.mp3', 'wand_discover.mp3',
+  'sword_thud.mp3', 'bullet_hit.mp3',
 ];
 
 let started = false;

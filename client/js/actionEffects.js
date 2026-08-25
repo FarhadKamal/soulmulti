@@ -467,4 +467,13 @@ export function handleLogEntryForEffects(entry, game) {
     addEffect(targetId, 'axechop', EFFECT_DURATION_MS.axechop, amountDealt);
     if (amountDealt === 3) addEffect(targetId, 'shake', EFFECT_DURATION_MS.shake);
   }
+
+  // Grim Strike: shakes once his kill-scaling has pushed the damage to 2+
+  // (i.e. he's landed at least 1 KO already this match) - per explicit
+  // request, a visual escalation cue as he racks up kills. No dedicated
+  // impact-shape effect of its own (unlike every other character's move) -
+  // the portrait flash (normal_attack.jpg) already carries the hit itself.
+  if (actionId === 'grimStrike' && targetId && !dodged && amountDealt >= 2) {
+    addEffect(targetId, 'shake', EFFECT_DURATION_MS.shake);
+  }
 }

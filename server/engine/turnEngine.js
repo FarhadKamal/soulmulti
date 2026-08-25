@@ -1,5 +1,5 @@
 import { cloneGame } from './state.js';
-import { applyDamage, isSilenced } from './damagePipeline.js';
+import { applyDamage, applyHeal, applyShield, isSilenced } from './damagePipeline.js';
 import * as chronox from '../abilities/chronox.js';
 import * as tharox from '../abilities/tharox.js';
 import * as zerathys from '../abilities/zerathys.js';
@@ -13,8 +13,9 @@ import * as kaelis from '../abilities/kaelis.js';
 import * as draxus from '../abilities/draxus.js';
 import * as rowan from '../abilities/rowan.js';
 import * as marin from '../abilities/marin.js';
+import * as grimtal from '../abilities/grimtal.js';
 
-const ABILITY_MODULES = { chronox, tharox, zerathys, akyros, velorya, boingo, blade, athena, melyssa, kaelis, draxus, rowan, marin };
+const ABILITY_MODULES = { chronox, tharox, zerathys, akyros, velorya, boingo, blade, athena, melyssa, kaelis, draxus, rowan, marin, grimtal };
 
 export function getAbilityModule(characterId) {
   return ABILITY_MODULES[characterId];
@@ -29,26 +30,6 @@ export function getLegalActions(character, game) {
     .map(([actionId, def]) => ({ actionId, ...def }));
 }
 
-// training4-only: identifies the human's one character, purely by deriving
-// from `game` (no new persistent state). A training4 game always has
-// exactly one player with isPC === false (the human) and 3 with isPC ===
-// true (the bots) - same isPC convention every other room type already
-// uses to mark bot-controlled seats.
-function trainingHumanCharacterId(game) {
-  const humanPlayer = game.players.find((p) => !p.isPC);
-  return humanPlayer ? humanPlayer.characterIds[0] : null;
-}
-
-// True while training4's "bots avoid the human" rule should still apply -
-// i.e. more than 2 characters remain alive. Once it's down to exactly 2
-// (human vs the last bot standing), this returns false and full-strength,
-// unrestricted bot AI takes over for a genuine final fight.
-function trainingBotsMustAvoidHuman(game) {
-  if (game.mode !== 'training4') return false;
-  const livingCount = Object.values(game.characters).filter((c) => !c.isKO).length;
-  return livingCount > 2;
-}
-
 // Default enemy-only targeting rule shared by most actions, plus the couple
 // of action-specific restrictions (Shadow Execution requires a mark).
 export function isValidTarget(game, characterId, actionId, targetId) {
@@ -56,16 +37,6 @@ export function isValidTarget(game, characterId, actionId, targetId) {
   if (!target || target.isKO) return false;
   const character = game.characters[characterId];
   if (target.ownerId === character.ownerId) return false;
-  // training4: bots must never target the human's one character while more
-  // than 2 characters remain alive on the board. Only applies when the
-  // ACTING character is a bot targeting the human's character - the human
-  // targeting a bot, or a bot targeting another bot, is always allowed.
-  // Once exactly 2 are alive, trainingBotsMustAvoidHuman returns false and
-  // full-strength AI takes over with no restriction, by design.
-  if (trainingBotsMustAvoidHuman(game)) {
-    const actingPlayer = game.players.find((p) => p.id === character.ownerId);
-    if (actingPlayer?.isPC && targetId === trainingHumanCharacterId(game)) return false;
-  }
   if (target.untargetable) return false;
   if (actionId === 'shadowExecution') return character.special.marks.has(targetId);
   if (actionId === 'hiddenMark') return !character.special.everMarkedIds.has(targetId);
@@ -99,16 +70,6 @@ export function isValidMindControlTarget(game, targetId) {
   if (!target || target.id === 'melyssa') return false;
   if (target.isKO || target.untargetable || target.skipNextTurn) return false;
   if (isCurrentlyFrozen(game, targetId)) return false;
-  // training4: same carve-out as isValidTarget - a bot-controlled Melyssa
-  // must not even SELECT the human's character as her puppet while more
-  // than 2 are alive (puppeting routes the human's own character into an
-  // action chosen by the bot AI, which is exactly the kind of "targeting"
-  // this rule exists to prevent). No caster param needed here: the only way
-  // this function is reachable in a training4 game with targetId equal to
-  // the human's character is a bot-controlled Melyssa's turn - the human
-  // can never BE Melyssa and Mind-Control-select themselves, since the
-  // target.id === 'melyssa' check above already excludes that case.
-  if (trainingBotsMustAvoidHuman(game) && targetId === trainingHumanCharacterId(game)) return false;
   return true; // deliberately no ownerId check - ally or enemy both legal
 }
 
@@ -158,13 +119,6 @@ export function isValidPuppetTarget(game, puppetId, actionId, targetId) {
   const target = game.characters[targetId];
   if (!target || target.isKO) return false;
   const puppet = game.characters[puppetId];
-  // training4: identical carve-out to isValidTarget/isValidMindControlTarget
-  // - a puppeted bot character's real action is functionally indistinguishable
-  // from any other bot's real action for the purposes of this rule. No
-  // caster param needed for the same reason as isValidMindControlTarget: a
-  // human-controlled Melyssa puppeting into her OWN character is impossible
-  // in training4 (she only has 1 character, and can't puppet herself).
-  if (trainingBotsMustAvoidHuman(game) && targetId === trainingHumanCharacterId(game)) return false;
   if (target.untargetable) return false;
   if (actionId === 'shadowExecution') return puppet.special.marks.has(targetId);
   if (actionId === 'hiddenMark') return !puppet.special.everMarkedIds.has(targetId);
@@ -272,10 +226,35 @@ function tickSilenceIfAny(character, game, log) {
   }
 }
 
+// Grimtal's Skull Crack headache: the 50% skip-chance is rolled LIVE at the
+// start of the VICTIM's own next turn (confirmed ruling - not predetermined
+// at cast time), then cleared immediately either way (one-shot, exactly one
+// turn's worth of risk, never re-rolled). Written generically (scans every
+// character's headacheVictimId rather than assuming a single Grimtal) for
+// the same future-proofing reasoning as tickPoisonIfAny/tickSilenceIfAny
+// above, though only Grimtal can set it today.
+function resolveHeadacheIfDue(character, game, log) {
+  if (character.isKO) return;
+  const caster = Object.values(game.characters).find(
+    (c) => c.special?.headacheVictimId === character.id && c.special.headacheRollPending
+  );
+  if (!caster) return;
+  caster.special.headacheVictimId = null;
+  caster.special.headacheRollPending = false;
+  const skipped = Math.random() < 0.5;
+  if (skipped) character.skipNextTurn = true;
+  log.push({ type: 'headache-roll', casterId: caster.id, targetCharacterId: character.id, skipped });
+}
+
+// Grim Ward's per-cycle attacker tracking (lastHitByThisCycle) is cleared by
+// Grimtal's own onTurnStart (grimtal.js) - a fresh round of "who's hit me
+// since my last turn" starts there, not here.
+
 // Runs turn-start passives for a character (shield gain, freeze flip, shield decay).
 export function beginCharacterTurn(character, game, log) {
   tickPoisonIfAny(character, game, log);
   tickSilenceIfAny(character, game, log);
+  resolveHeadacheIfDue(character, game, log);
   const mod = ABILITY_MODULES[character.id];
   if (mod?.onTurnStart) mod.onTurnStart(character, game, log);
   // Poison's tick above deals REAL damage outside the normal executeAction/

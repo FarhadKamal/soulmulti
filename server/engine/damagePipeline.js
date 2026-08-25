@@ -172,6 +172,47 @@ export function applyDamage(game, log, {
     return result;
   }
 
+  // Grim Ward (Grimtal's passive, always-on, no cast needed): dodges live
+  // the moment a SECOND distinct attacker targets him in the same cycle
+  // (since his own last turn ended) - confirmed via detailed walkthrough:
+  // the FIRST attacker each cycle always lands (even a 0-damage hit still
+  // "counts" as having attacked), every attacker after that dodges. Fully
+  // fades out once only 1 living attacker remains (2 characters alive total)
+  // since there's then no "earlier hitter" to set the condition up - falls
+  // out naturally from the >=1-prior-attacker check, no explicit headcount
+  // branch needed. Same !isMirror exclusion as every other dodge above.
+  if (target.id === 'grimtal' && !isMirror) {
+    const cycle = target.special.lastHitByThisCycle;
+    if (cycle.size > 0 && !cycle.has(sourceCharacterId)) {
+      cycle.add(sourceCharacterId);
+      result.dodged = true;
+      log.push({ type: 'dodge', attackerId: sourceCharacterId, targetCharacterId });
+      // Reward scales with current alive headcount: 4 alive -> 2 points,
+      // 3 alive -> 1 point, 2 alive -> Grim Ward never triggers at all (see
+      // the cycle.size > 0 guard above, which is already false with only 1
+      // possible attacker). Each point heals 1 (if not at max hearts) or
+      // grants 1 stacking, non-decaying shield (if already full) -
+      // confirmed ruling: points spill from heal into shield within the
+      // same reward, not an all-or-nothing choice.
+      const aliveCount = Object.values(game.characters).filter((c) => !c.isKO).length;
+      const points = aliveCount >= 4 ? 2 : aliveCount === 3 ? 1 : 0;
+      let healed = 0;
+      let shielded = 0;
+      for (let i = 0; i < points; i++) {
+        if (target.hearts < target.maxHearts) {
+          target.hearts += 1;
+          healed += 1;
+        } else {
+          target.shield += 1;
+          shielded += 1;
+        }
+      }
+      log.push({ type: 'grim-ward-reward', targetCharacterId, healed, shielded });
+      return result;
+    }
+    cycle.add(sourceCharacterId);
+  }
+
   if (!ignoresShield && target.shield > 0) {
     const absorbed = Math.min(target.shield, amt);
     target.shield -= absorbed;
@@ -354,6 +395,28 @@ export function applyDamage(game, log, {
     // holder's already dead, there's no one left to deal damage to.
     if (game.jesterBall && game.jesterBall.holderCharacterId === target.id) {
       game.jesterBall = null;
+    }
+    // Grim Strike's own damage scales with how many KOs GRIMTAL HIMSELF has
+    // personally landed (1 + koCount) - confirmed ruling: only increases
+    // when HE lands the killing blow, not when anyone else does. Covers any
+    // of his attacks that lands a KO (not just grimStrike itself), matching
+    // "own kill count" rather than "grimStrike kill count" specifically.
+    // isMirror excluded since a mirrored/reflected kill isn't Grimtal's own
+    // attack landing - same reasoning as every other attacker-attribution
+    // check in this file.
+    if (sourceCharacterId === 'grimtal' && !isMirror) {
+      const grimtalChar = game.characters.grimtal;
+      if (grimtalChar && !grimtalChar.isKO) grimtalChar.special.koCount += 1;
+    }
+    // Grimtal's own death ends Skull Crack's pending headache immediately -
+    // no one left to have caused it, same "caster's death cancels their own
+    // ongoing effects" rule as Rowan's poison/silence/mirror cleanup above.
+    // Grim Ward simply stops mattering once he's dead (applyDamage's own
+    // isKO guard at the top blocks any future hit from ever reading
+    // lastHitByThisCycle again), so no explicit clear needed for that part.
+    if (target.id === 'grimtal') {
+      target.special.headacheVictimId = null;
+      target.special.headacheRollPending = false;
     }
   }
 

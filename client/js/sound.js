@@ -143,6 +143,8 @@ const ACTION_SOUND = {
   threefoldVeil: 'magic_dodge.wav',
   cleanSlate: 'cleanSlate',
   wandDiscover: 'wand_discover',
+  grimStrike: 'sword_thud',
+  skullCrack: 'bullet_hit',
 };
 
 export function playActionSound(actionId) {

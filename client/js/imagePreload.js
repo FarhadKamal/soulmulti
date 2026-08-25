@@ -75,6 +75,10 @@ const FLASH_IMAGES = [
   'assets/images/marin/clean_slate.jpg',
   'assets/images/marin/piercing_wand.jpg',
   'assets/images/marin/wand_mastery.jpg',
+  'assets/images/grimtal/idle.jpg',
+  'assets/images/grimtal/normal_attack.jpg',
+  'assets/images/grimtal/dodge.jpg',
+  'assets/images/grimtal/skull_crack.jpg',
 ];
 
 let started = false;

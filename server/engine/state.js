@@ -158,6 +158,39 @@ function baseSpecialFor(id) {
         piercingWandActive: false,
         wandMasteryActive: false,
       };
+    case 'grimtal':
+      // koCount: how many characters GRIMTAL HIMSELF has personally KO'd -
+      // drives Grim Strike's own damage (1 + koCount), incremented directly
+      // inside applyDamage's KO branch (damagePipeline.js) rather than here,
+      // since any of his attacks (not just grimStrike) could land a killing
+      // blow. Does NOT increase from a KO some other character lands.
+      // lastHitByThisCycle: Set<attackerCharacterId> - everyone who has
+      // landed an attack on him since his own last turn ended (cleared at
+      // the start of his own turn, turnEngine.js's beginCharacterTurn calls
+      // resetGrimtalCycle). Grim Ward's live-dodge check in applyDamage
+      // reads this to tell "am I the 2nd+ distinct attacker this cycle" -
+      // the attacker doesn't need to have dealt real damage, only to have
+      // made the attempt (confirmed ruling: a 0-damage first hit still sets
+      // up the dodge on the next attacker).
+      // skullCrackUsed: count of Skull Crack casts so far (3 allowed/match) -
+      // a plain counter rather than usedSpecial's single boolean, same
+      // reasoning as Boingo's jesterBallsUsed (usedSpecial is read
+      // elsewhere as a flat "has the ONE special been used" flag, and only
+      // flips true here once all 3 casts are spent).
+      // headacheVictimId/headacheRoll: set together the instant Skull Crack
+      // lands - headacheRoll is decided live at the START of the VICTIM's
+      // own next turn (not at cast time - confirmed ruling), then both are
+      // cleared the instant that turn's roll resolves, win or lose. Lives
+      // on Grimtal (the caster) rather than the victim, matching every
+      // other caster-side effect in the codebase (Akyros's marks, Athena's
+      // curseTargetCharacterId, Rowan's poisonTargets).
+      return {
+        koCount: 0,
+        lastHitByThisCycle: new Set(),
+        skullCrackUsed: 0,
+        headacheVictimId: null,
+        headacheRollPending: true,
+      };
     default:
       return {};
   }

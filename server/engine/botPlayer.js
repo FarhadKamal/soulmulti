@@ -1069,6 +1069,24 @@ function chooseMarinMove(character, game, usable) {
   return { actionId: 'wandStrike', targetId };
 }
 
+// Grimtal has no real decisions to weigh: Grim Strike is his only repeatable
+// damage move (no situational alternative to hold it back for), Grim Ward is
+// fully passive with no button at all, and Skull Crack has no downside
+// beyond its own 3-use cap - always worth firing on the biggest threat
+// whenever it's available, same "no downside, no reason to hold it" logic
+// as Rowan's Arcane Study fallback.
+function chooseGrimtalMove(character, game, usable) {
+  const byId = Object.fromEntries(usable.map((a) => [a.actionId, a]));
+  if (byId.skullCrack) {
+    const targets = validTargetsFor(game, character, 'skullCrack');
+    const targetId = biggestThreatTarget(game, character, targets) || lowestHeartsTarget(game, targets) || pickRandom(targets);
+    return { actionId: 'skullCrack', targetId };
+  }
+  const targets = validTargetsFor(game, character, 'grimStrike');
+  const targetId = biggestThreatTarget(game, character, targets) || lowestHeartsTarget(game, targets) || pickRandom(targets);
+  return { actionId: 'grimStrike', targetId };
+}
+
 const MOVE_CHOOSERS = {
   tharox: chooseTharoxMove,
   zerathys: chooseZerathysMove,
@@ -1083,6 +1101,7 @@ const MOVE_CHOOSERS = {
   draxus: chooseDraxusMove,
   rowan: chooseRowanMove,
   marin: chooseMarinMove,
+  grimtal: chooseGrimtalMove,
 };
 
 // Fallback for characters without bot logic yet: picks a random usable

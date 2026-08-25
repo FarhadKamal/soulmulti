@@ -86,6 +86,7 @@ const IDLE_IMAGE = {
   draxus: 'assets/images/draxus/idle.jpg',
   rowan: 'assets/images/rowan/idle.jpg',
   marin: 'assets/images/marin/idle.jpg',
+  grimtal: 'assets/images/grimtal/idle.jpg',
 };
 
 // Call once per character at the moment their own turn starts (i.e. when
@@ -352,6 +353,12 @@ export function handleLogEntryForFlash(entry, game) {
       setFlash(characterId, 'assets/images/rowan/mirror_reflect.jpg'); break;
     case 'silenceLock':
       setFlash(characterId, 'assets/images/rowan/silence_lock.jpg'); break;
+    case 'grimStrike':
+      if (!dodged && amountDealt > 0) setFlash(characterId, 'assets/images/grimtal/normal_attack.jpg');
+      break;
+    case 'skullCrack':
+      if (!dodged && amountDealt > 0) setFlash(characterId, 'assets/images/grimtal/skull_crack.jpg');
+      break;
     default:
       break;
   }
@@ -364,10 +371,12 @@ export function handleDodgeForFlash(entry, game) {
   const target = game.characters[entry.targetCharacterId];
   if (!target || target.isKO) return;
   // Shared log entry type/shape (damagePipeline.js's applyDamage pushes the
-  // same 'dodge' entry for both Akyros's per-attacker dodge and Marin's
-  // Threefold Veil flat 3-charge pool) - the image differs per character,
-  // same reasoning as wandStrike/arcaneStudy's shared-action-id branching
-  // below in this file.
-  const src = target.id === 'marin' ? 'assets/images/marin/threefold.jpg' : 'assets/images/akyros/dodge.jpg';
+  // same 'dodge' entry for Akyros's per-attacker dodge, Marin's Threefold
+  // Veil flat 3-charge pool, AND Grimtal's Grim Ward) - the image differs
+  // per character, same reasoning as wandStrike/arcaneStudy's shared-
+  // action-id branching below in this file.
+  const src = target.id === 'marin' ? 'assets/images/marin/threefold.jpg'
+    : target.id === 'grimtal' ? 'assets/images/grimtal/dodge.jpg'
+    : 'assets/images/akyros/dodge.jpg';
   setFlash(target.id, src);
 }

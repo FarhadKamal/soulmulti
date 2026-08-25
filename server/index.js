@@ -898,49 +898,6 @@ function handleCreateBotShowRoomCustom(ws, sessionId, { name, characterIds }) {
   runBotTurnsIfAny(room);
 }
 
-// training4: human picks ONE character, dropped into a 4-player FFA with 3
-// REAL bot-controlled characters (chooseBotMove etc. - not scripted), each
-// randomly assigned exactly like bots4's fillSeatWithBot. The only behavior
-// difference from a normal 4p/bots4 match is enforced entirely inside
-// turnEngine.js's isValidTarget/isValidMindControlTarget/isValidPuppetTarget
-// (bots avoid the human's character above 2-alive) - this function itself
-// is otherwise a plain room+match bootstrap, no scripting of any kind. This
-// replaces the old per-character scripted tutorial system: a single generic
-// flow that works for every character, including future ones, with zero new
-// content required per character.
-function handleCreateTrainingRoom(ws, sessionId, { name, characterId }) {
-  const cleanName = sanitizeName(name);
-  if (!cleanName) return send(ws, 'error', { message: 'A name is required.' });
-  if (!CHARACTER_IDS.includes(characterId)) return send(ws, 'error', { message: 'Invalid character.' });
-
-  const room = createRoom('training4');
-  const humanSeat = room.seats[0];
-  humanSeat.kind = 'human';
-  humanSeat.playerId = sessionId;
-  humanSeat.spectatorId = sessionId;
-  humanSeat.name = cleanName;
-  humanSeat.characterIds = [characterId];
-  room.ownerId = sessionId;
-
-  for (let i = 1; i < room.seats.length; i++) fillSeatWithBot(room, room.seats[i]);
-
-  const playerPicks = room.seats.map((s) => ({
-    id: s.playerId || `bot-${s.index}`,
-    name: s.name,
-    characterIds: s.characterIds,
-    isPC: s.kind === 'bot',
-  }));
-  room.game = createGame('training4', playerPicks);
-  room.phase = 'in-match';
-  send(ws, 'room-created', { code: room.code });
-  broadcastLobby(room);
-  broadcastGameState(room);
-  // Safety/consistency with bots4's own creation flow - human is always
-  // seat 0 so this is a no-op in practice today, but keeps the two flows
-  // structurally identical in case seat order ever changes.
-  runBotTurnsIfAny(room);
-}
-
 // Resets all 4 seats to freshly bot-filled and starts a brand new game -
 // shared by the initial creation above and the auto-restart loop in
 // broadcastGameState, so both paths produce an identical fresh match. When
@@ -1251,17 +1208,15 @@ function leaveRoom(sessionId, ws) {
   // "Exit Room" click always goes straight to permanent (no grace period -
   // that's reserved for genuine disconnects, see ws.on('close')); a real
   // disconnect reaching here means the seat had no reconnectToken to begin
-  // with (e.g. a training4 room, seated directly rather than via
-  // handleCreateRoom/handleJoinRoom) since a reconnectable seat's close
-  // handler diverts to the grace period instead of ever calling leaveRoom
-  // directly.
+  // with, since a reconnectable seat's close handler diverts to the grace
+  // period instead of ever calling leaveRoom directly.
   permanentlyConvertSeatToBot(room, seat, room.ownerId === sessionId);
 }
 
 // Starts a 60s grace period for a seat whose connection just genuinely
 // dropped mid-match (heartbeat-detected dead socket, or a real close event) -
 // called only for seats that have a reconnectToken (i.e. claimed via
-// handleCreateRoom/handleJoinRoom, never a training4 seat) and only while
+// handleCreateRoom/handleJoinRoom) and only while
 // room.phase === 'in-match'. The seat plays as a bot for the duration
 // (identical visible behavior to a permanent takeover - no separate
 // "temporarily disconnected" UI state), but keeps spectatorId/reconnectToken
@@ -1662,7 +1617,6 @@ wss.on('connection', (ws) => {
     if (type === 'create-room') return handleCreateRoom(ws, sessionId, payload);
     if (type === 'create-bot-show-room') return handleCreateBotShowRoom(ws, sessionId, payload);
     if (type === 'create-bot-show-room-custom') return handleCreateBotShowRoomCustom(ws, sessionId, payload);
-    if (type === 'create-training-room') return handleCreateTrainingRoom(ws, sessionId, payload);
     if (type === 'join-room') return handleJoinRoom(ws, sessionId, payload);
     if (type === 'reconnect') return handleReconnect(ws, sessionId, payload);
     if (type === 'leave-room') return leaveRoom(sessionId, ws);
@@ -1694,11 +1648,11 @@ wss.on('connection', (ws) => {
     sessions.delete(sessionId);
     // A genuine disconnect mid-match, for a seat that CAN be reconnected to
     // (has a reconnectToken - i.e. claimed via handleCreateRoom/
-    // handleJoinRoom, not a training4 seat), gets a 60s grace period instead
-    // of leaveRoom's usual immediate-and-permanent bot conversion - see
-    // startDisconnectGracePeriod. Every other close (lobby-phase, training4
-    // rooms, or a seat with no token for some other reason) falls through to
-    // the existing leaveRoom behavior unchanged.
+    // handleJoinRoom), gets a 60s grace period instead of leaveRoom's usual
+    // immediate-and-permanent bot conversion - see
+    // startDisconnectGracePeriod. Every other close (lobby-phase rooms, or a
+    // seat with no token for some other reason) falls through to the
+    // existing leaveRoom behavior unchanged.
     const room = findRoomBySessionId(sessionId);
     const seat = room?.seats.find((s) => s.spectatorId === sessionId);
     if (room && seat && seat.kind === 'human' && room.phase === 'in-match' && seat.reconnectToken) {

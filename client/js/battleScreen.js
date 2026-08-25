@@ -191,6 +191,17 @@ export function renderBattle(root, state) {
     if (!rowan || rowan.isKO || rowan.id === characterId) return 0;
     return rowan.special?.silenceTargets?.[characterId] || 0;
   };
+  // Grimtal's Skull Crack headache - same "badge on the VICTIM's own tile"
+  // reasoning as poison/silence above. Strictly one-shot: true only from
+  // the moment the hit lands until the victim's own next turn resolves the
+  // 50% skip roll (headacheRollPending flips false either way, win or
+  // lose), then this reads false again - never multi-turn, never re-armed
+  // without a fresh Skull Crack.
+  const grimtal = Object.values(game.characters).find((c) => c.id === 'grimtal');
+  const isDazedFor = (characterId) => {
+    if (!grimtal || grimtal.isKO || grimtal.id === characterId) return false;
+    return grimtal.special?.headacheVictimId === characterId && !!grimtal.special?.headacheRollPending;
+  };
   Object.values(game.characters).forEach((character) => {
     board.appendChild(renderCharacterTile(character, {
       isActing: character.id === actingCharacterId,
@@ -201,6 +212,7 @@ export function renderBattle(root, state) {
       grudgeCount: grudgeCountFor(character.id),
       isPoisoned: isPoisonedFor(character.id),
       silencedTurns: silencedTurnsFor(character.id),
+      isDazed: isDazedFor(character.id),
       isCursed: character.id === cursedId,
       isFrozenVisual: character.id === frozenId,
       isPuppet: character.id === puppetHighlightId || character.id === activePuppetId,
@@ -454,7 +466,7 @@ function renderVictoryPortraits(game) {
   return container;
 }
 
-function renderCharacterTile(character, { isActing, isMine, isTargetable, onTargetClick, isHoldingBall, isCursed, isFrozenVisual, isVictorious, isPuppet, isHypnotized, grudgeCount, isPoisoned, silencedTurns }) {
+function renderCharacterTile(character, { isActing, isMine, isTargetable, onTargetClick, isHoldingBall, isCursed, isFrozenVisual, isVictorious, isPuppet, isHypnotized, grudgeCount, isPoisoned, silencedTurns, isDazed }) {
   const def = CHARACTERS[character.id];
   const tile = document.createElement('div');
   tile.className = 'char-tile';
@@ -478,6 +490,21 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
   if (character.isKO) tile.classList.add('char-tile--ko');
   if (isCursed && !character.isKO) tile.classList.add('cursed-mark');
   if (isFrozenVisual && !character.isKO) tile.classList.add('ice-frozen');
+  // Grimtal's Skull Crack headache: persistent (server-state-driven, not a
+  // timed flash) swirl overlay for as long as the roll is pending - same
+  // "real serialized state" pattern as .ice-frozen above, not a one-shot
+  // portraitFlash/actionEffects animation, since this has to keep showing
+  // across however many OTHER characters act before the victim's own next
+  // turn finally resolves the roll.
+  if (isDazed && !character.isKO) {
+    tile.classList.add('char-tile--dazed');
+    const dazed = document.createElement('div');
+    dazed.className = 'headache-fx';
+    dazed.innerHTML = '<span class="headache-star headache-star--1">✦</span>' +
+      '<span class="headache-star headache-star--2">✦</span>' +
+      '<span class="headache-star headache-star--3">✦</span>';
+    tile.appendChild(dazed);
+  }
   // Winning side's tile grows and glows gold during the 'victory' game-over
   // stage - swaps the victory art INTO this same tile rather than showing a
   // separate floating portrait below the board, so it reads as "this
@@ -874,6 +901,17 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
     silence.textContent = `⛓️${silencedTurns}`;
     silence.title = `Silenced by Rowan - cannot use their special ability for ${silencedTurns} more of their own turn(s)`;
     tile.appendChild(silence);
+  }
+
+  if (isDazed && !character.isKO) {
+    // Grimtal's Skull Crack headache - same per-relationship badge
+    // reasoning as poison/silence above, cleared the instant the pending
+    // roll resolves on this character's own next turn (win or lose).
+    const dazedBadge = document.createElement('div');
+    dazedBadge.className = 'headache-badge';
+    dazedBadge.textContent = '💫';
+    dazedBadge.title = "Headache from Grimtal's Skull Crack - 50% chance to skip your next turn";
+    tile.appendChild(dazedBadge);
   }
 
   const portrait = document.createElement('img');
@@ -1470,6 +1508,7 @@ const ACTION_LABELS = {
   mirrorReflect: 'Mirror Reflect', silenceLock: 'Silence Lock',
   everbloom: 'Everbloom', threefoldVeil: 'Threefold Veil', cleanSlate: 'Clean Slate',
   piercingWand: 'Piercing Wand', wandMastery: 'Wand Mastery',
+  grimStrike: 'Grim Strike', skullCrack: 'Skull Crack',
 };
 
 // Rowan's and Marin's discoverable spells, shared by describeLogEntry's
@@ -1538,6 +1577,16 @@ function describeLogEntry(entry) {
       return `${name(entry.characterId)}'s Clean Slate activates - cleansed and protected!`;
     case 'clean-slate-immunity-end':
       return `${name(entry.characterId)}'s Clean Slate protection fades`;
+    case 'grim-ward-reward': {
+      const parts = [];
+      if (entry.healed) parts.push(`+${entry.healed} heart${entry.healed > 1 ? 's' : ''}`);
+      if (entry.shielded) parts.push(`+${entry.shielded} shield`);
+      return `${name(entry.targetCharacterId)}'s Grim Ward triggers${parts.length ? ` - ${parts.join(', ')}` : ''}`;
+    }
+    case 'headache-roll':
+      return entry.skipped
+        ? `${name(entry.targetCharacterId)}'s headache flares up - turn skipped!`
+        : `${name(entry.targetCharacterId)} shakes off the headache`;
     case 'passive':
       return entry.text;
     default:
