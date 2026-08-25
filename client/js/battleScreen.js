@@ -1103,6 +1103,18 @@ function statusBadges(character) {
     case 'boingo':
       badges.push({ text: `Jester Ball: ${character.special.jesterBallsUsed}/2` });
       break;
+    case 'grimtal': {
+      // Skull Crack: 3 total casts per match - shown as REMAINING/3 (not
+      // used/3, unlike Boingo's Jester Ball badge above), so the number
+      // counts down to 0 as he spends them, matching how a limited-use
+      // resource reads most intuitively at a glance.
+      const remaining = 3 - character.special.skullCrackUsed;
+      badges.push({ text: `Skull Crack: ${remaining}/3` });
+      if (character.special.unclaimedKillCount > 0) {
+        badges.push({ text: `💀 ${character.special.unclaimedKillCount}`, cls: 'warn', title: 'Unclaimed kills banked - cast Claim the Kill to convert into permanent power' });
+      }
+      break;
+    }
   }
   return badges;
 }
