@@ -168,28 +168,31 @@ function processNewLogEntries(game) {
 // (playKoedVoice returns true once it actually played something) - falls
 // back to the generic sound for any character without a recorded koed
 // line yet, same as every other voice/sound fallback in this file.
-// game is threaded through here (rather than each call site handling its
-// own follow-ups) so the Grimtal power-surge hook below has exactly one
-// place to live, covering all 4 koTriggered sites in this file (curse-
-// mirror, mirror-reflect, jester-ball-take, generic attack/special) without
-// duplicating the check at each of them.
-function playKoedFor(characterId, game) {
+// game/killerCharacterId are threaded through here (rather than each call
+// site handling its own follow-ups) so the Grimtal power-surge hook below
+// has exactly one place to live, covering all 4 koTriggered sites in this
+// file (curse-mirror, mirror-reflect, jester-ball-take, generic attack/
+// special) without duplicating the check at each of them.
+function playKoedFor(characterId, game, killerCharacterId) {
   if (!playKoedVoice(characterId)) playKO();
-  queueGrimtalPowerIfAlive(game, characterId);
+  queueGrimtalPowerIfAlive(game, characterId, killerCharacterId);
 }
 
-// Grimtal's power.jpg/power.mp3 follow-up: per updated design, Grim
-// Strike's damage now scales with the TOTAL number of characters KO'd on
-// the board, regardless of who/what caused each death - so the power-surge
-// animation/voice should fire on ANY KO in the match, not just one he
-// personally lands. A no-op if Grimtal isn't in this match or is already
-// KO'd himself (checked here AND again inside queueGrimtalPowerFlash's own
-// delayed timer, in case he dies during the delay window), and if the
-// character who just died IS Grimtal (his own death doesn't power himself
-// up).
-function queueGrimtalPowerIfAlive(game, koedCharacterId) {
+// Grimtal's power.jpg/power.mp3 follow-up: per the Claim the Kill design,
+// only a kill GRIMTAL HIMSELF personally lands auto-powers him - a kill
+// someone else lands just banks as unclaimed (see claim_kill.jpg/mp3 for
+// that separate, deliberately different moment, triggered from the
+// claimKill action itself, not from here). killerCharacterId must be
+// 'grimtal' for this to fire at all - a no-op for every other attacker,
+// and a no-op if Grimtal isn't in this match, is already KO'd himself
+// (checked here AND again inside queueGrimtalPowerFlash's own delayed
+// timer, in case he dies during the delay window), or IS the character who
+// just died (can't happen in practice since killerCharacterId === 'grimtal'
+// already implies he's alive and attacking, but guarded for clarity).
+function queueGrimtalPowerIfAlive(game, koedCharacterId, killerCharacterId) {
   const grimtal = game.characters.grimtal;
   if (!grimtal || grimtal.isKO || koedCharacterId === 'grimtal') return;
+  if (killerCharacterId !== 'grimtal') return;
   queueGrimtalPowerFlash('grimtal', game);
   // Relative to right now (playKoedFor just started the koed voice playing)
   // rather than the original log-entry-processing moment - koed.mp3 runs
@@ -250,15 +253,20 @@ function playLogEntrySound(entry, game) {
     return;
   }
   if (entry.type === 'curse-mirror') {
-    if (entry.koTriggered) setTimeout(() => playKoedFor(entry.toCharacterId, game), 200);
+    // fromCharacterId is always 'athena' here (this is her curse mirror
+    // specifically) - passed through anyway for correctness rather than
+    // hardcoding a non-Grimtal marker, in case a future character adds a
+    // similar mirror mechanic.
+    if (entry.koTriggered) setTimeout(() => playKoedFor(entry.toCharacterId, game, entry.fromCharacterId), 200);
     return;
   }
   if (entry.type === 'mirror-reflect') {
     // Same reasoning as curse-mirror above - no dedicated sound of its
     // own, just the KO'd sound if the reflect happens to finish someone
     // off. The visible confirmation (hit-flash/shake) is handled in
-    // actionEffects.js's handleLogEntryForEffects.
-    if (entry.koTriggered) setTimeout(() => playKoedFor(entry.toCharacterId, game), 200);
+    // actionEffects.js's handleLogEntryForEffects. fromCharacterId is
+    // always 'rowan' here (this is his Mirror Reflect specifically).
+    if (entry.koTriggered) setTimeout(() => playKoedFor(entry.toCharacterId, game, entry.fromCharacterId), 200);
     return;
   }
   if (entry.type === 'jester-ball-pass') {
@@ -289,7 +297,10 @@ function playLogEntrySound(entry, game) {
       // playLaughVoiceIfAlive) a no-op if he was already KO'd earlier in
       // this same pass chain before it went on to explode on someone else.
       if (entry.targetCharacterId !== 'boingo') playLaughVoiceIfAlive('boingo', game);
-      if (entry.koTriggered) setTimeout(() => playKoedFor(entry.targetCharacterId, game), 200);
+      // A Jester Ball explosion is always attributed to whoever threw it
+      // (only Boingo has this move) - can never be Grimtal's own kill, so
+      // 'boingo' is passed explicitly here rather than a real lookup.
+      if (entry.koTriggered) setTimeout(() => playKoedFor(entry.targetCharacterId, game, 'boingo'), 200);
     }
     return;
   }
@@ -423,7 +434,7 @@ function playLogEntrySound(entry, game) {
   // 200ms mark here and runs ~1.6s itself (matches power.jpg's own
   // FLASH_DURATION_MS-based delay in portraitFlash.js, so the voice and the
   // portrait swap land together).
-  if (entry.koTriggered) setTimeout(() => playKoedFor(entry.targetCharacterId, game), 200);
+  if (entry.koTriggered) setTimeout(() => playKoedFor(entry.targetCharacterId, game, entry.characterId), 200);
 }
 
 function mySeatCharacterIds() {
