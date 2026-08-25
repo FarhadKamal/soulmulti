@@ -384,6 +384,14 @@ function playLogEntrySound(entry, game) {
     playDraxusStrikeVoice(entry.strikeNumber);
   }
   if (entry.koTriggered) setTimeout(() => playKoedFor(entry.targetCharacterId), 200);
+  // Grimtal's power.mp3: per explicit request, plays only AFTER his koed
+  // victim's own koed.mp3 has fully finished, not overlapping/arbitrated
+  // against it. koed fires at the 200ms mark above and runs ~1.6s itself
+  // (matches power.jpg's own FLASH_DURATION_MS-based delay in
+  // portraitFlash.js, so the voice and the portrait swap land together).
+  if (entry.koTriggered && (entry.actionId === 'grimStrike' || entry.actionId === 'skullCrack')) {
+    setTimeout(() => playMoveVoice('grimtal', 'power'), 1800);
+  }
 }
 
 function mySeatCharacterIds() {

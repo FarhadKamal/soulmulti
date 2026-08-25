@@ -79,6 +79,7 @@ const FLASH_IMAGES = [
   'assets/images/grimtal/normal_attack.jpg',
   'assets/images/grimtal/dodge.jpg',
   'assets/images/grimtal/skull_crack.jpg',
+  'assets/images/grimtal/power.jpg',
 ];
 
 let started = false;

@@ -204,6 +204,12 @@ const ACTION_VOICE_LINES = {
     grimStrike: 'basic_strike',
     grimWard: 'dodge',
     skullCrack: 'skull',
+    // Not dispatched through the generic playMoveVoice bottom-of-switch
+    // call - see main.js's dedicated koTriggered branch for grimStrike/
+    // skullCrack, which plays this on its own delayed timer (after his
+    // koed victim's own koed.mp3 finishes) rather than fighting for the
+    // normal move-voice arbitration slot.
+    power: 'power',
   },
 };
 

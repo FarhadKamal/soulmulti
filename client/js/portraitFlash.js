@@ -8,6 +8,14 @@ import { v } from './assetVersion.js';
 
 const FLASH_DURATION_MS = 1600;
 
+// Grimtal's power.jpg follow-up: fires AFTER his own strike flash has fully
+// finished playing (not simultaneously), same "let the first beat read
+// before the second starts" sequencing Rowan's mirror-shard effect uses
+// (see actionEffects.js's MIRROR_SEQUENCE_DELAY_MS) - here the gap is the
+// full FLASH_DURATION_MS itself, since the thing being sequenced IS another
+// portrait flash sharing this exact same timer/slot.
+const GRIMTAL_POWER_DELAY_MS = FLASH_DURATION_MS;
+
 // Per-character currently-flashing image path, cleared after
 // FLASH_DURATION_MS. Keyed by characterId (not a Set, since only one flash
 // image can show per character at a time - a later flash simply overwrites
@@ -152,6 +160,19 @@ function handleLaughing(entry, game) {
 let lastJesterBallThrowerId = null;
 function findThrowerFor() {
   return lastJesterBallThrowerId;
+}
+
+// Grimtal's power.jpg: queued (not fired immediately) whenever a Grim
+// Strike/Skull Crack lands a KO he personally earned - per explicit
+// request, this should play strictly AFTER his own strike flash has fully
+// finished, not layered on top of it. game is captured via closure at call
+// time rather than passed through the timer so a stale isKO check can't
+// read from an outdated snapshot.
+function queueGrimtalPowerFlash(characterId, game) {
+  setTimeout(() => {
+    if (!game.characters[characterId]?.isKO) setFlash(characterId, 'assets/images/grimtal/power.jpg');
+    onFlashExpired();
+  }, GRIMTAL_POWER_DELAY_MS);
 }
 
 // Processes one NEW log entry (already known not to have been seen before)
@@ -354,10 +375,16 @@ export function handleLogEntryForFlash(entry, game) {
     case 'silenceLock':
       setFlash(characterId, 'assets/images/rowan/silence_lock.jpg'); break;
     case 'grimStrike':
-      if (!dodged && amountDealt > 0) setFlash(characterId, 'assets/images/grimtal/normal_attack.jpg');
+      if (!dodged && amountDealt > 0) {
+        setFlash(characterId, 'assets/images/grimtal/normal_attack.jpg');
+        if (entry.koTriggered) queueGrimtalPowerFlash(characterId, game);
+      }
       break;
     case 'skullCrack':
-      if (!dodged && amountDealt > 0) setFlash(characterId, 'assets/images/grimtal/skull_crack.jpg');
+      if (!dodged && amountDealt > 0) {
+        setFlash(characterId, 'assets/images/grimtal/skull_crack.jpg');
+        if (entry.koTriggered) queueGrimtalPowerFlash(characterId, game);
+      }
       break;
     default:
       break;
