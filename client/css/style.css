@@ -282,6 +282,18 @@ input {
   100% { transform: skewX(0deg) translateX(0); }
 }
 
+/* Grimtal's Skull Crack headache, actual-skip outcome: the whole tile
+   itself spins - a full rotation that overshoots slightly then settles
+   back, reading as genuine disorientation rather than a quick wobble.
+   Duration matches EFFECT_DURATION_MS.headspin (actionEffects.js). */
+.char-tile--headspin { animation: tile-head-spin 1.4s ease-in-out; }
+@keyframes tile-head-spin {
+  0% { transform: rotate(0deg) scale(1); }
+  55% { transform: rotate(380deg) scale(1.05); }
+  80% { transform: rotate(345deg) scale(1.02); }
+  100% { transform: rotate(360deg) scale(1); }
+}
+
 .char-tile--divine { animation: tile-divine-flash 1.1s ease-out; }
 .char-tile--divine::after {
   content: '✨'; position: absolute; top: 50%; left: 50%; font-size: 34px;
@@ -397,18 +409,6 @@ input {
   font-size: 0.75em; font-weight: 700;
   padding: 2px 6px; border-radius: 10px;
   box-shadow: 0 0 6px rgba(75, 0, 130, 0.6);
-  pointer-events: none; z-index: 5;
-}
-/* Grimtal's Skull Crack headache - persistent, one-shot-per-turn status
-   (cleared the instant the victim's own next turn resolves the roll), same
-   corner-badge language as poison/silence above. Centered top since both
-   bottom corners and top-right (grudge) are already spoken for. */
-.headache-badge {
-  position: absolute; top: 6px; left: 50%; translate: -50% 0;
-  background: rgba(90, 60, 160, 0.85); color: #fff;
-  font-size: 0.85em; font-weight: 700;
-  padding: 2px 6px; border-radius: 10px;
-  box-shadow: 0 0 6px rgba(90, 60, 160, 0.6);
   pointer-events: none; z-index: 5;
 }
 @keyframes tile-ball-wobble {

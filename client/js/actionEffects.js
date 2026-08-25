@@ -33,6 +33,7 @@ const EFFECT_DURATION_MS = {
   revive: 1300,
   divine: 1100,
   cursesnap: 500,
+  headspin: 1400,
 };
 
 // How long the mirror-shard counter-hit effect waits before it even starts,
@@ -143,6 +144,17 @@ export function handleLogEntryForEffects(entry, game) {
 
   if (entry.type === 'rebirth') {
     if (!isKO(entry.targetCharacterId)) addEffect(entry.targetCharacterId, 'revive', EFFECT_DURATION_MS.revive);
+    return;
+  }
+
+  // Grimtal's Skull Crack headache: only an actual SKIP outcome gets a
+  // visual - a roll that resolves with no skip is a non-event (nothing
+  // changed), matching playLogEntrySound's same skipped-only gate in
+  // main.js. The head_spin.mp3 sound plays alongside this from there.
+  if (entry.type === 'headache-roll') {
+    if (entry.skipped && !isKO(entry.targetCharacterId)) {
+      addEffect(entry.targetCharacterId, 'headspin', EFFECT_DURATION_MS.headspin);
+    }
     return;
   }
 

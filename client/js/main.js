@@ -208,6 +208,14 @@ function playLogEntrySound(entry, game) {
     }
     return;
   }
+  if (entry.type === 'headache-roll') {
+    // Grimtal's Skull Crack headache: only the actual SKIP outcome gets a
+    // sound/tile animation - a roll that resolves with no skip is a non-
+    // event visually (nothing was lost), same "only the consequential
+    // outcome gets feedback" reasoning as chaosGamble's 'lose' branch below.
+    if (entry.skipped) playSound('head_spin.mp3');
+    return;
+  }
   if (entry.type === 'rebirth') {
     playRebirth();
     // Layered on top, never replacing the generic rebirth sound - a no-op

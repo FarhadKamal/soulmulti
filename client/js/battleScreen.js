@@ -807,6 +807,13 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
     wildBolt.innerHTML = `<svg viewBox="0 0 100 100" preserveAspectRatio="none">${wildBolts}</svg><span class="lightning-core"></span>`;
     tile.appendChild(wildBolt);
   }
+  if (effects.has('headspin') && !character.isKO) {
+    // Grimtal's Skull Crack headache, actual-skip outcome: the whole tile
+    // itself visibly spins - distinct motion language from every other
+    // effect here (none of which spin the CARD, only overlay shapes on top
+    // of it), reading directly as "this character is too dizzy to act."
+    tile.classList.add('char-tile--headspin');
+  }
   if (effects.has('axechop') && !character.isKO) {
     // Draxus's Dying Blow: a downward axe-chop wedge that slams straight
     // down and embeds (directional slam, unlike every other effect's
@@ -903,16 +910,6 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
     tile.appendChild(silence);
   }
 
-  if (isDazed && !character.isKO) {
-    // Grimtal's Skull Crack headache - same per-relationship badge
-    // reasoning as poison/silence above, cleared the instant the pending
-    // roll resolves on this character's own next turn (win or lose).
-    const dazedBadge = document.createElement('div');
-    dazedBadge.className = 'headache-badge';
-    dazedBadge.textContent = '💫';
-    dazedBadge.title = "Headache from Grimtal's Skull Crack - 50% chance to skip your next turn";
-    tile.appendChild(dazedBadge);
-  }
 
   const portrait = document.createElement('img');
   portrait.className = 'char-portrait';
