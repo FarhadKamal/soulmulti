@@ -419,6 +419,27 @@ export function applyDamage(game, log, {
       target.special.headacheVictimId = null;
       target.special.headacheRollPending = false;
     }
+    // Grim Strike's own-kill/claimed-kill tracking: a kill Grimtal
+    // personally lands (any of his attacks, not just grimStrike) grants
+    // power automatically - increments ownKillCount right here, no button
+    // needed. A kill anyone ELSE lands just banks as an unclaimed kill;
+    // Grimtal only gains power from it once he spends a whole turn on the
+    // Claim the Kill action (grimtal.js). isMirror excluded from the
+    // "his own kill" case for the same reasoning as every other attacker-
+    // attribution check in this file (a mirrored/reflected kill isn't a
+    // direct attack of his), but still banks as an unclaimed kill via the
+    // else branch below (someone/something else's kill either way, from
+    // Grimtal's perspective).
+    if (target.id !== 'grimtal') {
+      const grimtalChar = game.characters.grimtal;
+      if (grimtalChar && !grimtalChar.isKO) {
+        if (sourceCharacterId === 'grimtal' && !isMirror) {
+          grimtalChar.special.ownKillCount += 1;
+        } else {
+          grimtalChar.special.unclaimedKillCount += 1;
+        }
+      }
+    }
   }
 
   // Melyssa's reactive shield: whenever damage actually reaches her hearts

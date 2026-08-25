@@ -159,10 +159,22 @@ function baseSpecialFor(id) {
         wandMasteryActive: false,
       };
     case 'grimtal':
-      // Grim Strike's damage (1 + total KO'd characters on the board) is
-      // derived live from game state at cast time (grimtal.js) rather than
-      // tracked here - no counter needed, any death counts regardless of
-      // who/what caused it.
+      // Grim Strike's damage is 1 + ownKillCount + claimedKillCount:
+      // - ownKillCount: KOs GRIMTAL HIMSELF personally lands (any of his
+      //   attacks, not just grimStrike) - increments automatically, no
+      //   button needed, inside applyDamage's KO branch.
+      // - claimedKillCount: KOs someone ELSE landed that Grimtal has since
+      //   spent a whole turn actively claiming via the Claim the Kill
+      //   action (see actions.claimKill below) - does NOT increment
+      //   automatically just because a death happened.
+      // unclaimedKillCount: how many of OTHER characters' kills are
+      // currently banked and waiting to be claimed - increments on every
+      // non-Grimtal KO (any source: another player's attack, a poison
+      // tick, a curse mirror, anything), decrements by 1 each time
+      // Claim the Kill is actually cast. Deaths bank up if he doesn't
+      // claim them right away - confirmed ruling: 2 kills he didn't land
+      // before his next turn means 2 separate turns to claim both, not one
+      // turn to claim everything at once.
       // lastHitByThisCycle: Set<attackerCharacterId> - everyone who has
       // landed an attack on him since his own last turn ended (cleared at
       // the start of his own turn, turnEngine.js's beginCharacterTurn calls
@@ -184,6 +196,9 @@ function baseSpecialFor(id) {
       // other caster-side effect in the codebase (Akyros's marks, Athena's
       // curseTargetCharacterId, Rowan's poisonTargets).
       return {
+        ownKillCount: 0,
+        claimedKillCount: 0,
+        unclaimedKillCount: 0,
         lastHitByThisCycle: new Set(),
         skullCrackUsed: 0,
         headacheVictimId: null,

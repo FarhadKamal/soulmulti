@@ -18,18 +18,32 @@ export const actions = {
     needsTarget: true,
     isLegal: () => true,
     execute(character, targetId, game, log) {
-      // Scales with TOTAL characters KO'd on the board so far this match -
-      // any source counts (his own kills, another player's, a poison tick,
-      // a curse mirror, anything), not just kills he personally lands.
-      // Derived live from game state rather than a tracked counter, so
-      // there's no separate bookkeeping to keep in sync anywhere else in
-      // the codebase (no KO-branch special-case needed in
-      // damagePipeline.js, unlike the earlier own-kills-only version).
-      const totalKO = Object.values(game.characters).filter((c) => c.isKO).length;
-      const amount = 1 + totalKO;
+      // ownKillCount: KOs he's personally landed (auto-incremented in
+      // damagePipeline.js's KO branch). claimedKillCount: kills OTHERS
+      // landed that he's since spent a turn actively claiming (see
+      // claimKill below) - a banked, unclaimed kill contributes nothing
+      // until claimed.
+      const amount = 1 + character.special.ownKillCount + character.special.claimedKillCount;
       const result = applyDamage(game, log, { sourceCharacterId: character.id, targetCharacterId: targetId, amount });
       log.push({ type: 'attack', characterId: character.id, actionId: 'grimStrike', targetId, ...result });
       return result;
+    },
+  },
+  claimKill: {
+    label: 'Claim the Kill',
+    needsTarget: false,
+    // Costs his entire turn (no attack this same turn) - plain repeatable
+    // action, not his special (Skull Crack already holds that slot).
+    // Legal only while there's an actual unclaimed kill banked - the
+    // button disappears entirely once everything banked has been claimed,
+    // same "hidden via isLegal alone" pattern Rowan's discoverable spells
+    // use (no separate hidden field needed).
+    isLegal: (character) => character.special.unclaimedKillCount > 0,
+    execute(character, targetId, game, log) {
+      character.special.unclaimedKillCount -= 1;
+      character.special.claimedKillCount += 1;
+      log.push({ type: 'setup', characterId: character.id, actionId: 'claimKill' });
+      return {};
     },
   },
   skullCrack: {

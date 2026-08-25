@@ -1077,6 +1077,14 @@ function chooseMarinMove(character, game, usable) {
 // as Rowan's Arcane Study fallback.
 function chooseGrimtalMove(character, game, usable) {
   const byId = Object.fromEntries(usable.map((a) => [a.actionId, a]));
+  // Claim the Kill first whenever available - pure permanent upside (a
+  // banked unclaimed kill never expires, but claiming it now means every
+  // FUTURE Grim Strike hits harder starting immediately) with no downside
+  // beyond the one turn it costs, same "no reason to hold it" reasoning as
+  // Rowan's Arcane Study fallback.
+  if (byId.claimKill) {
+    return { actionId: 'claimKill', targetId: null };
+  }
   if (byId.skullCrack) {
     const targets = validTargetsFor(game, character, 'skullCrack');
     const targetId = biggestThreatTarget(game, character, targets) || lowestHeartsTarget(game, targets) || pickRandom(targets);

@@ -383,6 +383,8 @@ export function handleLogEntryForFlash(entry, game) {
     case 'skullCrack':
       if (!dodged && amountDealt > 0) setFlash(characterId, 'assets/images/grimtal/skull_crack.jpg');
       break;
+    case 'claimKill':
+      setFlash(characterId, 'assets/images/grimtal/claim_kill.jpg'); break;
     default:
       break;
   }

@@ -1505,7 +1505,7 @@ const ACTION_LABELS = {
   mirrorReflect: 'Mirror Reflect', silenceLock: 'Silence Lock',
   everbloom: 'Everbloom', threefoldVeil: 'Threefold Veil', cleanSlate: 'Clean Slate',
   piercingWand: 'Piercing Wand', wandMastery: 'Wand Mastery',
-  grimStrike: 'Grim Strike', skullCrack: 'Skull Crack',
+  grimStrike: 'Grim Strike', skullCrack: 'Skull Crack', claimKill: 'Claim the Kill',
 };
 
 // Rowan's and Marin's discoverable spells, shared by describeLogEntry's
