@@ -313,6 +313,19 @@ export function applyDamage(game, log, {
     // again with no way to ever escape it.
     const rowan = Object.values(game.characters).find((c) => c.id === 'rowan');
     if (rowan) rowan.special.poisonTargets.delete(target.id);
+    // Grimtal's Skull Crack headache doesn't survive Rebirth either, same
+    // "comes back fresh" reasoning as poison above - covers two distinct
+    // stale-state risks: (1) a pending, not-yet-rolled headache from before
+    // he died would otherwise still resolve on his reborn self's next turn,
+    // and (2) if the roll had ALREADY resolved to a skip before he died,
+    // skipHeadacheTurn would still be sitting true, costing his very next
+    // turn back to a headache from before he was even reborn.
+    target.skipHeadacheTurn = false;
+    const grimtal = Object.values(game.characters).find((c) => c.id === 'grimtal');
+    if (grimtal && grimtal.special.headacheVictimId === target.id) {
+      grimtal.special.headacheVictimId = null;
+      grimtal.special.headacheRollPending = false;
+    }
     // Deferred (not pushed to `log` here) and returned on the result so
     // executeAction() can push it AFTER the triggering attack's own log
     // entry - otherwise it lands BEFORE that entry in the log, since this
