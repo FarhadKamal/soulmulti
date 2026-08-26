@@ -7,7 +7,7 @@ function baseSpecialFor(id) {
       // chronox.js's timeFreeze.isLegal) - same pattern as Velorya's own
       // hasActedOnce for Moonstep. Set true inside cyclonePunch/timeFreeze's
       // own execute, same as any real action counting as "he's acted."
-      // rewindUsed: his one-time Rewind special, tracked separately from
+      // rewindUsesRemaining: Rewind can be cast twice per match, tracked separately from
       // usedSpecial since usedSpecial is already spoken for by Time Freeze
       // (matching how every other multi-special-move character - Rowan's
       // usedSpells Set, Boingo's jesterBallsUsed counter - avoids
@@ -39,7 +39,7 @@ function baseSpecialFor(id) {
       // isValidTarget.
       return {
         freezeActive: false, freezeTargetId: null, freezeSkipsApplied: 0, hasActedOnce: false,
-        rewindUsed: false,
+        rewindUsesRemaining: 2,
         lastActionAgainstMe: null,
         lockedActionCasterId: null,
         lockedActionId: null,

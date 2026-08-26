@@ -1079,6 +1079,9 @@ function statusBadges(character) {
   // show he still has a throw in reserve after using just one.
   if (character.usedSpecial && character.id !== 'boingo') badges.push({ text: 'Special used', cls: 'warn' });
   switch (character.id) {
+    case 'chronox':
+      badges.push({ text: `Rewind: ${character.special.rewindUsesRemaining}/2` });
+      break;
     case 'tharox':
       if (character.special.hasCharge) badges.push({ text: 'Charge ready', cls: 'warn' });
       break;

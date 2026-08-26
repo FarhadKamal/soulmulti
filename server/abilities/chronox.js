@@ -89,15 +89,16 @@ export const actions = {
     // (same "no target picker needed" reasoning as Grimtal's Claim the
     // Kill/Illyra's Mirage Burst).
     needsTarget: false,
-    // Own dedicated one-shot flag (rewindUsed), NOT the shared usedSpecial
+    // Own dedicated counter (rewindUsesRemaining), NOT the shared usedSpecial
     // boolean - Time Freeze already owns that one, and overloading it here
     // would incorrectly also lock out Time Freeze (or vice versa) the
     // moment either was cast, same reasoning as every other multi-special
     // character in the roster (Rowan's usedSpells Set, Boingo's
-    // jesterBallsUsed counter, Grimtal's skullCrackUsed counter).
+    // jesterBallsUsed counter, Grimtal's skullCrackUsed counter). Usable
+    // twice per match.
     special: true,
     isLegal: (character, game) => {
-      if (character.special.rewindUsed) return false;
+      if (character.special.rewindUsesRemaining <= 0) return false;
       const record = character.special.lastActionAgainstMe;
       if (!record) return false;
       const caster = game.characters[record.casterId];
@@ -110,7 +111,7 @@ export const actions = {
       return !!caster && !caster.isKO;
     },
     execute(character, targetId, game, log) {
-      character.special.rewindUsed = true;
+      character.special.rewindUsesRemaining -= 1;
       const record = character.special.lastActionAgainstMe;
       const caster = game.characters[record.casterId];
       // Restoring the CASTER's and CHRONOX's entire character objects
@@ -123,12 +124,14 @@ export const actions = {
       // headache/mirageMarks all live on the caster's own special),
       // reverses Soul Swap's heart-swap (both sides' hearts are part of
       // the restored objects), and restores Illyra's stack count that a
-      // Mirage Burst zeroed out. Only rewindUsed itself (set true just
-      // above, AFTER the snapshot was taken) survives this restore, since
-      // it's never part of the snapshot's own prior state.
+      // Mirage Burst zeroed out. Only rewindUsesRemaining itself
+      // (decremented just above, AFTER the snapshot was taken) must survive
+      // this restore, since it's never part of the snapshot's own prior
+      // state.
+      const rewindUsesRemaining = character.special.rewindUsesRemaining;
       Object.assign(caster, structuredClone(record.casterSnapshot));
       Object.assign(character, structuredClone(record.chronoxSnapshot));
-      character.special.rewindUsed = true; // re-assert past the restore
+      character.special.rewindUsesRemaining = rewindUsesRemaining; // re-assert past the restore
       if (record.jesterBallSnapshot !== undefined) {
         game.jesterBall = structuredClone(record.jesterBallSnapshot);
       }
