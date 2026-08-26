@@ -36,6 +36,7 @@ const EFFECT_DURATION_MS = {
   headspin: 1400,
   bloodsacrifice: 800,
   sacrificepierce: 600,
+  shockmark: 650,
 };
 
 // How long the mirror-shard counter-hit effect waits before it even starts,
@@ -280,6 +281,19 @@ export function handleLogEntryForEffects(entry, game) {
   // the same generic hit-flash/shake to EACH one independently, same
   // gating (landed, real damage) every other impact effect in this file
   // uses.
+  // Chronox's Rewind: the attacker whose action just got undone gets a
+  // startled "!" mark popping up over their tile - reads as "wait, that
+  // didn't just happen?!". Lands on rewoundCasterId, NOT Chronox himself
+  // (the caster) or any normal targetId, since Rewind is a no-target
+  // special - see server/abilities/chronox.js's rewind.execute for the log
+  // entry shape.
+  if (entry.type === 'special' && entry.actionId === 'rewind') {
+    if (!isKO(entry.rewoundCasterId)) {
+      addEffect(entry.rewoundCasterId, 'shockmark', EFFECT_DURATION_MS.shockmark);
+    }
+    return;
+  }
+
   if (entry.type === 'special' && entry.actionId === 'mirageBurst') {
     for (const burst of entry.bursts || []) {
       if (!isKO(burst.targetId) && burst.amountDealt > 0) {

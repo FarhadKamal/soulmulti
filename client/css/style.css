@@ -668,6 +668,30 @@ input {
   100% { opacity: 0; scale: 0.8; }
 }
 
+/* Chronox's Rewind: a big bold "!" snaps into place over the attacker whose
+   action just got undone, overshoots slightly, then settles and fades - a
+   startled "wait, what just happened?!" beat. Plain glyph pop, distinct
+   from every other effect's SVG/shape-based motion, and deliberately loud
+   (large size, bright gold) since it needs to read clearly at a glance as
+   "your move got reversed." */
+.shock-mark-fx {
+  position: absolute; inset: 0; pointer-events: none; z-index: 5;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden; border-radius: inherit;
+  font-size: 4.2rem; font-weight: 900;
+  color: #ffd43b;
+  text-shadow: 0 0 18px rgba(255, 212, 59, 0.95), 0 0 6px rgba(0, 0, 0, 0.85), 0 2px 0 rgba(0, 0, 0, 0.6);
+  opacity: 0;
+  animation: tile-shock-mark 0.65s cubic-bezier(0.2, 1.4, 0.4, 1) forwards;
+}
+@keyframes tile-shock-mark {
+  0% { opacity: 0; scale: 0.2; translate: 0 12px; }
+  35% { opacity: 1; scale: 1.35; translate: 0 -6px; }
+  55% { scale: 1.05; translate: 0 0; }
+  80% { opacity: 1; }
+  100% { opacity: 0; scale: 0.95; translate: 0 -4px; }
+}
+
 /* Melyssa's Self Choke, victim (puppet) side: a constricting violet ring
    that starts wide and contracts inward around the portrait before
    snapping tight and fading - a genuinely new contracting-loop motion,

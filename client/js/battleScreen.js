@@ -703,6 +703,16 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
       '<span class="ice-shard ice-shard--4"></span>';
     tile.appendChild(ice);
   }
+  if (effects.has('shockmark') && !character.isKO) {
+    // Chronox's Rewind: a bold "!" pops up over the attacker's tile whose
+    // action just got undone - snap-in-and-bounce, reading as sudden
+    // shock/disbelief, distinct from every other effect (nothing else uses
+    // a plain glyph pop like this).
+    const shock = document.createElement('div');
+    shock.className = 'shock-mark-fx';
+    shock.textContent = '!';
+    tile.appendChild(shock);
+  }
   if (effects.has('poisoncloud') && !character.isKO) {
     // Rowan's Poison Cloud: a swirling green toxic mist settles over the
     // target - fires on the initial cast AND re-fires on every subsequent
