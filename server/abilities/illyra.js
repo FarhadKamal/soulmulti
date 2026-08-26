@@ -1,5 +1,13 @@
 import { applyDamage } from '../engine/damagePipeline.js';
 
+// Mirage Burst's per-target damage: each stack is worth 1.5 damage,
+// rounded down - confirmed ruling, matches the exact sequence given
+// (1 stack->1, 2->3, 3->4, 4->6, 5->7, continuing 6->9, 7->10...). Not a
+// flat 1-per-stack any more.
+function burstDamageFor(stackCount) {
+  return Math.floor(stackCount * 1.5);
+}
+
 export const actions = {
   mirageMark: {
     label: 'Mirage Mark',
@@ -47,7 +55,7 @@ export const actions = {
         const result = applyDamage(game, log, {
           sourceCharacterId: character.id,
           targetCharacterId: tid,
-          amount: stackCount,
+          amount: burstDamageFor(stackCount),
           ignoresDodge: true,
         });
         bursts.push({ targetId: tid, stackCount, ...result });
