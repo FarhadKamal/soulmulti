@@ -319,9 +319,32 @@ function puppetActionsFor(game, puppetId) {
 // see botPlayer.js) need this exact same option set for legality purposes,
 // but only the human-facing path needs it SERIALIZED for broadcast, hence
 // this lives here rather than in turnEngine.js.
+// Self Choke never routes through isValidPuppetTarget/isValidTarget at all
+// (it's needsTarget: false, and the puppet is its own implicit "target"),
+// so Chronox's Rewind lockout - which every other action against him is
+// checked against in those two functions - was silently never enforced
+// against it. Confirmed live: Melyssa could keep forcing a puppeted Chronox
+// into Self Choke turn after turn, immune to the very lockout his own
+// Rewind had just imposed on that exact (caster, action) pair.
+//
+// Keyed on melyssaId, NOT puppetId: executeSelfChoke's own
+// recordActionAgainstChronoxIfApplicable call (below) deliberately records
+// MELYSSA as the caster (matching Self Choke's real actor/victim
+// attribution - see executeSelfChoke's own comment), so that's who Rewind's
+// lockedActionCasterId actually names afterward, confirmed by the live log
+// itself ("Chronox used Rewind - undid Melyssa's Self Choke!"). Checking
+// against puppetId here would never match.
+function isSelfChokeLocked(game, melyssaId, puppetId) {
+  if (puppetId !== 'chronox') return false;
+  const chronoxChar = game.characters.chronox;
+  return !!chronoxChar && chronoxChar.special.lockedActionCasterId === melyssaId
+    && chronoxChar.special.lockedActionId === 'selfChoke';
+}
+
 function mindControlOptionsFor(game, melyssaId, puppetId) {
   const puppet = game.characters[puppetId];
   const isEnemyPuppet = puppet.ownerId !== game.characters[melyssaId].ownerId;
+  const selfChokeLocked = isSelfChokeLocked(game, melyssaId, puppetId);
 
   const jb = game.jesterBall;
   if (jb && jb.holderCharacterId === puppetId) {
@@ -332,18 +355,23 @@ function mindControlOptionsFor(game, melyssaId, puppetId) {
     if (jb.passCount < 5) {
       jbOptions.push({ actionId: '__mcJesterBallPass', label: 'Pass the Jester Ball', needsTarget: true, special: false, validTargetIds: passTargets });
     }
-    return isEnemyPuppet ? [...jbOptions, selfChokeOption()] : jbOptions;
+    return isEnemyPuppet && !selfChokeLocked ? [...jbOptions, selfChokeOption()] : jbOptions;
   }
 
   // Lone-duel restriction only applies to an ENEMY puppet (an ally puppet
   // was never offered Self Choke at all, so there's nothing to restrict
   // TO) and never to Zerathys (see LONE_DUEL_EXCEPTIONS above).
   if (isEnemyPuppet && !LONE_DUEL_EXCEPTIONS.has(puppetId) && isMelyssaLoneDuel(game, melyssaId)) {
-    return [selfChokeOption()];
+    // Note: if Self Choke is locked in this exact stalemate scenario, there
+    // is genuinely no legal option left for this puppet - the caller (both
+    // the human and bot paths, via getUsablePuppetActions/hasAnyValidTarget)
+    // is expected to fall back to skip logic same as any other "no usable
+    // action" case, not something this function needs to special-case.
+    return selfChokeLocked ? [] : [selfChokeOption()];
   }
 
   const realOptions = puppetActionsFor(game, puppetId);
-  if (!isEnemyPuppet) return realOptions;
+  if (!isEnemyPuppet || selfChokeLocked) return realOptions;
   return [...realOptions, selfChokeOption()];
 }
 

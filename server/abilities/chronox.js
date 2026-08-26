@@ -124,14 +124,30 @@ export const actions = {
       // headache/mirageMarks all live on the caster's own special),
       // reverses Soul Swap's heart-swap (both sides' hearts are part of
       // the restored objects), and restores Illyra's stack count that a
-      // Mirage Burst zeroed out. Only rewindUsesRemaining itself
-      // (decremented just above, AFTER the snapshot was taken) must survive
-      // this restore, since it's never part of the snapshot's own prior
-      // state.
+      // Mirage Burst zeroed out. rewindUsesRemaining (decremented just
+      // above, AFTER the snapshot was taken) must survive this restore,
+      // since it's never part of the snapshot's own prior state.
       const rewindUsesRemaining = character.special.rewindUsesRemaining;
+      // Melyssa's Mind Control lifecycle flags need the same "survive the
+      // restore" treatment, for a different reason: her snapshot is always
+      // taken MID-turn, while special.controlling is still true (Self
+      // Choke doesn't route through executeAction, so
+      // recordActionAgainstChronoxIfApplicable fires from inside
+      // executeSelfChoke, before finishMelyssaTurn/finishBotMindControlTurn
+      // ever clears controlling/puppetCharacterId back to false/null).
+      // Restoring her whole object wholesale would resurrect that stale
+      // "still mid-control" state even though her turn had genuinely
+      // already ended by the time Rewind was cast - confirmed live as a
+      // stuck mind-control glow/portrait on Chronox that never cleared.
+      // Only relevant when Melyssa herself is the rewound caster; harmless
+      // no-op (both undefined) for every other character.
+      const controlling = caster.special.controlling;
+      const puppetCharacterId = caster.special.puppetCharacterId;
       Object.assign(caster, structuredClone(record.casterSnapshot));
       Object.assign(character, structuredClone(record.chronoxSnapshot));
       character.special.rewindUsesRemaining = rewindUsesRemaining; // re-assert past the restore
+      caster.special.controlling = controlling;
+      caster.special.puppetCharacterId = puppetCharacterId;
       if (record.jesterBallSnapshot !== undefined) {
         game.jesterBall = structuredClone(record.jesterBallSnapshot);
       }
