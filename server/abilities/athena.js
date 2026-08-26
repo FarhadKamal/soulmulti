@@ -1,4 +1,4 @@
-import { applyDamage, applyHeal, applyShield, decayShieldIfDue, tryTriggerCleanSlate } from '../engine/damagePipeline.js';
+import { applyDamage, applyHeal, applyShield, decayShieldIfDue, tryTriggerCleanSlate, tryIllyraDodgeStatus } from '../engine/damagePipeline.js';
 
 export function onTurnStart(character, game, log) {
   decayShieldIfDue(character);
@@ -15,6 +15,12 @@ export const actions = {
       // letting it land - the cast still happens (this counts as her turn),
       // it just has no lasting effect on the target.
       if (tryTriggerCleanSlate(target, game, log)) {
+        log.push({ type: 'curse', characterId: character.id, targetId, blocked: true });
+        return {};
+      }
+      // Illyra's passive: a 50% chance the curse status itself simply
+      // doesn't take, checked alongside Clean Slate at the same point.
+      if (tryIllyraDodgeStatus(target, game, log, character.id)) {
         log.push({ type: 'curse', characterId: character.id, targetId, blocked: true });
         return {};
       }

@@ -124,6 +124,29 @@ export function tryTriggerCleanSlate(target, game, log) {
   return false;
 }
 
+// Illyra's passive against STATUS-application attempts specifically (Curse
+// Strike, Time Freeze, Hidden Mark, Silence Lock, Grimtal's Skull Crack
+// headache) - none of these route their status side effect through
+// applyDamage at all (only their direct damage, if any, does), so her 50%
+// dodge needs this separate hook called at each of those 5 sites,
+// mirroring tryTriggerCleanSlate's exact call shape. Same underlying rule
+// as her applyDamage dodge block: a fresh, unconditional 50% roll every
+// single attempt, no memory, no exceptions beyond mirror/poison (neither
+// of which reach these 5 sites anyway, since none of them are mirrored or
+// poison-tick sources). Returns true if the status attempt is dodged - the
+// caller must then skip applying its own status, same contract as
+// tryTriggerCleanSlate. The underlying action/damage still resolves
+// normally either way; only the status side effect is what's being rolled
+// against here.
+export function tryIllyraDodgeStatus(target, game, log, attackerId) {
+  if (target.id !== 'illyra') return false;
+  if (Math.random() < 0.5) {
+    log.push({ type: 'dodge', attackerId, targetCharacterId: target.id });
+    return true;
+  }
+  return false;
+}
+
 export function applyDamage(game, log, {
   sourceCharacterId,
   targetCharacterId,
@@ -132,6 +155,14 @@ export function applyDamage(game, log, {
   ignoresUntargetable = false,
   isMirror = false,
   isPoisonTick = false,
+  // Illyra's Mirage Burst is the first (and so far only) source that needs
+  // to bypass EVERY dodge mechanic in the game uniformly - not just one
+  // character's, all of them (Akyros, Marin, Grimtal, and Illyra's own
+  // passive too), since it's detonating an already-planted mark rather
+  // than landing a fresh attack the target could actually evade. Rather
+  // than adding a bespoke exclusion to each of the 4 dodge blocks
+  // individually, this single flag gates all of them at once.
+  ignoresDodge = false,
 }) {
   const target = game.characters[targetCharacterId];
   const result = {
@@ -155,8 +186,9 @@ export function applyDamage(game, log, {
   let amt = amount;
 
   // Akyros Dodge: only applies to direct attacks, never to mirrored damage
-  // (confirmed ruling: Athena's curse mirror bypasses Dodge).
-  if (target.id === 'akyros' && !isMirror) {
+  // (confirmed ruling: Athena's curse mirror bypasses Dodge). ignoresDodge
+  // (Illyra's Mirage Burst) also bypasses it, same reasoning.
+  if (target.id === 'akyros' && !isMirror && !ignoresDodge) {
     if (!target.special.dodgedAttackerIds.has(sourceCharacterId)) {
       target.special.dodgedAttackerIds.add(sourceCharacterId);
       result.dodged = true;
@@ -171,7 +203,7 @@ export function applyDamage(game, log, {
   // the shared pool regardless of who's attacking, until all 3 are spent
   // (no recharge). Same !isMirror exclusion as Akyros above - a mirrored
   // hit (Athena's curse-mirror) always bypasses dodge.
-  if (target.id === 'marin' && !isMirror && target.special.veilChargesRemaining > 0) {
+  if (target.id === 'marin' && !isMirror && !ignoresDodge && target.special.veilChargesRemaining > 0) {
     target.special.veilChargesRemaining -= 1;
     result.dodged = true;
     log.push({ type: 'dodge', attackerId: sourceCharacterId, targetCharacterId });
@@ -187,7 +219,7 @@ export function applyDamage(game, log, {
   // since there's then no "earlier hitter" to set the condition up - falls
   // out naturally from the >=1-prior-attacker check, no explicit headcount
   // branch needed. Same !isMirror exclusion as every other dodge above.
-  if (target.id === 'grimtal' && !isMirror) {
+  if (target.id === 'grimtal' && !isMirror && !ignoresDodge) {
     const cycle = target.special.lastHitByThisCycle;
     if (cycle.size > 0 && !cycle.has(sourceCharacterId)) {
       cycle.add(sourceCharacterId);
@@ -217,6 +249,25 @@ export function applyDamage(game, log, {
       return result;
     }
     cycle.add(sourceCharacterId);
+  }
+
+  // Illyra's passive (always-on, no cast needed): a flat, unconditional 50%
+  // chance that ANY direct attack or negative-status application against
+  // her simply fails - a fresh coin flip every single time, with no memory
+  // of prior attackers or rolls (confirmed ruling - deliberately NOT
+  // per-attacker like Akyros, and NOT a finite charge pool like Marin's
+  // Threefold Veil). Same !isMirror exclusion as every other dodge above
+  // (a curse mirror always lands, matching game-wide precedent - confirmed
+  // ruling she is NOT a special exception here). Also excludes poison
+  // ticks (isPoisonTick) - confirmed ruling: an already-applied DoT isn't
+  // something her illusion can retroactively avoid, matching how poison
+  // already bypasses every other dodge/shield in the game. !ignoresDodge
+  // lets her OWN Mirage Burst (and any future ignoresDodge source) bypass
+  // this too, same as it bypasses Akyros/Marin/Grimtal.
+  if (target.id === 'illyra' && !isMirror && !isPoisonTick && !ignoresDodge && Math.random() < 0.5) {
+    result.dodged = true;
+    log.push({ type: 'dodge', attackerId: sourceCharacterId, targetCharacterId });
+    return result;
   }
 
   if (!ignoresShield && target.shield > 0) {

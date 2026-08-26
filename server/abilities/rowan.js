@@ -1,4 +1,4 @@
-import { applyDamage, applyHeal, tryTriggerCleanSlate } from '../engine/damagePipeline.js';
+import { applyDamage, applyHeal, tryTriggerCleanSlate, tryIllyraDodgeStatus } from '../engine/damagePipeline.js';
 
 // The full discoverable spell pool - Arcane Study draws one of whichever
 // aren't in special.discoveredSpells yet, so each ever appears at most once
@@ -166,6 +166,13 @@ export const actions = {
       // still spends Rowan's one-time use of this spell, it just never
       // actually locks her special ability away.
       if (tryTriggerCleanSlate(target, game, log)) {
+        log.push({ type: 'special', characterId: character.id, actionId: 'silenceLock', targetId, blocked: true });
+        return {};
+      }
+      // Illyra's passive: a 50% chance the silence itself simply doesn't
+      // take - the cast still spends this one-time spell either way, same
+      // reasoning as the Clean Slate case above.
+      if (tryIllyraDodgeStatus(target, game, log, character.id)) {
         log.push({ type: 'special', characterId: character.id, actionId: 'silenceLock', targetId, blocked: true });
         return {};
       }

@@ -141,6 +141,16 @@ export function handleLogEntryForEffects(entry, game) {
   if (entry.type === 'dodge') {
     // Keyed on the DEFENDER, same as portraitFlash's akyros_dodge image.
     if (!isKO(entry.targetCharacterId)) addEffect(entry.targetCharacterId, 'dodge', EFFECT_DURATION_MS.dodge);
+    // Illyra's passive, per explicit request: on a successful dodge, the
+    // ATTACKER's own tile spins - reads as their strike missing so
+    // completely they're thrown off balance by it. Gated specifically on
+    // her (not a generic "every dodge spins the attacker" rule) since this
+    // is her own unique defensive flavor, not a game-wide dodge behavior -
+    // Akyros/Marin/Grimtal's own dodges keep their existing plain
+    // .char-tile--dodge skew with no attacker-side reaction.
+    if (entry.targetCharacterId === 'illyra' && !isKO(entry.attackerId)) {
+      addEffect(entry.attackerId, 'headspin', EFFECT_DURATION_MS.headspin);
+    }
     return;
   }
 

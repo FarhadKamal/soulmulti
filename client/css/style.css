@@ -477,6 +477,19 @@ input {
   box-shadow: 0 0 6px rgba(75, 0, 130, 0.6);
   pointer-events: none; z-index: 5;
 }
+/* Illyra's Mirage Mark - same persistent per-relationship badge pattern as
+   the others above. Every corner is already spoken for (top-left: Jester
+   Ball, top-right: grudge, bottom-left: poison, bottom-right: silence),
+   and top-center is Grimtal's headache badge - bottom-center is the one
+   remaining free spot. */
+.mirage-mark-badge {
+  position: absolute; bottom: 6px; left: 50%; translate: -50% 0;
+  background: rgba(142, 91, 196, 0.85); color: #fff;
+  font-size: 0.85em; font-weight: 700;
+  padding: 2px 6px; border-radius: 10px;
+  box-shadow: 0 0 6px rgba(142, 91, 196, 0.6);
+  pointer-events: none; z-index: 5;
+}
 @keyframes tile-ball-wobble {
   0%, 100% { transform: rotate(-8deg) scale(1); }
   50% { transform: rotate(8deg) scale(1.08); }

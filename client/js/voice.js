@@ -129,6 +129,7 @@ const VOICE_LINES = {
   rowan: { idle: 'idle', injured: 'injured', koed: 'koed', victory: 'victory' },
   marin: { idle: 'idle', injured: 'injured', koed: 'koed', victory: 'victory' },
   grimtal: { idle: 'idle', injured: 'injured', koed: 'koed', victory: 'victory' },
+  illyra: { idle: 'idle', injured: 'injured', koed: 'koed', victory: 'victory' },
 };
 
 // actionId -> filename, per character - every action here plays its line
@@ -218,6 +219,15 @@ const ACTION_VOICE_LINES = {
     // a normal type: 'setup' entry, same shape as Rowan's arcaneStudy) -
     // no special-casing needed, unlike power above.
     claimKill: 'claim_kill',
+  },
+  illyra: {
+    mirageMark: 'mark',
+    mirageBurst: 'burst',
+    // dodge is played directly from main.js's 'dodge' log-entry handler
+    // (same pattern as grimtal's grimWard/marin's threefoldDodge above),
+    // not through the generic actionId-keyed dispatch - her passive has no
+    // actionId of its own, it's triggered by the shared 'dodge' entry type.
+    dodge: 'dodge',
   },
 };
 

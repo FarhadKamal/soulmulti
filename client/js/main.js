@@ -219,6 +219,10 @@ function playLogEntrySound(entry, game) {
     // of the plain generic dodge sound everyone else gets, per explicit
     // request for a more distinct/weighty cue on his counter-dodge.
     if (entry.targetCharacterId === 'grimtal') playSound('magic_dodge.wav');
+    // Illyra's passive uses its own dedicated illusion.mp3 sound, per
+    // explicit request - distinct from both the plain generic dodge and
+    // Grimtal's magic_dodge.wav.
+    else if (entry.targetCharacterId === 'illyra') playSound('illusion.mp3');
     else playDodge();
     // Marin's Threefold Veil dodge gets its own spoken line on top of the
     // generic dodge sound - a no-op for Akyros's own dodge (same shared
@@ -234,6 +238,11 @@ function playLogEntrySound(entry, game) {
     // dodge source only.
     if (entry.targetCharacterId === 'grimtal' && !game.characters.grimtal?.isKO) {
       playMoveVoice('grimtal', 'grimWard');
+    }
+    // Illyra's passive, same reasoning as Marin/Grimtal above - a spoken
+    // line on top of her own dedicated dodge sound.
+    if (entry.targetCharacterId === 'illyra' && !game.characters.illyra?.isKO) {
+      playMoveVoice('illyra', 'dodge');
     }
     return;
   }

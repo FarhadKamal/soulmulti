@@ -202,6 +202,16 @@ export function renderBattle(root, state) {
     if (!grimtal || grimtal.isKO || grimtal.id === characterId) return false;
     return grimtal.special?.headacheVictimId === characterId && !!grimtal.special?.headacheRollPending;
   };
+  // Illyra's Mirage Mark - same "badge on the VICTIM's own tile" reasoning
+  // as Kaelis's grudge badge above (a per-relationship stack count, not
+  // something that fits cleanly on Illyra's own tile). mirageMarks arrives
+  // as a plain object (Map -> Object.fromEntries, same sanitizeGameFor
+  // Broadcast conversion as Rowan's silenceTargets).
+  const illyra = Object.values(game.characters).find((c) => c.id === 'illyra');
+  const mirageMarksFor = (characterId) => {
+    if (!illyra || illyra.isKO || illyra.id === characterId) return 0;
+    return illyra.special?.mirageMarks?.[characterId] || 0;
+  };
   Object.values(game.characters).forEach((character) => {
     board.appendChild(renderCharacterTile(character, {
       isActing: character.id === actingCharacterId,
@@ -213,6 +223,7 @@ export function renderBattle(root, state) {
       isPoisoned: isPoisonedFor(character.id),
       silencedTurns: silencedTurnsFor(character.id),
       isDazed: isDazedFor(character.id),
+      mirageMarkCount: mirageMarksFor(character.id),
       isCursed: character.id === cursedId,
       isFrozenVisual: character.id === frozenId,
       isPuppet: character.id === puppetHighlightId || character.id === activePuppetId,
@@ -466,7 +477,7 @@ function renderVictoryPortraits(game) {
   return container;
 }
 
-function renderCharacterTile(character, { isActing, isMine, isTargetable, onTargetClick, isHoldingBall, isCursed, isFrozenVisual, isVictorious, isPuppet, isHypnotized, grudgeCount, isPoisoned, silencedTurns, isDazed }) {
+function renderCharacterTile(character, { isActing, isMine, isTargetable, onTargetClick, isHoldingBall, isCursed, isFrozenVisual, isVictorious, isPuppet, isHypnotized, grudgeCount, isPoisoned, silencedTurns, isDazed, mirageMarkCount }) {
   const def = CHARACTERS[character.id];
   const tile = document.createElement('div');
   tile.className = 'char-tile';
@@ -831,10 +842,14 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
     tile.appendChild(drip);
   }
   if (effects.has('headspin') && !character.isKO) {
-    // Grimtal's Skull Crack headache, actual-skip outcome: the whole tile
-    // itself visibly spins - distinct motion language from every other
-    // effect here (none of which spin the CARD, only overlay shapes on top
-    // of it), reading directly as "this character is too dizzy to act."
+    // The whole tile itself visibly spins - distinct motion language from
+    // every other effect here (none of which spin the CARD, only overlay
+    // shapes on top of it). Two distinct triggers share this same visual:
+    // Grimtal's Skull Crack headache (actual-skip outcome, reads as "too
+    // dizzy to act") and, on the ATTACKER's own tile, a successful dodge
+    // against Illyra's passive (reads as "missed so badly they're thrown
+    // off balance") - see actionEffects.js's 'dodge' handler for the
+    // Illyra-specific trigger.
     tile.classList.add('char-tile--headspin');
   }
   if (effects.has('axechop') && !character.isKO) {
@@ -906,6 +921,16 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
     grudge.textContent = `🗡${grudgeCount}`;
     grudge.title = `Kaelis's grudge: ${grudgeCount} (her next Grudge Strike on you deals ${1 + grudgeCount})`;
     tile.appendChild(grudge);
+  }
+
+  if (mirageMarkCount > 0 && !character.isKO) {
+    // Illyra's Mirage Mark - same per-relationship badge reasoning as
+    // Kaelis's grudge badge above.
+    const mirage = document.createElement('div');
+    mirage.className = 'mirage-mark-badge';
+    mirage.textContent = `🪞${mirageMarkCount}`;
+    mirage.title = `Illyra's Mirage Mark: ${mirageMarkCount} stack${mirageMarkCount > 1 ? 's' : ''} (her Mirage Burst on you would deal ${mirageMarkCount})`;
+    tile.appendChild(mirage);
   }
 
   if (isPoisoned && !character.isKO) {
@@ -1541,6 +1566,7 @@ const ACTION_LABELS = {
   everbloom: 'Everbloom', threefoldVeil: 'Threefold Veil', cleanSlate: 'Clean Slate',
   piercingWand: 'Piercing Wand', wandMastery: 'Wand Mastery',
   grimStrike: 'Grim Strike', skullCrack: 'Skull Crack', claimKill: 'Claim the Kill',
+  mirageMark: 'Mirage Mark', mirageBurst: 'Mirage Burst',
 };
 
 // Rowan's and Marin's discoverable spells, shared by describeLogEntry's
@@ -1570,10 +1596,16 @@ function describeLogEntry(entry) {
         // including if it happened to KO her too.
         return `${name(entry.characterId)} used ${actionLabel(entry.actionId)} on ${name(entry.targetId)}${entry.amountDealt != null ? ` - ${entry.amountDealt} damage` : ''}${entry.koTriggered ? ' - KO!' : ''} (sacrificed ${entry.selfCost} heart${entry.selfCost > 1 ? 's' : ''}${entry.selfResult?.koTriggered ? ' - KO!' : ''})`;
       }
+      if (entry.actionId === 'mirageBurst') {
+        return `${name(entry.characterId)} used Mirage Burst on ${name(entry.targetId)} - detonated ${entry.stackCount} stack${entry.stackCount > 1 ? 's' : ''}${entry.amountDealt != null ? ` (${entry.amountDealt} damage)` : ''}${entry.koTriggered ? ' - KO!' : ''}`;
+      }
       return `${name(entry.characterId)} used ${actionLabel(entry.actionId)} on ${name(entry.targetId)}${entry.amountDealt != null ? ` - ${entry.amountDealt} damage` : ''}${entry.koTriggered ? ' - KO!' : ''}`;
     case 'special':
       return `${name(entry.characterId)} used their SPECIAL: ${actionLabel(entry.actionId)}${entry.targetId ? ` on ${name(entry.targetId)}` : ''}${entry.blocked ? ' - blocked by Clean Slate!' : ''}`;
     case 'setup':
+      if (entry.actionId === 'mirageMark') {
+        return `${name(entry.characterId)} used Mirage Mark on ${name(entry.targetId)} - ${entry.stackCount} stack${entry.stackCount > 1 ? 's' : ''}`;
+      }
       return `${name(entry.characterId)} used ${actionLabel(entry.actionId)}${entry.chargeCount ? ` (${entry.chargeCount}/2)` : ''}`;
     case 'hidden-mark':
       return `${name(entry.characterId)} placed a Hidden Mark`;

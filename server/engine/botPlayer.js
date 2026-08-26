@@ -1134,6 +1134,46 @@ function chooseGrimtalMove(character, game, usable) {
   return { actionId: 'grimStrike', targetId };
 }
 
+// Illyra's own decision is simple: detonate whenever a meaningful stack
+// exists on someone (biggest stack = biggest guaranteed payoff, and unlike
+// Grimtal's Claim the Kill there's no cap/cooldown pressuring an immediate
+// cast - but leaving a big stack sitting idle forever wastes the tempo, so
+// still prefer detonating once it's worth it rather than endlessly
+// stacking). ILLYRA_BURST_THRESHOLD is the minimum stack size worth
+// spending the turn on rather than continuing to build it further -
+// smaller stacks (1-2) are cheap to keep growing since Mirage Mark itself
+// costs nothing but a turn either way.
+const ILLYRA_BURST_THRESHOLD = 3;
+
+function chooseIllyraMove(character, game, usable) {
+  const byId = Object.fromEntries(usable.map((a) => [a.actionId, a]));
+  if (byId.mirageBurst) {
+    const targets = validTargetsFor(game, character, 'mirageBurst');
+    // Detonate the single BIGGEST stack available (not just any legal
+    // target) - same "focus the most valuable payoff" reasoning as every
+    // other stack-based character's targeting (Kaelis's grudge, Grimtal's
+    // claimed kills).
+    const marks = character.special.mirageMarks;
+    let bestTarget = null;
+    let bestCount = 0;
+    for (const tid of targets) {
+      const count = marks.get(tid) || 0;
+      if (count > bestCount) {
+        bestCount = count;
+        bestTarget = tid;
+      }
+    }
+    if (bestTarget && bestCount >= ILLYRA_BURST_THRESHOLD) {
+      return { actionId: 'mirageBurst', targetId: bestTarget };
+    }
+  }
+  const targets = validTargetsFor(game, character, 'mirageMark');
+  // Prefer stacking on the biggest current threat, same default targeting
+  // heuristic as most other characters' basic attacks.
+  const targetId = biggestThreatTarget(game, character, targets) || lowestHeartsTarget(game, targets) || pickRandom(targets);
+  return { actionId: 'mirageMark', targetId };
+}
+
 const MOVE_CHOOSERS = {
   tharox: chooseTharoxMove,
   zerathys: chooseZerathysMove,
@@ -1149,6 +1189,7 @@ const MOVE_CHOOSERS = {
   rowan: chooseRowanMove,
   marin: chooseMarinMove,
   grimtal: chooseGrimtalMove,
+  illyra: chooseIllyraMove,
 };
 
 // Fallback for characters without bot logic yet: picks a random usable

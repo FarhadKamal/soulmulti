@@ -1,4 +1,4 @@
-import { applyDamage, tryTriggerCleanSlate } from '../engine/damagePipeline.js';
+import { applyDamage, tryTriggerCleanSlate, tryIllyraDodgeStatus } from '../engine/damagePipeline.js';
 
 // Grim Ward and the headache-roll from Skull Crack both need to run BEFORE
 // the acting character's own legal-action set is computed, so they live in
@@ -87,7 +87,11 @@ export const actions = {
       let blocked = false;
       if (!result.dodged && result.amountDealt > 0 && !result.koTriggered) {
         const target = game.characters[targetId];
-        if (tryTriggerCleanSlate(target, game, log)) {
+        // Illyra's passive checked alongside Clean Slate - same "50%
+        // chance the STATUS side effect itself doesn't take" reasoning as
+        // every other status-application site, independent of whatever
+        // roll may have already applied to the 2 pierce damage above.
+        if (tryTriggerCleanSlate(target, game, log) || tryIllyraDodgeStatus(target, game, log, character.id)) {
           blocked = true;
         } else {
           character.special.headacheVictimId = targetId;

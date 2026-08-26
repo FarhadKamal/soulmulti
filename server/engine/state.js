@@ -204,6 +204,25 @@ function baseSpecialFor(id) {
         headacheVictimId: null,
         headacheRollPending: true,
       };
+    case 'illyra':
+      // mirageMarks: Map<targetCharacterId, stackCount> - how many
+      // uncapped Mirage Mark stacks currently sit on each enemy. Lives on
+      // Illyra (the caster), matching every other caster-side effect in
+      // the codebase (Akyros's marks, Athena's curseTargetCharacterId,
+      // Rowan's poisonTargets) - so her own death can clear it directly if
+      // ever needed, and Blade's Rebirth "comes back fresh" cleanup can
+      // strip a target's own stacks on revival, same pattern as Rowan's
+      // poison/Kaelis's grudge count. Mirage Burst (her special) zeroes out
+      // ONE target's count on detonation (confirmed ruling: clears after
+      // bursting) - stacks on every OTHER target are untouched. No cap on
+      // how high a single target's count can climb (confirmed ruling).
+      // Her passive 50% dodge (both the applyDamage block and
+      // tryIllyraDodgeStatus) needs no tracked state at all - it's a pure,
+      // memoryless coin flip every single time, unlike Akyros's per-
+      // attacker Set or Marin's finite charge pool.
+      return {
+        mirageMarks: new Map(),
+      };
     default:
       return {};
   }

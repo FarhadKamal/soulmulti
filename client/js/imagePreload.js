@@ -83,6 +83,10 @@ const FLASH_IMAGES = [
   'assets/images/grimtal/skull_crack.jpg',
   'assets/images/grimtal/power.jpg',
   'assets/images/grimtal/claim_kill.jpg',
+  'assets/images/illyra/idle.jpg',
+  'assets/images/illyra/illusion.jpg',
+  'assets/images/illyra/mirage_mark.jpg',
+  'assets/images/illyra/mirage_burst.jpg',
 ];
 
 let started = false;

@@ -95,6 +95,7 @@ const IDLE_IMAGE = {
   rowan: 'assets/images/rowan/idle.jpg',
   marin: 'assets/images/marin/idle.jpg',
   grimtal: 'assets/images/grimtal/idle.jpg',
+  illyra: 'assets/images/illyra/idle.jpg',
 };
 
 // Per-character idle-flash duration overrides (falls back to the shared
@@ -405,6 +406,14 @@ export function handleLogEntryForFlash(entry, game) {
       break;
     case 'claimKill':
       setFlash(characterId, 'assets/images/grimtal/claim_kill.jpg'); break;
+    case 'mirageMark':
+      setFlash(characterId, 'assets/images/illyra/mirage_mark.jpg'); break;
+    case 'mirageBurst':
+      // Always flashes on cast, regardless of amountDealt - unlike a
+      // normal attack, this can never be dodged (ignoresDodge: true is
+      // always set server-side), so the detonation itself always visibly
+      // happens even if the target's shield ends up absorbing all of it.
+      setFlash(characterId, 'assets/images/illyra/mirage_burst.jpg'); break;
     default:
       break;
   }
@@ -418,11 +427,12 @@ export function handleDodgeForFlash(entry, game) {
   if (!target || target.isKO) return;
   // Shared log entry type/shape (damagePipeline.js's applyDamage pushes the
   // same 'dodge' entry for Akyros's per-attacker dodge, Marin's Threefold
-  // Veil flat 3-charge pool, AND Grimtal's Grim Ward) - the image differs
-  // per character, same reasoning as wandStrike/arcaneStudy's shared-
-  // action-id branching below in this file.
+  // Veil flat 3-charge pool, Grimtal's Grim Ward, AND Illyra's passive) -
+  // the image differs per character, same reasoning as wandStrike/
+  // arcaneStudy's shared-action-id branching below in this file.
   const src = target.id === 'marin' ? 'assets/images/marin/threefold.jpg'
     : target.id === 'grimtal' ? 'assets/images/grimtal/dodge.jpg'
+    : target.id === 'illyra' ? 'assets/images/illyra/illusion.jpg'
     : 'assets/images/akyros/dodge.jpg';
   setFlash(target.id, src);
 }

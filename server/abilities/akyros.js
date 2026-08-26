@@ -1,4 +1,4 @@
-import { applyDamage, tryTriggerCleanSlate } from '../engine/damagePipeline.js';
+import { applyDamage, tryTriggerCleanSlate, tryIllyraDodgeStatus } from '../engine/damagePipeline.js';
 
 function anyEnemyIsMarked(game, akyrosId) {
   const akyros = game.characters[akyrosId];
@@ -19,6 +19,14 @@ export const actions = {
       // "once marked, never again" shouldn't apply to an attempt that was
       // cleansed before it landed.
       if (tryTriggerCleanSlate(target, game, log)) {
+        log.push({ type: 'hidden-mark', characterId: character.id, targetId, hidden: true, blocked: true });
+        return {};
+      }
+      // Illyra's passive: a 50% chance the mark itself simply doesn't
+      // take - same "never added to everMarkedIds" reasoning as the Clean
+      // Slate case just above, an attempt that never actually lands
+      // shouldn't burn her "once ever" mark eligibility.
+      if (tryIllyraDodgeStatus(target, game, log, character.id)) {
         log.push({ type: 'hidden-mark', characterId: character.id, targetId, hidden: true, blocked: true });
         return {};
       }
