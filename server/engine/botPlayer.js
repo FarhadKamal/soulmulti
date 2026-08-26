@@ -1197,9 +1197,27 @@ function chooseIllyraMove(character, game, usable) {
     }
   }
   const targets = validTargetsFor(game, character, 'mirageMark');
-  // Prefer stacking on the biggest current threat, same default targeting
-  // heuristic as most other characters' basic attacks.
-  const targetId = biggestThreatTarget(game, character, targets) || lowestHeartsTarget(game, targets) || pickRandom(targets);
+  // Concentrate marks on whoever ALREADY has the most stacks, rather than
+  // chasing "whoever's been attacking me most recently" every turn (the
+  // generic biggestThreatTarget heuristic every other character's basic
+  // attack uses) - confirmed live report: her bot was noticeably weaker
+  // than human play specifically because it kept scattering marks across
+  // whichever enemy happened to hit her that particular cycle, instead of
+  // deliberately building one big stack on a single chosen target the way
+  // an obvious human strategy would. Only falls back to the generic
+  // threat-based pick when she has nothing marked anywhere yet (a genuine
+  // fresh choice, no existing investment to protect).
+  const marks = character.special.mirageMarks;
+  let stackTarget = null;
+  let stackCount = 0;
+  for (const tid of targets) {
+    const count = marks.get(tid) || 0;
+    if (count > stackCount) {
+      stackCount = count;
+      stackTarget = tid;
+    }
+  }
+  const targetId = stackTarget || biggestThreatTarget(game, character, targets) || lowestHeartsTarget(game, targets) || pickRandom(targets);
   return { actionId: 'mirageMark', targetId };
 }
 
