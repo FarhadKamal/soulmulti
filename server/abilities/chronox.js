@@ -82,4 +82,68 @@ export const actions = {
       return { targetCharacterId: targetId };
     },
   },
+  rewind: {
+    label: 'Rewind',
+    // No-target: always resolves against whoever caused
+    // special.lastActionAgainstMe, there's only ever one valid choice
+    // (same "no target picker needed" reasoning as Grimtal's Claim the
+    // Kill/Illyra's Mirage Burst).
+    needsTarget: false,
+    // Own dedicated one-shot flag (rewindUsed), NOT the shared usedSpecial
+    // boolean - Time Freeze already owns that one, and overloading it here
+    // would incorrectly also lock out Time Freeze (or vice versa) the
+    // moment either was cast, same reasoning as every other multi-special
+    // character in the roster (Rowan's usedSpells Set, Boingo's
+    // jesterBallsUsed counter, Grimtal's skullCrackUsed counter).
+    special: true,
+    isLegal: (character, game) => {
+      if (character.special.rewindUsed) return false;
+      const record = character.special.lastActionAgainstMe;
+      if (!record) return false;
+      const caster = game.characters[record.casterId];
+      // Confirmed ruling: illegal if the qualifying attacker has since
+      // died - his one precious use is preserved for a real future
+      // opportunity rather than being wasted refunding a move that's now
+      // moot (though he'd still get his own hearts/shield back either way
+      // in principle, the ruling was explicitly "illegal," not "still
+      // works, refund wasted").
+      return !!caster && !caster.isKO;
+    },
+    execute(character, targetId, game, log) {
+      character.special.rewindUsed = true;
+      const record = character.special.lastActionAgainstMe;
+      const caster = game.characters[record.casterId];
+      // Restoring the CASTER's and CHRONOX's entire character objects
+      // wholesale (not a hand-computed diff) is what makes this correct
+      // for every possible effect type in the game uniformly - it
+      // automatically refunds whatever limited-use tracking field that
+      // action touched (usedSpecial, skullCrackUsed, jesterBallsUsed,
+      // usedSpells, etc.) as a side effect of restoring the WHOLE object,
+      // undoes any status the action placed (curse/freeze/mark/silence/
+      // headache/mirageMarks all live on the caster's own special),
+      // reverses Soul Swap's heart-swap (both sides' hearts are part of
+      // the restored objects), and restores Illyra's stack count that a
+      // Mirage Burst zeroed out. Only rewindUsed itself (set true just
+      // above, AFTER the snapshot was taken) survives this restore, since
+      // it's never part of the snapshot's own prior state.
+      Object.assign(caster, structuredClone(record.casterSnapshot));
+      Object.assign(character, structuredClone(record.chronoxSnapshot));
+      character.special.rewindUsed = true; // re-assert past the restore
+      if (record.jesterBallSnapshot !== undefined) {
+        game.jesterBall = structuredClone(record.jesterBallSnapshot);
+      }
+      // Lock: that exact same action is barred against Chronox specifically
+      // for the caster's own next turn only (see turnEngine.js's
+      // isValidTarget/tickChronoxLockoutIfAny for enforcement/timing).
+      character.special.lockedActionCasterId = record.casterId;
+      character.special.lockedActionId = record.actionId;
+      character.special.lockedActionTurnsRemaining = 1;
+      character.special.lastActionAgainstMe = null;
+      log.push({
+        type: 'special', characterId: character.id, actionId: 'rewind',
+        rewoundCasterId: record.casterId, rewoundActionId: record.actionId,
+      });
+      return {};
+    },
+  },
 };

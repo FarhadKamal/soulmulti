@@ -325,6 +325,8 @@ export function handleLogEntryForFlash(entry, game) {
       break;
     case 'timeFreeze':
       setFlash(characterId, 'assets/images/chronox/time.jpg'); break;
+    case 'rewind':
+      setFlash(characterId, 'assets/images/chronox/rewind.jpg'); break;
     case 'cyclonePunch':
       if (!dodged) setFlash(characterId, 'assets/images/chronox/cyclone.jpg');
       break;

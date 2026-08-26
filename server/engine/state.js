@@ -7,7 +7,44 @@ function baseSpecialFor(id) {
       // chronox.js's timeFreeze.isLegal) - same pattern as Velorya's own
       // hasActedOnce for Moonstep. Set true inside cyclonePunch/timeFreeze's
       // own execute, same as any real action counting as "he's acted."
-      return { freezeActive: false, freezeTargetId: null, freezeSkipsApplied: 0, hasActedOnce: false };
+      // rewindUsed: his one-time Rewind special, tracked separately from
+      // usedSpecial since usedSpecial is already spoken for by Time Freeze
+      // (matching how every other multi-special-move character - Rowan's
+      // usedSpells Set, Boingo's jesterBallsUsed counter - avoids
+      // overloading the single shared boolean).
+      // lastActionAgainstMe: a full snapshot of game state taken
+      // IMMEDIATELY BEFORE the most recent action that targeted him
+      // resolved (see turnEngine.js's executeAction, which records this
+      // generically for every action in the game, not just ones aimed at
+      // Chronox - keeping it fully game-agnostic rather than hand-writing
+      // per-ability undo logic). null until something has actually
+      // targeted him. Shape: { casterId, actionId, gameSnapshot } where
+      // gameSnapshot is a structuredClone of the ENTIRE game.characters +
+      // game.jesterBall as they existed right before that action ran -
+      // Rewind restores from this wholesale rather than trying to compute
+      // a targeted diff, so it correctly handles every kind of effect in
+      // the game uniformly (plain damage, curse/freeze/mark/silence/
+      // headache statuses, Soul Swap's heart-swap, Illyra's multi-target
+      // Mirage Burst, Jester Ball's global holder state) with zero
+      // per-ability special-casing needed.
+      // lockedActionCasterId/lockedActionId/lockedActionTurnsRemaining:
+      // after a Rewind, the refunded caster is barred from using that
+      // EXACT SAME action against Chronox specifically for their own next
+      // turn only. turnsRemaining starts at 1 the instant Rewind resolves
+      // and is decremented at the start of the locked caster's OWN next
+      // turn (turnEngine.js's beginCharacterTurn, same victim-turn-tick
+      // shape Rowan's silenceTargets Map already uses) - reaching 0 clears
+      // the whole lock, restoring the caster's normal options from their
+      // turn after that onward. Enforced generically in turnEngine.js's
+      // isValidTarget.
+      return {
+        freezeActive: false, freezeTargetId: null, freezeSkipsApplied: 0, hasActedOnce: false,
+        rewindUsed: false,
+        lastActionAgainstMe: null,
+        lockedActionCasterId: null,
+        lockedActionId: null,
+        lockedActionTurnsRemaining: 0,
+      };
     case 'tharox':
       return { hasCharge: false };
     case 'zerathys':

@@ -12,7 +12,7 @@ import { createGame } from './engine/state.js';
 import {
   getUsableActions, getUsablePuppetActions, executeAction, isValidTarget, isValidMindControlTarget,
   isValidPuppetTarget, markCharacterActed, finalizeAction, executeActionAsPuppet,
-  isMelyssaLoneDuel, LONE_DUEL_EXCEPTIONS,
+  isMelyssaLoneDuel, LONE_DUEL_EXCEPTIONS, recordActionAgainstChronoxIfApplicable,
 } from './engine/turnEngine.js';
 import { applyDamage } from './engine/damagePipeline.js';
 import {
@@ -364,6 +364,11 @@ function selfChokeOption() {
 // it's intentional (see client/js/portraitFlash.js's dedicated Self-Choke
 // flash check, which relies on this exact attribution).
 function executeSelfChoke(game, melyssaId, puppetId) {
+  // Chronox's Rewind needs to see this too, if he's ever the puppet forced
+  // into it - Self Choke doesn't route through executeAction (it calls
+  // applyDamage directly), so it needs the same recording hook called
+  // explicitly here.
+  recordActionAgainstChronoxIfApplicable(game, melyssaId, 'selfChoke', puppetId);
   const log = [];
   const result = applyDamage(game, log, {
     sourceCharacterId: melyssaId,

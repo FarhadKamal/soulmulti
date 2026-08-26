@@ -390,6 +390,21 @@ export function applyDamage(game, log, {
     // carried it over.
     const illyra = Object.values(game.characters).find((c) => c.id === 'illyra');
     if (illyra) illyra.special.mirageMarks.delete(target.id);
+    // Chronox's Rewind snapshot must be invalidated if IT was recorded
+    // against this now-revived character as the caster - otherwise
+    // casting Rewind later would restore a STALE pre-death snapshot of
+    // them, silently erasing their Rebirth entirely (their hearts revert
+    // to whatever they were before the fatal hit, rebirthUsed reverts to
+    // false, letting them "die and revive" a second time for free).
+    // Confirmed live-reasoning gap: isLegal's own "caster still alive"
+    // check doesn't catch this, since rebirthUsed flips isKO straight back
+    // to false - the caster looks alive again by the time Rewind is cast,
+    // even though the snapshot itself now predates a death/revival it
+    // knows nothing about.
+    const chronoxForRewind = Object.values(game.characters).find((c) => c.id === 'chronox');
+    if (chronoxForRewind && chronoxForRewind.special.lastActionAgainstMe?.casterId === target.id) {
+      chronoxForRewind.special.lastActionAgainstMe = null;
+    }
     // Deferred (not pushed to `log` here) and returned on the result so
     // executeAction() can push it AFTER the triggering attack's own log
     // entry - otherwise it lands BEFORE that entry in the log, since this
@@ -482,6 +497,19 @@ export function applyDamage(game, log, {
     if (target.id === 'grimtal') {
       target.special.headacheVictimId = null;
       target.special.headacheRollPending = false;
+    }
+    // Chronox's own death ends any pending Rewind opportunity and lockout
+    // immediately - not strictly load-bearing today (he has no revival
+    // mechanic, and applyDamage's own isKO guard at the top already blocks
+    // any future action from ever targeting a dead Chronox), but matches
+    // the same defensive "caster's death cancels their own state" cleanup
+    // every other character gets here, in case a future mechanic ever
+    // revives him.
+    if (target.id === 'chronox') {
+      target.special.lastActionAgainstMe = null;
+      target.special.lockedActionCasterId = null;
+      target.special.lockedActionId = null;
+      target.special.lockedActionTurnsRemaining = 0;
     }
     // Grim Strike's own-kill/claimed-kill tracking: a kill Grimtal
     // personally lands (any of his attacks, not just grimStrike) grants

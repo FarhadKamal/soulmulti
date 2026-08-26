@@ -41,6 +41,19 @@ export function isValidTarget(game, characterId, actionId, targetId) {
   if (target.untargetable) return false;
   if (actionId === 'shadowExecution') return character.special.marks.has(targetId);
   if (actionId === 'hiddenMark') return !character.special.everMarkedIds.has(targetId);
+  // Chronox's Rewind lockout: the caster it was cast against cannot use
+  // that EXACT SAME action against Chronox specifically, for their own
+  // next turn only (see tickChronoxLockoutIfAny for the timing). Every
+  // OTHER action against Chronox, and this exact action against anyone
+  // else, remain fully legal - only this one precise (caster, action,
+  // Chronox) combination is blocked.
+  if (targetId === 'chronox') {
+    const chronoxChar = game.characters.chronox;
+    if (chronoxChar && chronoxChar.special.lockedActionCasterId === characterId
+      && chronoxChar.special.lockedActionId === actionId) {
+      return false;
+    }
+  }
   return true;
 }
 
@@ -123,6 +136,16 @@ export function isValidPuppetTarget(game, puppetId, actionId, targetId) {
   if (target.untargetable) return false;
   if (actionId === 'shadowExecution') return puppet.special.marks.has(targetId);
   if (actionId === 'hiddenMark') return !puppet.special.everMarkedIds.has(targetId);
+  // Chronox's Rewind lockout applies here too - a puppeted attacker is
+  // still the same underlying character the lock is keyed on, so forcing
+  // them into it via Mind Control shouldn't bypass the restriction.
+  if (targetId === 'chronox') {
+    const chronoxChar = game.characters.chronox;
+    if (chronoxChar && chronoxChar.special.lockedActionCasterId === puppetId
+      && chronoxChar.special.lockedActionId === actionId) {
+      return false;
+    }
+  }
   return true;
 }
 
@@ -259,10 +282,45 @@ function resolveHeadacheIfDue(character, game, log) {
 // since my last turn" starts there, not here.
 
 // Runs turn-start passives for a character (shield gain, freeze flip, shield decay).
+// Chronox's Rewind lockout: unlike every other status-tracking field in
+// this file, this one lives on CHRONOX'S OWN special (lockedActionCasterId
+// points AT the restricted caster) rather than on the restricted caster's
+// own special pointing back at Chronox - simpler here since there's only
+// ever one active lock at a time (Rewind is 1-use total) and no need to
+// scan every character the way tickSilenceIfAny does.
+//
+// lockedActionTurnsRemaining starts at 1 the instant Rewind resolves. This
+// tick fires at the START of the LOCKED CASTER's own turn (character.id
+// here is whoever's turn is starting, not Chronox) - a two-phase
+// check-then-consume, NOT a simple decrement-and-check-in-the-same-pass,
+// because isValidTarget (later in this SAME turn) still needs to see the
+// lock as active for the caster's very next turn: if this tick both
+// decremented to 0 AND deleted the lock in one pass, the restriction would
+// never actually apply on the turn it's meant to cover.
+// - First sighting (turnsRemaining === 1, their genuine "next turn"):
+//   decrement to 0, but KEEP the lock in place - isValidTarget still
+//   blocks the exact locked action against Chronox for the rest of this
+//   turn.
+// - Second sighting (turnsRemaining === 0, meaning their turn after that
+//   has now arrived and the restricted turn is fully over): clear the
+//   lock entirely, restoring their normal options from here on.
+function tickChronoxLockoutIfAny(character, game, log) {
+  const chronoxChar = game.characters.chronox;
+  if (!chronoxChar || chronoxChar.isKO) return;
+  if (chronoxChar.special.lockedActionCasterId !== character.id) return;
+  if (chronoxChar.special.lockedActionTurnsRemaining > 0) {
+    chronoxChar.special.lockedActionTurnsRemaining -= 1;
+    return;
+  }
+  chronoxChar.special.lockedActionCasterId = null;
+  chronoxChar.special.lockedActionId = null;
+}
+
 export function beginCharacterTurn(character, game, log) {
   tickPoisonIfAny(character, game, log);
   tickSilenceIfAny(character, game, log);
   resolveHeadacheIfDue(character, game, log);
+  tickChronoxLockoutIfAny(character, game, log);
   const mod = ABILITY_MODULES[character.id];
   if (mod?.onTurnStart) mod.onTurnStart(character, game, log);
   // Poison's tick above deals REAL damage outside the normal executeAction/
@@ -275,7 +333,50 @@ export function beginCharacterTurn(character, game, log) {
   applyEndOfActionChecks(game);
 }
 
+// Chronox's Rewind: records a full snapshot of every character's state
+// (plus game.jesterBall) IMMEDIATELY BEFORE any action that directly
+// targets him resolves. Deliberately generic/game-agnostic rather than
+// hand-writing per-ability undo logic (see the detailed reasoning in
+// state.js's chronox special-field comments) - this single hook is what
+// makes Rewind work correctly for every kind of effect in the game
+// uniformly (plain damage, statuses, Soul Swap's heart-swap, Illyra's
+// Mirage Burst, Jester Ball state), with zero changes needed to any other
+// ability file. Only records when targetId === 'chronox' specifically
+// (the caster's own self-only actions, or actions aimed at someone else,
+// never count as "an action against him") - deliberately does NOT try to
+// capture indirect cascades like a curse-mirror landing on him from
+// someone else's attack, since "the most recent action taken against him"
+// naturally means the most recent time he was the ACTUAL chosen target.
+export function recordActionAgainstChronoxIfApplicable(game, characterId, actionId, targetId) {
+  if (targetId !== 'chronox') return;
+  const chronoxChar = game.characters.chronox;
+  if (!chronoxChar || chronoxChar.isKO) return;
+  // Deliberately snapshots ONLY the caster's own character object, Chronox
+  // himself, and game.jesterBall - NOT the entire game.characters map.
+  // Restoring every character's full state wholesale would incorrectly
+  // undo everyone ELSE's unrelated progress too (their own damage dealt,
+  // resources spent, etc.) if other turns happened between the recorded
+  // action and Chronox actually casting Rewind - clearly wrong for an
+  // ability that's meant to reverse ONE specific past action, not rewind
+  // the whole match. Every effect type in the game that could plausibly
+  // target Chronox only ever touches the caster's own state and/or
+  // Chronox's own state (plain damage, curse/freeze/mark/silence/headache
+  // statuses live on the caster's special; Soul Swap only swaps hearts
+  // between caster and target; Illyra's Mirage Burst's stack map lives on
+  // the caster) plus, for Jester Ball specifically, the single shared
+  // game.jesterBall slot - covered separately below since it isn't scoped
+  // to any one character.
+  chronoxChar.special.lastActionAgainstMe = {
+    casterId: characterId,
+    actionId,
+    casterSnapshot: structuredClone(game.characters[characterId]),
+    chronoxSnapshot: structuredClone(chronoxChar),
+    jesterBallSnapshot: structuredClone(game.jesterBall),
+  };
+}
+
 export function executeAction(game, characterId, actionId, targetId, extra) {
+  recordActionAgainstChronoxIfApplicable(game, characterId, actionId, targetId);
   const character = game.characters[characterId];
   const mod = ABILITY_MODULES[characterId];
   const actionDef = mod.actions[actionId];
@@ -348,7 +449,36 @@ export function executeActionAsPuppet(game, melyssaCharacterId, puppetCharacterI
 export function resolveJesterBall(game, holderCharacterId, choice, extra) {
   const log = [];
   const res = boingo.jesterBallResolution[choice];
+  // Jester Ball explosions (Take, or an un-intercepted 5th Pass) can deal
+  // real damage to whoever's currently holding it - Chronox's Rewind needs
+  // to see this too, but there's no single upfront targetId to check the
+  // way executeAction's own recordActionAgainstChronoxIfApplicable does
+  // (a Pass might just move the ball with no explosion at all). Snapshot
+  // unconditionally before resolving (cheap - same structuredClone cost as
+  // every other snapshot in this file), then only actually record it
+  // against Chronox if the holder turns out to be him once resolution is
+  // known.
+  const isChronoxHolder = holderCharacterId === 'chronox' && !game.characters.chronox?.isKO;
+  // Captured BEFORE res.execute() runs - by the time it returns,
+  // game.jesterBall may already be null (the ball fully resolved), losing
+  // the thrower's id, and the thrower's own pre-explosion state would be
+  // gone too. Same scoped shape as recordActionAgainstChronoxIfApplicable -
+  // only the thrower's own character object, Chronox, and jesterBall, not
+  // the whole game.characters map.
+  const thrownById = game.jesterBall?.thrownByCharacterId ?? 'boingo';
+  const preSnapshot = isChronoxHolder
+    ? {
+      casterId: thrownById,
+      actionId: `jesterBall:${choice}`,
+      casterSnapshot: structuredClone(game.characters[thrownById]),
+      chronoxSnapshot: structuredClone(game.characters.chronox),
+      jesterBallSnapshot: structuredClone(game.jesterBall),
+    }
+    : null;
   const result = res.execute(game, log, extra);
+  if (preSnapshot && game.characters.chronox) {
+    game.characters.chronox.special.lastActionAgainstMe = preSnapshot;
+  }
   if (result?.rebirthLogEntry) log.push(result.rebirthLogEntry);
   applyEndOfActionChecks(game);
   game.log.push(...log, { type: 'end-action', round: game.round, characterId: holderCharacterId, actionId: `jesterBall:${choice}`, hearts: heartsSnapshot(game) });

@@ -1550,7 +1550,7 @@ function fallbackCopy(text, onDone) {
 // as a client-side lookup rather than plumbed through every log entry,
 // since action ids are stable, non-secret game data.
 const ACTION_LABELS = {
-  cyclonePunch: 'Cyclone Punch', timeFreeze: 'Time Freeze',
+  cyclonePunch: 'Cyclone Punch', timeFreeze: 'Time Freeze', rewind: 'Rewind',
   smash: 'Smash', titanToss: 'Titan Toss', titanSmash: 'Titan Smash', glorySmash: 'Glory Smash',
   chargeUp: 'Charge Up', thunderWrath: 'Thunder Wrath', soulSwap: 'Soul Swap', soulSwapWrath: 'Thunder Wrath (free)',
   hiddenMark: 'Hidden Mark', fatalSlash: 'Fatal Slash', shadowExecution: 'Shadow Execution',
@@ -1611,6 +1611,9 @@ function describeLogEntry(entry) {
           `${name(b.targetId)} (${b.stackCount} stack${b.stackCount > 1 ? 's' : ''}${b.amountDealt != null ? `, ${b.amountDealt} dmg` : ''}${b.koTriggered ? ' - KO!' : ''})`
         );
         return `${name(entry.characterId)} used Mirage Burst - detonated ${parts.join(', ')}`;
+      }
+      if (entry.actionId === 'rewind') {
+        return `${name(entry.characterId)} used Rewind - undid ${name(entry.rewoundCasterId)}'s ${actionLabel(entry.rewoundActionId)}!`;
       }
       return `${name(entry.characterId)} used their SPECIAL: ${actionLabel(entry.actionId)}${entry.targetId ? ` on ${name(entry.targetId)}` : ''}${entry.blocked ? ' - blocked by Clean Slate!' : ''}`;
     case 'setup':

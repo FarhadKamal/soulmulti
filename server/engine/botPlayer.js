@@ -396,6 +396,16 @@ export function chooseSoulSwapWrathTarget(character, game, excludeOwnerId = null
 
 function chooseChronoxMove(character, game, usable) {
   const byId = Object.fromEntries(usable.map((a) => [a.actionId, a]));
+  // Rewind first, whenever it's legal at all - it's a free heal, a free
+  // status cleanse, a free refund of whatever the caster spent, AND locks
+  // that exact move out against him next turn, all with zero downside
+  // beyond the one turn it costs (it's never illegal to cast when there's
+  // genuinely nothing to undo - isLegal already requires a real qualifying
+  // record). Same "no reason to hold it" reasoning as Rowan's Arcane Study
+  // fallback and Grimtal's Claim the Kill.
+  if (byId.rewind) {
+    return { actionId: 'rewind', targetId: null };
+  }
   // Time Freeze is best spent either defensively (Chronox himself is low
   // and needs to lock down whoever's been hurting him) or offensively on
   // the biggest live threat once available - it denies 2 of their turns.

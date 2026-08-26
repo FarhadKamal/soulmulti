@@ -150,6 +150,7 @@ const ACTION_SOUND = {
   divineSacrifice: 'sword_thud',
   mirageMark: 'mirage_mark',
   mirageBurst: 'mirage_burst',
+  rewind: 'rewind',
 };
 
 export function playActionSound(actionId) {
