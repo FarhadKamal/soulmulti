@@ -657,6 +657,23 @@ function chooseAthenaMove(character, game, usable) {
   // rather than firing a curse with no legal target.
   if (byId.curseStrike) {
     const targets = validTargetsFor(game, character, 'curseStrike');
+    const currentCursed = character.special.curseTargetCharacterId;
+    // Danger override: once she's genuinely at risk of dying soon, re-curse
+    // onto whoever's actually been hitting her hardest recently - even if
+    // that means abandoning an existing curse she'd normally stay locked
+    // onto. The reasoning: if she's about to lose this exchange anyway, a
+    // curse on her actual likely killer turns that loss into a mutual KO
+    // (a draw) instead of a clean loss, via the curse-mirror firing the
+    // instant the killing blow lands. A curse on anyone else just wastes
+    // the mirror on a hit that may never come. Confirmed live: she died to
+    // Akyros while still cursing an unrelated target from earlier, missing
+    // a real chance to at least take her own killer down with her.
+    if (character.hearts <= LOW_HEARTS_THRESHOLD) {
+      const likelyKiller = biggestThreatTarget(game, character, targets);
+      if (likelyKiller && likelyKiller !== currentCursed) {
+        return { actionId: 'curseStrike', targetId: likelyKiller };
+      }
+    }
     // Keep the curse on whoever's already cursed if they're still a legal
     // target - re-picking a new target every turn for no reason just makes
     // the mirror unpredictable and wastes the fact the curse never expires
@@ -664,7 +681,6 @@ function chooseAthenaMove(character, game, usable) {
     // when a clearly healthier/more dangerous target exists to curse
     // instead - a target with more hearts left can keep attacking Athena
     // for longer, making the eventual mirror damage add up more.
-    const currentCursed = character.special.curseTargetCharacterId;
     if (currentCursed && targets.includes(currentCursed)) {
       const healthierOptions = targets.filter((tid) =>
         game.characters[tid].hearts > game.characters[currentCursed].hearts + 2
