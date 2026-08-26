@@ -1596,11 +1596,22 @@ function describeLogEntry(entry) {
         // including if it happened to KO her too.
         return `${name(entry.characterId)} used ${actionLabel(entry.actionId)} on ${name(entry.targetId)}${entry.amountDealt != null ? ` - ${entry.amountDealt} damage` : ''}${entry.koTriggered ? ' - KO!' : ''} (sacrificed ${entry.selfCost} heart${entry.selfCost > 1 ? 's' : ''}${entry.selfResult?.koTriggered ? ' - KO!' : ''})`;
       }
-      if (entry.actionId === 'mirageBurst') {
-        return `${name(entry.characterId)} used Mirage Burst on ${name(entry.targetId)} - detonated ${entry.stackCount} stack${entry.stackCount > 1 ? 's' : ''}${entry.amountDealt != null ? ` (${entry.amountDealt} damage)` : ''}${entry.koTriggered ? ' - KO!' : ''}`;
-      }
       return `${name(entry.characterId)} used ${actionLabel(entry.actionId)} on ${name(entry.targetId)}${entry.amountDealt != null ? ` - ${entry.amountDealt} damage` : ''}${entry.koTriggered ? ' - KO!' : ''}`;
     case 'special':
+      if (entry.actionId === 'mirageBurst') {
+        // No single target - detonates everyone currently marked at once,
+        // each for their own stack count. Lists every victim who actually
+        // had something to burst (entry.bursts is empty if she somehow
+        // cast this with nothing marked, though isLegal should prevent
+        // that from ever happening).
+        if (!entry.bursts || entry.bursts.length === 0) {
+          return `${name(entry.characterId)} used Mirage Burst - nothing was marked!`;
+        }
+        const parts = entry.bursts.map((b) =>
+          `${name(b.targetId)} (${b.stackCount} stack${b.stackCount > 1 ? 's' : ''}${b.amountDealt != null ? `, ${b.amountDealt} dmg` : ''}${b.koTriggered ? ' - KO!' : ''})`
+        );
+        return `${name(entry.characterId)} used Mirage Burst - detonated ${parts.join(', ')}`;
+      }
       return `${name(entry.characterId)} used their SPECIAL: ${actionLabel(entry.actionId)}${entry.targetId ? ` on ${name(entry.targetId)}` : ''}${entry.blocked ? ' - blocked by Clean Slate!' : ''}`;
     case 'setup':
       if (entry.actionId === 'mirageMark') {

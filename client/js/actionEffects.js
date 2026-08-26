@@ -274,6 +274,22 @@ export function handleLogEntryForEffects(entry, game) {
     return;
   }
 
+  // Illyra's Mirage Burst: detonates EVERY currently-marked enemy at once
+  // (confirmed ruling) - no single targetId/amountDealt at the top level
+  // like a normal attack, instead an array of per-victim results. Apply
+  // the same generic hit-flash/shake to EACH one independently, same
+  // gating (landed, real damage) every other impact effect in this file
+  // uses.
+  if (entry.type === 'special' && entry.actionId === 'mirageBurst') {
+    for (const burst of entry.bursts || []) {
+      if (!isKO(burst.targetId) && burst.amountDealt > 0) {
+        applyHitFlash(burst.targetId, burst.amountDealt);
+        addEffect(burst.targetId, 'shake', EFFECT_DURATION_MS.shake);
+      }
+    }
+    return;
+  }
+
   if (entry.type !== 'attack' && entry.type !== 'special') return;
   const { characterId, actionId, targetId, dodged, amountDealt, streak, flip, outcome, grudgeCount, isNewTarget, wasMarked } = entry;
 

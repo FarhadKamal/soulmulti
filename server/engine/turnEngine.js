@@ -41,13 +41,6 @@ export function isValidTarget(game, characterId, actionId, targetId) {
   if (target.untargetable) return false;
   if (actionId === 'shadowExecution') return character.special.marks.has(targetId);
   if (actionId === 'hiddenMark') return !character.special.everMarkedIds.has(targetId);
-  // Illyra's Mirage Burst: only a target with 1+ Mirage Mark stacks is a
-  // valid detonation target - matches the shadowExecution shape above
-  // (requires a prior mark to have been placed), same reasoning as her
-  // own mirageBurst.isLegal only checking "does ANY target have stacks" at
-  // the action-visibility level, while THIS is what actually filters which
-  // specific enemies are offered as targets.
-  if (actionId === 'mirageBurst') return (character.special.mirageMarks.get(targetId) || 0) > 0;
   return true;
 }
 

@@ -17,16 +17,12 @@ export const actions = {
   },
   mirageBurst: {
     label: 'Mirage Burst',
-    needsTarget: true,
-    // Fully repeatable, no cooldown, no usedSpecial gate - the only limit
-    // is having any stacks to detonate at all. Legal per-target is
-    // enforced via isValidTarget in turnEngine.js (needs a target with
-    // 1+ stacks); this isLegal only gates whether the button/action shows
-    // up AT ALL - true if ANY enemy currently has 1+ stacks, matching
-    // Rowan's Arcane Study "hidden via isLegal alone" pattern (no separate
-    // hidden field needed). hasAnyValidTarget (turnEngine.js) is what
-    // actually filters this out of getUsableActions once no valid target
-    // remains, same mechanism every other targeted action already uses.
+    // No-target: one click detonates EVERY currently-marked enemy at once
+    // (confirmed ruling), not a single chosen target - each takes damage
+    // equal to their OWN stack count, independently. Fully repeatable, no
+    // cooldown, no usedSpecial gate - the only limit is having any stacks
+    // to detonate at all.
+    needsTarget: false,
     isLegal: (character) => {
       for (const count of character.special.mirageMarks.values()) {
         if (count > 0) return true;
@@ -35,21 +31,29 @@ export const actions = {
     },
     execute(character, targetId, game, log) {
       const marks = character.special.mirageMarks;
-      const stackCount = marks.get(targetId) || 0;
-      marks.set(targetId, 0);
-      // Confirmed ruling: bypasses EVERY dodge mechanic in the game
-      // (Akyros, Marin, Grimtal, and her own passive too) - detonating an
-      // already-planted mark isn't a fresh attack the target could evade.
-      // Shield still absorbs it normally (not ignoresShield) - dodge-proof,
-      // not shield-proof.
-      const result = applyDamage(game, log, {
-        sourceCharacterId: character.id,
-        targetCharacterId: targetId,
-        amount: stackCount,
-        ignoresDodge: true,
-      });
-      log.push({ type: 'attack', characterId: character.id, actionId: 'mirageBurst', targetId, stackCount, ...result });
-      return result;
+      const bursts = [];
+      // Snapshot the target list BEFORE clearing anything - iterating and
+      // mutating the same Map in one pass is fine here since .set() never
+      // adds new keys mid-loop (only zeroes existing ones), but snapshotting
+      // makes the intent explicit and survives any future refactor safely.
+      for (const [tid, stackCount] of [...marks.entries()]) {
+        if (stackCount <= 0) continue;
+        marks.set(tid, 0);
+        // Confirmed ruling: bypasses EVERY dodge mechanic in the game
+        // (Akyros, Marin, Grimtal, and her own passive too) - detonating an
+        // already-planted mark isn't a fresh attack the target could
+        // evade. Shield still absorbs it normally (not ignoresShield) -
+        // dodge-proof, not shield-proof.
+        const result = applyDamage(game, log, {
+          sourceCharacterId: character.id,
+          targetCharacterId: tid,
+          amount: stackCount,
+          ignoresDodge: true,
+        });
+        bursts.push({ targetId: tid, stackCount, ...result });
+      }
+      log.push({ type: 'special', characterId: character.id, actionId: 'mirageBurst', bursts });
+      return { bursts };
     },
   },
 };

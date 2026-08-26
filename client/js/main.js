@@ -451,6 +451,17 @@ function playLogEntrySound(entry, game) {
   // FLASH_DURATION_MS-based delay in portraitFlash.js, so the voice and the
   // portrait swap land together).
   if (entry.koTriggered) setTimeout(() => playKoedFor(entry.targetCharacterId, game, entry.characterId), 200);
+  // Illyra's Mirage Burst can KO multiple victims in the SAME detonation
+  // (no single koTriggered/targetCharacterId at the top level like a
+  // normal attack - see entry.bursts instead) - each one that died still
+  // deserves its own koed voice/sound confirmation, same as any other KO.
+  if (entry.actionId === 'mirageBurst') {
+    for (const burst of entry.bursts || []) {
+      if (burst.koTriggered) {
+        setTimeout(() => playKoedFor(burst.targetId, game, entry.characterId), 200);
+      }
+    }
+  }
   // Athena's Divine Sacrifice can KO HERSELF via its own separate self-cost
   // roll (entry.selfResult.koTriggered) - a distinct outcome from the enemy
   // target's own koTriggered above (both could even fire from the same
