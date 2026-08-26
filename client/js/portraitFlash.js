@@ -38,13 +38,13 @@ export function registerFlashRerender(fn) {
   onFlashExpired = fn;
 }
 
-function setFlash(characterId, src) {
+function setFlash(characterId, src, durationMs = FLASH_DURATION_MS) {
   const existing = activeFlash.get(characterId);
   if (existing) clearTimeout(existing.timer);
   const timer = setTimeout(() => {
     activeFlash.delete(characterId);
     onFlashExpired();
-  }, FLASH_DURATION_MS);
+  }, durationMs);
   activeFlash.set(characterId, { src, timer });
 }
 
@@ -97,6 +97,14 @@ const IDLE_IMAGE = {
   grimtal: 'assets/images/grimtal/idle.jpg',
 };
 
+// Per-character idle-flash duration overrides (falls back to the shared
+// FLASH_DURATION_MS for everyone not listed here). Grimtal's flute-playing
+// idle image is a quieter character beat meant to linger longer than a
+// normal 1.6s flash - per explicit request, held roughly double that.
+const IDLE_DURATION_MS = {
+  grimtal: 3000,
+};
+
 // Call once per character at the moment their own turn starts (i.e. when
 // they first appear as actingCharacterId after not having been the actor
 // on the previous broadcast) - see main.js's turn-start edge detection.
@@ -134,7 +142,7 @@ export function checkIdlePortrait(character) {
   }
   if (isIdle) {
     const src = IDLE_IMAGE[character.id];
-    if (src) setFlash(character.id, src);
+    if (src) setFlash(character.id, src, IDLE_DURATION_MS[character.id]);
   }
   heartsAtLastTurnStart.set(character.id, character.hearts);
   return isIdle;
