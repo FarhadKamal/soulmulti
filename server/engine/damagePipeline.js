@@ -383,6 +383,13 @@ export function applyDamage(game, log, {
       grimtal.special.headacheVictimId = null;
       grimtal.special.headacheRollPending = false;
     }
+    // Illyra's Mirage Mark stacks don't survive Rebirth either, same
+    // "comes back fresh" reasoning as poison/headache above - otherwise a
+    // banked stack from before he died would still be sitting there ready
+    // to detonate on his reborn self, even though he never should have
+    // carried it over.
+    const illyra = Object.values(game.characters).find((c) => c.id === 'illyra');
+    if (illyra) illyra.special.mirageMarks.delete(target.id);
     // Deferred (not pushed to `log` here) and returned on the result so
     // executeAction() can push it AFTER the triggering attack's own log
     // entry - otherwise it lands BEFORE that entry in the log, since this
