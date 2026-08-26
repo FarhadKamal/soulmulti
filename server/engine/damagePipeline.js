@@ -17,20 +17,21 @@ export function isSilenced(character, game) {
   );
 }
 
-// True if character currently has any of the 4 genuine debuff-style
+// True if character currently has any of the 5 genuine debuff-style
 // negative statuses another character has placed on them (Athena's curse,
-// Chronox's freeze, Akyros's Hidden Mark, Rowan's Silence Lock) -
-// deliberately excludes Blade's streak-lock and Kaelis's grudge count,
-// since both are the ATTACKER's own tracked resource rather than a status
-// placed ON the victim (same ruling already established for what Rowan's
-// Purify treats as "urgent" vs. what it merely sweeps up as a side effect -
-// see rowanHasUrgentNegativeStatus in botPlayer.js). Used by Marin's Clean
-// Slate: both its reactive trigger condition (fires the first time this
-// becomes true) and, while her immunity window is active, to block these 4
-// specific status-applications from landing on her at all (see the
-// isImmuneToNegativeStatus carve-outs in each ability file below).
-// Deliberately does NOT cover Poison Cloud - confirmed scope decision, she's
-// still vulnerable to Rowan's poison same as anyone else.
+// Chronox's freeze, Akyros's Hidden Mark, Rowan's Silence Lock, Grimtal's
+// Skull Crack headache) - deliberately excludes Blade's streak-lock and
+// Kaelis's grudge count, since both are the ATTACKER's own tracked
+// resource rather than a status placed ON the victim (same ruling already
+// established for what Rowan's Purify treats as "urgent" vs. what it
+// merely sweeps up as a side effect - see rowanHasUrgentNegativeStatus in
+// botPlayer.js). Used by Marin's Clean Slate: both its reactive trigger
+// condition (fires the first time this becomes true) and, while her
+// immunity window is active, to block these 5 specific status-applications
+// from landing on her at all (see the isImmuneToNegativeStatus carve-outs
+// in each ability file below). Deliberately does NOT cover Poison Cloud -
+// confirmed scope decision, she's still vulnerable to Rowan's poison same
+// as anyone else.
 export function hasNegativeStatus(character, game) {
   return Object.values(game.characters).some((c) => {
     if (c.id === character.id) return false;
@@ -40,6 +41,7 @@ export function hasNegativeStatus(character, game) {
     if (s.freezeActive && s.freezeTargetId === character.id) return true;
     if (s.marks?.has(character.id)) return true;
     if (s.silenceTargets?.has(character.id)) return true;
+    if (s.headacheVictimId === character.id && s.headacheRollPending) return true;
     return false;
   });
 }
@@ -71,6 +73,10 @@ export function clearNegativeStatuses(character, game, log) {
     if (s.marks?.has(character.id)) s.marks.delete(character.id);
     if (s.revealedMarks?.has(character.id)) s.revealedMarks.delete(character.id);
     if (s.silenceTargets?.has(character.id)) s.silenceTargets.delete(character.id);
+    if (s.headacheVictimId === character.id) {
+      s.headacheVictimId = null;
+      s.headacheRollPending = false;
+    }
   }
 }
 

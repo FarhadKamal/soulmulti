@@ -1,4 +1,4 @@
-import { applyDamage } from '../engine/damagePipeline.js';
+import { applyDamage, tryTriggerCleanSlate } from '../engine/damagePipeline.js';
 
 // Grim Ward and the headache-roll from Skull Crack both need to run BEFORE
 // the acting character's own legal-action set is computed, so they live in
@@ -79,11 +79,22 @@ export const actions = {
       // slot, not a list - confirmed acceptable since a landed Skull Crack
       // is rare (one every several turns) and always the more recent
       // threat.
+      //
+      // Marin's Clean Slate: consumes/blocks the headache status itself,
+      // same as Rowan's Silence Lock - the 2 pierce damage above still
+      // lands normally regardless, only the headache side effect is
+      // suppressed.
+      let blocked = false;
       if (!result.dodged && result.amountDealt > 0 && !result.koTriggered) {
-        character.special.headacheVictimId = targetId;
-        character.special.headacheRollPending = true;
+        const target = game.characters[targetId];
+        if (tryTriggerCleanSlate(target, game, log)) {
+          blocked = true;
+        } else {
+          character.special.headacheVictimId = targetId;
+          character.special.headacheRollPending = true;
+        }
       }
-      log.push({ type: 'special', characterId: character.id, actionId: 'skullCrack', targetId, ...result });
+      log.push({ type: 'special', characterId: character.id, actionId: 'skullCrack', targetId, blocked, ...result });
       return result;
     },
   },
