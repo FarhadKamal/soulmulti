@@ -10,6 +10,7 @@ import { CHARACTERS } from '../client/js/characters.js';
 import {
   getUsableActions, beginCharacterTurn, consumeSkipIfFrozen, consumeSkipIfHeadache, markCharacterActed,
   hasCharacterActedThisTurn, charactersActingThisTurn, resolveJesterBall, endTurn,
+  tickChronoxLockoutIfAny,
 } from './engine/turnEngine.js';
 
 // Zeroes out a stalled Draxus bonus turn (see draxus.js's onTurnStart) when
@@ -90,6 +91,11 @@ export function getActingCharacterId(game) {
       markCharacterActed(game, character.id);
       continue;
     }
+    // Past both skip checks - this character is genuinely getting a turn,
+    // so this is the right moment to count it against Chronox's Rewind
+    // lockout (see tickChronoxLockoutIfAny's own comment for why this can't
+    // live in beginCharacterTurn above).
+    tickChronoxLockoutIfAny(character, game, game.log);
     if (!isBallHolder && getUsableActions(character, game).length === 0) {
       game.log.push({ type: 'passive', characterId: character.id, text: `${CHARACTERS[character.id].name} has no valid targets and skips their turn.` });
       clearStalledBonusTurn(character);

@@ -304,7 +304,21 @@ function resolveHeadacheIfDue(character, game, log) {
 // - Second sighting (turnsRemaining === 0, meaning their turn after that
 //   has now arrived and the restricted turn is fully over): clear the
 //   lock entirely, restoring their normal options from here on.
-function tickChronoxLockoutIfAny(character, game, log) {
+// Deliberately NOT called from beginCharacterTurn like the other tick
+// functions above - unlike poison/silence/headache (which all need to fire
+// every round a character's turn comes up regardless of whether they end up
+// frozen/skipped, per beginCharacterTurn's own unconditional-firing
+// rationale in gameFlow.js), this lockout is specifically meant to cover
+// one turn where the caster actually GETS to act. beginCharacterTurn fires
+// before the freeze/headache skip checks in getActingCharacterId, so if
+// this lived there, a frozen or headache-skipped "turn" would silently
+// consume the lockout countdown without the caster ever having a real turn
+// restricted by it - confirmed live: Chronox froze Melyssa right after
+// Rewinding her Self Choke, both frozen turns ticked the lock down to 0,
+// and she Self Choked him again completely unrestricted on her next REAL
+// turn. Called explicitly from gameFlow.js instead, only once a character
+// is confirmed to be getting a genuine turn (past both skip checks).
+export function tickChronoxLockoutIfAny(character, game, log) {
   const chronoxChar = game.characters.chronox;
   if (!chronoxChar || chronoxChar.isKO) return;
   if (chronoxChar.special.lockedActionCasterId !== character.id) return;
@@ -320,7 +334,6 @@ export function beginCharacterTurn(character, game, log) {
   tickPoisonIfAny(character, game, log);
   tickSilenceIfAny(character, game, log);
   resolveHeadacheIfDue(character, game, log);
-  tickChronoxLockoutIfAny(character, game, log);
   const mod = ABILITY_MODULES[character.id];
   if (mod?.onTurnStart) mod.onTurnStart(character, game, log);
   // Poison's tick above deals REAL damage outside the normal executeAction/
