@@ -124,6 +124,41 @@ export const jesterBallResolution = {
         game.jesterBall = null;
         return;
       }
+      // Illyra's passive: a 50% chance a pass TO her simply fails - the
+      // ball phases through her illusion and detonates on whoever tried to
+      // pass it instead, as if it fumbled in their own hands (confirmed
+      // ruling: identical resolveExplosion rules as any other explosion -
+      // flat 4 damage, Rebirth-interceptable - just landing on the PASSER
+      // rather than her). She never becomes the holder at all in this
+      // case - game.jesterBall.holderCharacterId is never updated to her,
+      // so no jester-ball-pass log entry is pushed either (the pass never
+      // truly completed). passCount still increments above regardless of
+      // outcome, same as any other pass attempt.
+      if (newHolderCharacterId === 'illyra' && Math.random() < 0.5) {
+        log.push({ type: 'dodge', attackerId: fromCharacterId, targetCharacterId: 'illyra' });
+        // Confirmed ruling: this must NEVER be Boingo himself - a failed
+        // pass FROM Boingo TO Illyra should never explode 4 damage onto
+        // Boingo, since landing on him is always meant to heal, not hurt,
+        // him (the whole point of the return-to-Boingo branch just above).
+        // Boingo can never actually be fromCharacterId here in practice
+        // anyway (he'd need to be holding the ball and choosing to pass it
+        // to Illyra himself, at which point he'd already be excluded by
+        // the newHolderCharacterId === thrownByCharacterId branch above if
+        // HE were the new holder - but fromCharacterId being Boingo, while
+        // passing to someone else entirely, is a completely normal,
+        // reachable case) - guarded explicitly regardless, since silently
+        // exploding on him would be a real, damaging bug if this
+        // assumption is ever wrong.
+        if (fromCharacterId === game.jesterBall.thrownByCharacterId) {
+          const wasKO = game.characters[fromCharacterId]?.isKO ?? false;
+          const healed = applyHeal(game, fromCharacterId, 4);
+          log.push({ type: 'jester-ball-return', boingoId: fromCharacterId, healed, wasKO });
+          game.jesterBall = null;
+          return;
+        }
+        resolveExplosion(game, log, fromCharacterId);
+        return;
+      }
       game.jesterBall.holderCharacterId = newHolderCharacterId;
       // The 5th pass that DOESN'T land on Boingo auto-resolves as an
       // explosion on whoever just received it - no 6th holder ever gets a
