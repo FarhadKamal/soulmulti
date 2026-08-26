@@ -607,10 +607,30 @@ function chooseBladeMove(character, game, usable) {
   return { actionId: 'bloodHunt', targetId: pickDefaultTarget(game, character, 'bloodHunt') };
 }
 
+// Divine Sacrifice is a genuine gamble (guaranteed 3 damage to an enemy,
+// but a RANDOM 1-3 hearts lost to herself every single cast, no cooldown,
+// can even KO her outright) - only worth the bot risking it as a surgical
+// finishing blow: an enemy at or below this threshold could be killed or
+// nearly killed by the guaranteed 3, AND she needs to be healthy enough
+// (ATHENA_SACRIFICE_SAFE_HEARTS) to comfortably absorb even the worst-case
+// 3-heart cost without it being what puts HER at risk. Both conditions
+// required (confirmed ruling) - neither alone is enough justification for
+// how much variance this move introduces.
+const ATHENA_SACRIFICE_FINISH_THRESHOLD = 3;
+const ATHENA_SACRIFICE_SAFE_HEARTS = 5;
+
 function chooseAthenaMove(character, game, usable) {
   const byId = Object.fromEntries(usable.map((a) => [a.actionId, a]));
   if (byId.divineRestore && character.hearts <= LOW_HEARTS_THRESHOLD) {
     return { actionId: 'divineRestore', targetId: null };
+  }
+  if (byId.divineSacrifice && character.hearts >= ATHENA_SACRIFICE_SAFE_HEARTS) {
+    const targets = validTargetsFor(game, character, 'divineSacrifice')
+      .filter((tid) => game.characters[tid].hearts <= ATHENA_SACRIFICE_FINISH_THRESHOLD);
+    if (targets.length > 0) {
+      const targetId = lowestHeartsTarget(game, targets) || pickRandom(targets);
+      return { actionId: 'divineSacrifice', targetId };
+    }
   }
   // Curse Strike may not actually be usable right now (no valid target -
   // e.g. everyone else is KO'd or the only remaining enemy is untargetable),

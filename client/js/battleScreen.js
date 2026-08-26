@@ -807,6 +807,18 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
     wildBolt.innerHTML = `<svg viewBox="0 0 100 100" preserveAspectRatio="none">${wildBolts}</svg><span class="lightning-core"></span>`;
     tile.appendChild(wildBolt);
   }
+  if (effects.has('bloodsacrifice') && !character.isKO) {
+    // Athena's Divine Sacrifice: fires on HER OWN tile (not the enemy she
+    // hit) - a few streaks of blood drip down from the top of the tile and
+    // a brief red pulse, reading as "this cost her something" rather than
+    // an incoming-hit flash (no one attacked her).
+    const drip = document.createElement('div');
+    drip.className = 'blood-sacrifice-fx';
+    drip.innerHTML = '<span class="blood-drip blood-drip--1"></span>' +
+      '<span class="blood-drip blood-drip--2"></span>' +
+      '<span class="blood-drip blood-drip--3"></span>';
+    tile.appendChild(drip);
+  }
   if (effects.has('headspin') && !character.isKO) {
     // Grimtal's Skull Crack headache, actual-skip outcome: the whole tile
     // itself visibly spins - distinct motion language from every other
@@ -1508,7 +1520,7 @@ const ACTION_LABELS = {
   hiddenMark: 'Hidden Mark', fatalSlash: 'Fatal Slash', shadowExecution: 'Shadow Execution',
   lunarStrike: 'Lunar Strike', moonstep: 'Moonstep', lunarEclipse: 'Lunar Eclipse',
   chaosGamble: 'Chaos Gamble', jesterBall: 'Jester Ball', bloodHunt: 'Blood Hunt',
-  curseStrike: 'Curse Strike', divineRestore: 'Divine Restore',
+  curseStrike: 'Curse Strike', divineRestore: 'Divine Restore', divineSacrifice: 'Divine Sacrifice',
   selfChoke: 'Self Choke',
   grudgeStrike: 'Grudge Strike', callAshka: 'Call Ashka',
   dyingBlow: 'Dying Blow', deathlessFury: 'Deathless Fury',
@@ -1539,6 +1551,12 @@ function describeLogEntry(entry) {
     case 'mind-control-select':
       return `${name(entry.characterId)} took control of ${name(entry.targetId)}'s mind!`;
     case 'attack':
+      if (entry.actionId === 'divineSacrifice') {
+        // Shows both sides of the gamble - the guaranteed 3 dealt to the
+        // enemy AND the random hearts it actually cost her this cast,
+        // including if it happened to KO her too.
+        return `${name(entry.characterId)} used ${actionLabel(entry.actionId)} on ${name(entry.targetId)}${entry.amountDealt != null ? ` - ${entry.amountDealt} damage` : ''}${entry.koTriggered ? ' - KO!' : ''} (sacrificed ${entry.selfCost} heart${entry.selfCost > 1 ? 's' : ''}${entry.selfResult?.koTriggered ? ' - KO!' : ''})`;
+      }
       return `${name(entry.characterId)} used ${actionLabel(entry.actionId)} on ${name(entry.targetId)}${entry.amountDealt != null ? ` - ${entry.amountDealt} damage` : ''}${entry.koTriggered ? ' - KO!' : ''}`;
     case 'special':
       return `${name(entry.characterId)} used their SPECIAL: ${actionLabel(entry.actionId)}${entry.targetId ? ` on ${name(entry.targetId)}` : ''}${entry.blocked ? ' - blocked by Clean Slate!' : ''}`;

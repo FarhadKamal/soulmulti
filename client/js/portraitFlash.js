@@ -296,6 +296,9 @@ export function handleLogEntryForFlash(entry, game) {
   switch (actionId) {
     case 'divineRestore':
       setFlash(characterId, 'assets/images/athena/heal.jpg'); break;
+    case 'divineSacrifice':
+      if (!dodged && amountDealt > 0) setFlash(characterId, 'assets/images/athena/sacrifice.jpg');
+      break;
     case 'glorySmash':
       setFlash(characterId, 'assets/images/tharox/glory.jpg'); break;
     case 'titanToss':

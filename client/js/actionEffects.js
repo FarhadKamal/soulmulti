@@ -34,6 +34,7 @@ const EFFECT_DURATION_MS = {
   divine: 1100,
   cursesnap: 500,
   headspin: 1400,
+  bloodsacrifice: 800,
 };
 
 // How long the mirror-shard counter-hit effect waits before it even starts,
@@ -487,5 +488,17 @@ export function handleLogEntryForEffects(entry, game) {
   // the portrait flash (normal_attack.jpg) already carries the hit itself.
   if (actionId === 'grimStrike' && targetId && !dodged && amountDealt >= 2) {
     addEffect(targetId, 'shake', EFFECT_DURATION_MS.shake);
+  }
+
+  // Divine Sacrifice: the enemy TARGET still gets the normal hit-flash/
+  // shake from applyHitFlash above (this is a real attack that lands like
+  // any other) - this effect is the SELF-cost visual instead, firing on
+  // ATHENA'S OWN tile (characterId, not targetId) regardless of whether the
+  // enemy hit landed or was dodged, since her own hearts are spent either
+  // way. A brief blood-drip pulse reading as "this cost her something,"
+  // distinct from a normal incoming-hit flash since no one attacked her -
+  // she did this to herself.
+  if (actionId === 'divineSacrifice' && !isKO(characterId)) {
+    addEffect(characterId, 'bloodsacrifice', EFFECT_DURATION_MS.bloodsacrifice);
   }
 }

@@ -435,6 +435,17 @@ function playLogEntrySound(entry, game) {
   // FLASH_DURATION_MS-based delay in portraitFlash.js, so the voice and the
   // portrait swap land together).
   if (entry.koTriggered) setTimeout(() => playKoedFor(entry.targetCharacterId, game, entry.characterId), 200);
+  // Athena's Divine Sacrifice can KO HERSELF via its own separate self-cost
+  // roll (entry.selfResult.koTriggered) - a distinct outcome from the enemy
+  // target's own koTriggered above (both could even fire from the same
+  // cast, in theory, though a dead Athena wouldn't be dealing the enemy hit
+  // in the first place - the ordering inside her execute() means her own
+  // death is resolved AFTER the enemy hit, so this is the realistic case).
+  // Without this, her own KO from this move would have no voice/sound
+  // confirmation at all.
+  if (entry.actionId === 'divineSacrifice' && entry.selfResult?.koTriggered) {
+    setTimeout(() => playKoedFor(entry.characterId, game, entry.characterId), 200);
+  }
 }
 
 function mySeatCharacterIds() {

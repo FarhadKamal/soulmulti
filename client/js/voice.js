@@ -141,7 +141,7 @@ const ACTION_VOICE_LINES = {
   chronox: { timeFreeze: 'time_freeze' },
   velorya: { lunarEclipse: 'eclipse' },
   boingo: { jesterBall: 'jerster' },
-  athena: { divineRestore: 'devine' },
+  athena: { divineRestore: 'devine', divineSacrifice: 'sacrifice' },
   zerathys: { chargeUp: 'charge', thunderWrath: 'release', soulSwap: 'soul_swap' },
   tharox: { titanToss: 'titan_toss', titanSmash: 'titan_smash', glorySmash: 'glory' },
   akyros: { hiddenMark: 'hidden_mark', shadowExecution: 'shadow' },
@@ -310,5 +310,11 @@ export function allVoiceFilePaths() {
   for (const [characterId, actions] of Object.entries(ACTION_VOICE_LINES)) {
     for (const filename of Object.values(actions)) paths.push(`assets/voice/${characterId}/${filename}.mp3`);
   }
+  // Draxus's 3 Deathless Fury bonus-strike lines (One/Two/Three.mp3) are
+  // dispatched via playDraxusStrikeVoice, not the generic ACTION_VOICE_LINES
+  // table above (one actionId, 3 different lines by strike number) - so
+  // DRAXUS_STRIKE_LINES needs to be folded in explicitly here or these 3
+  // files would never be preloaded at all, only fetched live on first use.
+  for (const filename of Object.values(DRAXUS_STRIKE_LINES)) paths.push(`assets/voice/draxus/${filename}.mp3`);
   return paths;
 }

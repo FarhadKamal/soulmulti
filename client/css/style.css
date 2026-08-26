@@ -294,6 +294,36 @@ input {
   100% { transform: rotate(360deg) scale(1); }
 }
 
+/* Athena's Divine Sacrifice: fires on HER OWN tile (the self-cost), not the
+   enemy she hit - a few streaks of blood drip down from the top edge and
+   fade, plus a brief red pulse on the tile border, reading as "this cost
+   her something" distinct from a normal incoming-hit flash. Duration
+   matches EFFECT_DURATION_MS.bloodsacrifice (actionEffects.js). */
+.blood-sacrifice-fx {
+  position: absolute; inset: 0; pointer-events: none; z-index: 4;
+  overflow: hidden; border-radius: inherit;
+  animation: tile-blood-pulse 0.8s ease-out;
+}
+.blood-drip {
+  position: absolute; top: -4%; width: 3px; height: 22%;
+  background: linear-gradient(to bottom, transparent 0%, #a80f1e 25%, #6b0812 90%);
+  border-radius: 0 0 2px 2px;
+  opacity: 0;
+  animation: tile-blood-drip 0.8s ease-in forwards;
+}
+.blood-drip--1 { left: 30%; animation-delay: 0s; }
+.blood-drip--2 { left: 52%; height: 28%; animation-delay: 0.08s; }
+.blood-drip--3 { left: 70%; height: 18%; animation-delay: 0.15s; }
+@keyframes tile-blood-drip {
+  0% { opacity: 0; transform: translateY(-20%); }
+  20% { opacity: 0.9; }
+  100% { opacity: 0.7; transform: translateY(0); }
+}
+@keyframes tile-blood-pulse {
+  0% { box-shadow: inset 0 0 0 9999px rgba(150, 10, 20, 0.35); }
+  100% { box-shadow: inset 0 0 0 9999px rgba(150, 10, 20, 0); }
+}
+
 .char-tile--divine { animation: tile-divine-flash 1.1s ease-out; }
 .char-tile--divine::after {
   content: '✨'; position: absolute; top: 50%; left: 50%; font-size: 34px;
