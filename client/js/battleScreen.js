@@ -807,6 +807,17 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
     wildBolt.innerHTML = `<svg viewBox="0 0 100 100" preserveAspectRatio="none">${wildBolts}</svg><span class="lightning-core"></span>`;
     tile.appendChild(wildBolt);
   }
+  if (effects.has('sacrificepierce') && !character.isKO) {
+    // Athena's Divine Sacrifice, VICTIM side: a searing crimson-gold spear-
+    // pierce gash flashes at the impact point, distinct from the plain
+    // generic hit-flash every other landed attack gets - matches the
+    // spear-fueled-by-her-own-blood language of her own cast image.
+    const pierce = document.createElement('div');
+    pierce.className = 'sacrifice-pierce-fx';
+    pierce.innerHTML = '<span class="sacrifice-pierce-line"></span>' +
+      '<span class="sacrifice-pierce-glow"></span>';
+    tile.appendChild(pierce);
+  }
   if (effects.has('bloodsacrifice') && !character.isKO) {
     // Athena's Divine Sacrifice: fires on HER OWN tile (not the enemy she
     // hit) - a few streaks of blood drip down from the top of the tile and

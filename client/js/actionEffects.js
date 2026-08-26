@@ -35,6 +35,7 @@ const EFFECT_DURATION_MS = {
   cursesnap: 500,
   headspin: 1400,
   bloodsacrifice: 800,
+  sacrificepierce: 600,
 };
 
 // How long the mirror-shard counter-hit effect waits before it even starts,
@@ -490,14 +491,27 @@ export function handleLogEntryForEffects(entry, game) {
     addEffect(targetId, 'shake', EFFECT_DURATION_MS.shake);
   }
 
-  // Divine Sacrifice: the enemy TARGET still gets the normal hit-flash/
-  // shake from applyHitFlash above (this is a real attack that lands like
-  // any other) - this effect is the SELF-cost visual instead, firing on
-  // ATHENA'S OWN tile (characterId, not targetId) regardless of whether the
-  // enemy hit landed or was dodged, since her own hearts are spent either
-  // way. A brief blood-drip pulse reading as "this cost her something,"
-  // distinct from a normal incoming-hit flash since no one attacked her -
-  // she did this to herself.
+  // Divine Sacrifice, victim side: a searing crimson-gold pierce/gash mark
+  // at the impact point plus a shake - distinct from the plain generic
+  // hit-flash every other landed attack gets, matching the spear-thrust-
+  // fueled-by-sacrificial-energy language of her own sacrifice.jpg flash.
+  // Gated the same way every other dedicated impact effect in this file is
+  // (landed, not dodged, real damage) - a fully shield-absorbed hit still
+  // gets the plain hit-flash from applyHitFlash above, but not this extra
+  // mark.
+  if (actionId === 'divineSacrifice' && targetId && !dodged && amountDealt > 0) {
+    addEffect(targetId, 'sacrificepierce', EFFECT_DURATION_MS.sacrificepierce);
+    addEffect(targetId, 'shake', EFFECT_DURATION_MS.shake);
+  }
+
+  // Divine Sacrifice, caster side: the enemy TARGET gets the pierce mark
+  // above (this is a real attack that lands like any other) - this effect
+  // is the SELF-cost visual instead, firing on ATHENA'S OWN tile
+  // (characterId, not targetId) regardless of whether the enemy hit landed
+  // or was dodged, since her own hearts are spent either way. A brief
+  // blood-drip pulse reading as "this cost her something," distinct from a
+  // normal incoming-hit flash since no one attacked her - she did this to
+  // herself.
   if (actionId === 'divineSacrifice' && !isKO(characterId)) {
     addEffect(characterId, 'bloodsacrifice', EFFECT_DURATION_MS.bloodsacrifice);
   }
