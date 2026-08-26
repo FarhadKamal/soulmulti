@@ -318,6 +318,24 @@ export function finalizeAction(game, log, result, characterId, actionId, targetI
 // her own mind_control_action.jpg flash to fire alongside the puppet's own
 // normal flash - see client/js/portraitFlash.js).
 export function executeActionAsPuppet(game, melyssaCharacterId, puppetCharacterId, actionId, targetId, extra) {
+  // 50% chance the puppet's control simply fails this turn - a genuine
+  // gamble every single puppeted action, specials included, no exceptions
+  // (confirmed ruling). On a fail, the puppet does nothing at all - no
+  // fallback action, the whole turn is just wasted - and a dedicated
+  // 'mind-control-resist' entry is pushed instead of ever calling
+  // executeAction, so the puppet's own ability never actually runs (no
+  // partial effects, no side effects at all from the attempted action).
+  if (Math.random() < 0.5) {
+    // controllingMelyssaId stamped directly on the entry (not post-hoc via
+    // array indexing) for consistency with how a successful puppeted
+    // action gets it below - client-side flash logic keys on this field.
+    const log = [{
+      type: 'mind-control-resist', characterId: melyssaCharacterId, puppetCharacterId, actionId,
+      controllingMelyssaId: melyssaCharacterId,
+    }];
+    finalizeAction(game, log, {}, puppetCharacterId, actionId, targetId);
+    return {};
+  }
   const before = game.log.length;
   const result = executeAction(game, puppetCharacterId, actionId, targetId, extra);
   for (let i = before; i < game.log.length; i++) {

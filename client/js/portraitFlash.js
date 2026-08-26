@@ -199,6 +199,15 @@ export function handleLogEntryForFlash(entry, game) {
     if (!isKO('melyssa')) setFlash('melyssa', 'assets/images/melyssa/self_choke.jpg');
     return;
   }
+  // The 50% chance her puppeted action simply fails - her own frustrated
+  // reaction flash, checked BEFORE the generic controllingMelyssaId block
+  // below (same early-return shape as Self Choke above), since this entry
+  // also carries controllingMelyssaId and would otherwise get overwritten
+  // by the generic mind_control_action.jpg flash instead.
+  if (entry.type === 'mind-control-resist') {
+    if (!isKO(entry.characterId)) setFlash(entry.characterId, 'assets/images/melyssa/useless.jpg');
+    return;
+  }
   // Any puppeted action (real or a forced Jester Ball take/pass) additionally
   // flashes Melyssa's own portrait the instant it resolves - the puppet's
   // own portrait still separately flashes for the SAME entry via the

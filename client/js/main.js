@@ -311,6 +311,13 @@ function playLogEntrySound(entry, game) {
     playMoveVoice(entry.characterId, 'mindControl');
     return;
   }
+  if (entry.type === 'mind-control-resist') {
+    // The 50% chance her puppeted action simply fails - her own frustrated
+    // reaction voice line, a no-op for anyone but Melyssa (only she has a
+    // 'useless' line recorded).
+    playMoveVoice(entry.characterId, 'resist');
+    return;
+  }
   // Curse Strike ('curse') and Hidden Mark ('hidden-mark') each log their
   // own dedicated type rather than 'attack'/'special'/'setup' - same
   // reasoning as portraitFlash.js's equivalent branches - so they need

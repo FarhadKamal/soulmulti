@@ -368,7 +368,12 @@ function executeSelfChoke(game, melyssaId, puppetId) {
   const result = applyDamage(game, log, {
     sourceCharacterId: melyssaId,
     targetCharacterId: puppetId,
-    amount: 1,
+    // Buffed 1->2: unlike a puppeted real action (now only a 50% chance to
+    // actually resolve, see executeActionAsPuppet), Self Choke stays fully
+    // guaranteed every time - the tradeoff is now "risk a real attack for
+    // a coin-flip, or take a bigger guaranteed 2" rather than Self Choke
+    // being the strictly worse fallback it was at 1 damage.
+    amount: 2,
     ignoresShield: true,
   });
   log.push({ type: 'attack', characterId: melyssaId, actionId: 'selfChoke', targetId: puppetId, ...result });

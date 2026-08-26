@@ -1561,6 +1561,8 @@ function describeLogEntry(entry) {
   switch (entry.type) {
     case 'mind-control-select':
       return `${name(entry.characterId)} took control of ${name(entry.targetId)}'s mind!`;
+    case 'mind-control-resist':
+      return `${name(entry.puppetCharacterId)}'s will resists ${name(entry.characterId)}'s control - ${actionLabel(entry.actionId)} fails!`;
     case 'attack':
       if (entry.actionId === 'divineSacrifice') {
         // Shows both sides of the gamble - the guaranteed 3 dealt to the
