@@ -37,7 +37,7 @@ function runOneMatch(roomType) {
       if (msg.type === 'session') {
         send('create-room', { roomType, name: 'Owner' });
       } else if (msg.type === 'room-created') {
-        for (let i = 1; i < (roomType === '2p' ? 2 : 4); i++) send('fill-bot', { seatIndex: i });
+        for (let i = 1; i < 4; i++) send('fill-bot', { seatIndex: i });
       } else if (msg.type === 'lobby-update') {
         const room = msg.room;
         if (room.seats.some((s) => s.kind === 'empty')) return;
@@ -95,7 +95,7 @@ function runOneMatch(roomType) {
 
 (async () => {
   for (let i = 0; i < MATCH_COUNT; i++) {
-    await runOneMatch(i % 2 === 0 ? '4p' : '2p');
+    await runOneMatch('4p');
     completed++;
   }
   const allLabels = new Set([...Object.values(ALL_LABELS), ...Object.values(JESTER_BALL_CHOICES)]);

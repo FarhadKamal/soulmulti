@@ -8,16 +8,11 @@ const rooms = new Map(); // code -> room
 const TURN_TIMER_MS = 30_000;
 
 // Room type shapes, matching the existing static game's local modes:
-// - '2p'  ("2 player" / "2v2"): 2 seats, each seat picks 2 characters as
-//   their own personal team - matches the local game's "2 Players" mode.
-//   It's called 2v2 because each SIDE fields 2 characters, not because 2
-//   separate humans share one side.
 // - '4p'  ("4 player" FFA): 4 seats, each seat picks 1 character.
 // - 'bots4': 4 bot-only seats, no human seat at all - a pure "watch the
 //   bots play" spectacle room (see handleCreateBotShowRoom in index.js).
 //   Same shape as '4p' since it reuses the same engine mode/turn order.
 const ROOM_SHAPES = {
-  '2p': { seatCount: 2, picksPerSeat: 2 },
   '4p': { seatCount: 4, picksPerSeat: 1 },
   bots4: { seatCount: 4, picksPerSeat: 1 },
 };
@@ -34,8 +29,8 @@ function generateRoomCode() {
   return code;
 }
 
-// A "seat" represents one team slot in the eventual match (1 character in
-// 4p, 2 characters in 2p). Until the match starts, a seat is either an
+// A "seat" represents one team slot in the eventual match (1 character).
+// Until the match starts, a seat is either an
 // empty slot, a joined human (characters not fully picked yet), or a bot
 // (auto-fills every remaining pick, chooses its own characters at start).
 function createSeat(index) {
@@ -74,7 +69,7 @@ export function createRoom(roomType) {
 
   const room = {
     code,
-    roomType, // '2p' | '4p' | 'bots4'
+    roomType, // '4p' | 'bots4'
     seats,
     ownerId: null, // set once the owner's seat claim happens - stays null for a 'bots4' room, which has no human-owned seat
     phase: 'lobby', // 'lobby' | 'in-match' | 'finished'

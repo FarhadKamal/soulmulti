@@ -125,12 +125,10 @@ function startGameOverSequence(game) {
       // which read as the fight never really ending.
       startMenuMusic();
       // A recorded voice REPLACES the generic victory jingle (see
-      // playVictoryVoice/hasVoice in voice.js) - the winning side can have
-      // more than one character (2v2/4p teams), and one of them may have
-      // been KO'd earlier in the match while a TEAMMATE finished the fight
-      // (a real bug this fixes: heard Boingo's victory line despite Boingo
-      // being KO'd, because he simply came first in characterIds and had a
-      // recorded voice - Akyros, the actual survivor, was never checked).
+      // playVictoryVoice/hasVoice in voice.js) - a real bug this fixes:
+      // heard Boingo's victory line despite Boingo being KO'd, because he
+      // simply came first in characterIds and had a recorded voice -
+      // Akyros, the actual survivor, was never checked.
       // Only a character who's still alive (!isKO) can speak for the win;
       // plays the first SURVIVING one that also has a recorded line,
       // falling back to the generic jingle if none of the survivors do (or

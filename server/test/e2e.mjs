@@ -13,7 +13,7 @@
 // the usableActions summary, so the test should too.)
 import WebSocket from 'ws';
 
-const roomType = process.argv[2] === '2p' ? '2p' : '4p';
+const roomType = '4p';
 const ws = new WebSocket('ws://localhost:3001');
 let myCharacterIds = [];
 let gameOverSeen = false;
@@ -35,7 +35,7 @@ ws.on('message', (raw) => {
     send('create-room', { roomType, name: 'Owner' });
   } else if (msg.type === 'room-created') {
     console.log('room created:', msg.code);
-    for (let i = 1; i < (roomType === '2p' ? 2 : 4); i++) send('fill-bot', { seatIndex: i });
+    for (let i = 1; i < 4; i++) send('fill-bot', { seatIndex: i });
   } else if (msg.type === 'lobby-update') {
     const room = msg.room;
     if (room.seats.some((s) => s.kind === 'empty')) return;

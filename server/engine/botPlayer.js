@@ -1134,24 +1134,49 @@ function chooseGrimtalMove(character, game, usable) {
   return { actionId: 'grimStrike', targetId };
 }
 
-// Illyra's own decision is simple: Mirage Burst now detonates EVERY
-// currently-marked enemy at once (not a single chosen target), so the bot
-// just needs to weigh TOTAL damage across all of them against the
-// threshold - unlike a single-target burst, even several small stacks
-// spread across multiple enemies can add up to a worthwhile cast. Unlike
-// Grimtal's Claim the Kill there's no cap/cooldown pressuring an immediate
-// detonation, but leaving stacks sitting idle forever wastes the tempo, so
-// still prefer bursting once the total is worth it rather than endlessly
-// stacking further. ILLYRA_BURST_THRESHOLD is the minimum COMBINED total
-// worth spending the turn on.
-const ILLYRA_BURST_THRESHOLD = 3;
+// Illyra's own decision has two parts: Mirage Burst detonates EVERY
+// currently-marked enemy at once (not a single chosen target), so stacks
+// never expire on their own - the real risk isn't "waiting too long," it's
+// a marked target dying to someone ELSE's hit first and wasting whatever
+// was banked on them entirely (confirmed live: 2 stacks on Draxus sat
+// through a Blood Hunt + Divine Sacrifice combo that nearly finished him,
+// while she kept stacking instead of cashing in). Two triggers, checked in
+// order:
+// 1. URGENCY: any marked target whose current hearts have dropped to or
+//    below their OWN stack count on them - a rough "this stack is now at
+//    real risk of being wasted" signal (their hearts are already low
+//    enough that another attacker's next hit plausibly finishes them
+//    before Illyra's next turn) - bursts immediately regardless of the
+//    total, securing whatever value is banked rather than gambling on a
+//    bigger total that might never arrive.
+// 2. PATIENT THRESHOLD: with no urgent target, the minimum COMBINED total
+//    worth spending the turn on scales with how many characters are still
+//    alive - more players alive means more attackers who could steal a
+//    marked target's stacks by killing them first, so she bursts sooner
+//    (lower total) to reduce that exposure; fewer alive means less of that
+//    risk, so she can afford to let stacks build higher before cashing in.
+const ILLYRA_BURST_THRESHOLD_BY_ALIVE = { 4: 2, 3: 3, 2: 4 };
+
+function illyraUrgentBurstTarget(character, game) {
+  for (const [tid, count] of character.special.mirageMarks) {
+    if (count <= 0) continue;
+    const target = game.characters[tid];
+    if (target && !target.isKO && target.hearts <= count) return tid;
+  }
+  return null;
+}
 
 function chooseIllyraMove(character, game, usable) {
   const byId = Object.fromEntries(usable.map((a) => [a.actionId, a]));
   if (byId.mirageBurst) {
+    if (illyraUrgentBurstTarget(character, game)) {
+      return { actionId: 'mirageBurst', targetId: null };
+    }
     let total = 0;
     for (const count of character.special.mirageMarks.values()) total += count;
-    if (total >= ILLYRA_BURST_THRESHOLD) {
+    const aliveCount = Object.values(game.characters).filter((c) => !c.isKO).length;
+    const threshold = ILLYRA_BURST_THRESHOLD_BY_ALIVE[aliveCount] ?? 2;
+    if (total >= threshold) {
       return { actionId: 'mirageBurst', targetId: null };
     }
   }

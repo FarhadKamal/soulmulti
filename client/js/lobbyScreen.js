@@ -181,7 +181,7 @@ function renderEntryForm() {
     nameInput.classList.toggle('input--invalid', !hasName);
     nameHint.style.display = hasName ? 'none' : 'block';
     if (hasName) sessionStorage.setItem('soulclash-name', currentName());
-    [btn4p, btn2p, joinBtn, ...nameRequiredButtons].forEach((btn) => { btn.disabled = !hasName; });
+    [btn4p, joinBtn, ...nameRequiredButtons].forEach((btn) => { btn.disabled = !hasName; });
   }
   nameInput.addEventListener('input', updateNameValidity);
 
@@ -196,11 +196,7 @@ function renderEntryForm() {
   const btn4p = document.createElement('button');
   btn4p.textContent = '4 Player (FFA)';
   btn4p.onclick = () => send('create-room', { roomType: '4p', name: currentName() });
-  const btn2p = document.createElement('button');
-  btn2p.textContent = '2 Player (2v2)';
-  btn2p.onclick = () => send('create-room', { roomType: '2p', name: currentName() });
   roomTypeRow.appendChild(btn4p);
-  roomTypeRow.appendChild(btn2p);
   createSection.appendChild(roomTypeRow);
   form.appendChild(createSection);
 

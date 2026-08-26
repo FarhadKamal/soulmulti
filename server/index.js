@@ -481,10 +481,7 @@ function broadcastGameState(room) {
 
 // ---- Turn timer: 30s per decision. On expiry, treated exactly like the
 // player leaving - a bot permanently takes over that seat's remaining moves
-// for the rest of the match (see multiplayer design notes). Note: a seat
-// can own 2 characters in a 2-player room - timing out bot-takes-over the
-// WHOLE seat (both characters), not just the one mid-decision, since the
-// same human was going to control both anyway. ----
+// for the rest of the match (see multiplayer design notes). ----
 function clearTurnTimer(room) {
   if (room.turnTimer) {
     clearTimeout(room.turnTimer);
@@ -975,12 +972,8 @@ function handleFillBot(room, sessionId, { seatIndex }) {
   broadcastLobby(room);
 }
 
-// Same as handleFillBot, but the owner picks the bot's character(s)
-// themselves instead of getting a random draw - for a 2p seat (picksPerSeat
-// 2) this fills only the FIRST slot with the chosen character and still
-// random-fills any remaining slot(s), same partial-random behavior
-// fillSeatWithBot already has for an owner who only picked some of their
-// own characters before hitting a "fill the rest" flow elsewhere.
+// Same as handleFillBot, but the owner picks the bot's character themselves
+// instead of getting a random draw.
 function handleFillBotWithCharacter(room, sessionId, { seatIndex, characterId }) {
   if (sessionId !== room.ownerId) return;
   const seat = room.seats[seatIndex];
