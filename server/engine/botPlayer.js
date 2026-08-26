@@ -609,29 +609,45 @@ function chooseBladeMove(character, game, usable) {
 
 // Divine Sacrifice is a genuine gamble (guaranteed 3 damage to an enemy,
 // but a RANDOM 1-3 hearts lost to herself every single cast, no cooldown,
-// can even KO her outright) - worth the bot risking it whenever a target
-// has <=3 hearts (the guaranteed 3 damage KOs them outright), as long as
-// she'd SURVIVE even the worst-case 3-heart self-cost (her own hearts must
-// be > 3). No separate "farming" case beyond this - a target this low is
-// always either a kill worth taking or (if she can't safely survive the
-// worst case) not worth the risk at all; there's no useful middle ground
-// once it's already a guaranteed KO on offer. Confirmed live: the bot
-// passed up an actual game-ending kill (enemy at 2 hearts, guaranteed KO)
-// purely because her own hearts (4) sat under an earlier, stricter flat
-// safety floor that never weighed how much the kill itself was worth.
+// can even KO her outright) - two separate justifications for the bot to
+// use it, checked in priority order:
+// 1. A SURE KILL: target has <=3 hearts (the guaranteed 3 damage KOs them
+//    outright) - worth it as long as she'd SURVIVE even the worst-case
+//    3-heart self-cost (her own hearts must be > 3), regardless of how
+//    comfortable that leaves her, since ending the threat now outweighs
+//    the risk. Confirmed live: the bot passed up an actual game-ending
+//    kill (enemy at 2 hearts) purely because her own hearts (4) sat under
+//    an earlier, stricter flat safety floor that never weighed how much
+//    the kill itself was worth.
+// 2. SAFE FARMING: no sure kill available, but she's near-full health
+//    (ATHENA_SACRIFICE_SAFE_HEARTS) - worth using as regular offense
+//    rather than sitting idle re-casting Curse Strike on an already-cursed
+//    target for no new effect. Confirmed live: a full-health Athena with
+//    nothing else productive to do (curse already applied, no sure kill
+//    on the board) still never used it, purely because the "sure kill"
+//    case was the ONLY case at all after an earlier fix removed farming
+//    entirely - too conservative, left an available high-value action
+//    completely unused this whole match.
 const ATHENA_SACRIFICE_FINISH_THRESHOLD = 3;
 const ATHENA_SACRIFICE_MAX_SELF_COST = 3;
+const ATHENA_SACRIFICE_SAFE_HEARTS = 6;
 
 function chooseAthenaMove(character, game, usable) {
   const byId = Object.fromEntries(usable.map((a) => [a.actionId, a]));
   if (byId.divineRestore && character.hearts <= LOW_HEARTS_THRESHOLD) {
     return { actionId: 'divineRestore', targetId: null };
   }
-  if (byId.divineSacrifice && character.hearts > ATHENA_SACRIFICE_MAX_SELF_COST) {
-    const lowTargets = validTargetsFor(game, character, 'divineSacrifice')
-      .filter((tid) => game.characters[tid].hearts <= ATHENA_SACRIFICE_FINISH_THRESHOLD);
-    if (lowTargets.length > 0) {
-      const targetId = lowestHeartsTarget(game, lowTargets) || pickRandom(lowTargets);
+  if (byId.divineSacrifice) {
+    const allTargets = validTargetsFor(game, character, 'divineSacrifice');
+    if (character.hearts > ATHENA_SACRIFICE_MAX_SELF_COST) {
+      const sureKills = allTargets.filter((tid) => game.characters[tid].hearts <= ATHENA_SACRIFICE_FINISH_THRESHOLD);
+      if (sureKills.length > 0) {
+        const targetId = lowestHeartsTarget(game, sureKills) || pickRandom(sureKills);
+        return { actionId: 'divineSacrifice', targetId };
+      }
+    }
+    if (character.hearts >= ATHENA_SACRIFICE_SAFE_HEARTS && allTargets.length > 0) {
+      const targetId = biggestThreatTarget(game, character, allTargets) || lowestHeartsTarget(game, allTargets) || pickRandom(allTargets);
       return { actionId: 'divineSacrifice', targetId };
     }
   }
