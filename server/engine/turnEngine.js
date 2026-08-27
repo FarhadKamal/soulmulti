@@ -360,64 +360,209 @@ export function beginCharacterTurn(character, game, log) {
 // capture indirect cascades like a curse-mirror landing on him from
 // someone else's attack, since "the most recent action taken against him"
 // naturally means the most recent time he was the ACTUAL chosen target.
-export function recordActionAgainstChronoxIfApplicable(game, characterId, actionId, targetId) {
-  if (targetId !== 'chronox') return;
+// Two-phase: this only BUILDS a candidate record and returns it (or a
+// sentinel/null) - committing it to chronoxChar.special.lastActionAgainstMe
+// is executeAction's job, below, AFTER the action has actually resolved and
+// its real effect on Chronox is known. See executeAction's own comment for
+// why the commit is conditional: a fully shield-absorbed hit (0 net
+// effect - the shield decays back to the same value on his own next turn
+// regardless) was otherwise a free, repeatable way to overwrite a
+// genuinely valuable pending Rewind record for nothing ("shield-tap
+// griefing," confirmed via audit).
+//
+// Returns: null (nothing to record - wrong target or Chronox already KO'd),
+// 'keep-existing' (still mid-combo with the CURRENTLY COMMITTED record -
+// caller must not touch lastActionAgainstMe at all, whether or not this
+// individual call ends up dealing damage), or a fresh record object ready
+// to commit pending the post-execute effect check.
+export function buildActionAgainstChronoxRecord(game, characterId, actionId, targetId) {
+  if (targetId !== 'chronox') return null;
   const chronoxChar = game.characters.chronox;
-  if (!chronoxChar || chronoxChar.isKO) return;
-  // Soul Swap's free Thunder Wrath follow-up (soulSwapWrath) is a SEPARATE
-  // executeAction call, immediately after soulSwap's own - if it also
-  // targets Chronox (a very natural, common follow-up choice, not a rare
-  // edge case), this function would otherwise fire a second time and
-  // overwrite the soulSwap record entirely before Chronox ever gets to
-  // Rewind it. That silently downgraded Rewind into only undoing the
-  // Wrath's damage - Zerathys's usedSpecial (spent by soulSwap, untouched
-  // by soulSwapWrath) never got refunded, unlike every other special-using
-  // character's kit. Confirmed as a real, not-rare gap: reported live after
-  // noticing every OTHER special holder gets refunded by Rewind except
-  // Zerathys in exactly this combo. Fix: keep the ORIGINAL soulSwap record
-  // untouched (its snapshots were taken before the swap even happened, i.e.
-  // before Wrath's own damage too) rather than overwriting it with a fresh
-  // snapshot here that would already reflect the swap having occurred -
-  // Rewind then correctly reverses the WHOLE combo (swap + follow-up
-  // Wrath damage) back to before either happened.
+  if (!chronoxChar || chronoxChar.isKO) return null;
+  // Generalized "still the same combo" guard. Several characters chain
+  // MULTIPLE separate executeAction calls against Chronox within what is
+  // conceptually one continuous turn: Soul Swap's free Thunder Wrath
+  // follow-up (soulSwapWrath, fired as a second executeAction right after
+  // soulSwap), and Draxus's Deathless Fury bonus turn (3 separate Dying
+  // Blow strikes, index.js deliberately withholds markCharacterActed
+  // between them - see its own comment there). If EACH of those calls
+  // re-recorded here, only the LAST one in the chain would survive to be
+  // Rewound - Zerathys's usedSpecial (spent by soulSwap, untouched by
+  // soulSwapWrath) never got refunded, and a Rewound Draxus combo only
+  // undid his 3rd strike while keeping strikes 1-2's damage AND leaking his
+  // spent bonusActionsRemaining back onto his object. Both confirmed live/
+  // via audit as real, not-rare gaps.
+  //
+  // Fix: detect "still mid-combo" via game.turnInstanceFor (gameFlow.js), a
+  // monotonically increasing per-character counter bumped once at the
+  // START of each of the caster's own genuinely new turns, never reset.
+  // (hasCharacterActedThisTurn was tried first and rejected - it's false
+  // at the START of every turn too, indistinguishable from "still
+  // mid-combo," so it wrongly kept an old record forever across an entire
+  // new later turn's first hit in testing.) Same caster + same
+  // turnInstanceFor value as the CURRENTLY COMMITTED record means this
+  // action is still part of that same turn's combo - keep the original
+  // snapshot untouched (taken before the combo's very first strike, i.e.
+  // before ALL of the combo's damage/effects) regardless of how much (if
+  // any) damage THIS individual strike deals, so Rewind correctly reverses
+  // the WHOLE combo at once. A different turnInstanceFor value means a
+  // genuinely new turn's first hit, which SHOULD build a fresh record.
+  const turnInstance = game.turnInstanceFor.get(characterId);
   if (
-    actionId === 'soulSwapWrath'
-    && chronoxChar.special.lastActionAgainstMe?.casterId === characterId
-    && chronoxChar.special.lastActionAgainstMe?.actionId === 'soulSwap'
+    chronoxChar.special.lastActionAgainstMe?.casterId === characterId
+    && chronoxChar.special.lastActionAgainstMe?.casterTurnInstance === turnInstance
   ) {
-    return;
+    return 'keep-existing';
   }
   // Deliberately snapshots ONLY the caster's own character object, Chronox
-  // himself, and game.jesterBall - NOT the entire game.characters map.
-  // Restoring every character's full state wholesale would incorrectly
-  // undo everyone ELSE's unrelated progress too (their own damage dealt,
-  // resources spent, etc.) if other turns happened between the recorded
-  // action and Chronox actually casting Rewind - clearly wrong for an
-  // ability that's meant to reverse ONE specific past action, not rewind
-  // the whole match. Every effect type in the game that could plausibly
-  // target Chronox only ever touches the caster's own state and/or
-  // Chronox's own state (plain damage, curse/freeze/mark/silence/headache
-  // statuses live on the caster's special; Soul Swap only swaps hearts
-  // between caster and target; Illyra's Mirage Burst's stack map lives on
-  // the caster) plus, for Jester Ball specifically, the single shared
-  // game.jesterBall slot - covered separately below since it isn't scoped
-  // to any one character.
-  chronoxChar.special.lastActionAgainstMe = {
+  // himself, game.jesterBall, and (see below) Grimtal's/Kaelis's own kill/
+  // grudge counters - NOT the entire game.characters map. Restoring every
+  // character's full state wholesale would incorrectly undo everyone ELSE's
+  // unrelated progress too (their own damage dealt, resources spent, etc.)
+  // if other turns happened between the recorded action and Chronox
+  // actually casting Rewind - clearly wrong for an ability that's meant to
+  // reverse ONE specific past action, not rewind the whole match. Every
+  // effect type in the game that could plausibly target Chronox only ever
+  // touches the caster's own state and/or Chronox's own state (plain
+  // damage, curse/freeze/mark/silence/headache statuses live on the
+  // caster's special; Soul Swap only swaps hearts between caster and
+  // target; Illyra's Mirage Burst's stack map lives on the caster) plus,
+  // for Jester Ball specifically, the single shared game.jesterBall slot -
+  // covered separately below since it isn't scoped to any one character.
+  //
+  // Grimtal's ownKillCount/unclaimedKillCount and Kaelis's grudgeCounts are
+  // the two known EXCEPTIONS to "only caster + Chronox" - both are
+  // incremented generically inside applyDamage's own KO-branch/damage-
+  // landed logic, triggered by ANY damage source (not just Chronox-directed
+  // ones), so an action recorded against Chronox can indirectly cause a
+  // side effect on these two THIRD-PARTY characters within the same
+  // execute() call - e.g. Athena's Divine Sacrifice on Chronox, followed by
+  // her own self-cost damage triggering a curse-mirror onto Kaelis (grudge
+  // point) or KO'ing a cursed target (Grimtal's banked kill). Confirmed via
+  // audit as reachable and real - without this, Rewind would undo the
+  // recorded action but leave Grimtal/Kaelis permanently keeping a kill/
+  // grudge point for an event that no longer happened. Snapshotting them
+  // alongside the caster+Chronox (when present/alive) closes this without
+  // needing to detect/special-case every possible chain generically.
+  const grimtalChar = game.characters.grimtal;
+  const kaelisChar = game.characters.kaelis;
+  return {
     casterId: characterId,
+    casterTurnInstance: turnInstance,
     actionId,
     casterSnapshot: structuredClone(game.characters[characterId]),
     chronoxSnapshot: structuredClone(chronoxChar),
     jesterBallSnapshot: structuredClone(game.jesterBall),
+    grimtalKillCounts: grimtalChar && !grimtalChar.isKO
+      ? { ownKillCount: grimtalChar.special.ownKillCount, unclaimedKillCount: grimtalChar.special.unclaimedKillCount }
+      : null,
+    kaelisGrudgeCounts: kaelisChar && !kaelisChar.isKO
+      ? structuredClone(kaelisChar.special.grudgeCounts)
+      : null,
   };
 }
 
+// Generic, per-ability-agnostic "did this action have a real effect worth
+// recording" check - a hit is worth committing if it dealt real HEART
+// damage or KO'd Chronox (shield alone is deliberately excluded: Chrono
+// Guard resets his shield to exactly 1 every one of his own turns
+// regardless, so absorbing 1 point of shield is not a meaningful loss worth
+// spending a valuable pending Rewind record on - it's exactly the
+// "shield-tap griefing" scenario this whole check exists to stop, confirmed
+// ruling). ALSO worth recording if the CASTER's own object changed at all
+// (deep-equal against their pre-action snapshot) - this is what makes a
+// pure 0-damage status action (Curse Strike, Time Freeze, Hidden Mark,
+// Silence Lock, Mirage Mark, Skull Crack's headache roll) still count:
+// every one of those effects lives entirely on the CASTER's own .special,
+// never on Chronox's own object, so checking only Chronox's state would
+// wrongly treat them as "no real effect" and silently drop them - confirmed
+// as a real regression during testing (Curse Strike stopped being recorded
+// at all once shield-only changes were excluded).
+export function chronoxStateActuallyChanged(chronoxChar, chronoxSnapshot, caster, casterSnapshot) {
+  const chronoxHeartsChanged = chronoxChar.hearts !== chronoxSnapshot.hearts || chronoxChar.isKO !== chronoxSnapshot.isKO;
+  if (chronoxHeartsChanged) return true;
+  if (!caster || !casterSnapshot) return false;
+  return !deepEqual(caster, casterSnapshot);
+}
+
+// Plain recursive deep-equal that understands Map/Set (several characters'
+// .special fields use them - Illyra's mirageMarks, Rowan's
+// discoveredSpells, Kaelis's grudgeCounts, Rowan's silenceTargets, Akyros's
+// marks/revealedMarks/everMarkedIds - so JSON.stringify, which silently
+// serializes any Map/Set as {}, would wrongly treat a Map/Set-only change
+// as "no change at all"). Good enough for character objects specifically
+// (plain values, arrays, Maps, Sets, nested plain objects - no functions,
+// no circular references, matches everything actually stored on
+// character.special across the whole roster).
+function deepEqual(a, b) {
+  if (a === b) return true;
+  if (a instanceof Map && b instanceof Map) {
+    if (a.size !== b.size) return false;
+    for (const [k, v] of a) {
+      if (!b.has(k) || !deepEqual(v, b.get(k))) return false;
+    }
+    return true;
+  }
+  if (a instanceof Set && b instanceof Set) {
+    if (a.size !== b.size) return false;
+    for (const v of a) {
+      if (!b.has(v)) return false;
+    }
+    return true;
+  }
+  if (Array.isArray(a) && Array.isArray(b)) {
+    if (a.length !== b.length) return false;
+    return a.every((v, i) => deepEqual(v, b[i]));
+  }
+  if (a && b && typeof a === 'object' && typeof b === 'object') {
+    const aKeys = Object.keys(a);
+    const bKeys = Object.keys(b);
+    if (aKeys.length !== bKeys.length) return false;
+    return aKeys.every((k) => deepEqual(a[k], b[k]));
+  }
+  return false;
+}
+
+// Illyra's Mirage Burst is needsTarget: false (one click detonates EVERY
+// currently-marked enemy at once - see illyra.js) - executeAction's normal
+// recordActionAgainstChronoxIfApplicable(..., targetId) call is a no-op for
+// it, since targetId is always undefined/null for a no-target action, so a
+// burst that genuinely hits Chronox was never recorded at all, leaving him
+// unable to Rewind his own biggest incoming hit from her kit. Confirmed via
+// audit as a real, not-rare gap - Mirage Mark stacking Chronox specifically
+// is an obvious, common line of play against him. Resolved generically
+// here (not inside illyra.js) to avoid a circular import (illyra.js is
+// itself imported BY this file); mirrors resolveJesterBall's own "no single
+// upfront targetId, so read the caster's own pre-existing state directly"
+// pattern - marks bypass dodge entirely (ignoresDodge: true in illyra.js),
+// so a positive stack count is a guaranteed hit, not just a possible one.
+function mirageBurstTargetsChronox(game, characterId, actionId) {
+  if (actionId !== 'mirageBurst') return false;
+  const caster = game.characters[characterId];
+  return (caster?.special.mirageMarks?.get('chronox') || 0) > 0;
+}
+
 export function executeAction(game, characterId, actionId, targetId, extra) {
-  recordActionAgainstChronoxIfApplicable(game, characterId, actionId, targetId);
+  const effectiveTargetId = mirageBurstTargetsChronox(game, characterId, actionId) ? 'chronox' : targetId;
+  const candidateRecord = buildActionAgainstChronoxRecord(game, characterId, actionId, effectiveTargetId);
   const character = game.characters[characterId];
   const mod = ABILITY_MODULES[characterId];
   const actionDef = mod.actions[actionId];
   const log = [];
   const result = actionDef.execute(character, targetId, game, log, extra);
+  // Commit the candidate record AFTER execute has actually run, and only
+  // if it's a genuinely fresh record (not 'keep-existing'/null) whose
+  // action had a REAL effect on Chronox - see
+  // buildActionAgainstChronoxRecord/chronoxStateActuallyChanged's own
+  // comments for why (shield-tap griefing fix, confirmed ruling). A
+  // 'keep-existing' combo-continuation never touches lastActionAgainstMe
+  // at all, regardless of this individual call's own effect.
+  if (candidateRecord && candidateRecord !== 'keep-existing') {
+    const chronoxChar = game.characters.chronox;
+    if (chronoxChar && chronoxStateActuallyChanged(chronoxChar, candidateRecord.chronoxSnapshot, character, candidateRecord.casterSnapshot)) {
+      chronoxChar.special.lastActionAgainstMe = candidateRecord;
+    }
+  }
   finalizeAction(game, log, result, characterId, actionId, targetId);
   return result;
 }
@@ -495,18 +640,32 @@ export function resolveJesterBall(game, holderCharacterId, choice, extra) {
   // against Chronox if the holder turns out to be him once resolution is
   // known.
   const isChronoxHolder = holderCharacterId === 'chronox' && !game.characters.chronox?.isKO;
-  // Captured BEFORE res.execute() runs - by the time it returns,
-  // game.jesterBall may already be null (the ball fully resolved), losing
-  // the thrower's id, and the thrower's own pre-explosion state would be
-  // gone too. Same scoped shape as recordActionAgainstChronoxIfApplicable -
-  // only the thrower's own character object, Chronox, and jesterBall, not
-  // the whole game.characters map.
-  const thrownById = game.jesterBall?.thrownByCharacterId ?? 'boingo';
+  // Deliberately NO caster/casterId at all here (unlike every other
+  // recorded action) - the "caster" for a Jester Ball explosion is
+  // ambiguous by nature (the ORIGINAL thrower, from turns earlier, chose
+  // none of this: whether it explodes on Chronox depends on who passed it
+  // to him, an auto-resolving 5th pass, or Chronox's own Take/frozen-forced
+  // Take). Originally this recorded thrownByCharacterId as casterId and
+  // restored their WHOLE object on Rewind - but that object is never
+  // actually mutated by an explosion landing on Chronox (only
+  // game.jesterBall and Chronox's own hearts change), so there was nothing
+  // to legitimately restore there in the first place. Worse, if that same
+  // thrower threw a SECOND ball before Chronox got around to Rewinding the
+  // first explosion, restoring their stale object rolled jesterBallsUsed/
+  // usedSpecial backward and resurrected the first ball's already-resolved
+  // state into game.jesterBall, corrupting the second throw entirely -
+  // confirmed reachable via audit. Also, the resulting lockout named the
+  // thrower for a `jesterBall:take`/`jesterBall:pass` action pair that
+  // nothing in this file's own Jester Ball resolution path ever checks, so
+  // it was pure dead weight. Fix: record no caster and no lockout for this
+  // case - Rewind still fully undoes Chronox's own damage and restores
+  // game.jesterBall (see chronox.js's rewind.execute, which now branches on
+  // casterId === null to skip the caster-object restore and lockout steps
+  // entirely for this action).
   const preSnapshot = isChronoxHolder
     ? {
-      casterId: thrownById,
+      casterId: null,
       actionId: `jesterBall:${choice}`,
-      casterSnapshot: structuredClone(game.characters[thrownById]),
       chronoxSnapshot: structuredClone(game.characters.chronox),
       jesterBallSnapshot: structuredClone(game.jesterBall),
     }
@@ -575,6 +734,7 @@ export function markCharacterActed(game, characterId) {
 export function endTurn(game) {
   game.actedThisTurn = new Set();
   game.turnStartFiredFor = new Set();
+  game.chronoxLockoutTickedFor = new Set();
   const n = game.turnOrder.length;
   let next = game.activePlayerIndex;
   for (let i = 0; i < n; i++) {

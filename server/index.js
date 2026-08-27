@@ -12,7 +12,7 @@ import { createGame } from './engine/state.js';
 import {
   getUsableActions, getUsablePuppetActions, executeAction, isValidTarget, isValidMindControlTarget,
   isValidPuppetTarget, markCharacterActed, finalizeAction, executeActionAsPuppet,
-  isMelyssaLoneDuel, LONE_DUEL_EXCEPTIONS, recordActionAgainstChronoxIfApplicable,
+  isMelyssaLoneDuel, LONE_DUEL_EXCEPTIONS, buildActionAgainstChronoxRecord, chronoxStateActuallyChanged,
 } from './engine/turnEngine.js';
 import { applyDamage } from './engine/damagePipeline.js';
 import {
@@ -394,9 +394,13 @@ function selfChokeOption() {
 function executeSelfChoke(game, melyssaId, puppetId) {
   // Chronox's Rewind needs to see this too, if he's ever the puppet forced
   // into it - Self Choke doesn't route through executeAction (it calls
-  // applyDamage directly), so it needs the same recording hook called
-  // explicitly here.
-  recordActionAgainstChronoxIfApplicable(game, melyssaId, 'selfChoke', puppetId);
+  // applyDamage directly), so it needs the same two-phase build-then-commit
+  // treatment explicitly here (see buildActionAgainstChronoxRecord's own
+  // comment for the full reasoning - the commit is deferred until after the
+  // hit resolves and only happens if it had a real effect on Chronox,
+  // though Self Choke's ignoresShield: true + guaranteed flat 2 means that
+  // gate can never actually block it in practice, unlike a normal attack).
+  const candidateRecord = buildActionAgainstChronoxRecord(game, melyssaId, 'selfChoke', puppetId);
   const log = [];
   const result = applyDamage(game, log, {
     sourceCharacterId: melyssaId,
@@ -409,6 +413,13 @@ function executeSelfChoke(game, melyssaId, puppetId) {
     amount: 2,
     ignoresShield: true,
   });
+  if (candidateRecord && candidateRecord !== 'keep-existing') {
+    const chronoxChar = game.characters.chronox;
+    const melyssaChar = game.characters[melyssaId];
+    if (chronoxChar && chronoxStateActuallyChanged(chronoxChar, candidateRecord.chronoxSnapshot, melyssaChar, candidateRecord.casterSnapshot)) {
+      chronoxChar.special.lastActionAgainstMe = candidateRecord;
+    }
+  }
   log.push({ type: 'attack', characterId: melyssaId, actionId: 'selfChoke', targetId: puppetId, ...result });
   finalizeAction(game, log, result, melyssaId, 'selfChoke', puppetId);
   return result;

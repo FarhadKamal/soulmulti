@@ -322,6 +322,8 @@ export function createGame(mode, playerPicks) {
     phase: 'player-turn',
     actedThisTurn: new Set(),
     turnStartFiredFor: new Set(),
+    chronoxLockoutTickedFor: new Set(),
+    turnInstanceFor: new Map(),
     jesterBall: null,
     winnerPlayerId: null,
     log: [],

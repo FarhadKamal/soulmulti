@@ -288,7 +288,10 @@ export function handleLogEntryForEffects(entry, game) {
   // special - see server/abilities/chronox.js's rewind.execute for the log
   // entry shape.
   if (entry.type === 'special' && entry.actionId === 'rewind') {
-    if (!isKO(entry.rewoundCasterId)) {
+    // rewoundCasterId is null for a Jester Ball explosion (no single
+    // attacker to react - see server's resolveJesterBall) - nothing to
+    // flash in that case.
+    if (entry.rewoundCasterId && !isKO(entry.rewoundCasterId)) {
       addEffect(entry.rewoundCasterId, 'shockmark', EFFECT_DURATION_MS.shockmark);
     }
     return;

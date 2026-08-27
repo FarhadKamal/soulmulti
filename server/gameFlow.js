@@ -47,6 +47,17 @@ export function getActingCharacterId(game) {
     // skipped by a freeze, since the hook that clears it never ran.
     if (!game.turnStartFiredFor.has(character.id)) {
       game.turnStartFiredFor.add(character.id);
+      // Monotonically increasing per-character turn counter, deliberately
+      // NEVER reset (unlike turnStartFiredFor/actedThisTurn, which reset
+      // every round) - recordActionAgainstChronoxIfApplicable
+      // (turnEngine.js) uses this to tell "still the same turn's combo,
+      // don't overwrite the Rewind record" apart from "a genuinely new
+      // turn's first hit, DO overwrite" for the same caster. Neither
+      // actedThisTurn (false at the START of every turn, indistinguishable
+      // from mid-combo) nor turnStartFiredFor (a per-round Set, not a
+      // counter, so it can't tell turn 3 apart from turn 5) can make that
+      // distinction on their own.
+      game.turnInstanceFor.set(character.id, (game.turnInstanceFor.get(character.id) ?? 0) + 1);
       beginCharacterTurn(character, game, game.log);
     }
     // beginCharacterTurn can itself deal lethal damage (a poison tick, or a
@@ -95,7 +106,25 @@ export function getActingCharacterId(game) {
     // so this is the right moment to count it against Chronox's Rewind
     // lockout (see tickChronoxLockoutIfAny's own comment for why this can't
     // live in beginCharacterTurn above).
-    tickChronoxLockoutIfAny(character, game, game.log);
+    //
+    // Guarded by chronoxLockoutTickedFor the same way beginCharacterTurn is
+    // guarded by turnStartFiredFor above - getActingCharacterId itself is
+    // NOT guaranteed to run only once per pending decision (index.js calls
+    // settleToNextDecision/getActingCharacterId repeatedly while the SAME
+    // character is still un-acted - e.g. once from stepBotTurn to pick a
+    // move, then again from a broadcastGameState in the same step, per the
+    // documented "settleToNextDecision called again mid-step" pattern).
+    // Without this guard, tickChronoxLockoutIfAny (a plain decrement-and-
+    // clear with no idempotency of its own) fired twice before the
+    // character's action ever resolved - fully clearing a fresh 1-turn
+    // lockout before the locked-out caster's turn had actually happened.
+    // Confirmed live: Chronox rewound Athena's Divine Sacrifice, and she
+    // was able to cast it on him again on what was supposed to be her
+    // locked-out very next turn.
+    if (!game.chronoxLockoutTickedFor.has(character.id)) {
+      game.chronoxLockoutTickedFor.add(character.id);
+      tickChronoxLockoutIfAny(character, game, game.log);
+    }
     if (!isBallHolder && getUsableActions(character, game).length === 0) {
       game.log.push({ type: 'passive', characterId: character.id, text: `${CHARACTERS[character.id].name} has no valid targets and skips their turn.` });
       clearStalledBonusTurn(character);

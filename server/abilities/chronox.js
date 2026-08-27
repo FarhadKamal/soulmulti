@@ -101,6 +101,10 @@ export const actions = {
       if (character.special.rewindUsesRemaining <= 0) return false;
       const record = character.special.lastActionAgainstMe;
       if (!record) return false;
+      // Jester Ball explosions record no caster at all (see
+      // turnEngine.js's resolveJesterBall) - always legal to undo, there's
+      // no "attacker" who could have died to make it moot.
+      if (record.casterId === null) return true;
       const caster = game.characters[record.casterId];
       // Confirmed ruling: illegal if the qualifying attacker has since
       // died - his one precious use is preserved for a real future
@@ -112,7 +116,27 @@ export const actions = {
     },
     execute(character, targetId, game, log) {
       character.special.rewindUsesRemaining -= 1;
+      const rewindUsesRemaining = character.special.rewindUsesRemaining;
       const record = character.special.lastActionAgainstMe;
+      // Jester Ball explosions record no caster at all (see turnEngine.js's
+      // resolveJesterBall's own comment for the full reasoning) - there's
+      // no character object to restore, and deliberately no lockout set
+      // afterward either (there's no clean "can't do this exact move
+      // again" concept for a shared ball with no single decision-maker).
+      // Just undo Chronox's own damage and put the ball back in play.
+      if (record.casterId === null) {
+        Object.assign(character, structuredClone(record.chronoxSnapshot));
+        character.special.rewindUsesRemaining = rewindUsesRemaining;
+        if (record.jesterBallSnapshot !== undefined) {
+          game.jesterBall = structuredClone(record.jesterBallSnapshot);
+        }
+        character.special.lastActionAgainstMe = null;
+        log.push({
+          type: 'special', characterId: character.id, actionId: 'rewind',
+          rewoundCasterId: null, rewoundActionId: record.actionId,
+        });
+        return {};
+      }
       const caster = game.characters[record.casterId];
       // Restoring the CASTER's and CHRONOX's entire character objects
       // wholesale (not a hand-computed diff) is what makes this correct
@@ -124,10 +148,9 @@ export const actions = {
       // headache/mirageMarks all live on the caster's own special),
       // reverses Soul Swap's heart-swap (both sides' hearts are part of
       // the restored objects), and restores Illyra's stack count that a
-      // Mirage Burst zeroed out. rewindUsesRemaining (decremented just
-      // above, AFTER the snapshot was taken) must survive this restore,
-      // since it's never part of the snapshot's own prior state.
-      const rewindUsesRemaining = character.special.rewindUsesRemaining;
+      // Mirage Burst zeroed out. rewindUsesRemaining (decremented above,
+      // AFTER the snapshot was taken) must survive this restore, since it's
+      // never part of the snapshot's own prior state.
       // Melyssa's Mind Control lifecycle flags need the same "survive the
       // restore" treatment, for a different reason: her snapshot is always
       // taken MID-turn, while special.controlling is still true (Self
@@ -143,13 +166,58 @@ export const actions = {
       // no-op (both undefined) for every other character.
       const controlling = caster.special.controlling;
       const puppetCharacterId = caster.special.puppetCharacterId;
+      // Draxus's Deathless Fury window flag needs the same "survive the
+      // restore" treatment, for the same underlying reason - Melyssa can
+      // puppet him into attacking Chronox WHILE deathproofActive is still
+      // true (his own onTurnStart, which normally clears it, only fires on
+      // HIS turn, so a puppeted mid-window attack is genuinely reachable
+      // even though he can never do this on his own). If his window later
+      // ends normally (his own onTurnStart clears deathproofActive and
+      // grants the 3-hit bonus turn) before Chronox gets around to
+      // Rewinding that old puppeted hit, restoring the stale snapshot would
+      // flip deathproofActive back to true - re-arming an already-spent
+      // Deathless Fury, granting a completely unearned SECOND bonus turn
+      // the next time his onTurnStart runs. Confirmed reachable via direct
+      // reproduction. Preserve the CURRENT live value instead; harmless
+      // no-op (undefined) for every other character.
+      //
+      // bonusActionsRemaining is deliberately NOT given this same
+      // treatment - unlike deathproofActive, restoring IT from the
+      // snapshot is the correct behavior: the snapshot is always taken
+      // before a bonus-turn combo's strikes begin consuming it (see the
+      // turnInstance "same combo" guard in recordActionAgainstChronoxIfApplicable),
+      // so restoring it un-consumes exactly the strikes Rewind is undoing.
+      const deathproofActive = caster.special.deathproofActive;
       Object.assign(caster, structuredClone(record.casterSnapshot));
       Object.assign(character, structuredClone(record.chronoxSnapshot));
       character.special.rewindUsesRemaining = rewindUsesRemaining; // re-assert past the restore
       caster.special.controlling = controlling;
       caster.special.puppetCharacterId = puppetCharacterId;
+      if (deathproofActive !== undefined) caster.special.deathproofActive = deathproofActive;
       if (record.jesterBallSnapshot !== undefined) {
         game.jesterBall = structuredClone(record.jesterBallSnapshot);
+      }
+      // Grimtal's/Kaelis's kill/grudge counters: restored alongside the
+      // caster+Chronox snapshot for the same reason it's captured in
+      // turnEngine.js's buildActionAgainstChronoxRecord - a chain triggered
+      // by the recorded action (e.g. a curse-mirror or a KO'd cursed
+      // target) can mutate these THIRD-PARTY characters' own counters, and
+      // without this they'd permanently keep a kill/grudge point for an
+      // event Rewind just undid. Guarded on the character still existing
+      // and being alive (a KO'd Grimtal/Kaelis has their own separate
+      // death-cleanup path elsewhere; nothing to restore onto here).
+      if (record.grimtalKillCounts) {
+        const grimtalChar = game.characters.grimtal;
+        if (grimtalChar && !grimtalChar.isKO) {
+          grimtalChar.special.ownKillCount = record.grimtalKillCounts.ownKillCount;
+          grimtalChar.special.unclaimedKillCount = record.grimtalKillCounts.unclaimedKillCount;
+        }
+      }
+      if (record.kaelisGrudgeCounts) {
+        const kaelisChar = game.characters.kaelis;
+        if (kaelisChar && !kaelisChar.isKO) {
+          kaelisChar.special.grudgeCounts = structuredClone(record.kaelisGrudgeCounts);
+        }
       }
       // Lock: that exact same action is barred against Chronox specifically
       // for the caster's own next turn only (see turnEngine.js's

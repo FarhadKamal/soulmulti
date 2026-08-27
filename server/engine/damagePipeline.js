@@ -277,8 +277,44 @@ export function applyDamage(game, log, {
     result.absorbed = absorbed;
   }
 
+  const heartsBefore = target.hearts;
   target.hearts = Math.max(0, target.hearts - amt);
   result.amountDealt = amt;
+
+  // Chronox's Rewind pending-snapshot drift correction: his snapshot
+  // (special.lastActionAgainstMe.chronoxSnapshot.hearts) is captured at
+  // some point in the PAST - the moment right before whichever action is
+  // currently the "most recent action against him." If damage lands on him
+  // from a source that ISN'T that recorded action (poison ticks, a
+  // curse-mirror bounce, Mirror Reflect's counter-hit, anything not routed
+  // through the normal recording flow), the snapshot itself must shift down
+  // by that same amount too - otherwise Rewind would restore him past
+  // damage it was never meant to touch, i.e. free healing for damage from
+  // an unrelated source, confirmed reachable via audit (a banked Rewind
+  // erasing several rounds of poison ticks at once, while the poison itself
+  // keeps ticking since it's never part of what gets restored).
+  //
+  // EXCLUDED: damage from the SAME caster+turnInstance as the currently
+  // pending record - this is a chained follow-up within the same combo
+  // (Soul Swap's soulSwapWrath, Draxus's bonus strikes), and that damage
+  // genuinely SHOULD be absorbed into the existing snapshot's own
+  // before-state, not corrected away as "unrelated." Confirmed as a real
+  // regression during testing without this exclusion: a Soul Swap +
+  // soulSwapWrath combo's own Wrath damage was being treated as drift and
+  // silently un-recorded, so Rewind stopped undoing it at all. Matches the
+  // same turnInstance-based combo detection turnEngine.js's
+  // buildActionAgainstChronoxRecord already uses.
+  if (target.id === 'chronox' && target.special?.lastActionAgainstMe) {
+    const record = target.special.lastActionAgainstMe;
+    const isSameComboContinuation = record.casterId === sourceCharacterId
+      && game.turnInstanceFor?.get(sourceCharacterId) === record.casterTurnInstance;
+    if (!isSameComboContinuation) {
+      const drift = heartsBefore - target.hearts;
+      if (drift > 0) {
+        record.chronoxSnapshot.hearts = Math.max(0, record.chronoxSnapshot.hearts - drift);
+      }
+    }
+  }
 
   // Set below if this hit KOs a cursed Athena - captures curseTargetCharacterId
   // before the KO branch clears it, so the killing blow can still mirror.

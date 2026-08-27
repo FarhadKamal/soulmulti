@@ -1626,6 +1626,12 @@ function describeLogEntry(entry) {
         return `${name(entry.characterId)} used Mirage Burst - detonated ${parts.join(', ')}`;
       }
       if (entry.actionId === 'rewind') {
+        // Jester Ball explosions record no caster (see server's
+        // resolveJesterBall) - describe it as undoing the explosion itself
+        // rather than crediting it to a specific attacker.
+        if (entry.rewoundCasterId === null) {
+          return `${name(entry.characterId)} used Rewind - undid the Jester Ball explosion!`;
+        }
         return `${name(entry.characterId)} used Rewind - undid ${name(entry.rewoundCasterId)}'s ${actionLabel(entry.rewoundActionId)}!`;
       }
       return `${name(entry.characterId)} used their SPECIAL: ${actionLabel(entry.actionId)}${entry.targetId ? ` on ${name(entry.targetId)}` : ''}${entry.blocked ? ' - blocked by Clean Slate!' : ''}`;
