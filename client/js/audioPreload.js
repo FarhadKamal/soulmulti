@@ -39,6 +39,7 @@ const SOUND_EFFECT_FILES = [
   'everbloom.wav', 'magic_dodge.wav', 'silent_study.wav', 'cleanSlate.mp3', 'wand_discover.mp3',
   'sword_thud.mp3', 'bullet_hit.mp3', 'head_spin.mp3',
   'illusion.mp3', 'mirage_mark.mp3', 'mirage_burst.mp3', 'rewind.mp3',
+  'rune_strike.mp3', 'rune_strike_strong.mp3', 'predict.mp3', 'correct.mp3', 'wrong.mp3',
 ];
 
 let started = false;

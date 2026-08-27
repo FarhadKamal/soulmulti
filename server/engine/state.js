@@ -260,6 +260,26 @@ function baseSpecialFor(id) {
       return {
         mirageMarks: new Map(),
       };
+    case 'oraclus':
+      // predictedAttackerId/predictedTargetId: his one pending Rune Vision
+      // guess, null when nothing is pending. Checked against the VERY NEXT
+      // real attack anyone takes (see turnEngine.js's
+      // resolveOraclusPredictionIfPending) - NOT cleared by a
+      // freeze/headache/no-target skip, since those aren't the predicted
+      // attacker's "real action" (confirmed ruling: the guess waits through
+      // skips for their next genuine attack).
+      // predictionWins: capped at 2 - runeVision.isLegal goes false once
+      // this hits 2, permanently retiring the ability for the rest of the
+      // match (confirmed ruling).
+      // runeStrikeBonusDamage: +1 permanent, non-decaying, per correct
+      // prediction (so max +2 once both wins are banked) - added on top of
+      // Rune Strike's own base damage.
+      return {
+        predictedAttackerId: null,
+        predictedTargetId: null,
+        predictionWins: 0,
+        runeStrikeBonusDamage: 0,
+      };
     default:
       return {};
   }

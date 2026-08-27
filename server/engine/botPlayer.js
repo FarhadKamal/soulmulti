@@ -1231,6 +1231,55 @@ function chooseIllyraMove(character, game, usable) {
   return { actionId: 'mirageMark', targetId };
 }
 
+// Oraclus's Rune Vision, stage 1 (picking the predicted ATTACKER). No
+// downside to a wrong guess (confirmed ruling - "nothing happens, just a
+// wasted turn"), so the bot predicts eagerly whenever it's legal, rather
+// than reserving it for only "safe" moments the way other risk-averse
+// choosers do. Picks whichever living character (other than himself) is
+// MOST likely to actually attack next - approximated as whoever has the
+// most usable damaging actions available right now (a rough proxy for "not
+// frozen/locked/out of options"), falling back to a random living pick if
+// that's tied or unclear.
+function chooseRuneVisionAttackerPick(character, game) {
+  const candidates = Object.values(game.characters).filter(
+    (c) => c.id !== character.id && !c.isKO && !c.untargetable
+  );
+  if (candidates.length === 0) return null;
+  const scored = candidates.map((c) => {
+    const usableCount = getUsableActions(c, game).filter((a) => a.needsTarget).length;
+    return { id: c.id, usableCount };
+  });
+  const maxUsable = Math.max(...scored.map((s) => s.usableCount));
+  const tied = scored.filter((s) => s.usableCount === maxUsable).map((s) => s.id);
+  return pickRandom(tied);
+}
+
+// Stage 2 (picking the predicted TARGET), given the attacker already
+// chosen above. Predicts that attacker will go after the lowest-hearts
+// living character (excluding the attacker themself, already impossible
+// via isValidRuneVisionTargetPick) - the same "focus the weakest" default
+// heuristic every other character's basic-attack targeting falls back to,
+// since it's the single most common real attack pattern across the bot
+// roster.
+export function chooseRuneVisionTargetPick(character, game, predictedAttackerId) {
+  const candidates = Object.values(game.characters)
+    .filter((c) => c.id !== predictedAttackerId && !c.isKO && !c.untargetable)
+    .map((c) => c.id);
+  if (candidates.length === 0) return null;
+  return lowestHeartsTarget(game, candidates) || pickRandom(candidates);
+}
+
+function chooseOraclusMove(character, game, usable) {
+  const byId = Object.fromEntries(usable.map((a) => [a.actionId, a]));
+  if (byId.runeVision) {
+    const attackerId = chooseRuneVisionAttackerPick(character, game);
+    if (attackerId) return { actionId: 'runeVision', targetId: attackerId };
+  }
+  const targets = validTargetsFor(game, character, 'runeStrike');
+  const targetId = lowestHeartsTarget(game, targets) || pickRandom(targets);
+  return { actionId: 'runeStrike', targetId };
+}
+
 const MOVE_CHOOSERS = {
   tharox: chooseTharoxMove,
   zerathys: chooseZerathysMove,
@@ -1247,6 +1296,7 @@ const MOVE_CHOOSERS = {
   marin: chooseMarinMove,
   grimtal: chooseGrimtalMove,
   illyra: chooseIllyraMove,
+  oraclus: chooseOraclusMove,
 };
 
 // Fallback for characters without bot logic yet: picks a random usable

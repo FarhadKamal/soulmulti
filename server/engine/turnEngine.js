@@ -15,8 +15,9 @@ import * as rowan from '../abilities/rowan.js';
 import * as marin from '../abilities/marin.js';
 import * as grimtal from '../abilities/grimtal.js';
 import * as illyra from '../abilities/illyra.js';
+import * as oraclus from '../abilities/oraclus.js';
 
-const ABILITY_MODULES = { chronox, tharox, zerathys, akyros, velorya, boingo, blade, athena, melyssa, kaelis, draxus, rowan, marin, grimtal, illyra };
+const ABILITY_MODULES = { chronox, tharox, zerathys, akyros, velorya, boingo, blade, athena, melyssa, kaelis, draxus, rowan, marin, grimtal, illyra, oraclus };
 
 export function getAbilityModule(characterId) {
   return ABILITY_MODULES[characterId];
@@ -85,6 +86,33 @@ export function isValidMindControlTarget(game, targetId) {
   if (target.isKO || target.untargetable || target.skipNextTurn) return false;
   if (isCurrentlyFrozen(game, targetId)) return false;
   return true; // deliberately no ownerId check - ally or enemy both legal
+}
+
+// Oraclus's Rune Vision stage 1 (picking the predicted ATTACKER) - same
+// "needs its own dedicated function, not a per-actionId bypass in
+// isValidTarget" reasoning as Mind Control above, since predicting who
+// will attack whom genuinely needs to allow ANY living character
+// (including allies) as the predicted attacker, never just enemies. He can
+// never predict HIMSELF as the attacker (confirmed ruling - "predicting an
+// opponent," not forecasting his own move).
+export function isValidRuneVisionAttackerPick(game, targetId) {
+  const target = game.characters[targetId];
+  if (!target || target.id === 'oraclus') return false;
+  if (target.isKO || target.untargetable) return false;
+  return true; // deliberately no ownerId check - any living character but himself
+}
+
+// Stage 2 (picking the predicted TARGET) - unlike the attacker pick, he CAN
+// predict himself as the target (confirmed ruling: "yes, he can predict
+// himself as the target too"). The only hard exclusion is the already-
+// chosen predicted attacker itself (an attacker can't "attack" themselves
+// in this game - no self-targeted damaging action exists in the roster).
+export function isValidRuneVisionTargetPick(game, predictedAttackerId, targetId) {
+  if (targetId === predictedAttackerId) return false;
+  const target = game.characters[targetId];
+  if (!target) return false;
+  if (target.isKO || target.untargetable) return false;
+  return true;
 }
 
 // True in the specific stalemate condition: exactly 2 characters left
@@ -184,6 +212,15 @@ export function getUsableActions(character, game) {
 // for Melyssa's own selection step).
 export function getUsablePuppetActions(puppetCharacter, game) {
   return getLegalActions(puppetCharacter, game).filter((action) => {
+    // Oraclus's Rune Vision is excluded from Mind Control entirely - it's
+    // a two-stage SELECTION move (targets via isValidRuneVisionAttackerPick,
+    // ally-allowed, not the enemy-only isValidPuppetTarget this function
+    // otherwise checks against), and thematically Mind Control forces real
+    // attacks/self-harm, not a passive prediction setup. Puppeting him into
+    // it would need its own dedicated stage-2 handling (mirroring Soul
+    // Swap's puppeted follow-up) for a move that deals no damage and poses
+    // no threat when forced - not worth the added complexity.
+    if (action.actionId === 'runeVision') return false;
     if (!action.needsTarget) return true;
     return hasAnyValidPuppetTarget(game, puppetCharacter.id, action.actionId);
   });
@@ -377,6 +414,30 @@ export function beginCharacterTurn(character, game, log) {
 // to commit pending the post-execute effect check.
 export function buildActionAgainstChronoxRecord(game, characterId, actionId, targetId) {
   if (targetId !== 'chronox') return null;
+  // Oraclus's Rune Vision (stage 1) is a SELECTION, not an attack - picking
+  // Chronox as the predicted ATTACKER genuinely sets targetId: 'chronox'
+  // (it reuses the normal single-target picker), but it deals no damage
+  // and doesn't act ON him at all, the same way Melyssa's mindControl
+  // puppet-selection targeting Chronox doesn't either. Without this
+  // exclusion, casting Rune Vision naming Chronox as the predicted
+  // attacker would get recorded as "the most recent action against him,"
+  // and a later real hit on him could be masked/overwritten incorrectly by
+  // it (or, worse, be silently dropped the way the mindControl bug was) -
+  // confirmed reachable via direct testing when this character was added.
+  if (actionId === 'runeVision') return null;
+  // Melyssa's mindControl (puppet SELECTION, not an attack) gets the exact
+  // same treatment as runeVision above, for the same underlying reason -
+  // picking Chronox AS THE PUPPET genuinely sets targetId: 'chronox', but
+  // selecting him deals no damage and doesn't act on him at all. The
+  // original fix for this (the "same combo" exclusion further below,
+  // matching on lastActionAgainstMe?.actionId !== 'mindControl') only
+  // prevented a LATER action from being wrongly merged into an EXISTING
+  // mindControl record - it never stopped mindControl from being recorded
+  // as the first/only record in the first place, which is wrong on its
+  // own even before any follow-up action happens (confirmed via direct
+  // regression testing after Oraclus's runeVision fix was added
+  // alongside it, exposing that this exact gap was never actually closed).
+  if (actionId === 'mindControl') return null;
   const chronoxChar = game.characters.chronox;
   if (!chronoxChar || chronoxChar.isKO) return null;
   // Generalized "still the same combo" guard. Several characters chain
@@ -407,10 +468,23 @@ export function buildActionAgainstChronoxRecord(game, characterId, actionId, tar
   // any) damage THIS individual strike deals, so Rewind correctly reverses
   // the WHOLE combo at once. A different turnInstanceFor value means a
   // genuinely new turn's first hit, which SHOULD build a fresh record.
+  // Melyssa's mindControl (puppet SELECTION, not an attack) is deliberately
+  // excluded from ever counting as an existing combo to continue from, even
+  // though it's a real, distinct recordable action against Chronox in its
+  // own right (she can target him AS the puppet, targetId === 'chronox').
+  // Without this exclusion, her very next action that same turn - Self
+  // Choke, or a puppeted real attack - would be wrongly treated as "still
+  // the same combo" as the selection step and silently dropped/merged
+  // instead of properly overwriting it, since both share her one
+  // turnInstance. Confirmed live: "Chronox used Rewind - undid Melyssa's
+  // mindControl!" fired instead of undoing the actual Self Choke damage
+  // that followed moments later - the selection step's harmless 0-damage
+  // snapshot was kept instead of being replaced.
   const turnInstance = game.turnInstanceFor.get(characterId);
   if (
     chronoxChar.special.lastActionAgainstMe?.casterId === characterId
     && chronoxChar.special.lastActionAgainstMe?.casterTurnInstance === turnInstance
+    && chronoxChar.special.lastActionAgainstMe?.actionId !== 'mindControl'
   ) {
     return 'keep-existing';
   }
@@ -542,6 +616,59 @@ function mirageBurstTargetsChronox(game, characterId, actionId) {
   return (caster?.special.mirageMarks?.get('chronox') || 0) > 0;
 }
 
+// Oraclus's Rune Vision: checks a pending prediction against the VERY NEXT
+// genuine attack anyone takes (see oraclus.js's runeVision.execute for how
+// the guess itself is stored) - written generically here in turnEngine.js,
+// not oraclus.js, for the same reason Chronox's Rewind recording lives here
+// (this needs to see EVERY action in the game, by any character, not just
+// ones that target Oraclus - a circular import concern if it lived in his
+// own ability file, since this file imports every ability module).
+//
+// "A real attack" (confirmed ruling): the action must be capable of
+// dealing damage to the target - i.e. it routed through applyDamage at all
+// - even if shield fully absorbed it or a dodge mechanic blocked it
+// entirely (0 amountDealt still counts, since he's predicting the ATTACK
+// CHOICE, not the outcome). A pure 0-damage setup/status move (Arcane
+// Study, Poison Cloud's cast, Hidden Mark, Time Freeze, Silence Lock, Soul
+// Swap) never calls applyDamage at all and returns a plain {} - the
+// presence of a numeric amountDealt on the result is what distinguishes a
+// genuine attack attempt from a setup move generically, without needing to
+// hardcode every action id in the game.
+//
+// Deliberately does NOT clear the pending prediction on a skip (frozen/
+// headache/no-valid-target) - those never reach this function at all
+// (gameFlow.js's getActingCharacterId marks a skipped character acted
+// without ever calling executeAction), so the guess correctly keeps
+// waiting through skips for the predicted attacker's next REAL action, per
+// the confirmed ruling.
+export function resolveOraclusPredictionIfPending(game, characterId, actionId, targetId, result) {
+  const oraclusChar = game.characters.oraclus;
+  if (!oraclusChar || oraclusChar.isKO) return;
+  if (!oraclusChar.special.predictedAttackerId) return;
+  // Only ever resolves against the PREDICTED attacker's own action - any
+  // other character acting in between (including Oraclus himself) is
+  // simply irrelevant noise, not a miss - the guess is specifically about
+  // that one character's NEXT action, wherever it falls in turn order.
+  if (characterId !== oraclusChar.special.predictedAttackerId) return;
+  if (!result || typeof result.amountDealt !== 'number') return;
+  const isMatch = targetId === oraclusChar.special.predictedTargetId;
+  oraclusChar.special.predictedAttackerId = null;
+  oraclusChar.special.predictedTargetId = null;
+  if (!isMatch) {
+    game.log.push({ type: 'prediction-result', characterId: 'oraclus', matched: false });
+    return;
+  }
+  oraclusChar.special.predictionWins += 1;
+  oraclusChar.special.runeStrikeBonusDamage += 1;
+  applyHeal(game, 'oraclus', 3);
+  applyShield(game, 'oraclus', 3, { decaying: false });
+  game.log.push({
+    type: 'prediction-result', characterId: 'oraclus', matched: true,
+    predictedAttackerId: characterId, predictedTargetId: targetId,
+    predictionWins: oraclusChar.special.predictionWins,
+  });
+}
+
 export function executeAction(game, characterId, actionId, targetId, extra) {
   const effectiveTargetId = mirageBurstTargetsChronox(game, characterId, actionId) ? 'chronox' : targetId;
   const candidateRecord = buildActionAgainstChronoxRecord(game, characterId, actionId, effectiveTargetId);
@@ -550,6 +677,7 @@ export function executeAction(game, characterId, actionId, targetId, extra) {
   const actionDef = mod.actions[actionId];
   const log = [];
   const result = actionDef.execute(character, targetId, game, log, extra);
+  resolveOraclusPredictionIfPending(game, characterId, actionId, targetId, result);
   // Commit the candidate record AFTER execute has actually run, and only
   // if it's a genuinely fresh record (not 'keep-existing'/null) whose
   // action had a REAL effect on Chronox - see

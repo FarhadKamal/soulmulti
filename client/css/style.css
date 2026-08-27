@@ -692,6 +692,71 @@ input {
   100% { opacity: 0; scale: 0.95; translate: 0 -4px; }
 }
 
+/* Oraclus's Rune Vision confirmed: three small rune stones snap into a
+   tight orbit around the tile and a radiant cyan-white ring blazes outward
+   from the center - an escalating "the vision was true" glow, distinct
+   from every other win-flavored effect (divine's steady golden self-buff,
+   revive's warm return-to-life burst) via its gathering-inward motion
+   rather than a simple radiate/pop. */
+.prediction-win-fx {
+  position: absolute; inset: 0; pointer-events: none; z-index: 5;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden; border-radius: inherit;
+}
+.prediction-rune {
+  position: absolute; width: 10%; height: 10%; border-radius: 3px;
+  background: #22d3d3;
+  box-shadow: 0 0 12px 3px rgba(45, 212, 191, 0.9);
+  opacity: 0;
+  animation: tile-prediction-rune-orbit 1.1s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+}
+.prediction-rune--1 { animation-delay: 0s; transform-origin: center; }
+.prediction-rune--2 { animation-delay: 0.06s; }
+.prediction-rune--3 { animation-delay: 0.12s; }
+@keyframes tile-prediction-rune-orbit {
+  0% { opacity: 0; scale: 0.3; translate: -40% -40%; rotate: 0deg; }
+  35% { opacity: 1; }
+  70% { opacity: 1; translate: 0% -55%; rotate: 220deg; }
+  100% { opacity: 0; translate: 0% -55%; rotate: 320deg; }
+}
+.prediction-win-ring {
+  position: absolute; width: 15%; height: 15%; border-radius: 50%;
+  border: 3px solid #5eead4;
+  box-shadow: 0 0 20px 4px rgba(94, 234, 212, 0.85);
+  opacity: 0;
+  animation: tile-prediction-win-ring 1.1s ease-out 0.15s forwards;
+}
+@keyframes tile-prediction-win-ring {
+  0% { opacity: 0; scale: 0.3; }
+  30% { opacity: 0.95; }
+  100% { opacity: 0; scale: 4; }
+}
+
+/* Oraclus's Rune Vision failed: the same rune stones instead crack apart
+   and scatter downward, dimming from cyan to grey - a sharp, quick
+   shatter-and-fall, the visual inverse of prediction-win-fx above
+   (gathering ring vs. scattering break). */
+.prediction-loss-fx {
+  position: absolute; inset: 0; pointer-events: none; z-index: 5;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden; border-radius: inherit;
+}
+.prediction-shard {
+  position: absolute; width: 9%; height: 9%; border-radius: 2px;
+  background: #6b7280;
+  box-shadow: 0 0 6px 1px rgba(107, 114, 128, 0.6);
+  opacity: 0;
+  animation: tile-prediction-shard-fall 0.65s cubic-bezier(0.4, 0, 0.6, 1) forwards;
+}
+.prediction-shard--1 { animation-delay: 0s; }
+.prediction-shard--2 { animation-delay: 0.05s; }
+.prediction-shard--3 { animation-delay: 0.1s; }
+@keyframes tile-prediction-shard-fall {
+  0% { opacity: 0; scale: 1; translate: 0 -30%; rotate: 0deg; background: #2dd4bf; }
+  20% { opacity: 1; scale: 1.1; background: #2dd4bf; }
+  100% { opacity: 0; scale: 0.5; translate: 0 40%; rotate: 140deg; background: #6b7280; }
+}
+
 /* Melyssa's Self Choke, victim (puppet) side: a constricting violet ring
    that starts wide and contracts inward around the portrait before
    snapping tight and fading - a genuinely new contracting-loop motion,

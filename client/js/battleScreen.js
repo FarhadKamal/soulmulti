@@ -713,6 +713,32 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
     shock.textContent = '!';
     tile.appendChild(shock);
   }
+  if (effects.has('predictionwin') && !character.isKO) {
+    // Oraclus's Rune Vision confirmed: a ring of rune stones snaps into a
+    // tight orbit and blazes with a radiant cyan-white burst, reading as
+    // "the vision was true" - escalating glow rather than a single pop,
+    // distinct from every other win-flavored effect in this file (divine's
+    // golden self-buff glow, revive's warm return-to-life burst).
+    const win = document.createElement('div');
+    win.className = 'prediction-win-fx';
+    win.innerHTML = '<span class="prediction-rune prediction-rune--1"></span>' +
+      '<span class="prediction-rune prediction-rune--2"></span>' +
+      '<span class="prediction-rune prediction-rune--3"></span>' +
+      '<span class="prediction-win-ring"></span>';
+    tile.appendChild(win);
+  }
+  if (effects.has('predictionloss') && !character.isKO) {
+    // Oraclus's Rune Vision failed: the same rune stones instead crack and
+    // scatter, dimming from cyan to grey as they fall - a sharp, quick
+    // shatter-and-fade, the visual inverse of predictionwin above (a
+    // gathering ring vs. a scattering break).
+    const loss = document.createElement('div');
+    loss.className = 'prediction-loss-fx';
+    loss.innerHTML = '<span class="prediction-shard prediction-shard--1"></span>' +
+      '<span class="prediction-shard prediction-shard--2"></span>' +
+      '<span class="prediction-shard prediction-shard--3"></span>';
+    tile.appendChild(loss);
+  }
   if (effects.has('poisoncloud') && !character.isKO) {
     // Rowan's Poison Cloud: a swirling green toxic mist settles over the
     // target - fires on the initial cast AND re-fires on every subsequent
@@ -1220,13 +1246,18 @@ function renderActionPanel(characterId, usableActions, armedAction, state) {
 
   const title = document.createElement('div');
   title.className = 'action-panel-title';
-  title.textContent = state.awaitingSoulSwapWrath ? 'Soul Swap landed - choose your free Thunder Wrath target' : 'Your turn - choose an action';
+  title.textContent = state.awaitingSoulSwapWrath
+    ? 'Soul Swap landed - choose your free Thunder Wrath target'
+    : state.awaitingRuneVisionTarget
+      ? 'Rune Vision: who will they strike?'
+      : 'Your turn - choose an action';
   panel.appendChild(title);
 
-  // Skipped for the Soul Swap free follow-up (awaitingSoulSwapWrath -
-  // that's a forced, already-in-motion continuation of the turn, not a
-  // fresh decision that needs its own "look before you act" beat).
-  const lockoutUntil = (!state.awaitingSoulSwapWrath && state.turnDeadline)
+  // Skipped for the Soul Swap free follow-up and Rune Vision's stage 2
+  // (awaitingSoulSwapWrath/awaitingRuneVisionTarget) - both are a forced,
+  // already-in-motion continuation of the turn, not a fresh decision that
+  // needs its own "look before you act" beat.
+  const lockoutUntil = (!state.awaitingSoulSwapWrath && !state.awaitingRuneVisionTarget && state.turnDeadline)
     ? state.turnDeadline - TURN_TIMER_MS + ACTION_LOCKOUT_MS
     : 0;
   const lockoutActive = lockoutUntil > Date.now();
@@ -1312,6 +1343,8 @@ function onTargetPicked(targetId, state) {
 function submitAction(characterId, action, targetId, state) {
   if (state.awaitingSoulSwapWrath) {
     send('soul-swap-wrath', { characterId, targetId });
+  } else if (state.awaitingRuneVisionTarget) {
+    send('rune-vision-target-pick', { characterId, targetId });
   } else {
     send('action', { characterId, actionId: action.actionId, targetId });
   }
@@ -1580,6 +1613,7 @@ const ACTION_LABELS = {
   piercingWand: 'Piercing Wand', wandMastery: 'Wand Mastery',
   grimStrike: 'Grim Strike', skullCrack: 'Skull Crack', claimKill: 'Claim the Kill',
   mirageMark: 'Mirage Mark', mirageBurst: 'Mirage Burst',
+  runeStrike: 'Rune Strike', runeVision: 'Rune Vision', runeVisionTargetPick: 'Rune Vision',
 };
 
 // Rowan's and Marin's discoverable spells, shared by describeLogEntry's
@@ -1625,6 +1659,17 @@ function describeLogEntry(entry) {
         );
         return `${name(entry.characterId)} used Mirage Burst - detonated ${parts.join(', ')}`;
       }
+      if (entry.actionId === 'runeVision') {
+        if (entry.stage === 1) {
+          // Deliberately vague about the PREDICTED TARGET here - only the
+          // attacker pick is public at this stage (matches Akyros's Hidden
+          // Mark's own "no target named" precedent for a secret setup
+          // move), the full guess is only revealed once it resolves via
+          // the 'prediction-result' entry below.
+          return `${name(entry.characterId)} cast Rune Vision, predicting ${name(entry.predictedAttackerId)} will strike...`;
+        }
+        return `${name(entry.characterId)} predicts ${name(entry.predictedAttackerId)} will strike ${name(entry.predictedTargetId)}`;
+      }
       if (entry.actionId === 'rewind') {
         // Jester Ball explosions record no caster (see server's
         // resolveJesterBall) - describe it as undoing the explosion itself
@@ -1648,6 +1693,10 @@ function describeLogEntry(entry) {
       return `Curse mirrors ${entry.amount} damage to ${name(entry.toCharacterId)}${entry.koTriggered ? ' - KO!' : ''}`;
     case 'ashka-heal':
       return `${name(entry.characterId)}'s Ashka heals +${entry.healed}`;
+    case 'prediction-result':
+      return entry.matched
+        ? `Rune Vision confirmed! ${name(entry.predictedAttackerId)} struck ${name(entry.predictedTargetId)} exactly as foreseen - +3 hearts, +3 shield, +1 damage (${entry.predictionWins}/2 wins)`
+        : `Rune Vision failed - the vision did not come to pass`;
     case 'deathless-fury-end':
       return `${name(entry.characterId)}'s Deathless Fury ends - 3 strikes granted!`;
     case 'rebirth':

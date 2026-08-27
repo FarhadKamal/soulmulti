@@ -13,11 +13,12 @@ import {
   getUsableActions, getUsablePuppetActions, executeAction, isValidTarget, isValidMindControlTarget,
   isValidPuppetTarget, markCharacterActed, finalizeAction, executeActionAsPuppet,
   isMelyssaLoneDuel, LONE_DUEL_EXCEPTIONS, buildActionAgainstChronoxRecord, chronoxStateActuallyChanged,
+  resolveOraclusPredictionIfPending, isValidRuneVisionAttackerPick, isValidRuneVisionTargetPick,
 } from './engine/turnEngine.js';
 import { applyDamage } from './engine/damagePipeline.js';
 import {
   chooseBotMove, chooseBotJesterBallMove, chooseSoulSwapWrathTarget,
-  chooseBotMelyssaPuppetAction,
+  chooseBotMelyssaPuppetAction, chooseRuneVisionTargetPick,
 } from './engine/botPlayer.js';
 import { settleToNextDecision, finishJesterBall } from './gameFlow.js';
 import {
@@ -420,6 +421,11 @@ function executeSelfChoke(game, melyssaId, puppetId) {
       chronoxChar.special.lastActionAgainstMe = candidateRecord;
     }
   }
+  // Oraclus's Rune Vision needs to see this too - Self Choke's true
+  // attacker is Melyssa (matching its own established log attribution),
+  // so a prediction of "Melyssa attacks <puppet>" is a legitimate, if
+  // niche, guess this should be able to confirm.
+  resolveOraclusPredictionIfPending(game, melyssaId, 'selfChoke', puppetId, result);
   log.push({ type: 'attack', characterId: melyssaId, actionId: 'selfChoke', targetId: puppetId, ...result });
   finalizeAction(game, log, result, melyssaId, 'selfChoke', puppetId);
   return result;
@@ -695,6 +701,20 @@ function stepBotTurn(room) {
       if (move.actionId === 'soulSwap') {
         const wrathTarget = chooseSoulSwapWrathTarget(character, room.game);
         if (wrathTarget) executeAction(room.game, acting, 'soulSwapWrath', wrathTarget);
+      }
+      if (move.actionId === 'runeVision') {
+        // Stage 2 (predicted TARGET pick) resolves inline, same as Soul
+        // Swap's own follow-up just above - a bot's whole turn (both
+        // stages of the prediction) completes in one synchronous tick,
+        // unlike the human path's two separate messages.
+        const predictionTarget = chooseRuneVisionTargetPick(character, room.game, move.targetId);
+        if (predictionTarget) {
+          character.special.predictedTargetId = predictionTarget;
+          room.game.log.push({
+            type: 'special', characterId: 'oraclus', actionId: 'runeVision',
+            predictedAttackerId: move.targetId, predictedTargetId: predictionTarget, stage: 2,
+          });
+        }
       }
 
       if (hitDraxusMidWindow && draxus.special.deathproofActive) {
@@ -1351,9 +1371,13 @@ function handleAction(room, sessionId, { characterId, actionId, targetId }) {
   if (actionDef.needsTarget) {
     // mindControl is the one action allowed to target allies - routes
     // through isValidMindControlTarget instead of the enemy-only isValidTarget.
+    // runeVision (stage 1, picking the predicted ATTACKER) similarly needs
+    // its own dedicated ally-allowed check.
     const validNow = actionId === 'mindControl'
       ? isValidMindControlTarget(room.game, targetId)
-      : isValidTarget(room.game, characterId, actionId, targetId);
+      : actionId === 'runeVision'
+        ? isValidRuneVisionAttackerPick(room.game, targetId)
+        : isValidTarget(room.game, characterId, actionId, targetId);
     if (!validNow) return;
   }
   if (actionId === 'mindControl') {
@@ -1361,6 +1385,32 @@ function handleAction(room, sessionId, { characterId, actionId, targetId }) {
     const puppetId = result.puppetCharacterId;
     const puppetOptions = mindControlOptionsFor(room.game, characterId, puppetId);
     broadcastMindControlStage(room, characterId, puppetId, puppetOptions);
+    return;
+  }
+  if (actionId === 'runeVision') {
+    // Stage 1 resolves (predictedAttackerId stored, no reward/lockout of
+    // his turn yet) - reuses the EXACT same usableActions/renderActionPanel
+    // shape Soul Swap's own free Thunder Wrath follow-up uses (see the
+    // soulSwap branch below and battleScreen.js's generic
+    // renderActionPanel), rather than a bespoke client-side panel, so
+    // stage 2 needs zero new rendering code. The SECOND stage here is a
+    // plain data write (predictedTargetId), not a real damaging action, so
+    // it's handled by its own dedicated message type
+    // (rune-vision-target-pick / handleRuneVisionTargetPick) rather than
+    // routing back through executeAction/getUsableActions a second time.
+    executeAction(room.game, characterId, actionId, targetId);
+    const validTargetPicks = Object.keys(room.game.characters).filter(
+      (tid) => isValidRuneVisionTargetPick(room.game, targetId, tid)
+    );
+    armTurnTimer(room, characterId);
+    broadcastRoom(room, 'game-state', {
+      game: sanitizeGameForBroadcast(room.game),
+      actingCharacterId: characterId,
+      awaitingRuneVisionTarget: true,
+      predictedAttackerId: targetId,
+      usableActions: [{ actionId: 'runeVisionTargetPick', label: 'Predict their target', needsTarget: true, validTargetIds: validTargetPicks }],
+      turnDeadline: room.turnDeadline,
+    });
     return;
   }
 
@@ -1455,6 +1505,32 @@ function handleSoulSwapWrath(room, sessionId, { characterId, targetId }) {
   if (!seat || seat.playerId !== sessionId) return;
   if (!isValidTarget(room.game, characterId, 'soulSwapWrath', targetId)) return;
   executeAction(room.game, characterId, 'soulSwapWrath', targetId);
+  markCharacterActed(room.game, characterId);
+  broadcastGameState(room);
+  runBotTurnsIfAny(room);
+}
+
+// Stage 2 of Oraclus's Rune Vision: completes his pending prediction with
+// the predicted TARGET pick. Unlike soulSwapWrath, this never routes
+// through executeAction/getLegalActions - it's a plain data write
+// (predictedTargetId), not a real ability with its own damage/effect
+// resolution, so there's nothing for the normal ability pipeline to do
+// here beyond storing the pick and ending his turn. The actual
+// match-or-miss check happens later, generically, in
+// resolveOraclusPredictionIfPending (turnEngine.js) the next time the
+// predicted attacker takes a real action - not here.
+function handleRuneVisionTargetPick(room, sessionId, { characterId, targetId }) {
+  if (room.phase !== 'in-match' || !room.game) return;
+  const seat = seatForCharacter(room, characterId);
+  if (!seat || seat.playerId !== sessionId) return;
+  const oraclusChar = room.game.characters[characterId];
+  if (!oraclusChar || oraclusChar.id !== 'oraclus' || !oraclusChar.special.predictedAttackerId) return;
+  if (!isValidRuneVisionTargetPick(room.game, oraclusChar.special.predictedAttackerId, targetId)) return;
+  oraclusChar.special.predictedTargetId = targetId;
+  room.game.log.push({
+    type: 'special', characterId: 'oraclus', actionId: 'runeVision',
+    predictedAttackerId: oraclusChar.special.predictedAttackerId, predictedTargetId: targetId, stage: 2,
+  });
   markCharacterActed(room.game, characterId);
   broadcastGameState(room);
   runBotTurnsIfAny(room);
@@ -1679,6 +1755,7 @@ wss.on('connection', (ws) => {
       case 'abandon-match': return handleAbandonMatch(room, sessionId);
       case 'action': return handleAction(room, sessionId, payload);
       case 'soul-swap-wrath': return handleSoulSwapWrath(room, sessionId, payload);
+      case 'rune-vision-target-pick': return handleRuneVisionTargetPick(room, sessionId, payload);
       case 'mind-control-action': return handleMindControlAction(room, sessionId, payload);
       case 'jester-ball-choice': return handleJesterBallChoice(room, sessionId, payload);
       case 'chat-message': return handleChatMessage(room, sessionId, payload);

@@ -37,6 +37,8 @@ const EFFECT_DURATION_MS = {
   bloodsacrifice: 800,
   sacrificepierce: 600,
   shockmark: 650,
+  predictionwin: 1100,
+  predictionloss: 700,
 };
 
 // How long the mirror-shard counter-hit effect waits before it even starts,
@@ -287,6 +289,22 @@ export function handleLogEntryForEffects(entry, game) {
   // (the caster) or any normal targetId, since Rewind is a no-target
   // special - see server/abilities/chronox.js's rewind.execute for the log
   // entry shape.
+  // Oraclus's Rune Vision resolving - its own dedicated log entry type
+  // (server's resolveOraclusPredictionIfPending), fires on OWN tile
+  // (rewards/failure both land on him, not the predicted attacker/target)
+  // whenever the predicted attacker's real action actually resolves -
+  // could be turns after the cast itself, a distinct reveal moment
+  // matching the win_prediction.jpg/loss_prediction.jpg portrait swap in
+  // portraitFlash.js. A win gets an escalating radiant confirmation glow
+  // (predictionwin); a miss gets a sharper, quicker shatter/dim
+  // (predictionloss) - same win/loss asymmetry as every other paired
+  // effect in this file (e.g. revive vs. smoke).
+  if (entry.type === 'prediction-result') {
+    if (!isKO('oraclus')) {
+      addEffect('oraclus', entry.matched ? 'predictionwin' : 'predictionloss', EFFECT_DURATION_MS[entry.matched ? 'predictionwin' : 'predictionloss']);
+    }
+    return;
+  }
   if (entry.type === 'special' && entry.actionId === 'rewind') {
     // rewoundCasterId is null for a Jester Ball explosion (no single
     // attacker to react - see server's resolveJesterBall) - nothing to

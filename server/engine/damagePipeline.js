@@ -306,8 +306,15 @@ export function applyDamage(game, log, {
   // buildActionAgainstChronoxRecord already uses.
   if (target.id === 'chronox' && target.special?.lastActionAgainstMe) {
     const record = target.special.lastActionAgainstMe;
+    // mindControl (Melyssa's puppet SELECTION step) is excluded from combo
+    // continuation here too, matching turnEngine.js's
+    // buildActionAgainstChronoxRecord - see its own comment for why. A
+    // pending mindControl record's snapshot must still drift-correct
+    // against any damage that follows in the same turn (e.g. Self Choke),
+    // not be treated as "part of the same combo" and skipped.
     const isSameComboContinuation = record.casterId === sourceCharacterId
-      && game.turnInstanceFor?.get(sourceCharacterId) === record.casterTurnInstance;
+      && game.turnInstanceFor?.get(sourceCharacterId) === record.casterTurnInstance
+      && record.actionId !== 'mindControl';
     if (!isSameComboContinuation) {
       const drift = heartsBefore - target.hearts;
       if (drift > 0) {

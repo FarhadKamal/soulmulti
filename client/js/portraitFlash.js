@@ -96,6 +96,7 @@ const IDLE_IMAGE = {
   marin: 'assets/images/marin/idle.jpg',
   grimtal: 'assets/images/grimtal/idle.jpg',
   illyra: 'assets/images/illyra/idle.jpg',
+  oraclus: 'assets/images/oraclus/idle.jpg',
 };
 
 // Per-character idle-flash duration overrides (falls back to the shared
@@ -247,6 +248,18 @@ export function handleLogEntryForFlash(entry, game) {
     // Athena's Curse Strike also logs its own dedicated type (never
     // 'attack'/'special'/'setup') - same reasoning as hidden-mark above.
     if (!isKO(entry.characterId)) setFlash(entry.characterId, 'assets/images/athena/curse.jpg');
+    return;
+  }
+  if (entry.type === 'prediction-result') {
+    // Oraclus's Rune Vision resolving - its own dedicated log entry type
+    // (server's resolveOraclusPredictionIfPending), same reasoning as
+    // hidden-mark/curse above. Win and miss get visually distinct images
+    // (see the win_prediction.jpg/loss_prediction.jpg design), unlike
+    // every other flash pair in this file which all reuse ONE image with
+    // different animation overlays for success/failure.
+    if (!isKO('oraclus')) {
+      setFlash('oraclus', entry.matched ? 'assets/images/oraclus/win_prediction.jpg' : 'assets/images/oraclus/loss_prediction.jpg');
+    }
     return;
   }
   if (entry.type === 'ashka-heal') {
@@ -416,6 +429,20 @@ export function handleLogEntryForFlash(entry, game) {
       // always set server-side), so the detonation itself always visibly
       // happens even if the target's shield ends up absorbing all of it.
       setFlash(characterId, 'assets/images/illyra/mirage_burst.jpg'); break;
+    case 'runeStrike':
+      // Empowered (3 damage, both prediction wins banked) gets its own
+      // more intense flash image, same amountDealt-gated swap the sound/
+      // voice already do (see main.js).
+      if (!dodged && amountDealt > 0) {
+        setFlash(characterId, amountDealt >= 3 ? 'assets/images/oraclus/rune_strong_strike.jpg' : 'assets/images/oraclus/rune_strike.jpg');
+      }
+      break;
+    case 'runeVision':
+      // Fires on stage 1 (the cast) only - stage 2 (entry.stage === 2,
+      // picking the predicted target) is a plain data completion of the
+      // same cast, not a second visible moment worth re-flashing.
+      if (entry.stage === 1) setFlash(characterId, 'assets/images/oraclus/rune_prediction.jpg');
+      break;
     default:
       break;
   }

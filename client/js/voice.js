@@ -130,6 +130,7 @@ const VOICE_LINES = {
   marin: { idle: 'idle', injured: 'injured', koed: 'koed', victory: 'victory' },
   grimtal: { idle: 'idle', injured: 'injured', koed: 'koed', victory: 'victory' },
   illyra: { idle: 'idle', injured: 'injured', koed: 'koed', victory: 'victory' },
+  oraclus: { idle: 'idle', injured: 'injured', koed: 'koed', victory: 'victory' },
 };
 
 // actionId -> filename, per character - every action here plays its line
@@ -228,6 +229,29 @@ const ACTION_VOICE_LINES = {
     // not through the generic actionId-keyed dispatch - her passive has no
     // actionId of its own, it's triggered by the shared 'dodge' entry type.
     dodge: 'dodge',
+  },
+  // runeVision's cast line plays via the generic dispatch (a normal
+  // type: 'special' entry, actionId: 'runeVision', stage 1). runeVisionWin/
+  // runeVisionLoss are NOT actionIds - they're played directly from
+  // main.js's dedicated 'prediction-result' log-entry handler (matched
+  // decides which), same pattern as Melyssa's 'resist' key above.
+  // runeStrike stays a single generic entry despite scaling 1/2/3 damage -
+  // unlike its sound effect (which swaps to rune_strike_strong.mp3 above
+  // 3 dmg), the recorded VOICE lines are distinct enough on their own
+  // (rune_strike.mp3 vs rune_strike_strong.mp3) to warrant the same
+  // amountDealt-based override, handled directly in main.js rather than
+  // this static lookup table (which has no access to the log entry's
+  // damage amount).
+  oraclus: {
+    runeVision: 'prediction',
+    runeVisionWin: 'rune_win',
+    runeVisionLoss: 'rune_loss',
+    runeStrike: 'rune_strike',
+    // Not a real actionId - a synthetic lookup key main.js passes directly
+    // (via playMoveVoice('oraclus', 'runeStrikeStrong')) once it's already
+    // determined amountDealt >= 3, same reasoning as the sound-effect
+    // override just above it.
+    runeStrikeStrong: 'rune_strike_strong',
   },
 };
 

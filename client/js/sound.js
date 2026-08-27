@@ -151,6 +151,8 @@ const ACTION_SOUND = {
   mirageMark: 'mirage_mark',
   mirageBurst: 'mirage_burst',
   rewind: 'rewind',
+  runeStrike: 'rune_strike',
+  runeVision: 'predict',
 };
 
 export function playActionSound(actionId) {

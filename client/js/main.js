@@ -23,6 +23,13 @@ const state = {
   actingCharacterId: null,
   usableActions: [],
   awaitingSoulSwapWrath: false,
+  // Mirrors awaitingSoulSwapWrath's pattern for Oraclus's own two-stage
+  // Rune Vision cast - true from the moment he picks the predicted
+  // ATTACKER through to picking the predicted TARGET. predictedAttackerId/
+  // validRuneVisionTargets drive the stage-2 target picker panel.
+  awaitingRuneVisionTarget: false,
+  predictedAttackerId: null,
+  validRuneVisionTargets: [],
   // Mirrors awaitingSoulSwapWrath's pattern for Melyssa's own two-stage
   // Mind Control flow - true from the moment she selects a puppet through
   // to the puppeted action (and any nested follow-up) fully resolving.
@@ -342,6 +349,16 @@ function playLogEntrySound(entry, game) {
     playMoveVoice(entry.characterId, 'hiddenMark');
     return;
   }
+  if (entry.type === 'prediction-result') {
+    // Oraclus's Rune Vision resolving - its own dedicated log entry type
+    // (server's resolveOraclusPredictionIfPending), not a player-picked
+    // action, so it can't flow through the generic playActionSound
+    // dispatch below either. matched decides win (triumphant chime) vs
+    // miss (fizzle/shatter) - see correct.mp3/wrong.mp3.
+    playSound(entry.matched ? 'correct' : 'wrong');
+    playMoveVoice('oraclus', entry.matched ? 'runeVisionWin' : 'runeVisionLoss');
+    return;
+  }
   if (entry.type === 'ashka-heal') {
     // Kaelis's passive follow-up bird heal (Call Ashka's 2 free ticks) -
     // not a player-picked action, so it can't flow through the generic
@@ -408,6 +425,12 @@ function playLogEntrySound(entry, game) {
   // mutually exclusive, not layered.
   if (entry.dodged) return;
 
+  // Rune Vision's sound/voice belongs to the CAST moment (stage 1) only -
+  // stage 2 (predictedTargetId, entry.stage === 2) shares the same
+  // actionId: 'runeVision' but is really just completing the same cast,
+  // not a second distinct action - without this it would play the mystical
+  // casting sound TWICE in quick succession for one prediction.
+  if (entry.actionId === 'runeVision' && entry.stage === 2) return;
   if (entry.actionId === 'cyclonePunch') playCoin();
   if (entry.actionId === 'chaosGamble' && entry.outcome === 'lose') {
     playSound('miss');
@@ -421,6 +444,17 @@ function playLogEntrySound(entry, game) {
   if (entry.actionId === 'arcaneStudy' && entry.characterId === 'marin') {
     playSound('silent_study.wav');
     playMoveVoice('marin', 'arcaneStudy');
+    return;
+  }
+  // Oraclus's Rune Strike scales 1/2/3 damage as his prediction wins stack
+  // (see oraclus.js) - the empowered 3-damage version gets its own heavier
+  // impact sound, same "amountDealt decides which sound" override pattern
+  // as this file's other manual cases. 2-damage (one win banked) still
+  // uses the base sound - only the fully-empowered 3-damage hit is
+  // distinct enough to warrant the stronger sound.
+  if (entry.actionId === 'runeStrike' && entry.amountDealt >= 3) {
+    playSound('rune_strike_strong');
+    playMoveVoice('oraclus', 'runeStrikeStrong');
     return;
   }
   playActionSound(entry.actionId);
@@ -554,6 +588,9 @@ onMessage((msg) => {
       state.actingCharacterId = msg.actingCharacterId;
       state.usableActions = msg.usableActions || [];
       state.awaitingSoulSwapWrath = !!msg.awaitingSoulSwapWrath;
+      state.awaitingRuneVisionTarget = !!msg.awaitingRuneVisionTarget;
+      state.predictedAttackerId = msg.predictedAttackerId ?? null;
+      state.validRuneVisionTargets = msg.validRuneVisionTargets || [];
       state.awaitingMindControlAction = !!msg.awaitingMindControlAction;
       state.mindControlPuppetId = msg.mindControlPuppetId ?? null;
       state.armedAction = null;
