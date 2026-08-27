@@ -421,12 +421,16 @@ function executeSelfChoke(game, melyssaId, puppetId) {
       chronoxChar.special.lastActionAgainstMe = candidateRecord;
     }
   }
+  log.push({ type: 'attack', characterId: melyssaId, actionId: 'selfChoke', targetId: puppetId, ...result });
   // Oraclus's Rune Vision needs to see this too - Self Choke's true
   // attacker is Melyssa (matching its own established log attribution),
   // so a prediction of "Melyssa attacks <puppet>" is a legitimate, if
-  // niche, guess this should be able to confirm.
-  resolveOraclusPredictionIfPending(game, melyssaId, 'selfChoke', puppetId, result);
-  log.push({ type: 'attack', characterId: melyssaId, actionId: 'selfChoke', targetId: puppetId, ...result });
+  // niche, guess this should be able to confirm. Pushed into the same
+  // local `log` array AFTER the attack entry above (not game.log
+  // directly) so the reveal is correctly ordered after its trigger - see
+  // resolveOraclusPredictionIfPending's own comment for why this ordering
+  // matters for voice-priority arbitration.
+  resolveOraclusPredictionIfPending(game, log, melyssaId, 'selfChoke', puppetId, result);
   finalizeAction(game, log, result, melyssaId, 'selfChoke', puppetId);
   return result;
 }

@@ -641,7 +641,20 @@ function mirageBurstTargetsChronox(game, characterId, actionId) {
 // without ever calling executeAction), so the guess correctly keeps
 // waiting through skips for the predicted attacker's next REAL action, per
 // the confirmed ruling.
-export function resolveOraclusPredictionIfPending(game, characterId, actionId, targetId, result) {
+// `log` is the CALLER's own local array (the same one their action's own
+// attack/special entry gets pushed into) - NOT game.log directly. Pushing
+// straight to game.log here would land the prediction-result entry BEFORE
+// the triggering attack's own entry, since the caller's local `log` isn't
+// appended to game.log until finalizeAction runs, afterward. Confirmed
+// live bug: with the reveal entry landing first, the client processed it
+// (and its move-priority win/loss voice line) before the attacker's own
+// move-voice - the two tied on priority, and whichever processed SECOND
+// (the attacker's own line) cut the first one off via the arbitration
+// window's tie-break rule, so the win/loss voice was audible for barely an
+// instant before being silenced. Pushing into the shared local `log`
+// array instead guarantees the reveal is ordered AFTER the attack that
+// caused it, both in the log AND in client-side voice arbitration.
+export function resolveOraclusPredictionIfPending(game, log, characterId, actionId, targetId, result) {
   const oraclusChar = game.characters.oraclus;
   if (!oraclusChar || oraclusChar.isKO) return;
   if (!oraclusChar.special.predictedAttackerId) return;
@@ -655,14 +668,14 @@ export function resolveOraclusPredictionIfPending(game, characterId, actionId, t
   oraclusChar.special.predictedAttackerId = null;
   oraclusChar.special.predictedTargetId = null;
   if (!isMatch) {
-    game.log.push({ type: 'prediction-result', characterId: 'oraclus', matched: false });
+    log.push({ type: 'prediction-result', characterId: 'oraclus', matched: false });
     return;
   }
   oraclusChar.special.predictionWins += 1;
   oraclusChar.special.runeStrikeBonusDamage += 1;
   applyHeal(game, 'oraclus', 3);
   applyShield(game, 'oraclus', 3, { decaying: false });
-  game.log.push({
+  log.push({
     type: 'prediction-result', characterId: 'oraclus', matched: true,
     predictedAttackerId: characterId, predictedTargetId: targetId,
     predictionWins: oraclusChar.special.predictionWins,
@@ -677,7 +690,7 @@ export function executeAction(game, characterId, actionId, targetId, extra) {
   const actionDef = mod.actions[actionId];
   const log = [];
   const result = actionDef.execute(character, targetId, game, log, extra);
-  resolveOraclusPredictionIfPending(game, characterId, actionId, targetId, result);
+  resolveOraclusPredictionIfPending(game, log, characterId, actionId, targetId, result);
   // Commit the candidate record AFTER execute has actually run, and only
   // if it's a genuinely fresh record (not 'keep-existing'/null) whose
   // action had a REAL effect on Chronox - see
