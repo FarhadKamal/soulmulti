@@ -364,6 +364,29 @@ export function recordActionAgainstChronoxIfApplicable(game, characterId, action
   if (targetId !== 'chronox') return;
   const chronoxChar = game.characters.chronox;
   if (!chronoxChar || chronoxChar.isKO) return;
+  // Soul Swap's free Thunder Wrath follow-up (soulSwapWrath) is a SEPARATE
+  // executeAction call, immediately after soulSwap's own - if it also
+  // targets Chronox (a very natural, common follow-up choice, not a rare
+  // edge case), this function would otherwise fire a second time and
+  // overwrite the soulSwap record entirely before Chronox ever gets to
+  // Rewind it. That silently downgraded Rewind into only undoing the
+  // Wrath's damage - Zerathys's usedSpecial (spent by soulSwap, untouched
+  // by soulSwapWrath) never got refunded, unlike every other special-using
+  // character's kit. Confirmed as a real, not-rare gap: reported live after
+  // noticing every OTHER special holder gets refunded by Rewind except
+  // Zerathys in exactly this combo. Fix: keep the ORIGINAL soulSwap record
+  // untouched (its snapshots were taken before the swap even happened, i.e.
+  // before Wrath's own damage too) rather than overwriting it with a fresh
+  // snapshot here that would already reflect the swap having occurred -
+  // Rewind then correctly reverses the WHOLE combo (swap + follow-up
+  // Wrath damage) back to before either happened.
+  if (
+    actionId === 'soulSwapWrath'
+    && chronoxChar.special.lastActionAgainstMe?.casterId === characterId
+    && chronoxChar.special.lastActionAgainstMe?.actionId === 'soulSwap'
+  ) {
+    return;
+  }
   // Deliberately snapshots ONLY the caster's own character object, Chronox
   // himself, and game.jesterBall - NOT the entire game.characters map.
   // Restoring every character's full state wholesale would incorrectly
