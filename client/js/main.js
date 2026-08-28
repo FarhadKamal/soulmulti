@@ -312,12 +312,12 @@ function playLogEntrySound(entry, game) {
   }
   // The ball passing THROUGH Boingo mid-sequence (not the final landing) -
   // a smaller, quieter version of the full jester-ball-return beat above:
-  // same coin/chime-style sound reused at lower stakes, no laugh voice
-  // (that's reserved for the genuinely big payoff moments - the full
-  // return or someone else's explosion) since this is just one checkpoint
-  // among potentially several across a single long pass chain.
+  // same coin/chime-style sound, but he still gets his laugh every single
+  // time it lands on him (confirmed ruling - "he will laugh each time ball
+  // landed on him"), not just the big payoff moments.
   if (entry.type === 'jester-ball-checkpoint-heal') {
     playCoin();
+    playLaughVoiceIfAlive(entry.boingoId, game);
     return;
   }
   // Boingo choosing to sit on the ball for now - no sound of its own, it's

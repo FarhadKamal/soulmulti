@@ -190,19 +190,22 @@ export function handleLogEntryForEffects(entry, game) {
     return;
   }
 
-  // Jester Ball returning to Boingo heals him - same self-buff golden glow
-  // as Divine Restore/Glory Smash below, just triggered from its own log
-  // entry type rather than 'attack'/'special'. Only when it actually
-  // healed (not already full/KO'd), same "no misleading sparkle" guard.
+  // Jester Ball returning to Boingo heals him (or, at full hearts, grants
+  // permanent stacking shield instead - confirmed ruling, see boingo.js's
+  // applyBoingoBallReward) - same self-buff golden glow as Divine Restore/
+  // Glory Smash below, just triggered from its own log entry type rather
+  // than 'attack'/'special'. Fires on either reward type, same "no
+  // misleading sparkle" guard against a KO'd Boingo.
   if (entry.type === 'jester-ball-return') {
-    if (entry.healed > 0 && !entry.wasKO) addEffect(entry.boingoId, 'divine', EFFECT_DURATION_MS.divine);
+    if ((entry.healed > 0 || entry.shielded > 0) && !entry.wasKO) addEffect(entry.boingoId, 'divine', EFFECT_DURATION_MS.divine);
     return;
   }
 
   // Same golden glow, smaller stakes - the ball passing through Boingo
-  // mid-sequence for its +1 checkpoint heal.
+  // mid-sequence for its +1 checkpoint reward (heal, or shield at full
+  // hearts).
   if (entry.type === 'jester-ball-checkpoint-heal') {
-    if (entry.healed > 0 && !entry.wasKO) addEffect(entry.boingoId, 'divine', EFFECT_DURATION_MS.divine);
+    if ((entry.healed > 0 || entry.shielded > 0) && !entry.wasKO) addEffect(entry.boingoId, 'divine', EFFECT_DURATION_MS.divine);
     return;
   }
 

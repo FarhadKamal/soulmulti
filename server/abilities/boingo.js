@@ -1,13 +1,12 @@
 import { applyDamage, applyHeal, applyShield, decayShieldIfDue } from '../engine/damagePipeline.js';
 import { rollChaosGamble } from '../engine/random.js';
 
-// Shield decays at the start of his own next turn, same mechanic/pattern
-// as Tharox's Glory Smash and Athena's old Divine Restore shield - added
-// as part of the "win" outcome below (see chaosGamble's execute) so a
-// good roll leaves him with a little protection until his next turn,
-// rather than pure damage with no lasting benefit. Doesn't stack across
-// wins in practice: he only gets one Chaos Gamble roll per turn, and any
-// prior shield already decays before his own next turn's roll runs.
+// Nothing in his current kit grants him DECAYING shield anymore (Chaos
+// Gamble's old +1 decaying shield on a "win" roll was removed, confirmed
+// ruling - the Jester Ball toll-booth's own shield reward, see
+// jesterBallResolution.pass below, is deliberately permanent/stacking, not
+// decaying). Kept as a defensive no-op rather than removed outright, in
+// case a future addition to his kit ever does grant him a decaying shield.
 export function onTurnStart(character, game, log) {
   decayShieldIfDue(character);
 }
@@ -36,10 +35,10 @@ export const actions = {
         targetCharacterId: targetId,
         amount,
       });
-      // A "win" roll also grants +1 decaying shield - some small lasting
-      // benefit from a good roll instead of pure damage-and-done, expires
-      // at the start of his own next turn same as Tharox's shield.
-      if (outcome === 'win') applyShield(game, character.id, 1, { decaying: true });
+      // Confirmed ruling: the "win" roll's old +1 decaying shield bonus is
+      // removed - a pure 3-damage hit now, no side benefit. His shield
+      // reward comes from the reworked Jester Ball toll-booth instead (see
+      // jesterBallResolution.pass's grantBoingoCheckpointReward below).
       log.push({ type: 'attack', characterId: character.id, actionId: 'chaosGamble', targetId, outcome, ...result });
       return result;
     },
@@ -76,6 +75,22 @@ export const actions = {
     },
   },
 };
+
+// Applies a Jester-Ball-landing-on-Boingo reward: heals him up to `amount`,
+// and converts anything that would have overhealed (he's already at/near
+// max hearts) into shield instead, point for point - confirmed ruling
+// ("when heart is already 7 nothing to heal, then shield will stake +1
+// each time", "final landing +4 life or even +4 shield, shield stack can
+// even possible"). The shield is deliberately PERMANENT/stacking (no
+// `decaying: true`) - only reduced by actually absorbing damage, unlike
+// every other shield source in the game. Returns { healed, shielded } for
+// the caller's own log entry.
+function applyBoingoBallReward(game, characterId, amount) {
+  const healed = applyHeal(game, characterId, amount);
+  const overflow = amount - healed;
+  if (overflow > 0) applyShield(game, characterId, overflow);
+  return { healed, shielded: overflow };
+}
 
 // Shared by both a voluntary Take and an un-intercepted 5th pass (see
 // jesterBallResolution.pass below) - same flat-4 damage, same Rebirth
@@ -134,10 +149,13 @@ export const jesterBallResolution = {
       // +4 final on the very same landing, confirmed via direct testing).
       const isFinalPass = game.jesterBall.passCount === MAX_JESTER_BALL_PASSES;
       let boingoCheckpointHeal = 0;
+      let boingoCheckpointShield = 0;
       let boingoWasKO = false;
       if (newHolderCharacterId === game.jesterBall.thrownByCharacterId && !isFinalPass) {
         boingoWasKO = game.characters[newHolderCharacterId]?.isKO ?? false;
-        boingoCheckpointHeal = applyHeal(game, newHolderCharacterId, 1);
+        const reward = applyBoingoBallReward(game, newHolderCharacterId, 1);
+        boingoCheckpointHeal = reward.healed;
+        boingoCheckpointShield = reward.shielded;
       }
       // Illyra's passive: a 50% chance a pass TO her simply fails - the
       // ball phases through her illusion and detonates on whoever tried to
@@ -171,17 +189,19 @@ export const jesterBallResolution = {
         return;
       }
       game.jesterBall.holderCharacterId = newHolderCharacterId;
-      if (!isFinalPass && (boingoCheckpointHeal > 0 || (newHolderCharacterId === game.jesterBall.thrownByCharacterId && boingoWasKO))) {
-        log.push({ type: 'jester-ball-checkpoint-heal', boingoId: newHolderCharacterId, healed: boingoCheckpointHeal, wasKO: boingoWasKO });
+      if (!isFinalPass && (boingoCheckpointHeal > 0 || boingoCheckpointShield > 0 || (newHolderCharacterId === game.jesterBall.thrownByCharacterId && boingoWasKO))) {
+        log.push({ type: 'jester-ball-checkpoint-heal', boingoId: newHolderCharacterId, healed: boingoCheckpointHeal, shielded: boingoCheckpointShield, wasKO: boingoWasKO });
       }
       // The final pass (reaching MAX_JESTER_BALL_PASSES) decides the big
-      // outcome: Boingo gets the full +4 (same as the old dedicated
-      // Return), anyone else explodes for the normal 4 damage.
+      // outcome: Boingo gets the full +4 worth of reward (heal, or shield
+      // for whatever part overflows past max hearts - same
+      // applyBoingoBallReward helper as the checkpoint case), anyone else
+      // explodes for the normal 4 damage.
       if (isFinalPass) {
         if (newHolderCharacterId === game.jesterBall.thrownByCharacterId) {
           const wasKO = game.characters[newHolderCharacterId]?.isKO ?? false;
-          const healed = applyHeal(game, newHolderCharacterId, 4);
-          log.push({ type: 'jester-ball-return', boingoId: newHolderCharacterId, healed, wasKO });
+          const { healed, shielded } = applyBoingoBallReward(game, newHolderCharacterId, 4);
+          log.push({ type: 'jester-ball-return', boingoId: newHolderCharacterId, healed, shielded, wasKO });
           game.jesterBall = null;
           return;
         }

@@ -1748,10 +1748,18 @@ function describeLogEntry(entry) {
       return `${name(entry.targetCharacterId)} took the Jester Ball${entry.amountDealt != null ? ` - -${entry.amountDealt} hearts` : ''}`;
     case 'jester-ball-pass':
       return `${name(entry.fromCharacterId)} passed the Jester Ball to ${name(entry.toCharacterId)}`;
-    case 'jester-ball-return':
-      return `Jester Ball returned to ${name(entry.boingoId)}${entry.healed ? ` - healed ${entry.healed}` : ''}`;
-    case 'jester-ball-checkpoint-heal':
-      return `The Jester Ball passes through ${name(entry.boingoId)} - healed ${entry.healed}`;
+    case 'jester-ball-return': {
+      const parts = [];
+      if (entry.healed) parts.push(`healed ${entry.healed}`);
+      if (entry.shielded) parts.push(`+${entry.shielded} shield`);
+      return `Jester Ball returned to ${name(entry.boingoId)}${parts.length ? ` - ${parts.join(', ')}` : ''}`;
+    }
+    case 'jester-ball-checkpoint-heal': {
+      const parts = [];
+      if (entry.healed) parts.push(`healed ${entry.healed}`);
+      if (entry.shielded) parts.push(`+${entry.shielded} shield`);
+      return `The Jester Ball passes through ${name(entry.boingoId)}${parts.length ? ` - ${parts.join(', ')}` : ''}`;
+    }
     case 'jester-ball-keep':
       return `${name(entry.boingoId)} holds onto the Jester Ball for now`;
     case 'spell-discovered':
