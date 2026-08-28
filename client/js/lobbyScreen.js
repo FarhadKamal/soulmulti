@@ -392,6 +392,19 @@ function renderRoomLobby(room, topControls, rerender) {
       removeBtn.onclick = () => send('remove-bot', { seatIndex: seat.index });
       actions.appendChild(removeBtn);
     }
+    // Voluntarily step back to Guest status - available to ANY seated
+    // human on their OWN seat (not owner-only, unlike Unseat below), since
+    // the owner specifically had no other way to do this (the per-seat
+    // Unseat button below never targets your own seat, and Make All Bots
+    // forces bots onto every OTHER seat too - neither is a clean "just
+    // step back and keep watching" option). Confirmed gap, fixed directly.
+    if (seat.kind === 'human' && seat.isMe) {
+      const becomeGuestBtn = document.createElement('button');
+      becomeGuestBtn.className = 'become-guest-btn';
+      becomeGuestBtn.textContent = 'Become a Guest';
+      becomeGuestBtn.onclick = () => send('become-guest');
+      actions.appendChild(becomeGuestBtn);
+    }
     // Unseat a real human player (moves them to Guest status in this same
     // room, rather than removing them entirely - renamed from "Kick" per
     // explicit request, since being pulled off a character seat no longer

@@ -1096,6 +1096,40 @@ function handleFillBotWithCharacter(room, sessionId, { seatIndex, characterId })
   broadcastLobby(room);
 }
 
+// Converts sessionId's OWN seat to empty and moves them to Guest status -
+// shared by handleBecomeGuest (any seated human, lobby-only, voluntary)
+// and handleFillAllBots below (owner's own seat, as part of converting
+// everything). No reseat cooldown here (unlike handleUnseatPlayer) - this
+// is always self-initiated, never something imposed by someone else, so
+// there's nothing to protect against by delaying their own ability to
+// re-seat themselves.
+function convertOwnSeatToGuest(room, sessionId) {
+  const seat = room.seats.find((s) => s.playerId === sessionId);
+  if (!seat) return;
+  room.spectatorIds.add(sessionId);
+  room.guestNames.set(sessionId, seat.name);
+  seat.kind = 'empty';
+  seat.playerId = null;
+  seat.spectatorId = null;
+  seat.name = null;
+  seat.characterIds = [];
+}
+
+// Lets ANY seated human (not just the owner) voluntarily step back to
+// Guest status without leaving the room - confirmed gap: the owner
+// specifically had no way to do this at all (the per-seat Unseat button
+// never targets your own seat, and Make All Bots forces bots onto every
+// OTHER seat too, not a clean "just step back and keep watching" option).
+// Lobby-only, matching every other seat-management action's own
+// restriction.
+function handleBecomeGuest(room, sessionId) {
+  if (room.phase !== 'lobby') return;
+  const seat = room.seats.find((s) => s.playerId === sessionId);
+  if (!seat) return; // already a Guest, or not in this room at all
+  convertOwnSeatToGuest(room, sessionId);
+  broadcastLobby(room);
+}
+
 // Owner-only, lobby-phase-only: converts EVERY seat to a bot in one click,
 // including seats currently held by a real human (who becomes a Guest in
 // this same room, same conversion + reseat-cooldown handleUnseatPlayer
@@ -1115,16 +1149,9 @@ function handleFillAllBots(room, sessionId) {
       // The owner's OWN seat: handleUnseatPlayer refuses to unseat the
       // caller (by design, for the normal single-seat Unseat button - see
       // its own "can't unseat yourself this way" comment), so that path
-      // doesn't apply here. Converting the owner's own seat straight to a
-      // bot and moving them to Guest is exactly what "make ALL seats
-      // bots" means for their own seat too - do it directly.
-      room.spectatorIds.add(sessionId);
-      room.guestNames.set(sessionId, seat.name);
-      seat.kind = 'empty';
-      seat.playerId = null;
-      seat.spectatorId = null;
-      seat.name = null;
-      seat.characterIds = [];
+      // doesn't apply here. Reuses the same self-conversion
+      // handleBecomeGuest relies on.
+      convertOwnSeatToGuest(room, sessionId);
     }
   }
   for (const seat of room.seats) {
@@ -1856,6 +1883,7 @@ wss.on('connection', (ws) => {
       case 'remove-bot': return handleRemoveBot(room, sessionId, payload);
       case 'unseat-player': return handleUnseatPlayer(room, sessionId, payload);
       case 'fill-all-bots': return handleFillAllBots(room, sessionId);
+      case 'become-guest': return handleBecomeGuest(room, sessionId);
       case 'reorder-seats': return handleReorderSeats(room, sessionId, payload);
       case 'start-match': return handleStartMatch(room, sessionId);
       case 'return-to-lobby': return handleReturnToLobby(room, sessionId);
