@@ -540,12 +540,16 @@ function broadcastGameState(room) {
     // clock/timer bookkeeping, just `deadline - Date.now()` ticked locally.
     // null while no timer is armed (e.g. game just ended).
     turnDeadline: room.turnTimer ? room.turnDeadline : null,
-    // Lets the client tell "solo vs bots" apart from "real opponents still
-    // playing" - e.g. only offering a one-click Exit Game during a match
-    // when there's nobody else around to leave hanging. state.room (the
+    // Lets the client tell "solo vs bots" apart from "real opponents/
+    // spectators still around" - e.g. only offering a one-click Exit Game
+    // during a match when there's nobody else (seated OR Guest) around to
+    // leave hanging. Counts Guests too (totalRoomMembers, not just seated
+    // humans) - confirmed gap: a solo owner with a Guest watching could
+    // previously still one-click abandon the match out from under that
+    // Guest, since the old count only looked at seats. state.room (the
     // last lobby-update) is stale mid-match under normal play, so this is
     // computed fresh here rather than relying on the client's old snapshot.
-    humanCount: room.seats.filter((s) => s.kind === 'human').length,
+    humanCount: totalRoomMembers(room),
   });
 }
 
@@ -754,7 +758,7 @@ function stepBotTurn(room) {
           actingCharacterId: acting,
           usableActions: [],
           turnDeadline: null,
-          humanCount: room.seats.filter((s) => s.kind === 'human').length,
+          humanCount: totalRoomMembers(room),
         });
         setTimeout(() => stepBotTurn(room), BOT_ACTION_DELAY_MS);
         return;
@@ -1325,9 +1329,18 @@ function handleReturnToLobby(room, sessionId) {
 // entirely) - this is "abandon what I'm playing, but stay in this room and
 // pick again," owner-only for the same reason every other room-lifecycle
 // action is.
+// Server-side enforcement of the same rule battleScreen.js's canExitGame
+// gates the button on (confirmed ruling: "battle can not be exit when even
+// 1 human exist... only leave from battle possible, not exit the battle")
+// - the client hiding the button is a convenience, not the real boundary;
+// without this check here, the message could still be sent directly,
+// letting a solo owner force-reset a match out from under a Guest who's
+// just watching. totalRoomMembers (seated humans + Guests) must be at
+// most 1 - i.e. the owner themselves, with truly nobody else around.
 function handleAbandonMatch(room, sessionId) {
   if (sessionId !== room.ownerId) return;
   if (room.phase !== 'in-match') return;
+  if (totalRoomMembers(room) > 1) return;
   clearTurnTimer(room);
   resetRoomToLobby(room);
   broadcastLobby(room);
@@ -1616,7 +1629,7 @@ function handleAction(room, sessionId, { characterId, actionId, targetId }) {
       actingCharacterId: characterId,
       usableActions: [],
       turnDeadline: null,
-      humanCount: room.seats.filter((s) => s.kind === 'human').length,
+      humanCount: totalRoomMembers(room),
     });
     setTimeout(() => {
       markCharacterActed(room.game, characterId);

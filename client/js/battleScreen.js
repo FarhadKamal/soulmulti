@@ -89,12 +89,15 @@ export function renderBattle(root, state) {
   wrap.appendChild(roundInfo);
 
   // Only offered when playing solo against bots (humanCount <= 1) AND to
-  // the room owner - with real opponents/teammates still in the match,
-  // leaving mid-game abandons them, which isn't something to one-click out
-  // of. Solo-vs-bots is the "I want out of this, nobody's affected" case
-  // this button is for (in that case the lone human is necessarily the
-  // owner, but checking youAreOwner directly is more explicit/robust than
-  // relying on that inference).
+  // the room owner - with real opponents/teammates OR Guests still around,
+  // abandoning the match isn't something to one-click out of. humanCount
+  // now counts Guests too (server's totalRoomMembers, not just seated
+  // players - confirmed ruling: "battle can not be exit when even 1 human
+  // exist... only leave from battle possible, not exit the battle"), so a
+  // solo owner with even one Guest watching no longer sees this button at
+  // all - they can still leave the room themselves, just not force-reset
+  // the match for that Guest. Solo-vs-bots-with-nobody-watching is the
+  // only "I want out of this, nobody's affected" case this button is for.
   const canExitGame = state.humanCount !== null && state.humanCount <= 1 && state.room?.youAreOwner;
   // A 'bots4' spectator never owns a seat (room.ownerId stays null - see
   // rooms.js's spectatorIds) so canExitGame above can never be true here,
