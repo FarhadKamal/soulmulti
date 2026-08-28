@@ -366,10 +366,16 @@ function mindControlOptionsFor(game, melyssaId, puppetId) {
   const jb = game.jesterBall;
   if (jb && jb.holderCharacterId === puppetId) {
     const passTargets = Object.keys(game.characters).filter((tid) => isJesterBallPassTarget(game, puppetId, tid));
-    const jbOptions = [
-      { actionId: '__mcJesterBallTake', label: 'Take the Jester Ball (-4 hearts)', needsTarget: false, special: false, validTargetIds: [] },
-    ];
-    if (jb.passCount < 5) {
+    // Boingo can NEVER Take his own ball (confirmed ruling, emphatic - not
+    // by his own choice, not even puppeted by Melyssa) - it would explode
+    // on himself for a flat -4 with zero benefit to anyone. Omit the Take
+    // option entirely for him rather than offering it and rejecting it
+    // server-side; he instead gets his own exclusive Keep option (see
+    // boingo.js's jesterBallResolution.keep), same as his own real turn.
+    const jbOptions = puppetId === 'boingo'
+      ? [{ actionId: '__mcJesterBallKeep', label: 'Keep it for now', needsTarget: false, special: false, validTargetIds: [] }]
+      : [{ actionId: '__mcJesterBallTake', label: 'Take the Jester Ball (-4 hearts)', needsTarget: false, special: false, validTargetIds: [] }];
+    if (jb.passCount < 10) {
       jbOptions.push({ actionId: '__mcJesterBallPass', label: 'Pass the Jester Ball', needsTarget: true, special: false, validTargetIds: passTargets });
     }
     return isEnemyPuppet && !selfChokeLocked ? [...jbOptions, selfChokeOption()] : jbOptions;
@@ -1690,6 +1696,14 @@ function handleMindControlAction(room, sessionId, { characterId, puppetId, actio
     if (!room.game.characters[puppetId].isKO) {
       followUp = { puppetId, options: mindControlOptionsFor(room.game, characterId, puppetId) };
     }
+  } else if (actionId === '__mcJesterBallKeep') {
+    // Boingo-only (see mindControlOptionsFor above) - same "doesn't consume
+    // the turn" treatment as Take gets for every other puppet, matching his
+    // own real-turn Keep behavior exactly. He can never be KO'd by this
+    // (it's a pure no-op on game state), so unlike the Take branch above
+    // there's no KO check needed before offering the follow-up.
+    finishJesterBall(room.game, 'keep', undefined);
+    followUp = { puppetId, options: mindControlOptionsFor(room.game, characterId, puppetId) };
   } else if (actionId === '__mcJesterBallPass') {
     finishJesterBall(room.game, 'pass', targetId);
     // Pass DOES consume the holder's action - Mind Control turn is complete.

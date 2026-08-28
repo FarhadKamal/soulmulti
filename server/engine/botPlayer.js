@@ -1360,6 +1360,23 @@ export function chooseBotMove(character, game) {
 export function chooseBotMelyssaPuppetAction(puppetCharacter, game, melyssaId) {
   const jb = game.jesterBall;
   if (jb && jb.holderCharacterId === puppetCharacter.id) {
+    // Boingo can NEVER choose Take on his own ball, full stop - not for
+    // himself, not even puppeted by Melyssa (confirmed ruling, emphatic:
+    // "that is never possible"). Take would explode his own ball on
+    // himself for a flat -4 with zero benefit to anyone, Melyssa included -
+    // there's no scenario where forcing it makes sense, since the "damage
+    // her puppet directly" reasoning below doesn't actually apply here (the
+    // explosion's source AND target both resolve to Boingo - it was never
+    // really Melyssa hurting a puppet, it's Boingo hurting himself with his
+    // own item, which his own agency is explicitly protected from). Falls
+    // back to his own genuine keep/pass logic instead - Melyssa gets no
+    // special direct-damage lever from this particular puppet/ball
+    // combination, same as any other action of his she can't turn to her
+    // advantage.
+    if (puppetCharacter.id === 'boingo') {
+      const move = chooseBotBoingoJesterBallMove(puppetCharacter, game);
+      return { kind: 'jesterBall', choice: move.choice, targetId: move.targetId };
+    }
     // chooseBotJesterBallMove decides Pass-vs-Take from the HOLDER's own
     // interest (dodge the -4 by passing it off onto someone else) - backed
     // by the same "puppeted decisions serve Melyssa, not the puppet"
