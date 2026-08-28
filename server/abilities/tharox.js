@@ -79,14 +79,14 @@ export const actions = {
       return result;
     },
   },
-  // Earthshatter: his desperate no-target nuke - one-time use, legal only
-  // while he's still reasonably healthy (hearts >= 3, confirmed ruling -
-  // the inverse gate direction from Illyra's Mirage Overload, which
-  // triggers when SHE'S low). No headcount scaling at all (unlike Mirage
-  // Overload's OVERLOAD_STACKS_BY_ALIVE_COUNT table) - always scatters a
-  // flat EARTHSHATTER_TOTAL_DAMAGE (7) points of damage, one point at a
-  // time, fully independently at random across every currently-alive
-  // OPPONENT (confirmed ruling: never lands on himself). Completely
+  // Earthshatter: his desperate last-stand no-target nuke - one-time use,
+  // legal only once he's genuinely on the brink (hearts <= 3, confirmed
+  // ruling/corrected - same gate DIRECTION as Illyra's Mirage Overload, a
+  // comeback move, not an opener). No headcount scaling at all (unlike
+  // Mirage Overload's OVERLOAD_STACKS_BY_ALIVE_COUNT table) - always
+  // scatters a flat EARTHSHATTER_TOTAL_DAMAGE (7) points of damage, one
+  // point at a time, fully independently at random across every currently-
+  // alive OPPONENT (confirmed ruling: never lands on himself). Completely
   // replaces the old "Final Smash" design (a single-target Glory-Smash
   // clone unlocked by landing Titan Smash) - no charge interaction, no
   // self-heal/shield, no relationship to hasCharge/titanSmash at all.
@@ -94,7 +94,7 @@ export const actions = {
     label: 'Earthshatter',
     needsTarget: false,
     special: true,
-    isLegal: (character) => character.hearts >= 3 && !character.special.usedEarthshatter,
+    isLegal: (character) => character.hearts <= 3 && !character.special.usedEarthshatter,
     execute(character, targetId, game, log) {
       character.special.usedEarthshatter = true;
       const others = Object.values(game.characters).filter((c) => c.id !== character.id && !c.isKO);

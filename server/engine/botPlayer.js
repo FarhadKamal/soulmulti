@@ -194,13 +194,12 @@ function pickDefaultTarget(game, character, actionId, minDamage = null) {
 
 function chooseTharoxMove(character, game, usable) {
   const byId = Object.fromEntries(usable.map((a) => [a.actionId, a]));
-  // Earthshatter: standalone, no-target, one-time (see tharox.js) - only
-  // legal while hearts >= 3, so unlike Mirage Overload (a desperation move
-  // gated the OPPOSITE way) waiting to cast it risks losing the option
-  // entirely if he drops below the threshold first. Cast it as soon as it's
-  // available rather than holding onto it - doesn't touch hasCharge at all,
-  // so it's checked first, unconditionally, ahead of the mandatory-cash-in
-  // narrowing below.
+  // Earthshatter: standalone, no-target, one-time (see tharox.js) - a
+  // desperation move, only legal once hearts <= 3 (same gate direction as
+  // Illyra's Mirage Overload). No real downside to casting it the instant
+  // it's available (no self-damage, no cost) - doesn't touch hasCharge at
+  // all, so it's checked first, unconditionally, ahead of the
+  // mandatory-cash-in narrowing below.
   if (byId.earthshatter) {
     return { actionId: 'earthshatter', targetId: null };
   }
