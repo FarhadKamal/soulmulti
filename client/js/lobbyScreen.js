@@ -386,6 +386,17 @@ function renderRoomLobby(room, topControls, rerender) {
       };
       actions.appendChild(chooseBtn);
     }
+    // Lets a Guest (owner or not) claim this specific empty seat from
+    // WITHIN the room - confirmed gap: after voluntarily becoming a Guest
+    // (or being unseated), there was previously no way back into a seat at
+    // all short of leaving and rejoining by code from the entry screen.
+    if (seat.kind === 'empty' && room.youAreGuest) {
+      const takeSeatBtn = document.createElement('button');
+      takeSeatBtn.className = 'take-seat-btn';
+      takeSeatBtn.textContent = 'Take This Seat';
+      takeSeatBtn.onclick = () => send('claim-seat', { seatIndex: seat.index });
+      actions.appendChild(takeSeatBtn);
+    }
     if (seat.kind === 'bot' && room.youAreOwner) {
       const removeBtn = document.createElement('button');
       removeBtn.textContent = 'Remove Bot';

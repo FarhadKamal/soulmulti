@@ -945,6 +945,36 @@ function handleJoinRoom(ws, sessionId, { code, name }) {
   if (room.game) broadcastGameState(room);
 }
 
+// A Guest ALREADY in the room (owner or not) claiming a SPECIFIC empty
+// seat, distinct from handleJoinRoom's own auto-pick-the-first-seat flow
+// (which only ever runs once, at entry via room code, before a session is
+// already a Guest). Confirmed gap: after voluntarily becoming a Guest
+// (handleBecomeGuest) or being unseated, there was no way to ever claim a
+// seat again from WITHIN the room - the join-by-code flow only applies to
+// someone not yet in the room at all. Lobby-only (matches every other
+// seat-claim path), and still respects the reseat cooldown for anyone who
+// was just unseated by someone else.
+function handleClaimSeat(room, sessionId, { seatIndex, name }) {
+  if (room.phase !== 'lobby') return;
+  if (!room.spectatorIds.has(sessionId)) return; // must already be a Guest
+  if (isOnReseatCooldown(room, sessionId)) return;
+  const seat = room.seats[seatIndex];
+  if (!seat || seat.kind !== 'empty') return;
+  // Reuses whatever name they joined the room with (guestNames) unless a
+  // fresh one is explicitly provided - matches how a seated player's own
+  // name never changes mid-room, just carried over from Guest status.
+  const cleanName = sanitizeName(name) || room.guestNames.get(sessionId) || 'Player';
+  room.spectatorIds.delete(sessionId);
+  room.guestNames.delete(sessionId);
+  seat.kind = 'human';
+  seat.playerId = sessionId;
+  seat.spectatorId = sessionId;
+  seat.name = cleanName;
+  seat.reconnectToken = randomUUID();
+  send(sessions.get(sessionId), 'room-joined', { code: room.code, seatIndex: seat.index, reconnectToken: seat.reconnectToken });
+  broadcastLobby(room);
+}
+
 // Delay before a 'bots4' room's next match auto-starts after the previous
 // one ends - long enough for a viewer to actually register the win screen
 // (matches BOT_ACTION_DELAY_MS's own "give a human a beat to read this"
@@ -1884,6 +1914,7 @@ wss.on('connection', (ws) => {
       case 'unseat-player': return handleUnseatPlayer(room, sessionId, payload);
       case 'fill-all-bots': return handleFillAllBots(room, sessionId);
       case 'become-guest': return handleBecomeGuest(room, sessionId);
+      case 'claim-seat': return handleClaimSeat(room, sessionId, payload);
       case 'reorder-seats': return handleReorderSeats(room, sessionId, payload);
       case 'start-match': return handleStartMatch(room, sessionId);
       case 'return-to-lobby': return handleReturnToLobby(room, sessionId);
