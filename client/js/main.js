@@ -1,4 +1,4 @@
-import { connect, onMessage, saveReconnectInfo, clearReconnectInfo } from './net.js';
+import { connect, onMessage } from './net.js';
 import { renderLobby } from './lobbyScreen.js';
 import { renderBattle } from './battleScreen.js';
 import { addChatMessage, clearChatMessages } from './chatPanel.js';
@@ -544,12 +544,6 @@ onMessage((msg) => {
       // to do with this one (see clearChatMessages's own comment for the
       // bug this fixes).
       clearChatMessages();
-      // bots4 rooms don't send a reconnectToken (see handleCreateRoom/
-      // handleJoinRoom in index.js - only real 2p/4p seat claims issue
-      // one), so this is naturally a no-op for those.
-      if (msg.reconnectToken) {
-        saveReconnectInfo({ roomCode: msg.code, seatIndex: msg.seatIndex, reconnectToken: msg.reconnectToken });
-      }
       break;
     case 'lobby-update':
       state.room = msg.room;
@@ -623,9 +617,7 @@ onMessage((msg) => {
       break;
     case 'left-room':
       // Confirmation that leave-room was processed - reset back to the
-      // entry screen (create/join), same connection stays open. Nothing
-      // left to reconnect into once you've deliberately left.
-      clearReconnectInfo();
+      // entry screen (create/join), same connection stays open.
       state.screen = 'lobby';
       state.room = null;
       state.game = null;
@@ -642,19 +634,9 @@ onMessage((msg) => {
       // (see handleUnseatPlayer in index.js) - unlike a full room exit,
       // they STAY in the room, just as a Guest now (a 'lobby-update'
       // reflecting that new status is broadcast right alongside this and
-      // will arrive separately) - only the reconnect token needs clearing
-      // (a Guest has no seat/token to reconnect to) and a brief notice so
-      // it reads as a deliberate host action, not a random bug.
-      clearReconnectInfo();
+      // will arrive separately) - just a brief notice so it reads as a
+      // deliberate host action, not a random bug.
       state.error = 'The host moved you to Guest.';
-      rerender();
-      break;
-    case 'reconnect-failed':
-      // The saved token didn't resolve to an active grace period (already
-      // expired, wrong room/seat, or the room's gone) - clear the stale
-      // entry so future connects don't keep retrying a dead reconnect, and
-      // let the player land on the normal entry screen instead of hanging.
-      clearReconnectInfo();
       rerender();
       break;
     case 'chat-message':

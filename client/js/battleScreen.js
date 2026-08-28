@@ -263,6 +263,35 @@ export function renderBattle(root, state) {
       ? `Waiting for ${CHARACTERS[actingCharacterId].name}'s turn...`
       : 'Waiting...';
     scroll.appendChild(waiting);
+    // A Guest watching a live match can jump into any bot-controlled seat
+    // directly, taking over that character with its CURRENT state (hearts,
+    // shield, everything) - confirmed ruling: no reconnect-token system at
+    // all, a disconnected/left seat just becomes a bot immediately, and
+    // claiming it mid-match is the only way back in (handleClaimSeat,
+    // server-side). Not shown to a seated player (mySeatCharacterIds
+    // non-empty would mean isMyTurn could still be false on someone else's
+    // turn, but they already have their own seat - only offered to a bare
+    // Guest, room.mySeatIndex === null).
+    if (state.room?.youAreGuest) {
+      const claimableSeats = (state.room.seats || []).filter((s) => s.kind === 'bot');
+      if (claimableSeats.length > 0) {
+        const claimSection = document.createElement('div');
+        claimSection.className = 'claim-seat-section';
+        const claimTitle = document.createElement('div');
+        claimTitle.className = 'claim-seat-title';
+        claimTitle.textContent = 'Take over a bot-controlled seat:';
+        claimSection.appendChild(claimTitle);
+        claimableSeats.forEach((seat) => {
+          const btn = document.createElement('button');
+          btn.className = 'claim-seat-btn';
+          const seatCharNames = seat.characterIds.map((id) => CHARACTERS[id]?.name).filter(Boolean).join(' + ');
+          btn.textContent = `Seat ${seat.index + 1}${seatCharNames ? ` (${seatCharNames})` : ''}`;
+          btn.onclick = () => send('claim-seat', { seatIndex: seat.index });
+          claimSection.appendChild(btn);
+        });
+        scroll.appendChild(claimSection);
+      }
+    }
   }
 
   wrap.appendChild(scroll);
@@ -349,8 +378,11 @@ function renderBotShowExitButton() {
 // cache-busting version token and reloads immediately (see
 // assetVersion.js's hardRefresh). One click, no confirmation: available
 // mid-match too since stale-cached audio/images can surface here just as
-// easily as on the entry screen, and a reload is low-stakes (you just
-// reconnect as a fresh session - nothing server-side is affected).
+// easily as on the entry screen. NOT low-stakes mid-match anymore though -
+// there's no reconnect-token system (confirmed ruling), so reloading here
+// disconnects the session and the seat converts to a bot immediately,
+// same as closing the tab would. Getting back in requires rejoining the
+// room by code as a Guest and claiming the now-bot seat (handleClaimSeat).
 function renderHardRefreshIconButton() {
   const btn = document.createElement('button');
   btn.className = 'hard-refresh-btn';

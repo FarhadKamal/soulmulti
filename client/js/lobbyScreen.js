@@ -124,12 +124,13 @@ function renderAboutButton(rerender) {
 
 // Icon button matching fullscreen/about's exact corner style - bumps the
 // cache-busting version token and reloads immediately (see
-// assetVersion.js's hardRefresh). One click, no confirmation - a page
-// reload is low-stakes (same as an accidental browser refresh; nothing
-// server-side is affected, you just reconnect as a fresh session), and
-// this exists specifically to recover from a stale-cached image/sound
-// under an unchanged filename, which forcing a confirmation step wouldn't
-// meaningfully protect against.
+// assetVersion.js's hardRefresh). One click, no confirmation - this exists
+// specifically to recover from a stale-cached image/sound under an
+// unchanged filename, which forcing a confirmation step wouldn't
+// meaningfully protect against. Note there's no reconnect-token system
+// (confirmed ruling): if seated when this fires, that seat is lost (freed
+// back to empty in the lobby, same as any disconnect there) - getting
+// back in means rejoining the room by code and picking a seat again.
 function renderHardRefreshButton() {
   const btn = document.createElement('button');
   btn.className = 'hard-refresh-btn';

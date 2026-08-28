@@ -146,13 +146,13 @@ const httpServer = createServer((req, res) => {
 const wss = new WebSocketServer({ server: httpServer });
 
 // sessionId -> ws connection. A session's raw id itself never survives a
-// disconnect (a fresh random one is issued on every new connection) - what
-// DOES survive is the per-seat reconnectToken (see rooms.js's createSeat and
-// handleReconnect below), which lets a returning browser prove which seat it
-// used to hold within that seat's 60s disconnect grace period.
+// disconnect (a fresh random one is issued on every new connection) - and
+// nothing else survives it either (confirmed ruling: no reconnect-token/
+// grace-period system at all). A disconnected or explicitly-left seat
+// converts to a bot immediately; getting back in is always the generic
+// "join by code as a Guest, then claim the bot seat" path
+// (handleClaimSeat), never automatic.
 const sessions = new Map();
-
-const DISCONNECT_GRACE_MS = 60_000;
 
 function send(ws, type, payload = {}) {
   if (ws.readyState === ws.OPEN) ws.send(JSON.stringify({ type, ...payload }));
@@ -901,9 +901,8 @@ function handleCreateRoom(ws, sessionId, { roomType, name }) {
   seat.playerId = sessionId;
   seat.spectatorId = sessionId;
   seat.name = cleanName;
-  seat.reconnectToken = randomUUID();
   room.ownerId = sessionId;
-  send(ws, 'room-created', { code: room.code, seatIndex: seat.index, reconnectToken: seat.reconnectToken });
+  send(ws, 'room-created', { code: room.code, seatIndex: seat.index });
   broadcastLobby(room);
 }
 
@@ -931,14 +930,13 @@ function handleJoinRoom(ws, sessionId, { code, name }) {
     seat.playerId = sessionId;
     seat.spectatorId = sessionId;
     seat.name = cleanName;
-    seat.reconnectToken = randomUUID();
-    send(ws, 'room-joined', { code: room.code, seatIndex: seat.index, reconnectToken: seat.reconnectToken });
+    send(ws, 'room-joined', { code: room.code, seatIndex: seat.index });
     broadcastLobby(room);
     return;
   }
   room.spectatorIds.add(sessionId);
   room.guestNames.set(sessionId, cleanName);
-  send(ws, 'room-joined', { code: room.code, seatIndex: null, reconnectToken: null });
+  send(ws, 'room-joined', { code: room.code, seatIndex: null });
   broadcastLobby(room);
   // A Guest joining mid-match also needs the CURRENT game state right
   // away, not just the lobby snapshot - broadcastLobby alone would leave
@@ -949,21 +947,26 @@ function handleJoinRoom(ws, sessionId, { code, name }) {
   if (room.game) broadcastGameState(room);
 }
 
-// A Guest ALREADY in the room (owner or not) claiming a SPECIFIC empty
-// seat, distinct from handleJoinRoom's own auto-pick-the-first-seat flow
-// (which only ever runs once, at entry via room code, before a session is
-// already a Guest). Confirmed gap: after voluntarily becoming a Guest
-// (handleBecomeGuest) or being unseated, there was no way to ever claim a
-// seat again from WITHIN the room - the join-by-code flow only applies to
-// someone not yet in the room at all. Lobby-only (matches every other
-// seat-claim path), and still respects the reseat cooldown for anyone who
-// was just unseated by someone else.
+// A Guest ALREADY in the room (owner or not) claiming a SPECIFIC seat -
+// either an EMPTY one (lobby-phase, same as before) or a BOT-controlled
+// one mid-match (confirmed ruling: no reconnect-token system at all -
+// anyone who disconnects/leaves just becomes a bot immediately, and the
+// only way back in is rejoining as a Guest and claiming an open/bot seat
+// directly, at any point during the match, taking over that character's
+// CURRENT state - hearts, shield, everything - with no reset). Distinct
+// from handleJoinRoom's own auto-pick-the-first-seat flow (which only ever
+// runs once, at entry via room code, before a session is already a
+// Guest). Still respects the reseat cooldown for anyone who was just
+// unseated by someone else (lobby-phase Unseat only - see
+// handleUnseatPlayer - so this only ever matters for the lobby branch).
 function handleClaimSeat(room, sessionId, { seatIndex, name }) {
-  if (room.phase !== 'lobby') return;
   if (!room.spectatorIds.has(sessionId)) return; // must already be a Guest
   if (isOnReseatCooldown(room, sessionId)) return;
   const seat = room.seats[seatIndex];
-  if (!seat || seat.kind !== 'empty') return;
+  if (!seat) return;
+  if (room.phase === 'lobby' && seat.kind !== 'empty') return;
+  if (room.phase === 'in-match' && seat.kind !== 'bot') return;
+  if (room.phase !== 'lobby' && room.phase !== 'in-match') return;
   // Reuses whatever name they joined the room with (guestNames) unless a
   // fresh one is explicitly provided - matches how a seated player's own
   // name never changes mid-room, just carried over from Guest status.
@@ -974,9 +977,13 @@ function handleClaimSeat(room, sessionId, { seatIndex, name }) {
   seat.playerId = sessionId;
   seat.spectatorId = sessionId;
   seat.name = cleanName;
-  seat.reconnectToken = randomUUID();
-  send(sessions.get(sessionId), 'room-joined', { code: room.code, seatIndex: seat.index, reconnectToken: seat.reconnectToken });
+  send(sessions.get(sessionId), 'room-joined', { code: room.code, seatIndex: seat.index });
   broadcastLobby(room);
+  // Mid-match, the newly-seated player also needs the CURRENT game state
+  // right away (same reasoning as handleJoinRoom's own mid-match Guest
+  // case just above) - broadcastLobby alone leaves their screen on the
+  // lobby view until the next unrelated game event happens to broadcast.
+  if (room.game) broadcastGameState(room);
 }
 
 // Delay before a 'bots4' room's next match auto-starts after the previous
@@ -1256,11 +1263,11 @@ function handleUnseatPlayer(room, sessionId, { seatIndex }) {
 // Physically swaps the array elements AND renumbers each seat's own .index
 // to match its new position, keeping the array-position === seat.index
 // invariant every other seatIndex-addressed handler (fill-bot, remove-bot,
-// unseat-player) depends on. This intentionally invalidates any client's
-// stale localStorage seatIndex from before the swap - handleReconnect
-// looks seats up by matching reconnectToken instead of trusting the
-// client's seatIndex for exactly this reason, so a reorder never breaks
-// reconnection for a currently-connected or later-reconnecting player.
+// unseat-player) depends on. A currently-connected player always gets
+// their up-to-date seatIndex via the next lobby-update broadcast, so a
+// reorder is never actually stale for anyone still in the room (and there
+// is no reconnect flow left to worry about breaking - see this file's own
+// "no reconnect-token system" comment near the top).
 function handleReorderSeats(room, sessionId, { seatIndex, direction }) {
   if (sessionId !== room.ownerId) return;
   if (room.phase !== 'lobby') return;
@@ -1369,22 +1376,16 @@ function anyoneStillInRoom(room) {
   return room.seats.some((s) => s.kind === 'human') || room.spectatorIds.size > 0;
 }
 
-// Permanent bot takeover of a seat that's done for good - no more
-// reconnecting back into it (spectatorId/reconnectToken both cleared, unlike
-// a turn-timeout which keeps spectatorId so the original human can keep
-// watching). Shared by: a deliberate "Exit Room"/disconnect with no active
-// grace period (leaveRoom's mid-match branch below), and a disconnect grace
-// period (see ws.on('close')) that expired with nobody reclaiming the seat.
-// Returns the room to a clean state (ownership handoff, room deletion only
-// if truly nobody - seated or Guest - is left) exactly as leaveRoom always has.
+// Permanent, immediate bot takeover of a seat - no reconnect window at all
+// (confirmed ruling: a disconnect or explicit leave just becomes a bot
+// right away; getting back in is always the generic "join by code as a
+// Guest, then claim the bot seat" path - see handleClaimSeat). Shared by
+// a deliberate "Exit Room" (leaveRoom's mid-match branch below) and a
+// genuine socket disconnect (ws.on('close')) - both behave identically.
 function permanentlyConvertSeatToBot(room, seat, wasOwner) {
   seat.kind = 'bot';
   seat.playerId = null;
   seat.spectatorId = null;
-  seat.reconnectToken = null;
-  if (seat.disconnectTimer) clearTimeout(seat.disconnectTimer);
-  seat.disconnectTimer = null;
-  seat.disconnectDeadline = null;
   if (wasOwner) room.ownerId = pickNextOwner(room);
   if (!anyoneStillInRoom(room)) {
     clearTurnTimer(room);
@@ -1458,96 +1459,12 @@ function leaveRoom(sessionId, ws) {
   // Mid-match (or finished, waiting on return-to-lobby): leaving = permanent
   // bot takeover, same as a timed-out turn - but this session is fully done
   // with the room (spectatorId cleared too), unlike a timeout. An explicit
-  // "Exit Room" click always goes straight to permanent (no grace period -
-  // that's reserved for genuine disconnects, see ws.on('close')); a real
-  // disconnect reaching here means the seat had no reconnectToken to begin
-  // with, since a reconnectable seat's close handler diverts to the grace
-  // period instead of ever calling leaveRoom directly.
+  // No grace period at all (confirmed ruling) - a deliberate "Exit Room"
+  // click and a genuine disconnect (see ws.on('close')) both convert the
+  // seat to a bot immediately and permanently. Getting back in is always
+  // the generic "join by code as a Guest, then claim the bot seat" path
+  // (handleClaimSeat), not a special reconnect flow.
   permanentlyConvertSeatToBot(room, seat, room.ownerId === sessionId);
-}
-
-// Starts a 60s grace period for a seat whose connection just genuinely
-// dropped mid-match (heartbeat-detected dead socket, or a real close event) -
-// called only for seats that have a reconnectToken (i.e. claimed via
-// handleCreateRoom/handleJoinRoom) and only while
-// room.phase === 'in-match'. The seat plays as a bot for the duration
-// (identical visible behavior to a permanent takeover - no separate
-// "temporarily disconnected" UI state), but keeps spectatorId/reconnectToken
-// alive so handleReconnect below can find and restore it. If nobody
-// reconnects before the timer fires, it converts exactly like a deliberate
-// leave (permanentlyConvertSeatToBot).
-function startDisconnectGracePeriod(room, seat, wasOwner) {
-  seat.kind = 'bot';
-  seat.playerId = null;
-  seat.disconnectDeadline = Date.now() + DISCONNECT_GRACE_MS;
-  seat.disconnectTimer = setTimeout(() => {
-    permanentlyConvertSeatToBot(room, seat, wasOwner);
-  }, DISCONNECT_GRACE_MS);
-  // Ownership is NOT handed off yet (unlike a deliberate leave) - the
-  // original owner might reconnect within the grace period and should get
-  // their room control back exactly as it was, same reasoning as
-  // armTurnTimer's own timeout not stripping ownership for a still-connected
-  // player. If the grace period actually expires, permanentlyConvertSeatToBot
-  // (called above) does the real ownership handoff then.
-  broadcastLobby(room);
-  if (room.phase === 'in-match') runBotTurnsIfAny(room);
-}
-
-function handleReconnect(ws, sessionId, { code, reconnectToken }) {
-  const room = getRoom(code);
-  if (!room) return send(ws, 'reconnect-failed', {});
-  // Looked up by matching token, not by trusting the client's own
-  // (possibly stale) seatIndex - seats can be reordered in the lobby
-  // (handleReorderSeats), which renumbers seat.index, so a client's
-  // localStorage-persisted seatIndex from before a reorder could otherwise
-  // point at the WRONG seat entirely after a refresh. The token alone is
-  // already the real security boundary (see below), so there's no reason
-  // to also depend on the array position staying stable.
-  const seat = room.seats.find((s) => s.reconnectToken === reconnectToken);
-  if (!seat) return send(ws, 'reconnect-failed', {});
-  // The token itself (a random UUID, unguessable, issued once at seat-claim
-  // time and never exposed anywhere but this seat's own client) IS the
-  // security boundary - anyone who has it correct is the seat's legitimate
-  // owner, full stop. There's no additional liveness check (e.g. requiring
-  // an active disconnectTimer, or the old socket's readyState reporting
-  // closed) - a real network drop can leave the OLD connection reporting
-  // OPEN for a long time (a proxy/load-balancer layer, like Render's, may
-  // not surface the drop immediately), while the client's own faster local
-  // detection lets the player reconnect before the server's heartbeat has
-  // caught up. A liveness gate here rejected exactly that legitimate, fast
-  // reconnect - confirmed live. Force-closing whatever's currently in the
-  // seat (if anything) handles a still-technically-open old socket safely.
-  if (seat.disconnectTimer) {
-    clearTimeout(seat.disconnectTimer);
-    seat.disconnectTimer = null;
-    seat.disconnectDeadline = null;
-  }
-  // If the old connection is still technically open (the exact case this
-  // fix targets), forcibly close it rather than leaving two sockets both
-  // believing they own this seat - the old one's own close handler will
-  // then find spectatorId already reassigned below and safely no-op (see
-  // leaveRoom/ws.on('close')'s findRoomBySessionId lookup).
-  const oldSessionId = seat.spectatorId;
-  const oldWs = oldSessionId ? sessions.get(oldSessionId) : null;
-  if (oldWs && oldWs !== ws && oldWs.readyState === oldWs.OPEN) oldWs.terminate();
-  // If this seat WAS the room's owner (room.ownerId still points at its old
-  // sessionId - startDisconnectGracePeriod deliberately leaves ownership
-  // untouched during the grace period, clearing only playerId, so a
-  // reconnecting owner gets control back exactly as it was, not handed off
-  // to someone else), the new sessionId needs to take over as ownerId too.
-  // oldSessionId (still preserved in spectatorId even mid-grace-period) is
-  // what lets this compare against the RIGHT id - seat.playerId is already
-  // null by this point (cleared at disconnect time), so comparing against
-  // that would never match. Without this fix, an owner who disconnects and
-  // reconnects mid-match keeps playing fine but silently loses every
-  // owner-only ability (no "(owner)" label, Fill with Bot/Start Match/Kick
-  // all silently no-op) for the rest of that room's life.
-  if (room.ownerId === oldSessionId) room.ownerId = sessionId;
-  seat.kind = 'human';
-  seat.playerId = sessionId;
-  seat.spectatorId = sessionId;
-  broadcastLobby(room);
-  if (room.game) broadcastGameState(room);
 }
 
 function handleAction(room, sessionId, { characterId, actionId, targetId }) {
@@ -1932,7 +1849,6 @@ wss.on('connection', (ws) => {
     if (type === 'create-bot-show-room') return handleCreateBotShowRoom(ws, sessionId, payload);
     if (type === 'create-bot-show-room-custom') return handleCreateBotShowRoomCustom(ws, sessionId, payload);
     if (type === 'join-room') return handleJoinRoom(ws, sessionId, payload);
-    if (type === 'reconnect') return handleReconnect(ws, sessionId, payload);
     if (type === 'leave-room') return leaveRoom(sessionId, ws);
 
     const room = findRoomBySessionId(sessionId);
@@ -1964,19 +1880,9 @@ wss.on('connection', (ws) => {
 
   ws.on('close', () => {
     sessions.delete(sessionId);
-    // A genuine disconnect mid-match, for a seat that CAN be reconnected to
-    // (has a reconnectToken - i.e. claimed via handleCreateRoom/
-    // handleJoinRoom), gets a 60s grace period instead of leaveRoom's usual
-    // immediate-and-permanent bot conversion - see
-    // startDisconnectGracePeriod. Every other close (lobby-phase rooms, or a
-    // seat with no token for some other reason) falls through to the
-    // existing leaveRoom behavior unchanged.
-    const room = findRoomBySessionId(sessionId);
-    const seat = room?.seats.find((s) => s.spectatorId === sessionId);
-    if (room && seat && seat.kind === 'human' && room.phase === 'in-match' && seat.reconnectToken) {
-      startDisconnectGracePeriod(room, seat, room.ownerId === sessionId);
-      return;
-    }
+    // No grace period at all (confirmed ruling) - a genuine disconnect
+    // always goes straight through leaveRoom, same as a deliberate "Exit
+    // Room" click, converting a mid-match seat to a bot immediately.
     leaveRoom(sessionId);
   });
 });

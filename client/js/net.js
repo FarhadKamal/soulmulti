@@ -1,10 +1,11 @@
 // Thin WebSocket wrapper: one persistent connection for the whole tab
 // session, dispatched to whichever listener the current screen registered.
-// No auto-retry-without-reload logic - but a fresh connect() DOES attempt to
-// resume a still-live seat via the reconnect token persisted in localStorage
-// (see maybeSendReconnect below), giving the existing Refresh-button flow
-// somewhere real to land instead of always starting over as a brand new
-// session. It also actively detects a silently-dead connection rather than
+// No auto-retry-without-reload logic, and no reconnect-token persistence
+// either (confirmed ruling: nothing is saved client-side at all - a
+// disconnect or refresh just drops the session; getting back into a room
+// is always the generic "join by code as a Guest, then claim an open/bot
+// seat" flow, same as anyone else joining fresh). It also actively detects
+// a silently-dead connection rather than
 // waiting indefinitely on the browser's own 'close' event, which in
 // practice could take minutes (or never fire at all) for a connection
 // dropped by an intermediate proxy/load balancer or a phone backgrounding
@@ -33,41 +34,6 @@ let staleCheckInterval = null;
 // experience.
 const STALE_THRESHOLD_MS = 90000;
 const STALE_CHECK_INTERVAL_MS = 15000;
-
-// Survives closing the tab entirely (not just a reload), unlike
-// sessionStorage - the whole point is a player who closed the tab by
-// accident (or their phone killed it) can still come back within the
-// server's 60s disconnect grace period (see index.js's
-// DISCONNECT_GRACE_MS/startDisconnectGracePeriod) and reclaim their seat.
-const RECONNECT_STORAGE_KEY = 'soulclash-reconnect';
-
-export function saveReconnectInfo({ roomCode, seatIndex, reconnectToken }) {
-  localStorage.setItem(RECONNECT_STORAGE_KEY, JSON.stringify({ roomCode, seatIndex, reconnectToken }));
-}
-
-export function clearReconnectInfo() {
-  localStorage.removeItem(RECONNECT_STORAGE_KEY);
-}
-
-function loadReconnectInfo() {
-  try {
-    const raw = localStorage.getItem(RECONNECT_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
-
-// Automatically attempts to resume a saved seat as soon as this connection
-// is confirmed live (the server's 'session' message) - no button click
-// needed, since the whole point is recovering transparently after a
-// Refresh. A stale/expired/wrong entry just gets a 'reconnect-failed' reply
-// (handled in main.js), same as never having attempted one at all.
-function maybeSendReconnect() {
-  const info = loadReconnectInfo();
-  if (!info) return;
-  send('reconnect', { code: info.roomCode, seatIndex: info.seatIndex, reconnectToken: info.reconnectToken });
-}
 
 // In production (Render, or any deploy where server/index.js serves the
 // client's own static files - see serveStaticFile there), the page is
@@ -108,7 +74,6 @@ export function connect() {
     const msg = JSON.parse(event.data);
     if (msg.type === 'session') {
       sessionId = msg.sessionId;
-      maybeSendReconnect();
     }
     if (listener) listener(msg);
   });

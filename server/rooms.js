@@ -45,6 +45,15 @@ function generateRoomCode() {
 // Until the match starts, a seat is either an
 // empty slot, a joined human (characters not fully picked yet), or a bot
 // (auto-fills every remaining pick, chooses its own characters at start).
+//
+// No reconnect-token/grace-period mechanism (confirmed ruling: "nothing
+// will save in client side memory... they must join by room number again
+// to attend as guest") - a disconnect or explicit leave converts a seat
+// straight to a bot, immediately, with no window to reclaim it via a saved
+// secret. Getting back into a match is always the same generic path: join
+// the room fresh by code (becomes a Guest), then claim any bot-controlled
+// seat directly (see index.js's handleClaimSeat, now usable mid-match too,
+// not just in the lobby).
 function createSeat(index) {
   return {
     index,
@@ -58,19 +67,6 @@ function createSeat(index) {
     spectatorId: null,
     name: null,
     characterIds: [], // length grows up to picksPerSeat as picks are made
-    // Reconnection support (mid-match disconnects only, see index.js's
-    // ws.on('close') branching and handleReconnect). A random secret issued
-    // when a human claims this seat (handleCreateRoom/handleJoinRoom) -
-    // never cleared while the seat is held by a human or mid-grace-period,
-    // only cleared once the seat permanently departs (mirrors spectatorId's
-    // lifecycle). disconnectTimer/disconnectDeadline are only ever set
-    // while a genuine disconnect grace period is actively counting down for
-    // this seat - their presence (non-null) is what handleReconnect checks
-    // to confirm a reconnect attempt is legitimate (not just guessing a
-    // leaked token against a seat that was never disconnected).
-    reconnectToken: null,
-    disconnectTimer: null,
-    disconnectDeadline: null,
   };
 }
 
@@ -221,10 +217,6 @@ export function resetRoomToLobby(room) {
       seat.kind = 'empty';
       seat.name = null;
       seat.spectatorId = null;
-      seat.reconnectToken = null;
-      if (seat.disconnectTimer) clearTimeout(seat.disconnectTimer);
-      seat.disconnectTimer = null;
-      seat.disconnectDeadline = null;
     }
   }
 }
