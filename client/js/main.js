@@ -38,9 +38,7 @@ const state = {
   awaitingMindControlAction: false,
   mindControlPuppetId: null,
   armedAction: null,
-  confirmingExit: false,
   turnDeadline: null,
-  humanCount: null,
   // Staged game-over transition, mirroring the main game's own
   // gameOverBannerShown/showVictoryArt sequence: 'freeze' (board stays up
   // so the winning action's flash/shake/portrait is actually seen, not cut
@@ -588,9 +586,7 @@ onMessage((msg) => {
       state.awaitingMindControlAction = !!msg.awaitingMindControlAction;
       state.mindControlPuppetId = msg.mindControlPuppetId ?? null;
       state.armedAction = null;
-      state.confirmingExit = false;
       state.turnDeadline = msg.turnDeadline || null;
-      state.humanCount = msg.humanCount ?? null;
       processNewLogEntries(msg.game);
       playInjuredVoiceIfNewlyHurt(msg.game);
       // A fresh turn just started for whoever's now acting (different from

@@ -88,55 +88,23 @@ export function renderBattle(root, state) {
   roundInfo.textContent = `Round ${game.round}`;
   wrap.appendChild(roundInfo);
 
-  // Only offered when playing solo against bots (humanCount <= 1) AND to
-  // the room owner - with real opponents/teammates OR Guests still around,
-  // abandoning the match isn't something to one-click out of. humanCount
-  // now counts Guests too (server's totalRoomMembers, not just seated
-  // players - confirmed ruling: "battle can not be exit when even 1 human
-  // exist... only leave from battle possible, not exit the battle"), so a
-  // solo owner with even one Guest watching no longer sees this button at
-  // all - they can still leave the room themselves, just not force-reset
-  // the match for that Guest. Solo-vs-bots-with-nobody-watching is the
-  // only "I want out of this, nobody's affected" case this button is for.
-  const canExitGame = state.humanCount !== null && state.humanCount <= 1 && state.room?.youAreOwner;
-  // A 'bots4' spectator never owns a seat (room.ownerId stays null - see
-  // rooms.js's spectatorIds) so canExitGame above can never be true here,
-  // and "abandon match, return to lobby" makes no sense anyway (there's no
-  // lobby to return to, no seats to re-pick). Requested directly after a
-  // live report: no way to leave a bot-vs-bot spectacle mid-match except
-  // closing the tab. A plain full exit (leave-room, same as the game-over
-  // screen's own "Exit to Main Menu" button) is the right equivalent -
-  // tears the room down immediately (see leaveRoom's own spectatorIds
-  // branch, index.js) since there's nothing left to watch once the one
-  // viewer leaves.
-  const isBotShowSpectator = state.room?.roomType === 'bots4';
-  // A Guest in a real '4p' room mid-match (room.youAreGuest, distinct from
-  // the bots4 case above) isn't playing, so there's no match to "abandon"
-  // on their behalf either - same simple leave-room exit as a bots4
-  // spectator, just for a room type that DOES still have other real
-  // players/a lobby to return to (leaveRoom's own spectatorIds branch,
-  // index.js, only tears the whole room down for bots4 - a '4p' room just
-  // removes this one Guest and carries on). Confirmed gap: previously had
-  // NO exit button at all in-match, since canExitGame requires
-  // youAreOwner and isBotShowSpectator requires roomType 'bots4' - neither
-  // ever true for a Guest watching a real match.
-  const isRealRoomGuest = !!state.room?.youAreGuest && !isBotShowSpectator;
-
+  // A match can NEVER be force-abandoned/reset for everyone mid-battle
+  // (confirmed ruling: "game cannot be exit during battle. only leave
+  // button possible... we already have logic if all human left, room will
+  // get destroy auto") - there is no owner-only "Exit Game"/abandon-match
+  // capability at all anymore. Every participant - seated player, Guest,
+  // or a bots4 spectator - gets the exact same simple Leave button, which
+  // only ever removes THEM (their seat converts to a bot immediately, same
+  // as any disconnect - see server's leaveRoom/permanentlyConvertSeatToBot).
+  // The room's own lifecycle already tears itself down automatically once
+  // truly nobody real is left (anyoneStillInRoom, index.js) - no separate
+  // manual reset button is needed for that case either.
   const topControls = document.createElement('div');
   topControls.className = 'top-right-controls';
-  if (canExitGame) topControls.appendChild(renderExitIconButton(state));
-  if (isBotShowSpectator || isRealRoomGuest) topControls.appendChild(renderBotShowExitButton());
+  topControls.appendChild(renderLeaveButton());
   topControls.appendChild(renderHardRefreshIconButton());
   topControls.appendChild(renderFullscreenButton());
   wrap.appendChild(topControls);
-
-  // The Yes/No confirmation is a separate row (not squeezed into the icon
-  // button's own small slot) so it stays an easy, deliberate tap target -
-  // same "no popups" reasoning as before, just no longer anchored to a
-  // full-width button of its own when collapsed.
-  if (canExitGame && state.confirmingExit) {
-    wrap.appendChild(renderExitConfirmRow(state));
-  }
 
   if (state.turnDeadline) {
     wrap.appendChild(renderTurnTimer(state.turnDeadline, actingCharacterId, mySeatCharacterIds.includes(actingCharacterId)));
@@ -342,33 +310,20 @@ function renderLogChatDrawer(log, rerender) {
 // Icon-only, same compact square style as the fullscreen button (see
 // fullscreen.js) - sits right next to it in top-right-controls instead of
 // its own separate full-width red button below the header, which read as
-// an odd, disconnected banner. Clicking it arms the confirmation row
-// (renderExitConfirmRow below) rather than doing anything destructive
-// itself.
-function renderExitIconButton(state) {
+// an odd, disconnected banner.
+// Single, unconditional Leave button - no confirmation needed (unlike the
+// old abandon-match flow this replaces): leaving only ever affects the
+// leaver themselves. A seated player's seat converts to a bot immediately
+// (same as any disconnect); a Guest or bots4 spectator just stops
+// watching. No one can force-reset the match for anyone else (confirmed
+// ruling) - the room's own lifecycle already tears itself down
+// automatically once truly nobody real is left (see server's
+// anyoneStillInRoom), so there's no separate manual "last one out, reset
+// the room" action needed either.
+function renderLeaveButton() {
   const btn = document.createElement('button');
   btn.className = 'exit-icon-btn';
-  btn.title = 'Exit Game';
-  btn.textContent = '🚪';
-  // Abandons the current match and returns to THIS room's character-pick
-  // lobby (same room code), NOT the same as Exit Room in the pre-match
-  // lobby - that removes you from the room entirely. Exit Game just
-  // scraps the in-progress match so you can pick fresh characters and
-  // start again, staying in the same room.
-  btn.onclick = () => { playUiClick(); state.confirmingExit = true; state.rerender(); };
-  return btn;
-}
-
-// A 'bots4' spectator's own exit - no confirmation needed (unlike
-// renderExitIconButton's abandon-match flow above): there's no in-progress
-// decision or teammates to leave hanging, just a bot-vs-bot spectacle with
-// one viewer. Sends leave-room directly, same as the game-over screen's
-// own "Exit to Main Menu" button - main.js's 'left-room' handler resets
-// straight back to the entry screen.
-function renderBotShowExitButton() {
-  const btn = document.createElement('button');
-  btn.className = 'exit-icon-btn';
-  btn.title = 'Stop watching';
+  btn.title = 'Leave';
   btn.textContent = '🚪';
   btn.onclick = () => { playUiClick(); send('leave-room'); };
   return btn;
@@ -390,36 +345,6 @@ function renderHardRefreshIconButton() {
   btn.textContent = '🔄';
   btn.onclick = () => hardRefresh();
   return btn;
-}
-
-// Inline confirm, not a blocking window.confirm() popup - a native dialog
-// freezes the whole page (nothing else can update while it's open) and on
-// mobile a mistimed tap can land on either "OK" or "Cancel" before the
-// dialog has visually settled. A dedicated, always-visible "Abandon this
-// match? Yes / No" row instead, impossible to mis-tap into by mistake
-// since it takes a second deliberate click on the icon button above first.
-function renderExitConfirmRow(state) {
-  const wrap = document.createElement('div');
-  wrap.className = 'exit-control';
-
-  const prompt = document.createElement('span');
-  prompt.className = 'exit-confirm-prompt';
-  prompt.textContent = 'Abandon this match?';
-  wrap.appendChild(prompt);
-
-  const yesBtn = document.createElement('button');
-  yesBtn.className = 'exit-confirm-yes';
-  yesBtn.textContent = 'Yes, exit';
-  yesBtn.onclick = () => send('abandon-match');
-  wrap.appendChild(yesBtn);
-
-  const noBtn = document.createElement('button');
-  noBtn.className = 'exit-confirm-no';
-  noBtn.textContent = 'No';
-  noBtn.onclick = () => { state.confirmingExit = false; state.rerender(); };
-  wrap.appendChild(noBtn);
-
-  return wrap;
 }
 
 // Ticks a countdown to the server's turn-decision deadline (see

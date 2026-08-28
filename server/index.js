@@ -540,16 +540,6 @@ function broadcastGameState(room) {
     // clock/timer bookkeeping, just `deadline - Date.now()` ticked locally.
     // null while no timer is armed (e.g. game just ended).
     turnDeadline: room.turnTimer ? room.turnDeadline : null,
-    // Lets the client tell "solo vs bots" apart from "real opponents/
-    // spectators still around" - e.g. only offering a one-click Exit Game
-    // during a match when there's nobody else (seated OR Guest) around to
-    // leave hanging. Counts Guests too (totalRoomMembers, not just seated
-    // humans) - confirmed gap: a solo owner with a Guest watching could
-    // previously still one-click abandon the match out from under that
-    // Guest, since the old count only looked at seats. state.room (the
-    // last lobby-update) is stale mid-match under normal play, so this is
-    // computed fresh here rather than relying on the client's old snapshot.
-    humanCount: totalRoomMembers(room),
   });
 }
 
@@ -758,7 +748,6 @@ function stepBotTurn(room) {
           actingCharacterId: acting,
           usableActions: [],
           turnDeadline: null,
-          humanCount: totalRoomMembers(room),
         });
         setTimeout(() => stepBotTurn(room), BOT_ACTION_DELAY_MS);
         return;
@@ -1328,31 +1317,6 @@ function handleReturnToLobby(room, sessionId) {
   broadcastLobby(room);
 }
 
-// "Exit Game" mid-match (solo owner vs bots only, per humanCount<=1 gating
-// on the client) - immediately scraps the in-progress match with no winner
-// declared and resets straight to a fresh lobby, same room code. Distinct
-// from return-to-lobby (which only fires once a match has already ended
-// naturally) and from leave-room (which removes the player from the room
-// entirely) - this is "abandon what I'm playing, but stay in this room and
-// pick again," owner-only for the same reason every other room-lifecycle
-// action is.
-// Server-side enforcement of the same rule battleScreen.js's canExitGame
-// gates the button on (confirmed ruling: "battle can not be exit when even
-// 1 human exist... only leave from battle possible, not exit the battle")
-// - the client hiding the button is a convenience, not the real boundary;
-// without this check here, the message could still be sent directly,
-// letting a solo owner force-reset a match out from under a Guest who's
-// just watching. totalRoomMembers (seated humans + Guests) must be at
-// most 1 - i.e. the owner themselves, with truly nobody else around.
-function handleAbandonMatch(room, sessionId) {
-  if (sessionId !== room.ownerId) return;
-  if (room.phase !== 'in-match') return;
-  if (totalRoomMembers(room) > 1) return;
-  clearTurnTimer(room);
-  resetRoomToLobby(room);
-  broadcastLobby(room);
-}
-
 // Ownership handoff target when the current owner leaves for good - prefers
 // the next SEATED human (matches original behavior: someone actively
 // playing is the more natural next owner), but falls back to the
@@ -1546,7 +1510,6 @@ function handleAction(room, sessionId, { characterId, actionId, targetId }) {
       actingCharacterId: characterId,
       usableActions: [],
       turnDeadline: null,
-      humanCount: totalRoomMembers(room),
     });
     setTimeout(() => {
       markCharacterActed(room.game, characterId);
@@ -1867,7 +1830,6 @@ wss.on('connection', (ws) => {
       case 'reorder-seats': return handleReorderSeats(room, sessionId, payload);
       case 'start-match': return handleStartMatch(room, sessionId);
       case 'return-to-lobby': return handleReturnToLobby(room, sessionId);
-      case 'abandon-match': return handleAbandonMatch(room, sessionId);
       case 'action': return handleAction(room, sessionId, payload);
       case 'soul-swap-wrath': return handleSoulSwapWrath(room, sessionId, payload);
       case 'rune-vision-target-pick': return handleRuneVisionTargetPick(room, sessionId, payload);
