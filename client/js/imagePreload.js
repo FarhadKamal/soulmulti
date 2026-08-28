@@ -38,6 +38,7 @@ const FLASH_IMAGES = [
   'assets/images/chronox/time.jpg',
   'assets/images/chronox/rewind.jpg',
   'assets/images/tharox/glory.jpg',
+  'assets/images/tharox/final.jpg',
   'assets/images/tharox/roar.jpg',
   'assets/images/tharox/smash.jpg',
   'assets/images/tharox/toss.jpg',

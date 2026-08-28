@@ -46,7 +46,15 @@ function baseSpecialFor(id) {
         lockedActionTurnsRemaining: 0,
       };
     case 'tharox':
-      return { hasCharge: false };
+      // usedFinalSmash: separate one-time flag from usedSpecial (which
+      // Glory Smash owns) - the two specials are fully independent, either
+      // can fire once per match regardless of order (confirmed ruling).
+      // finalSmashAvailable: set true the first time Titan Smash lands
+      // (see tharox.js), independent of hasCharge entirely - Final Smash is
+      // a standalone banked one-time option once unlocked, not a same-turn
+      // follow-up, so it doesn't interact with the normal charge state at
+      // all (confirmed ruling: optional, usable on any later turn).
+      return { hasCharge: false, finalSmashAvailable: false, usedFinalSmash: false };
     case 'zerathys':
       return { chargeCount: 0 };
     case 'akyros':

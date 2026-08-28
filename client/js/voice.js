@@ -145,7 +145,7 @@ const ACTION_VOICE_LINES = {
   boingo: { jesterBall: 'jerster' },
   athena: { divineRestore: 'devine', divineSacrifice: 'sacrifice' },
   zerathys: { chargeUp: 'charge', thunderWrath: 'release', soulSwap: 'soul_swap' },
-  tharox: { titanToss: 'titan_toss', titanSmash: 'titan_smash', glorySmash: 'glory' },
+  tharox: { titanToss: 'titan_toss', titanSmash: 'titan_smash', glorySmash: 'glory', finalSmash: 'final_wrath' },
   akyros: { hiddenMark: 'hidden_mark', shadowExecution: 'shadow' },
   // mindControl's line fires from main.js's dedicated 'mind-control-select'
   // sound branch (via playMoveVoice(entry.characterId, 'mindControl')), not
