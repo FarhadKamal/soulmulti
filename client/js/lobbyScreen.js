@@ -234,72 +234,12 @@ function renderEntryForm() {
   botShowSection.appendChild(botShowBtn);
   form.appendChild(botShowSection);
 
-  // Custom-pick variant: same spectacle room as above, but the viewer
-  // chooses exactly which 4 characters face off instead of a random draw.
-  // Click-to-toggle grid (same interaction shape as the training grid
-  // above), capped at 4 selections - reusing the ordered array itself as
-  // the selection order also fixes which seat each pick lands in server-
-  // side, though that's not visible/meaningful to the viewer.
-  const customBotShowSection = document.createElement('div');
-  customBotShowSection.className = 'bot-show-section custom-bot-show-section';
-  const customBotShowTitle = document.createElement('h2');
-  customBotShowTitle.textContent = 'Watch bots play (your picks)';
-  customBotShowSection.appendChild(customBotShowTitle);
-
-  const customBotShowHint = document.createElement('div');
-  customBotShowHint.className = 'name-hint';
-  customBotShowSection.appendChild(customBotShowHint);
-
-  const selectedCharacterIds = [];
-  const customBotShowGrid = document.createElement('div');
-  customBotShowGrid.className = 'character-grid';
-  const customBotShowBtn = document.createElement('button');
-  customBotShowBtn.textContent = 'Start Watching (Custom 4)';
-  customBotShowBtn.onclick = () => {
-    if (selectedCharacterIds.length !== 4) return;
-    send('create-bot-show-room-custom', { name: currentName(), characterIds: [...selectedCharacterIds] });
-  };
-
-  function updateCustomBotShowUI() {
-    const count = selectedCharacterIds.length;
-    customBotShowHint.textContent = `Pick exactly 4 characters (${count}/4 selected).`;
-    customBotShowBtn.disabled = !currentName() || count !== 4;
-    [...customBotShowGrid.children].forEach((btn) => {
-      const isSelected = selectedCharacterIds.includes(btn.dataset.characterId);
-      btn.classList.toggle('character-grid-btn--selected', isSelected);
-      // A 5th pick is blocked (button disabled) once 4 are already chosen,
-      // but an already-selected button must stay clickable so it can still
-      // be toggled back OFF - only the UNselected ones lock up at the cap.
-      btn.disabled = !isSelected && count >= 4;
-    });
-  }
-
-  Object.values(CHARACTERS).forEach((def) => {
-    const btn = document.createElement('button');
-    btn.textContent = def.name;
-    btn.style.borderColor = def.color;
-    btn.dataset.characterId = def.id;
-    btn.onclick = () => {
-      const idx = selectedCharacterIds.indexOf(def.id);
-      if (idx !== -1) {
-        selectedCharacterIds.splice(idx, 1);
-      } else if (selectedCharacterIds.length < 4) {
-        selectedCharacterIds.push(def.id);
-      }
-      updateCustomBotShowUI();
-    };
-    customBotShowGrid.appendChild(btn);
-  });
-  customBotShowSection.appendChild(customBotShowGrid);
-  customBotShowSection.appendChild(customBotShowBtn);
-  form.appendChild(customBotShowSection);
-  updateCustomBotShowUI();
-  // currentName() can change (name input edited after this point), so the
-  // custom button's disabled state needs the same live re-check the other
-  // name-required buttons get - reusing nameRequiredButtons' existing hook
-  // isn't enough on its own since this button ALSO gates on the 4-pick
-  // count, so it gets its own listener that re-runs the combined check.
-  nameInput.addEventListener('input', updateCustomBotShowUI);
+  // The standalone "Watch bots play (your picks)" custom-4-character
+  // screen was removed (confirmed ruling) - the owner can now get the same
+  // all-bot spectacle from within a normal room via the "Make All Bots"
+  // action (see renderRoomLobby/handleFillAllBots in index.js) instead of
+  // a separate pre-room flow. Only the simple random-draw "Start Watching"
+  // button above remains.
 
   updateNameValidity();
   return form;
@@ -356,7 +296,11 @@ function renderRoomLobby(room, topControls, rerender) {
   // to the in-match Exit Game button (see battleScreen.js). Available to
   // ANY human seated in the room, not just the owner - a non-owner player
   // previously had no way to leave the room at all once they'd joined.
-  if (room.mySeatIndex !== null) {
+  // Available to anyone in the room, seated or Guest - a bare Guest
+  // (room.mySeatIndex === null, room.youAreGuest true) previously had NO
+  // way to leave the room at all once they'd joined, since this was
+  // gated on mySeatIndex alone.
+  if (room.mySeatIndex !== null || room.youAreGuest) {
     const exitBtn = document.createElement('button');
     exitBtn.className = 'exit-icon-btn';
     exitBtn.title = 'Exit Room';
@@ -448,22 +392,25 @@ function renderRoomLobby(room, topControls, rerender) {
       removeBtn.onclick = () => send('remove-bot', { seatIndex: seat.index });
       actions.appendChild(removeBtn);
     }
-    // Kick a real human player - never offered for your own seat (isMe),
-    // never a bot seat (that's Remove Bot above), and lobby-only just like
-    // every other seat-management action here - the server enforces the
-    // same, this just keeps the button from ever appearing somewhere it'd
-    // silently no-op.
+    // Unseat a real human player (moves them to Guest status in this same
+    // room, rather than removing them entirely - renamed from "Kick" per
+    // explicit request, since being pulled off a character seat no longer
+    // means being ejected from the room) - never offered for your own seat
+    // (isMe), never a bot seat (that's Remove Bot above), and lobby-only
+    // just like every other seat-management action here - the server
+    // enforces the same, this just keeps the button from ever appearing
+    // somewhere it'd silently no-op.
     if (seat.kind === 'human' && !seat.isMe && room.youAreOwner) {
       if (confirmingKickSeatIndex === seat.index) {
         const prompt = document.createElement('span');
         prompt.className = 'kick-confirm-prompt';
-        prompt.textContent = `Kick ${seat.name}?`;
+        prompt.textContent = `Move ${seat.name} to Guest?`;
         actions.appendChild(prompt);
         const yesBtn = document.createElement('button');
         yesBtn.className = 'kick-confirm-yes';
-        yesBtn.textContent = 'Yes, kick';
+        yesBtn.textContent = 'Yes, unseat';
         yesBtn.onclick = () => {
-          send('kick-player', { seatIndex: seat.index });
+          send('unseat-player', { seatIndex: seat.index });
           confirmingKickSeatIndex = null;
           rerender();
         };
@@ -476,7 +423,7 @@ function renderRoomLobby(room, topControls, rerender) {
       } else {
         const kickBtn = document.createElement('button');
         kickBtn.className = 'kick-btn';
-        kickBtn.textContent = 'Kick';
+        kickBtn.textContent = 'Unseat';
         kickBtn.onclick = () => { confirmingKickSeatIndex = seat.index; rerender(); };
         actions.appendChild(kickBtn);
       }
@@ -505,6 +452,28 @@ function renderRoomLobby(room, topControls, rerender) {
     }
   });
   wrap.appendChild(seatList);
+
+  // Guest list - watch-only members, listed separately from the 4 player
+  // seats above. Shows the current/max member count (confirmed 10-member
+  // cap, flexibly shared between seats and Guests - see rooms.js's
+  // totalRoomMembers) so it's clear at a glance how much room is left.
+  if (room.guests.length > 0 || room.youAreGuest) {
+    const guestSection = document.createElement('div');
+    guestSection.className = 'guest-section';
+    const guestTitle = document.createElement('h3');
+    guestTitle.textContent = `Guests (${room.memberCount}/${room.maxMembers} total in room)`;
+    guestSection.appendChild(guestTitle);
+    const guestList = document.createElement('div');
+    guestList.className = 'guest-list';
+    room.guests.forEach((guest) => {
+      const chip = document.createElement('span');
+      chip.className = 'guest-chip' + (guest.isMe ? ' guest-chip--me' : '');
+      chip.textContent = guest.name + (guest.isOwner ? ' (owner)' : '') + (guest.isMe ? ' (you)' : '');
+      guestList.appendChild(chip);
+    });
+    guestSection.appendChild(guestList);
+    wrap.appendChild(guestSection);
+  }
 
   const mySeat = room.mySeatIndex !== null ? room.seats[room.mySeatIndex] : null;
 
@@ -571,6 +540,17 @@ function renderRoomLobby(room, topControls, rerender) {
     startBtn.disabled = !canStart;
     startBtn.onclick = () => send('start-match');
     wrap.appendChild(startBtn);
+
+    // Converts every seat to a bot in one click, including any seat
+    // currently held by a real human (who becomes a Guest, same as the
+    // per-seat Unseat button above) - replaces the old standalone
+    // "Watch bots play (your picks)" entry-screen flow (confirmed
+    // ruling), now available from within a normal room instead.
+    const fillAllBtn = document.createElement('button');
+    fillAllBtn.className = 'fill-all-bots-btn';
+    fillAllBtn.textContent = 'Make All Bots';
+    fillAllBtn.onclick = () => send('fill-all-bots');
+    wrap.appendChild(fillAllBtn);
   } else {
     const waiting = document.createElement('div');
     waiting.className = 'waiting-note';

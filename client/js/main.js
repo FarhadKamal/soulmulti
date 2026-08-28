@@ -637,21 +637,16 @@ onMessage((msg) => {
       startMenuMusic();
       rerender();
       break;
-    case 'kicked':
-      // The room owner removed this player's seat directly (see
-      // handleKickPlayer in index.js) - same reset as left-room, but with
-      // an explicit notice so it reads as a deliberate host action, not a
-      // random disconnect/bug.
+    case 'unseated':
+      // The room owner moved this player's seat to Guest status directly
+      // (see handleUnseatPlayer in index.js) - unlike a full room exit,
+      // they STAY in the room, just as a Guest now (a 'lobby-update'
+      // reflecting that new status is broadcast right alongside this and
+      // will arrive separately) - only the reconnect token needs clearing
+      // (a Guest has no seat/token to reconnect to) and a brief notice so
+      // it reads as a deliberate host action, not a random bug.
       clearReconnectInfo();
-      state.screen = 'lobby';
-      state.room = null;
-      state.game = null;
-      state.error = 'You were removed from the room by the host.';
-      lastLogLength = 0;
-      previousActingCharacterId = null;
-      lastKnownHearts.clear();
-      clearChatMessages();
-      startMenuMusic();
+      state.error = 'The host moved you to Guest.';
       rerender();
       break;
     case 'reconnect-failed':

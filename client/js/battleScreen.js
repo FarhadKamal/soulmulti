@@ -107,11 +107,22 @@ export function renderBattle(root, state) {
   // branch, index.js) since there's nothing left to watch once the one
   // viewer leaves.
   const isBotShowSpectator = state.room?.roomType === 'bots4';
+  // A Guest in a real '4p' room mid-match (room.youAreGuest, distinct from
+  // the bots4 case above) isn't playing, so there's no match to "abandon"
+  // on their behalf either - same simple leave-room exit as a bots4
+  // spectator, just for a room type that DOES still have other real
+  // players/a lobby to return to (leaveRoom's own spectatorIds branch,
+  // index.js, only tears the whole room down for bots4 - a '4p' room just
+  // removes this one Guest and carries on). Confirmed gap: previously had
+  // NO exit button at all in-match, since canExitGame requires
+  // youAreOwner and isBotShowSpectator requires roomType 'bots4' - neither
+  // ever true for a Guest watching a real match.
+  const isRealRoomGuest = !!state.room?.youAreGuest && !isBotShowSpectator;
 
   const topControls = document.createElement('div');
   topControls.className = 'top-right-controls';
   if (canExitGame) topControls.appendChild(renderExitIconButton(state));
-  if (isBotShowSpectator) topControls.appendChild(renderBotShowExitButton());
+  if (isBotShowSpectator || isRealRoomGuest) topControls.appendChild(renderBotShowExitButton());
   topControls.appendChild(renderHardRefreshIconButton());
   topControls.appendChild(renderFullscreenButton());
   wrap.appendChild(topControls);

@@ -24,6 +24,7 @@ import { settleToNextDecision, finishJesterBall } from './gameFlow.js';
 import {
   createRoom, getRoom, deleteRoom, findRoomBySessionId, roomShapeFor,
   availableSeats, availableCharacterIds, seatIsReady, resetRoomToLobby, TURN_TIMER_DURATION_MS,
+  totalRoomMembers, roomHasCapacity, isOnReseatCooldown, RESEAT_COOLDOWN_DURATION_MS, MAX_ROOM_MEMBERS_COUNT,
 } from './rooms.js';
 
 const PORT = process.env.PORT || 3001;
@@ -208,6 +209,11 @@ function lobbyView(room, recipientSessionId) {
     ownerId: room.ownerId,
     youAreOwner: room.ownerId === recipientSessionId,
     mySeatIndex: room.seats.find((s) => s.playerId === recipientSessionId)?.index ?? null,
+    // True only for a genuine Guest (spectatorIds, no seat) - a seated
+    // player who ALSO happens to be a Guest-owner (not seated at all) is
+    // covered by mySeatIndex === null rather than this flag; kept separate
+    // so the client can tell "I'm a Guest" apart from "no room data yet."
+    youAreGuest: room.spectatorIds.has(recipientSessionId),
     phase: room.phase,
     seats: room.seats.map((s) => ({
       index: s.index,
@@ -217,6 +223,16 @@ function lobbyView(room, recipientSessionId) {
       isOwner: s.playerId === room.ownerId,
       isMe: s.playerId === recipientSessionId,
     })),
+    // Guest display list - name only (no per-guest permissions to expose),
+    // sorted by join order isn't tracked so this is Set iteration order
+    // (insertion order for a JS Set, i.e. still join order in practice).
+    guests: [...room.spectatorIds].map((id) => ({
+      name: room.guestNames.get(id) ?? 'Guest',
+      isOwner: id === room.ownerId,
+      isMe: id === recipientSessionId,
+    })),
+    memberCount: totalRoomMembers(room),
+    maxMembers: MAX_ROOM_MEMBERS_COUNT,
     availableCharacterIds: availableCharacterIds(room),
   };
 }
@@ -887,21 +903,46 @@ function handleCreateRoom(ws, sessionId, { roomType, name }) {
   broadcastLobby(room);
 }
 
+// Joining a room by code now has two outcomes, decided here rather than by
+// the client: claim an empty seat as a real player (only possible while
+// the room is still in the lobby AND a seat is free AND this session isn't
+// on its own reseat cooldown - see rooms.js's isOnReseatCooldown), or
+// otherwise join as a Guest (watch + chat only). Guests can join at ANY
+// room phase, including mid-match (confirmed ruling) - the existing
+// broadcastRoom/broadcastPersonalized machinery already reaches every
+// session in room.spectatorIds automatically (see their own comments), so
+// a Guest who joins mid-match gets the live game-state broadcast the very
+// next time anything happens, same as a seated player would.
 function handleJoinRoom(ws, sessionId, { code, name }) {
   const cleanName = sanitizeName(name);
   if (!cleanName) return send(ws, 'error', { message: 'A name is required.' });
   const room = getRoom(code);
   if (!room) return send(ws, 'error', { message: 'Room not found.' });
-  if (room.phase !== 'lobby') return send(ws, 'error', { message: 'Match already started.' });
-  const seat = availableSeats(room)[0];
-  if (!seat) return send(ws, 'error', { message: 'Room is full.' });
-  seat.kind = 'human';
-  seat.playerId = sessionId;
-  seat.spectatorId = sessionId;
-  seat.name = cleanName;
-  seat.reconnectToken = randomUUID();
-  send(ws, 'room-joined', { code: room.code, seatIndex: seat.index, reconnectToken: seat.reconnectToken });
+  if (!roomHasCapacity(room)) return send(ws, 'error', { message: 'Room is full (10 members max).' });
+  const seat = room.phase === 'lobby' && !isOnReseatCooldown(room, sessionId)
+    ? availableSeats(room)[0]
+    : null;
+  if (seat) {
+    seat.kind = 'human';
+    seat.playerId = sessionId;
+    seat.spectatorId = sessionId;
+    seat.name = cleanName;
+    seat.reconnectToken = randomUUID();
+    send(ws, 'room-joined', { code: room.code, seatIndex: seat.index, reconnectToken: seat.reconnectToken });
+    broadcastLobby(room);
+    return;
+  }
+  room.spectatorIds.add(sessionId);
+  room.guestNames.set(sessionId, cleanName);
+  send(ws, 'room-joined', { code: room.code, seatIndex: null, reconnectToken: null });
   broadcastLobby(room);
+  // A Guest joining mid-match also needs the CURRENT game state right
+  // away, not just the lobby snapshot - broadcastLobby alone would leave
+  // their screen blank/stuck on the lobby view until the next unrelated
+  // game event happens to fire a game-state broadcast. Only relevant once
+  // a match is actually live; a no-op (room.game is null) during lobby/
+  // finished phases.
+  if (room.game) broadcastGameState(room);
 }
 
 // Delay before a 'bots4' room's next match auto-starts after the previous
@@ -1055,6 +1096,43 @@ function handleFillBotWithCharacter(room, sessionId, { seatIndex, characterId })
   broadcastLobby(room);
 }
 
+// Owner-only, lobby-phase-only: converts EVERY seat to a bot in one click,
+// including seats currently held by a real human (who becomes a Guest in
+// this same room, same conversion + reseat-cooldown handleUnseatPlayer
+// applies - a human is never just silently dropped). Confirmed ruling:
+// this replaces the standalone "Watch bots play (your picks)" custom-4-
+// character lobby screen entirely - the owner can now get the same
+// all-bot spectacle from within a normal room instead of a separate flow.
+function handleFillAllBots(room, sessionId) {
+  if (sessionId !== room.ownerId) return;
+  if (room.phase !== 'lobby') return;
+  for (const seat of room.seats) {
+    if (seat.kind === 'human' && seat.playerId !== sessionId) {
+      // Reuses handleUnseatPlayer's own conversion (Guest + cooldown +
+      // 'unseated' notice) rather than duplicating that logic here.
+      handleUnseatPlayer(room, sessionId, { seatIndex: seat.index });
+    } else if (seat.kind === 'human' && seat.playerId === sessionId) {
+      // The owner's OWN seat: handleUnseatPlayer refuses to unseat the
+      // caller (by design, for the normal single-seat Unseat button - see
+      // its own "can't unseat yourself this way" comment), so that path
+      // doesn't apply here. Converting the owner's own seat straight to a
+      // bot and moving them to Guest is exactly what "make ALL seats
+      // bots" means for their own seat too - do it directly.
+      room.spectatorIds.add(sessionId);
+      room.guestNames.set(sessionId, seat.name);
+      seat.kind = 'empty';
+      seat.playerId = null;
+      seat.spectatorId = null;
+      seat.name = null;
+      seat.characterIds = [];
+    }
+  }
+  for (const seat of room.seats) {
+    if (seat.kind === 'empty') fillSeatWithBot(room, seat);
+  }
+  broadcastLobby(room);
+}
+
 // Owner can undo a bot-fill back to an empty seat (e.g. they meant to
 // leave it open for a friend to join) - only while still in the lobby, a
 // bot seat mid/post-match can't un-fill since it's already playing a role
@@ -1071,29 +1149,36 @@ function handleRemoveBot(room, sessionId, { seatIndex }) {
   broadcastLobby(room);
 }
 
-// Owner-only, lobby-phase-only (never mid-match - see the room.phase
-// check) removal of another HUMAN player from the room, distinct from
-// Remove Bot (that only ever un-fills a bot seat). Mirrors leaveRoom's own
-// "still in lobby" branch exactly (free the seat back to empty, hand off
-// ownership if the kicked player somehow was the owner - not reachable
-// today since only the owner can kick, but kept for symmetry/future-
-// proofing), except the kicked player didn't initiate this themselves, so
-// they need an explicit notice (not the generic 'left-room' a real Exit
-// Room click gets) telling them what happened rather than a message that
-// would read as a random disconnect.
-function handleKickPlayer(room, sessionId, { seatIndex }) {
+// Owner-only, lobby-phase-only (never mid-match - confirmed ruling, no
+// change from the original Kick's own restriction) removal of another
+// HUMAN player from their SEAT, distinct from Remove Bot (that only ever
+// un-fills a bot seat). Renamed from "Kick" per explicit request - being
+// removed from a seat no longer means being ejected from the room: the
+// unseated person becomes a Guest in the SAME room instead (added to
+// spectatorIds/guestNames, same as anyone who joined via handleJoinRoom
+// with no seat available), free to keep watching/chatting. A short
+// RESEAT_COOLDOWN_MS cooldown (rooms.js) blocks that specific session from
+// immediately re-claiming a seat - every other Guest is unaffected.
+function handleUnseatPlayer(room, sessionId, { seatIndex }) {
   if (sessionId !== room.ownerId) return;
   if (room.phase !== 'lobby') return;
   const seat = room.seats[seatIndex];
   if (!seat || seat.kind !== 'human') return;
-  if (seat.playerId === sessionId) return; // can't kick yourself
-  const kickedWs = seat.spectatorId ? sessions.get(seat.spectatorId) : null;
-  if (kickedWs) send(kickedWs, 'kicked', {});
+  if (seat.playerId === sessionId) return; // can't unseat yourself this way - use Exit/leave instead
+  const unseatedSessionId = seat.spectatorId;
+  const unseatedWs = unseatedSessionId ? sessions.get(unseatedSessionId) : null;
+  const unseatedName = seat.name;
   seat.kind = 'empty';
   seat.playerId = null;
   seat.spectatorId = null;
   seat.name = null;
   seat.characterIds = [];
+  if (unseatedSessionId) {
+    room.spectatorIds.add(unseatedSessionId);
+    room.guestNames.set(unseatedSessionId, unseatedName);
+    room.reseatCooldowns.set(unseatedSessionId, Date.now() + RESEAT_COOLDOWN_DURATION_MS);
+  }
+  if (unseatedWs) send(unseatedWs, 'unseated', {});
   broadcastLobby(room);
 }
 
@@ -1110,7 +1195,7 @@ function handleKickPlayer(room, sessionId, { seatIndex }) {
 // Physically swaps the array elements AND renumbers each seat's own .index
 // to match its new position, keeping the array-position === seat.index
 // invariant every other seatIndex-addressed handler (fill-bot, remove-bot,
-// kick-player) depends on. This intentionally invalidates any client's
+// unseat-player) depends on. This intentionally invalidates any client's
 // stale localStorage seatIndex from before the swap - handleReconnect
 // looks seats up by matching reconnectToken instead of trusting the
 // client's seatIndex for exactly this reason, so a reorder never breaks
@@ -1237,10 +1322,22 @@ function leaveRoom(sessionId, ws) {
   // rather than left running forever for no one (the same tradeoff every
   // other "all humans leave" case already makes, just via a different check
   // since there's no human seat here to notice leaving).
+  //
+  // A real '4p' room's Guest (spectatorIds is now also the general Guest
+  // mechanism there, not just bots4's own viewer - see rooms.js's own
+  // comment) must NOT trigger this same teardown - other real human
+  // players can still be actively playing. Only clean up this one Guest's
+  // own entries and let the room carry on.
   if (room.spectatorIds.has(sessionId)) {
     room.spectatorIds.delete(sessionId);
+    room.guestNames.delete(sessionId);
+    room.reseatCooldowns.delete(sessionId);
     if (ws) send(ws, 'left-room', {});
-    deleteRoom(room.code);
+    if (room.roomType === 'bots4') {
+      deleteRoom(room.code);
+    } else {
+      broadcastLobby(room);
+    }
     return;
   }
   const seat = room.seats.find((s) => s.spectatorId === sessionId);
@@ -1683,17 +1780,22 @@ function isJesterBallPassTarget(game, holderId, targetId) {
 function handleChatMessage(room, sessionId, { text }) {
   // spectatorId, not playerId - a timed-out/bot-taken-over player should
   // still be able to chat even though they can no longer act (see
-  // findRoomBySessionId for the same reasoning).
+  // findRoomBySessionId for the same reasoning). A bare Guest (never held
+  // a seat at all) has no seat.spectatorId to match, so falls through to
+  // the guestNames lookup below instead.
   const seat = room.seats.find((s) => s.spectatorId === sessionId);
-  if (!seat) return;
+  const name = seat ? seat.name : room.guestNames.get(sessionId);
+  if (!name) return;
   // Short-sentence cap, not a full message board - keeps the compact chat
   // panel readable rather than needing to render long paragraphs.
   const clean = typeof text === 'string' ? text.trim().slice(0, 60) : '';
   if (!clean) return;
   // seatIndex (not just name) so the client can label messages "P1: name"
   // etc. - two players can pick the same display name, and even without a
-  // clash it's a quick way to tell who's who against the seat list.
-  broadcastRoom(room, 'chat-message', { name: seat.name, seatIndex: seat.index, text: clean, at: Date.now() });
+  // clash it's a quick way to tell who's who against the seat list. null
+  // for a Guest (no seat to attribute to) - the client renders those as
+  // "Guest: name" instead of "P1: name".
+  broadcastRoom(room, 'chat-message', { name, seatIndex: seat ? seat.index : null, text: clean, at: Date.now() });
 }
 
 // ---- Connection handling ----
@@ -1752,7 +1854,8 @@ wss.on('connection', (ws) => {
       case 'fill-bot': return handleFillBot(room, sessionId, payload);
       case 'fill-bot-with-character': return handleFillBotWithCharacter(room, sessionId, payload);
       case 'remove-bot': return handleRemoveBot(room, sessionId, payload);
-      case 'kick-player': return handleKickPlayer(room, sessionId, payload);
+      case 'unseat-player': return handleUnseatPlayer(room, sessionId, payload);
+      case 'fill-all-bots': return handleFillAllBots(room, sessionId);
       case 'reorder-seats': return handleReorderSeats(room, sessionId, payload);
       case 'start-match': return handleStartMatch(room, sessionId);
       case 'return-to-lobby': return handleReturnToLobby(room, sessionId);

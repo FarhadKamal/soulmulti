@@ -17,6 +17,18 @@ const ROOM_SHAPES = {
   bots4: { seatCount: 4, picksPerSeat: 1 },
 };
 
+// Total room membership cap (4 player seats + Guests, flexibly sharing
+// whatever isn't occupied by a real human seat - confirmed ruling: fewer
+// seated humans means MORE guest room, not a fixed separate guest quota).
+const MAX_ROOM_MEMBERS = 10;
+
+// How long a just-unseated human is barred from claiming ANY seat again in
+// this room (confirmed ruling) - applies only to that specific session,
+// every other Guest is unaffected. Short enough not to feel punitive, long
+// enough that "unseat" can't be trivially undone by the same person
+// instantly re-claiming the seat they were just removed from.
+const RESEAT_COOLDOWN_MS = 5000;
+
 export function roomShapeFor(roomType) {
   return ROOM_SHAPES[roomType];
 }
@@ -77,14 +89,28 @@ export function createRoom(roomType) {
     turnTimer: null,
     botSequenceActive: false, // guards against overlapping paced bot-turn sequences
     createdAt: Date.now(),
-    // Session ids watching this room WITHOUT occupying a seat - only ever
-    // populated for a 'bots4' room (see handleCreateBotShowRoom), where
-    // every seat is a bot and the connecting viewer has nothing to claim.
-    // broadcastRoom/broadcastPersonalized (index.js) and
-    // findRoomBySessionId (below) both need to know about these sessions
-    // too, not just seat.spectatorId - a plain Set since a 'bots4' room in
-    // practice has exactly one viewer, but nothing stops more from watching.
+    // Session ids watching this room WITHOUT occupying a seat - "Guests."
+    // Originally only populated for a 'bots4' room (see
+    // handleCreateBotShowRoom), where every seat is a bot and the
+    // connecting viewer has nothing to claim; now also the general Guest
+    // mechanism for a real '4p' room (join-as-guest, and anyone unseated
+    // via handleUnseatPlayer - see index.js). broadcastRoom/
+    // broadcastPersonalized (index.js) and findRoomBySessionId (below)
+    // both need to know about these sessions too, not just seat.spectatorId.
     spectatorIds: new Set(),
+    // Display name for each Guest session (parallel to seat.name for a
+    // seated player) - a bare spectatorIds Set alone has nowhere to store
+    // this. Never cleared once set for a session still present in
+    // spectatorIds; removed when they leave/claim a seat.
+    guestNames: new Map(),
+    // sessionId -> timestamp (Date.now() + RESEAT_COOLDOWN_MS) until which
+    // that specific session may not claim ANY seat in this room - set only
+    // by handleUnseatPlayer, checked by handlePickCharacter/whatever claims
+    // an empty seat. Entries are self-expiring (checked against Date.now()
+    // at claim time, never proactively swept) - a stale past-timestamp
+    // entry is harmless dead weight, just never blocks anything once its
+    // time has passed.
+    reseatCooldowns: new Map(),
     // Only set for a 'bots4' room created via the custom-pick flow (see
     // handleCreateBotShowRoom in index.js) - an ordered array of exactly
     // seatCount character ids the viewer chose, so startFreshBotShowMatch
@@ -118,6 +144,27 @@ export function findRoomBySessionId(sessionId) {
     if (room.spectatorIds.has(sessionId)) return room;
   }
   return null;
+}
+
+// Total distinct people currently in the room - occupied human seats
+// (kind === 'human', by playerId, not spectatorId, so a timed-out/bot-
+// taken-over seat's lingering spectatorId isn't double-counted alongside
+// its own Guest entry once unseated) plus every Guest session.
+export function totalRoomMembers(room) {
+  const seatedHumans = room.seats.filter((s) => s.kind === 'human').length;
+  return seatedHumans + room.spectatorIds.size;
+}
+
+export function roomHasCapacity(room) {
+  return totalRoomMembers(room) < MAX_ROOM_MEMBERS;
+}
+
+// True if sessionId is currently barred from claiming a seat in this room
+// (RESEAT_COOLDOWN_MS after being unseated - confirmed ruling, applies
+// only to the specific person just removed).
+export function isOnReseatCooldown(room, sessionId) {
+  const until = room.reseatCooldowns.get(sessionId);
+  return !!until && until > Date.now();
 }
 
 export function availableSeats(room) {
@@ -183,3 +230,5 @@ export function resetRoomToLobby(room) {
 }
 
 export const TURN_TIMER_DURATION_MS = TURN_TIMER_MS;
+export const RESEAT_COOLDOWN_DURATION_MS = RESEAT_COOLDOWN_MS;
+export const MAX_ROOM_MEMBERS_COUNT = MAX_ROOM_MEMBERS;
