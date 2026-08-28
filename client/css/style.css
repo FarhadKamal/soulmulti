@@ -92,19 +92,29 @@ input {
 .room-code { text-align: center; font-size: 1.3em; letter-spacing: 3px; }
 .copy-code-btn { font-size: 0.8em; padding: 6px 12px; }
 .seat-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
-/* Fixed 3-column row (reorder arrows | label+picks | action button) rather
-   than a loosely flex-wrapped row - previously each piece (label, picks,
-   button) wrapped onto its own full-width line on a narrow screen, making
-   every seat noticeably taller than it needed to be. */
+/* 2-row layout (reorder arrows | label+picks on the top row, action
+   buttons wrapping onto their OWN row below) rather than cramming
+   everything into one horizontal line - a seat can now show 2-3 action
+   buttons at once (Fill with Bot / Choose / Take This Seat, e.g. an
+   owner-who-is-also-a-Guest sees both their own owner actions AND their
+   own Guest ones), which used to fight the label/picks for space on the
+   same row and wrap into a cramped, hard-to-read mess on a narrow screen -
+   confirmed live report ("it looks bad in screen"). flex-wrap on the
+   outer row lets .seat-actions drop to its own full-width line once it no
+   longer fits, without needing a fixed 3-column layout at all. */
 .seat-row {
-  display: flex; align-items: center; gap: 10px;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
   padding: 8px 12px; border-radius: 8px; background: #1c1c2c; border: 1px solid #333;
 }
 .seat-row--me { border-color: #6c6cff; }
 .seat-info { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .seat-label { font-weight: 600; font-size: 0.95em; }
 .seat-picks { opacity: 0.75; font-size: 0.82em; }
-.seat-actions { flex: 0 0 auto; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.seat-actions {
+  flex: 1 1 100%; display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.seat-actions:empty { display: none; }
 .seat-actions button { font-size: 0.85em; padding: 6px 10px; }
 .seat-reorder-controls { flex: 0 0 auto; display: flex; flex-direction: column; gap: 2px; }
 .seat-reorder-btn {
