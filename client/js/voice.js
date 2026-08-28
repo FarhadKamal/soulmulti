@@ -224,6 +224,7 @@ const ACTION_VOICE_LINES = {
   illyra: {
     mirageMark: 'mark',
     mirageBurst: 'burst',
+    mirageOverload: 'mirage_overload',
     // dodge is played directly from main.js's 'dodge' log-entry handler
     // (same pattern as grimtal's grimWard/marin's threefoldDodge above),
     // not through the generic actionId-keyed dispatch - her passive has no

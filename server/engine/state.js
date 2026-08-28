@@ -257,8 +257,16 @@ function baseSpecialFor(id) {
       // tryIllyraDodgeStatus) needs no tracked state at all - it's a pure,
       // memoryless coin flip every single time, unlike Akyros's per-
       // attacker Set or Marin's finite charge pool.
+      // mirageOverloadUsed: her one-time Mirage Overload special (see
+      // illyra.js) - a dedicated flag rather than the shared usedSpecial
+      // boolean, matching every other multi-special character's own
+      // pattern (Chronox's rewindUsesRemaining, Boingo's jesterBallsUsed) -
+      // though in her case there's no OTHER special competing for
+      // usedSpecial, this still keeps the convention consistent and leaves
+      // room for a future second special without a collision.
       return {
         mirageMarks: new Map(),
+        mirageOverloadUsed: false,
       };
     case 'oraclus':
       // predictedAttackerId/predictedTargetId: his one pending Rune Vision

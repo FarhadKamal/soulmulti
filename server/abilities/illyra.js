@@ -8,6 +8,13 @@ function burstDamageFor(stackCount) {
   return Math.floor(stackCount * 1.5);
 }
 
+// Total mirage stack-points Mirage Overload throws, keyed by how many
+// characters (including her) are currently alive - confirmed ruling: 7 at
+// 4 alive, 5 at 3 alive, 2 at 2 alive (a 1v1 is explicitly allowed, no
+// headcount gate on casting it at all - only her own hearts <= 3 gates
+// legality, see isLegal below).
+const OVERLOAD_STACKS_BY_ALIVE_COUNT = { 4: 7, 3: 5, 2: 2 };
+
 export const actions = {
   mirageMark: {
     label: 'Mirage Mark',
@@ -50,18 +57,71 @@ export const actions = {
         // Confirmed ruling: bypasses EVERY dodge mechanic in the game
         // (Akyros, Marin, Grimtal, and her own passive too) - detonating an
         // already-planted mark isn't a fresh attack the target could
-        // evade. Shield still absorbs it normally (not ignoresShield) -
-        // dodge-proof, not shield-proof.
+        // evade. Also bypasses untargetable (e.g. Velorya's Lunar
+        // Eclipse) for the exact same reasoning - the mark was already
+        // planted before she went untargetable, so a later Eclipse
+        // shouldn't retroactively nullify the detonation. Confirmed real
+        // gap: without ignoresUntargetable, applyDamage's own defensive
+        // untargetable re-check (damagePipeline.js) silently no-op'd the
+        // whole hit at 0 damage, even though the mark stack was genuinely
+        // there. Shield still absorbs it normally (not ignoresShield) -
+        // dodge-proof and untargetable-proof, not shield-proof.
         const result = applyDamage(game, log, {
           sourceCharacterId: character.id,
           targetCharacterId: tid,
           amount: burstDamageFor(stackCount),
           ignoresDodge: true,
+          ignoresUntargetable: true,
         });
         bursts.push({ targetId: tid, stackCount, ...result });
       }
       log.push({ type: 'special', characterId: character.id, actionId: 'mirageBurst', bursts });
       return { bursts };
+    },
+  },
+  // Mirage Overload: her desperate last-stand special. No-target, one-time
+  // use, only legal once she's genuinely on the brink (hearts <= 3,
+  // confirmed ruling) - no headcount gate on casting it at all, usable at
+  // any alive-count including a straight 1v1 (only the total stack-point
+  // pool scales down with fewer targets - see OVERLOAD_STACKS_BY_ALIVE_COUNT
+  // above). Deals ZERO direct damage on its own (confirmed ruling) - it
+  // ONLY plants mirage stacks, exactly like Mirage Mark does, just
+  // scattered across everyone at once instead of one chosen target. She'd
+  // still need to cast Mirage Burst separately afterward to cash any of
+  // them in for damage.
+  mirageOverload: {
+    label: 'Mirage Overload',
+    needsTarget: false,
+    special: true,
+    isLegal: (character, game) => {
+      if (character.special.mirageOverloadUsed) return false;
+      return character.hearts <= 3;
+    },
+    execute(character, targetId, game, log) {
+      character.special.mirageOverloadUsed = true;
+      const others = Object.values(game.characters).filter((c) => c.id !== character.id && !c.isKO);
+      const aliveCount = others.length + 1; // +1 for herself
+      const totalStacks = OVERLOAD_STACKS_BY_ALIVE_COUNT[aliveCount] ?? 0;
+      const marks = character.special.mirageMarks;
+      // Fully independent random assignment, EACH of the totalStacks
+      // points separately - deliberately NOT an even/balanced split
+      // (confirmed ruling: "totally random... someone can get 7 mirage!").
+      // No weighting, no minimum-per-target guarantee, no cap - a genuine
+      // coin-flip-per-point, so a lopsided or even a single-target result
+      // is completely normal, not a bug.
+      const landedOn = {};
+      for (let i = 0; i < totalStacks; i++) {
+        if (others.length === 0) break; // defensive - can't happen once alive-count table is respected, but never divide by zero
+        const target = others[Math.floor(Math.random() * others.length)];
+        const newCount = (marks.get(target.id) || 0) + 1;
+        marks.set(target.id, newCount);
+        landedOn[target.id] = (landedOn[target.id] || 0) + 1;
+      }
+      log.push({
+        type: 'special', characterId: character.id, actionId: 'mirageOverload',
+        totalStacks, landedOn,
+      });
+      return { landedOn };
     },
   },
 };

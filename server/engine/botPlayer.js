@@ -1194,6 +1194,15 @@ function illyraUrgentBurstTarget(character, game) {
 
 function chooseIllyraMove(character, game, usable) {
   const byId = Object.fromEntries(usable.map((a) => [a.actionId, a]));
+  // Mirage Overload: no downside to casting it the instant it's legal
+  // (hearts <= 3, one-time use, 0 direct damage/cost to her) - top
+  // priority even above her usual Mirage Burst threshold check below,
+  // since she's already in genuine danger at that hearts range and this
+  // is pure free value (scattered stacks she can cash in with a later
+  // Burst). No target to choose - the distribution is server-side random.
+  if (byId.mirageOverload) {
+    return { actionId: 'mirageOverload', targetId: null };
+  }
   if (byId.mirageBurst) {
     if (illyraUrgentBurstTarget(character, game)) {
       return { actionId: 'mirageBurst', targetId: null };

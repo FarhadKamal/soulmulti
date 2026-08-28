@@ -88,6 +88,7 @@ const FLASH_IMAGES = [
   'assets/images/illyra/illusion.jpg',
   'assets/images/illyra/mirage_mark.jpg',
   'assets/images/illyra/mirage_burst.jpg',
+  'assets/images/illyra/mirage_overload.jpg',
   'assets/images/oraclus/idle.jpg',
   'assets/images/oraclus/rune_strike.jpg',
   'assets/images/oraclus/rune_strong_strike.jpg',

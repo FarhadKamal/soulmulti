@@ -727,6 +727,28 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
       '<span class="poison-bubble poison-bubble--2"></span>';
     tile.appendChild(cloud);
   }
+  if (effects.has('mirageshatter') && !character.isKO) {
+    // Illyra's Mirage Burst detonation: a broken-glass shatter on each
+    // victim, reading as their illusion cracking apart - riffs on Rowan's
+    // mirror-shard shape (same fragment silhouette) but deliberately
+    // RANDOMIZED (angle, size, count) each time it fires, per explicit
+    // request ("random shatter animation"), and recolored to Illyra's own
+    // violet palette rather than Rowan's silvery reflection tone, so the
+    // two never read as the same effect even though they share a shape.
+    const shatter = document.createElement('div');
+    shatter.className = 'mirage-shatter-burst';
+    const shardCount = 5 + Math.floor(Math.random() * 4); // 5-8 shards
+    shatter.innerHTML = Array.from({ length: shardCount }, (_, i) => {
+      const deg = Math.random() * 360;
+      const dist = 32 + Math.random() * 20;
+      const rad = (deg * Math.PI) / 180;
+      const x = Math.round(Math.cos(rad) * dist);
+      const y = Math.round(Math.sin(rad) * dist);
+      const size = 0.7 + Math.random() * 0.6;
+      return `<span class="mirage-shard" style="--shard-x:${x}px; --shard-y:${y}px; --shard-scale:${size.toFixed(2)}; animation-delay:${(i * 0.025).toFixed(3)}s; rotate:${deg.toFixed(0)}deg;"></span>`;
+    }).join('');
+    tile.appendChild(shatter);
+  }
   if (effects.has('mirrorshard') && !character.isKO) {
     // Rowan's Mirror Reflect counter-hit: small glass/mirror shard
     // fragments burst outward from the impact point on the ATTACKER who
@@ -1583,7 +1605,7 @@ const ACTION_LABELS = {
   everbloom: 'Everbloom', threefoldVeil: 'Threefold Veil', cleanSlate: 'Clean Slate',
   piercingWand: 'Piercing Wand', wandMastery: 'Wand Mastery',
   grimStrike: 'Grim Strike', skullCrack: 'Skull Crack', claimKill: 'Claim the Kill',
-  mirageMark: 'Mirage Mark', mirageBurst: 'Mirage Burst',
+  mirageMark: 'Mirage Mark', mirageBurst: 'Mirage Burst', mirageOverload: 'Mirage Overload',
   runeStrike: 'Rune Strike', runeVision: 'Rune Vision', runeVisionTargetPick: 'Rune Vision',
 };
 
@@ -1629,6 +1651,11 @@ function describeLogEntry(entry) {
           `${name(b.targetId)} (${b.stackCount} stack${b.stackCount > 1 ? 's' : ''}${b.amountDealt != null ? `, ${b.amountDealt} dmg` : ''}${b.koTriggered ? ' - KO!' : ''})`
         );
         return `${name(entry.characterId)} used Mirage Burst - detonated ${parts.join(', ')}`;
+      }
+      if (entry.actionId === 'mirageOverload') {
+        const landed = Object.entries(entry.landedOn || {});
+        const parts = landed.map(([tid, count]) => `${name(tid)} (+${count})`);
+        return `${name(entry.characterId)} unleashed Mirage Overload - scattered ${entry.totalStacks} mirage stacks: ${parts.join(', ')}`;
       }
       if (entry.actionId === 'runeVision') {
         if (entry.stage === 1) {

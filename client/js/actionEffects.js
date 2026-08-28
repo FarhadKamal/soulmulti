@@ -39,6 +39,7 @@ const EFFECT_DURATION_MS = {
   shockmark: 650,
   predictionwin: 1100,
   predictionloss: 700,
+  mirageshatter: 600,
 };
 
 // How long the mirror-shard counter-hit effect waits before it even starts,
@@ -320,6 +321,14 @@ export function handleLogEntryForEffects(entry, game) {
       if (!isKO(burst.targetId) && burst.amountDealt > 0) {
         applyHitFlash(burst.targetId, burst.amountDealt);
         addEffect(burst.targetId, 'shake', EFFECT_DURATION_MS.shake);
+        // Broken-glass shatter on each detonated victim - requested
+        // directly ("we can use broken glass random shatter animation on
+        // victim"), reads as the illusion itself cracking apart. Distinct
+        // from the generic hit-flash/shake alone every other attack gets.
+        // Random shard angles/count are rolled fresh in battleScreen.js's
+        // own render (not cached here), so it genuinely looks different
+        // every single detonation rather than reusing one fixed pattern.
+        addEffect(burst.targetId, 'mirageshatter', EFFECT_DURATION_MS.mirageshatter);
       }
     }
     return;

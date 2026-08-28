@@ -429,6 +429,8 @@ export function handleLogEntryForFlash(entry, game) {
       // always set server-side), so the detonation itself always visibly
       // happens even if the target's shield ends up absorbing all of it.
       setFlash(characterId, 'assets/images/illyra/mirage_burst.jpg'); break;
+    case 'mirageOverload':
+      setFlash(characterId, 'assets/images/illyra/mirage_overload.jpg'); break;
     case 'runeStrike':
       // Empowered (3 damage, both prediction wins banked) gets its own
       // more intense flash image, same amountDealt-gated swap the sound/

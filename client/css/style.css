@@ -947,6 +947,43 @@ input {
   100% { transform: rotate(360deg) translateX(22px) rotate(-360deg); opacity: 0.9; }
 }
 
+/* Illyra's Mirage Burst detonation: a broken-glass shatter on each victim,
+   reading as their illusion cracking apart - shares Rowan's mirror-shard
+   fragment silhouette (see .mirror-shard below) but every angle/distance/
+   size is randomized per burst (battleScreen.js), never a fixed pattern,
+   and recolored to Illyra's own deep violet rather than Rowan's silvery
+   reflection tone so the two effects never read as the same move. */
+.mirage-shatter-burst {
+  position: absolute; inset: 0; pointer-events: none; z-index: 6;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden; border-radius: inherit;
+}
+.mirage-shatter-burst::before {
+  content: ''; position: absolute; width: 34%; height: 34%; border-radius: 50%;
+  background: radial-gradient(circle, rgba(230, 200, 255, 0.9) 0%, rgba(142, 91, 196, 0.55) 55%, transparent 78%);
+  opacity: 0;
+  animation: tile-mirage-glint 0.3s ease-out forwards;
+}
+@keyframes tile-mirage-glint {
+  0% { opacity: 0; scale: 0.3; }
+  35% { opacity: 1; scale: 1.25; }
+  100% { opacity: 0; scale: 1.6; }
+}
+.mirage-shard {
+  position: absolute; width: 9px; height: 13px;
+  background: linear-gradient(135deg, rgba(200, 160, 240, 0.95), rgba(94, 44, 138, 0.65));
+  clip-path: polygon(50% 0%, 100% 35%, 78% 100%, 15% 85%, 0% 30%);
+  filter: drop-shadow(0 0 3px rgba(142, 91, 196, 0.85));
+  opacity: 0;
+  --shatter-scale: var(--shard-scale, 1);
+  animation: tile-mirage-shard-fly 0.5s ease-out forwards;
+}
+@keyframes tile-mirage-shard-fly {
+  0% { opacity: 0; translate: 0 0; scale: calc(var(--shatter-scale) * 0.4); }
+  20% { opacity: 1; scale: var(--shatter-scale); }
+  100% { opacity: 0; translate: var(--shard-x) var(--shard-y); scale: calc(var(--shatter-scale) * 0.5); }
+}
+
 /* Rowan's Mirror Reflect counter-hit: small glass/mirror shard fragments
    burst outward from the impact point on the attacker, silver/violet
    tinted (reflection language, distinct from Kaelis's grey stone cracks
