@@ -222,24 +222,12 @@ function renderEntryForm() {
   joinSection.appendChild(joinBtn);
   form.appendChild(joinSection);
 
-  const botShowSection = document.createElement('div');
-  botShowSection.className = 'bot-show-section';
-  const botShowTitle = document.createElement('h2');
-  botShowTitle.textContent = 'Watch bots play';
-  botShowSection.appendChild(botShowTitle);
-  const botShowBtn = document.createElement('button');
-  botShowBtn.textContent = 'Start Watching (Random 4)';
-  botShowBtn.onclick = () => send('create-bot-show-room', { name: currentName() });
-  nameRequiredButtons.push(botShowBtn); // reuses the same name-required disable wiring as the training grid
-  botShowSection.appendChild(botShowBtn);
-  form.appendChild(botShowSection);
-
-  // The standalone "Watch bots play (your picks)" custom-4-character
-  // screen was removed (confirmed ruling) - the owner can now get the same
-  // all-bot spectacle from within a normal room via the "Make All Bots"
-  // action (see renderRoomLobby/handleFillAllBots in index.js) instead of
-  // a separate pre-room flow. Only the simple random-draw "Start Watching"
-  // button above remains.
+  // Both the random-draw "Watch bots play" button AND the custom-pick
+  // variant were removed from the entry screen (confirmed ruling) - the
+  // owner can now get the same all-bot spectacle from within a normal
+  // room via the "Make All Bots" action (see renderRoomLobby/
+  // handleFillAllBots in index.js) instead of a separate pre-room flow,
+  // and Guests can watch/chat there too, unlike the old standalone rooms.
 
   updateNameValidity();
   return form;
