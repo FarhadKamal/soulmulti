@@ -81,8 +81,26 @@ const ARBITRATION_WINDOW_MS = 300;
 let windowStartedAt = 0;
 let windowWinnerPriority = -1;
 
+// Tharox's Earthshatter line gets a much longer EXCLUSIVE hold than the
+// normal 300ms same-broadcast arbitration window - confirmed ruling: while
+// it's playing, no other character's voice should play at all, not even a
+// same-or-higher-priority one from a later, unrelated broadcast (e.g. the
+// next player's own move-voice on their following turn). The normal
+// ARBITRATION_WINDOW_MS is sized for genuinely simultaneous same-broadcast
+// collisions (an attack landing + a KO + the next idle, all within ~300ms
+// of each other) - Earthshatter's own clip runs ~2.7s, well past that
+// window, so without this it would get talked over by whoever acts next.
+// koed/rebirth are still allowed through even during the lock (matches the
+// existing "biggest/rarest moments are never drowned out" reasoning behind
+// PRIORITY itself) - only lower-priority categories are held back.
+const EARTHSHATTER_VOICE_LOCK_MS = 2700;
+let voiceLockUntil = 0;
+
 function playVoiceFile(characterId, line, priority) {
   const now = Date.now();
+  if (now < voiceLockUntil && priority < PRIORITY.rebirth) {
+    return; // Earthshatter's exclusive hold is still active - dropped
+  }
   if (now - windowStartedAt > ARBITRATION_WINDOW_MS) {
     // Previous window has fully elapsed - this is a genuinely new moment,
     // starts its own fresh window regardless of priority.
@@ -97,6 +115,13 @@ function playVoiceFile(characterId, line, priority) {
     windowWinnerPriority = priority;
   } else {
     return; // outranked by something already claimed in this window - drop it
+  }
+  // Starting Earthshatter's own line claims the exclusive hold from this
+  // moment - checked by characterId+line rather than a dedicated flag
+  // passed down from playMoveVoice, so the lock only ever engages for the
+  // real thing, not any other 'move' line that happens to win arbitration.
+  if (characterId === 'tharox' && line === ACTION_VOICE_LINES.tharox?.earthshatter) {
+    voiceLockUntil = now + EARTHSHATTER_VOICE_LOCK_MS;
   }
   playRawVoiceFile(characterId, line);
 }

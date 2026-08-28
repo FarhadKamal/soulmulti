@@ -89,12 +89,34 @@ export function stopMusic() {
   }
 }
 
+// Tharox's Earthshatter sound effect gets an exclusive hold on this whole
+// layer - confirmed ruling: while it's playing, no other sound effect
+// should play at all, not even one from an unrelated later action (the
+// next player's own move sound, a dodge, etc.). Sound effects normally
+// have zero exclusivity at all (every playSound() call just clones and
+// plays freely, layering on top of whatever else is already going - fine
+// for short, ordinary hits, but wrong for this one deliberately climactic
+// moment). earthshatter.mp3 runs ~5.2s - the lock is sized to its own real
+// duration, same reasoning as EARTHSHATTER_VOICE_LOCK_MS in voice.js for
+// the voice layer.
+const EARTHSHATTER_SOUND_LOCK_MS = 5200;
+// game-over/rebirth are exempt from the lock, same "biggest/rarest
+// moments are never drowned out" reasoning voice.js's koed/rebirth
+// exemption already uses for the voice layer - a KO or a revival landing
+// mid-Earthshatter shouldn't go silent just because he happened to cast it
+// first.
+const SOUND_LOCK_EXEMPT = new Set(['earthshatter', 'game-over', 'rebirth']);
+let soundLockUntil = 0;
+
 export function playSound(name) {
+  const now = Date.now();
+  if (now < soundLockUntil && !SOUND_LOCK_EXEMPT.has(name)) return;
   try {
     const base = get(name);
     const node = base.cloneNode();
     node.volume = 0.6;
     node.play().catch(() => {});
+    if (name === 'earthshatter') soundLockUntil = now + EARTHSHATTER_SOUND_LOCK_MS;
   } catch {
     // ignore
   }
