@@ -1101,13 +1101,15 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
 // unlike the timed action-flash portraits/tile effects above.
 function statusBadges(character) {
   const badges = [];
-  // Boingo and Tharox both get their own dedicated "N/2" badge below
-  // instead of the generic one - each has 2 uses of their signature move
-  // per match (jesterBallsUsed / glorySmashesUsed), and usedSpecial only
-  // flips true once BOTH are spent, so the generic badge alone would only
-  // ever announce "fully out," never show a use still in reserve after
-  // spending just one.
-  if (character.usedSpecial && character.id !== 'boingo' && character.id !== 'tharox') badges.push({ text: 'Special used', cls: 'warn' });
+  // Tharox gets his own dedicated "N/2" badge below instead of the generic
+  // one - Glory Smash is good for 2 casts per match (glorySmashesUsed),
+  // and usedSpecial only flips true once BOTH are spent, so the generic
+  // badge alone would only ever announce "fully out," never show a use
+  // still in reserve after spending just one. Boingo's Jester Ball is back
+  // to 1 throw per match (reverted from an earlier 2-throw buff), so the
+  // generic badge below is accurate for him again - no dedicated case
+  // needed.
+  if (character.usedSpecial && character.id !== 'tharox') badges.push({ text: 'Special used', cls: 'warn' });
   switch (character.id) {
     case 'chronox':
       badges.push({ text: `Rewind: ${character.special.rewindUsesRemaining}/2` });
@@ -1181,9 +1183,6 @@ function statusBadges(character) {
       if (character.special.cleanSlateImmuneTurnsRemaining > 0) {
         badges.push({ text: `🕯️ ${character.special.cleanSlateImmuneTurnsRemaining}`, cls: 'warn', title: 'Clean Slate immunity - turns remaining' });
       }
-      break;
-    case 'boingo':
-      badges.push({ text: `Jester Ball: ${character.special.jesterBallsUsed}/2` });
       break;
     case 'grimtal': {
       // Skull Crack: 3 total casts per match - shown as REMAINING/3 (not
