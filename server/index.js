@@ -1735,6 +1735,12 @@ function handleJesterBallChoice(room, sessionId, { characterId, choice, targetId
   // he's the one who gets a checkpoint heal / eventual big payoff from the
   // ball, not a generic stalling tool for anyone else.
   if (choice === 'keep' && characterId !== 'boingo') return;
+  // Take is never legal for Boingo - it would explode his own ball on
+  // himself for a flat -4 with no benefit at all (see resolveExplosion's
+  // sourceCharacterId/targetCharacterId both resolving to him). The client
+  // never shows this button to him (battleScreen.js), but a real gate here
+  // too since the server is the sole authority on legal choices.
+  if (choice === 'take' && characterId === 'boingo') return;
   finishJesterBall(room.game, choice, targetId);
   // Draxus's Deathless Fury bonus turn, forfeited: resolving the ball -
   // Take OR Pass, either one - consumes his ENTIRE bonus turn per spec.

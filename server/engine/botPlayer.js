@@ -1599,16 +1599,17 @@ export function chooseBotJesterBallMove(character, game) {
 export function chooseBotBoingoJesterBallMove(character, game) {
   const jb = game.jesterBall;
   const canPass = jb.passCount < MAX_JESTER_BALL_PASSES;
-  // Reaching the pass cap while it's sitting on Boingo IS the good ending
-  // (+4, see boingo.js) - but that can only happen via a Pass landing
-  // exactly on the cap, never via Keep (which never increments passCount
-  // at all) or Take (which always explodes on himself for -4, clearly
-  // worse than a 1-in-N chance at the cap). With passCount already at the
-  // max legal value going into this decision (canPass false), there's
-  // nothing left to do but Take - matches every other character's own
-  // "otherwise Take" fallback.
+  // Take is NEVER a sensible choice for Boingo - it explodes his own ball
+  // on himself for a flat -4 with no benefit (see resolveExplosion's
+  // sourceCharacterId/targetCharacterId both resolving to him; confirmed
+  // live report - the UI shouldn't even offer him this button, and the
+  // bot must never choose it either). In practice canPass should always be
+  // true here anyway - reaching the pass cap auto-resolves entirely inside
+  // pass.execute() itself (boingo.js), tearing down game.jesterBall before
+  // this function would ever be asked to decide again - but Keep as a
+  // defensive fallback instead of Take either way, never self-harm.
   if (!canPass) {
-    return { choice: 'take' };
+    return { choice: 'keep' };
   }
   // Deliberately keep it more often than not while healthy - it's free
   // tempo/board presence (an opponent still has to deal with a live ball

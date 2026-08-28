@@ -1466,10 +1466,19 @@ function renderJesterBallPrompt(game, characterId, armedAction, state) {
   const btnRow = document.createElement('div');
   btnRow.className = 'action-btn-row';
 
-  const takeBtn = document.createElement('button');
-  takeBtn.textContent = 'Take it (-4 hearts)';
-  takeBtn.onclick = () => send('jester-ball-choice', { characterId, choice: 'take' });
-  btnRow.appendChild(takeBtn);
+  // Take deals its 4 damage to WHOEVER'S HOLDING IT - for Boingo that
+  // would mean exploding his own ball on himself for a flat -4 with zero
+  // upside, since he's the one whose whole special is built around this
+  // ball being GOOD for him. Genuinely never a sensible choice for him
+  // (Keep/Pass both strictly beat it), so the button is hidden entirely
+  // rather than just being a trap option - confirmed live report ("why is
+  // this showing on boingo").
+  if (characterId !== 'boingo') {
+    const takeBtn = document.createElement('button');
+    takeBtn.textContent = 'Take it (-4 hearts)';
+    takeBtn.onclick = () => send('jester-ball-choice', { characterId, choice: 'take' });
+    btnRow.appendChild(takeBtn);
+  }
 
   // Boingo's exclusive third option (see boingo.js's jesterBallResolution.
   // keep / index.js's handleJesterBallChoice gate) - sit on the ball this
