@@ -8,6 +8,13 @@ import { v } from './assetVersion.js';
 
 const FLASH_DURATION_MS = 1600;
 
+// Tharox's Earthshatter portrait stays up much longer than the normal
+// 1600ms every other flash uses - confirmed ruling: the image shouldn't
+// revert back to idle while the ground-shattering sound effect (~5.2s, see
+// sound.js's EARTHSHATTER_SOUND_LOCK_MS) is still playing out. 4.5s rather
+// than the sound's own full length, per explicit choice.
+const EARTHSHATTER_FLASH_DURATION_MS = 4500;
+
 // Grimtal's power.jpg follow-up: fires AFTER his own strike flash has fully
 // finished playing (not simultaneously), same "let the first beat read
 // before the second starts" sequencing Rowan's mirror-shard effect uses
@@ -325,7 +332,7 @@ export function handleLogEntryForFlash(entry, game) {
     case 'glorySmash':
       setFlash(characterId, 'assets/images/tharox/glory.jpg'); break;
     case 'earthshatter':
-      setFlash(characterId, 'assets/images/tharox/final.jpg'); break;
+      setFlash(characterId, 'assets/images/tharox/final.jpg', EARTHSHATTER_FLASH_DURATION_MS); break;
     case 'titanToss':
       setFlash(characterId, 'assets/images/tharox/toss.jpg'); break;
     case 'smash': case 'titanSmash':
