@@ -189,6 +189,17 @@ export const jesterBallResolution = {
         return;
       }
       game.jesterBall.holderCharacterId = newHolderCharacterId;
+      // The pass itself (the action) is logged BEFORE any consequence of
+      // where it landed (checkpoint reward, final reward, or an explosion)
+      // - confirmed live report: the reward line was appearing ABOVE "X
+      // passed the ball to Y" in the match log, reading backwards ("he got
+      // the reward" before "the ball even arrived"). Every one of this
+      // pass's own possible follow-up entries (checkpoint-heal below, or
+      // the final-landing/explosion branch further down) now pushes AFTER
+      // this line instead of before it.
+      if (!isFinalPass) {
+        log.push({ type: 'jester-ball-pass', fromCharacterId, toCharacterId: newHolderCharacterId });
+      }
       if (!isFinalPass && (boingoCheckpointHeal > 0 || boingoCheckpointShield > 0 || (newHolderCharacterId === game.jesterBall.thrownByCharacterId && boingoWasKO))) {
         log.push({ type: 'jester-ball-checkpoint-heal', boingoId: newHolderCharacterId, healed: boingoCheckpointHeal, shielded: boingoCheckpointShield, wasKO: boingoWasKO });
       }
@@ -196,7 +207,9 @@ export const jesterBallResolution = {
       // outcome: Boingo gets the full +4 worth of reward (heal, or shield
       // for whatever part overflows past max hearts - same
       // applyBoingoBallReward helper as the checkpoint case), anyone else
-      // explodes for the normal 4 damage.
+      // explodes for the normal 4 damage. No separate jester-ball-pass
+      // entry for this one - the return/explosion entry itself already
+      // names both the ball's arrival and its outcome in one line.
       if (isFinalPass) {
         if (newHolderCharacterId === game.jesterBall.thrownByCharacterId) {
           const wasKO = game.characters[newHolderCharacterId]?.isKO ?? false;
@@ -208,7 +221,6 @@ export const jesterBallResolution = {
         resolveExplosion(game, log, newHolderCharacterId);
         return;
       }
-      log.push({ type: 'jester-ball-pass', fromCharacterId, toCharacterId: newHolderCharacterId });
     },
   },
   // Boingo-only third option (see index.js's handleJesterBallChoice, which
