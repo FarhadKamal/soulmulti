@@ -1333,14 +1333,37 @@ function handleAbandonMatch(room, sessionId) {
   broadcastLobby(room);
 }
 
+// Ownership handoff target when the current owner leaves for good - prefers
+// the next SEATED human (matches original behavior: someone actively
+// playing is the more natural next owner), but falls back to the
+// earliest-joined Guest rather than null if every seat is a bot (fully
+// reachable now that Make All Bots exists - previously ownership would
+// silently go to nobody even with real people still in the room watching).
+function pickNextOwner(room) {
+  const nextHuman = room.seats.find((s) => s.kind === 'human');
+  if (nextHuman) return nextHuman.playerId;
+  const nextGuest = room.spectatorIds.values().next();
+  return nextGuest.done ? null : nextGuest.value;
+}
+
+// True if ANYONE - a seated human OR a Guest - is still actually present
+// in the room. Room teardown/ownerId-null decisions must consider Guests
+// too now that a room can be fully bot-seated (Make All Bots) while real
+// people keep watching/chatting - checking seats alone (the original
+// behavior) would wrongly tear down or orphan a room that still has real
+// occupants, just none of them currently seated.
+function anyoneStillInRoom(room) {
+  return room.seats.some((s) => s.kind === 'human') || room.spectatorIds.size > 0;
+}
+
 // Permanent bot takeover of a seat that's done for good - no more
 // reconnecting back into it (spectatorId/reconnectToken both cleared, unlike
 // a turn-timeout which keeps spectatorId so the original human can keep
 // watching). Shared by: a deliberate "Exit Room"/disconnect with no active
 // grace period (leaveRoom's mid-match branch below), and a disconnect grace
 // period (see ws.on('close')) that expired with nobody reclaiming the seat.
-// Returns the room to a clean state (ownership handoff, room deletion if no
-// humans remain) exactly as leaveRoom always has.
+// Returns the room to a clean state (ownership handoff, room deletion only
+// if truly nobody - seated or Guest - is left) exactly as leaveRoom always has.
 function permanentlyConvertSeatToBot(room, seat, wasOwner) {
   seat.kind = 'bot';
   seat.playerId = null;
@@ -1349,12 +1372,8 @@ function permanentlyConvertSeatToBot(room, seat, wasOwner) {
   if (seat.disconnectTimer) clearTimeout(seat.disconnectTimer);
   seat.disconnectTimer = null;
   seat.disconnectDeadline = null;
-  if (wasOwner) {
-    const nextHuman = room.seats.find((s) => s.kind === 'human');
-    room.ownerId = nextHuman ? nextHuman.playerId : null;
-  }
-  const anyHumanLeft = room.seats.some((s) => s.kind === 'human');
-  if (!anyHumanLeft) {
+  if (wasOwner) room.ownerId = pickNextOwner(room);
+  if (!anyoneStillInRoom(room)) {
     clearTurnTimer(room);
     deleteRoom(room.code);
     return;
@@ -1413,11 +1432,8 @@ function leaveRoom(sessionId, ws) {
     seat.spectatorId = null;
     seat.name = null;
     seat.characterIds = [];
-    if (room.ownerId === sessionId) {
-      const nextHuman = room.seats.find((s) => s.kind === 'human');
-      room.ownerId = nextHuman ? nextHuman.playerId : null;
-      if (!room.ownerId) return deleteRoom(room.code);
-    }
+    if (room.ownerId === sessionId) room.ownerId = pickNextOwner(room);
+    if (!anyoneStillInRoom(room)) return deleteRoom(room.code);
     broadcastLobby(room);
     return;
   }
