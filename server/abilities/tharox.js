@@ -121,6 +121,14 @@ export const actions = {
           // points that happened to land on her, same gap Mirage Burst had
           // before it was fixed.
           ignoresUntargetable: true,
+          // Confirmed ruling: also bypasses every dodge mechanic in the
+          // game (Akyros, Marin's Threefold Veil, Grimtal, Illyra's own
+          // passive) - one flag gates all four (see damagePipeline.js).
+          // Same reasoning as ignoresUntargetable above and as Mirage
+          // Burst's own ignoresDodge - the points are already committed by
+          // the moment of casting, not a fresh attack any of them could
+          // still evade.
+          ignoresDodge: true,
         });
         hits.push({ targetId: tid, ...result });
       }
