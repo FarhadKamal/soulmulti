@@ -1386,6 +1386,7 @@ function leaveRoom(sessionId, ws) {
   // the same anyoneStillInRoom check every other "did the last human
   // leave" path uses, not the unconditional bots4-only rule above.
   if (room.spectatorIds.has(sessionId)) {
+    const wasOwner = room.ownerId === sessionId;
     room.spectatorIds.delete(sessionId);
     room.guestNames.delete(sessionId);
     room.reseatCooldowns.delete(sessionId);
@@ -1394,6 +1395,16 @@ function leaveRoom(sessionId, ws) {
       clearTurnTimer(room);
       deleteRoom(room.code);
     } else {
+      // Confirmed live bug: a Guest-owner leaving (e.g. the original owner
+      // watching a room they made all-bot, per Make All Bots) never
+      // handed ownership off at all - room.ownerId kept pointing at the
+      // departed session forever, leaving the remaining Guest(s) with NO
+      // owner controls (no Return to Lobby, no Fill Bot, nothing) for the
+      // rest of that room's life. Every OTHER "owner leaves" path
+      // (seated-human leave/disconnect below, and the lobby-phase branch
+      // further down) already calls pickNextOwner - this branch was the
+      // one place that didn't.
+      if (wasOwner) room.ownerId = pickNextOwner(room);
       broadcastLobby(room);
     }
     return;
