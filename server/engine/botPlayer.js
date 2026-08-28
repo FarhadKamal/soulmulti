@@ -1527,19 +1527,21 @@ function zerathysBallComboTarget(character, game) {
 }
 
 // Jester Ball resolution for a PC holder. Returns 'pass' | 'take' and, for
-// 'pass', the chosen new holder's character id - there is no separate
-// 'return_' choice anymore (passing TO Boingo is just a pass target that
-// happens to heal him and end the ball - see boingo.js's
-// jesterBallResolution.pass). A 5th pass that doesn't land on Boingo
-// auto-resolves as an explosion on the receiver regardless of what the
-// bot "intended" - bots don't need special awareness of that, since
-// passCount === 5 only ever comes up as the LAST legal pass anyway
-// (isLegal already gates passCount < 5, so this function is never even
-// asked to choose once 5 real passes have already happened).
+// 'pass', the chosen new holder's character id. Landing on Boingo mid-
+// sequence is no longer a free "return and end it" outcome (confirmed
+// ruling, reworked alongside the pass-cap raise below) - it's now just a
+// small +1 checkpoint heal for him, and the ball keeps going. Only the
+// FINAL pass (reaching MAX_JESTER_BALL_PASSES) decides the big outcome:
+// +4 to Boingo, or an explosion on whoever else it lands on. Bots don't
+// need special awareness of exactly which pass is the last one - that's
+// handled entirely server-side once passCount reaches the cap, regardless
+// of what any individual bot "intended" when passing.
+const MAX_JESTER_BALL_PASSES = 10;
+
 export function chooseBotJesterBallMove(character, game) {
   const jb = game.jesterBall;
   const boingo = game.characters[jb.thrownByCharacterId];
-  const canPass = jb.passCount < 5;
+  const canPass = jb.passCount < MAX_JESTER_BALL_PASSES;
   // Zerathys-specific: deliberately Take the ball to set up an immediate
   // Soul Swap combo (see zerathysBallComboTarget) - this is a bigger tempo
   // swing than relocating the ball via Pass, so it takes priority whenever
@@ -1553,9 +1555,10 @@ export function chooseBotJesterBallMove(character, game) {
   // Passing it onto an enemy is the best outcome when available - it moves
   // the eventual -4 (or the whole decision) onto whoever's the biggest
   // threat instead of eating it themselves. Takes priority over passing to
-  // Boingo (see below) - denying an enemy team's heal, or advancing the
-  // ball toward a real target, both beat a "free" pass-to-ally-Boingo heal
-  // when a genuine enemy target is available.
+  // Boingo (see below) - a mid-sequence pass to Boingo is now only worth a
+  // small +1 checkpoint heal to him (not the old free +4-and-done), so
+  // advancing the ball toward a real enemy target clearly beats it
+  // whenever one's available.
   if (canPass) {
     const candidates = livingEnemies(game, character).filter((c) => c.id !== character.id);
     if (candidates.length > 0) {
@@ -1564,25 +1567,72 @@ export function chooseBotJesterBallMove(character, game) {
       if (targetId) return { choice: 'pass', targetId };
     }
   }
-  // Passing to Boingo is free for the holder (no self-damage) - the only
-  // downside is that it always heals him +4, which is bad when he's an
-  // enemy. When he's a living teammate (or this character IS Boingo), that
-  // downside doesn't exist, so passing to him is a clear win. There's no
-  // one to heal if he's already KO'd, in which case it isn't a real choice
-  // either - falls through to Take for consistency.
+  // No enemy candidate available (e.g. everyone else is KO'd or a
+  // teammate) - passing to Boingo mid-sequence is still free for the
+  // holder (no self-damage either way) and either grants him a small +1
+  // checkpoint heal (ally/self) or, if he's an enemy, denies the holder
+  // nothing extra by doing it anyway since Take costs -4 regardless. Only
+  // meaningfully bad when Boingo's an enemy AND the holder could otherwise
+  // survive a Take comfortably - handled by the low-hearts fallback below
+  // instead of a flat exclusion, matching the previous reasoning's spirit
+  // now that the stakes of passing to him are much lower than before.
   if (canPass && boingo && !boingo.isKO && boingo.ownerId === character.ownerId) {
     return { choice: 'pass', targetId: boingo.id };
   }
-  // Boingo's an enemy (FFA, or 2v2 opposing team) - passing to him heals
-  // him for free, Take costs the holder -4. Only when Take would actually
-  // KO the holder is eating the free heal on an enemy Boingo worth it -
-  // staying alive matters more than denying one heal. Any survivable Take,
-  // even down to 1 heart, still denies the enemy that heal, which is
-  // usually worth more than the holder's own comfort - so this is purely a
-  // last resort, not a general low-health caution.
   if (canPass && boingo && !boingo.isKO && character.hearts <= 4) {
     return { choice: 'pass', targetId: boingo.id };
   }
   // Otherwise Take is the only sensible remaining option.
   return { choice: 'take' };
+}
+
+// Boingo's own decision when the ball lands on HIM specifically - he's now
+// a genuine holder like anyone else rather than an automatic end-of-line
+// (confirmed ruling), with an exclusive third option (Keep) nobody else
+// gets. Prioritizes Keep whenever it's genuinely free value: it doesn't
+// consume his turn (he still gets his normal Chaos Gamble/etc. that same
+// turn) and doesn't burn one of the 10 passes, so there's no real cost to
+// sitting on it for a turn UNLESS the match could plausibly end (someone's
+// close to a kill and stalling risks never cashing in the eventual +4) -
+// keeping this simple rather than trying to model that, since Keep is
+// still available again next turn if this one doesn't pan out.
+export function chooseBotBoingoJesterBallMove(character, game) {
+  const jb = game.jesterBall;
+  const canPass = jb.passCount < MAX_JESTER_BALL_PASSES;
+  // Reaching the pass cap while it's sitting on Boingo IS the good ending
+  // (+4, see boingo.js) - but that can only happen via a Pass landing
+  // exactly on the cap, never via Keep (which never increments passCount
+  // at all) or Take (which always explodes on himself for -4, clearly
+  // worse than a 1-in-N chance at the cap). With passCount already at the
+  // max legal value going into this decision (canPass false), there's
+  // nothing left to do but Take - matches every other character's own
+  // "otherwise Take" fallback.
+  if (!canPass) {
+    return { choice: 'take' };
+  }
+  // Deliberately keep it more often than not while healthy - it's free
+  // tempo/board presence (an opponent still has to deal with a live ball
+  // hanging over the match) and racks up nothing lost, but don't loop on
+  // it forever: once he's already comfortably healthy (above half hearts)
+  // and the ball has already paid out a few checkpoint heals this
+  // sequence, passing it back out keeps the game moving rather than
+  // stalling turn after turn for no further benefit. A simple 50/50 avoids
+  // needing to track "how many times has it visited him this chain"
+  // explicitly.
+  if (character.hearts > character.maxHearts / 2 && Math.random() < 0.5) {
+    return { choice: 'keep' };
+  }
+  // Otherwise pass it on toward the biggest remaining enemy threat, same
+  // targeting logic every other holder uses.
+  const candidates = livingEnemies(game, character).filter((c) => c.id !== character.id);
+  if (candidates.length > 0) {
+    const targetId = biggestThreatTarget(game, character, candidates.map((c) => c.id))
+      || lowestHeartsTarget(game, candidates.map((c) => c.id));
+    if (targetId) return { choice: 'pass', targetId };
+  }
+  // No enemy left to target - just keep holding it rather than passing to
+  // a teammate for no benefit (mirrors chooseBotJesterBallMove's own
+  // no-candidate fallback, but Keep instead of a teammate-Boingo pass
+  // since there's no teammate-Boingo case when Boingo himself is holding).
+  return { choice: 'keep' };
 }

@@ -1472,14 +1472,27 @@ function renderJesterBallPrompt(game, characterId, armedAction, state) {
   takeBtn.onclick = () => send('jester-ball-choice', { characterId, choice: 'take' });
   btnRow.appendChild(takeBtn);
 
-  // Passing is now repeatable up to 5 times (jb.passCount, not the old
-  // one-shot canPass flag) - there's no separate "Return to Boingo" button
-  // anymore, since passing TO Boingo (now a legal target, see below) is
-  // what heals him and ends the ball, same outcome as the old dedicated
+  // Boingo's exclusive third option (see boingo.js's jesterBallResolution.
+  // keep / index.js's handleJesterBallChoice gate) - sit on the ball this
+  // turn without resolving it, still taking a normal action too (doesn't
+  // consume his turn, unlike Pass). Only ever shown to him, never to any
+  // other holder.
+  if (characterId === 'boingo') {
+    const keepBtn = document.createElement('button');
+    keepBtn.textContent = 'Keep it for now';
+    keepBtn.onclick = () => send('jester-ball-choice', { characterId, choice: 'keep' });
+    btnRow.appendChild(keepBtn);
+  }
+
+  // Passing is now repeatable up to 10 times (jb.passCount, raised from 5 -
+  // confirmed ruling alongside the Boingo-toll-booth rework) - there's no
+  // separate "Return to Boingo" button anymore, since passing TO Boingo
+  // (now a legal target, see below) is what grants his checkpoint heal (or
+  // the full +4 if it's the final pass), same outcome as the old dedicated
   // Return choice just reached via Pass instead.
-  if (jb.passCount < 5) {
+  if (jb.passCount < 10) {
     const passBtn = document.createElement('button');
-    passBtn.textContent = `Pass to another player (${5 - jb.passCount} left)`;
+    passBtn.textContent = `Pass to another player (${10 - jb.passCount} left)`;
     const holder = game.characters[characterId];
     const validTargetIds = Object.keys(game.characters).filter((id) => {
       if (id === characterId || game.characters[id].isKO) return false;
@@ -1729,6 +1742,10 @@ function describeLogEntry(entry) {
       return `${name(entry.fromCharacterId)} passed the Jester Ball to ${name(entry.toCharacterId)}`;
     case 'jester-ball-return':
       return `Jester Ball returned to ${name(entry.boingoId)}${entry.healed ? ` - healed ${entry.healed}` : ''}`;
+    case 'jester-ball-checkpoint-heal':
+      return `The Jester Ball passes through ${name(entry.boingoId)} - healed ${entry.healed}`;
+    case 'jester-ball-keep':
+      return `${name(entry.boingoId)} holds onto the Jester Ball for now`;
     case 'spell-discovered':
       return entry.spellId
         ? `${name(entry.characterId)} discovered a new spell: ${SPELL_NAMES[entry.spellId] || entry.spellId}!`

@@ -310,6 +310,21 @@ function playLogEntrySound(entry, game) {
     playLaughVoiceIfAlive(entry.boingoId, game);
     return;
   }
+  // The ball passing THROUGH Boingo mid-sequence (not the final landing) -
+  // a smaller, quieter version of the full jester-ball-return beat above:
+  // same coin/chime-style sound reused at lower stakes, no laugh voice
+  // (that's reserved for the genuinely big payoff moments - the full
+  // return or someone else's explosion) since this is just one checkpoint
+  // among potentially several across a single long pass chain.
+  if (entry.type === 'jester-ball-checkpoint-heal') {
+    playCoin();
+    return;
+  }
+  // Boingo choosing to sit on the ball for now - no sound of its own, it's
+  // a quiet non-event (nothing about game state changed at all).
+  if (entry.type === 'jester-ball-keep') {
+    return;
+  }
   if (entry.type === 'jester-ball-take') {
     // Explodes on the holder UNLESS it triggered Blade's Rebirth instead -
     // that case gets its own dedicated 'rebirth' entry right after this

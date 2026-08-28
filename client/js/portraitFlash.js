@@ -237,6 +237,12 @@ export function handleLogEntryForFlash(entry, game) {
     handleLaughing(entry, game);
     return;
   }
+  // The ball passing THROUGH Boingo mid-sequence - same laughing beat as
+  // the full return, just for a smaller checkpoint heal along the way.
+  if (entry.type === 'jester-ball-checkpoint-heal') {
+    handleLaughing(entry, game);
+    return;
+  }
   if (entry.type === 'jester-ball-take') {
     // Explodes on someone OTHER than Boingo - flash the thrower laughing,
     // per the main game's reasoning ("his mischief paid off either way").

@@ -17,7 +17,7 @@ import {
 } from './engine/turnEngine.js';
 import { applyDamage } from './engine/damagePipeline.js';
 import {
-  chooseBotMove, chooseBotJesterBallMove, chooseSoulSwapWrathTarget,
+  chooseBotMove, chooseBotJesterBallMove, chooseBotBoingoJesterBallMove, chooseSoulSwapWrathTarget,
   chooseBotMelyssaPuppetAction, chooseRuneVisionTargetPick,
 } from './engine/botPlayer.js';
 import { settleToNextDecision, finishJesterBall } from './gameFlow.js';
@@ -656,7 +656,13 @@ function stepBotTurn(room) {
   const character = room.game.characters[acting];
   const isBallHolder = room.game.jesterBall && room.game.jesterBall.holderCharacterId === acting;
   if (isBallHolder) {
-    const move = chooseBotJesterBallMove(character, room.game);
+    // Boingo gets his own exclusive Keep option (see boingo.js's
+    // jesterBallResolution.keep / botPlayer.js's
+    // chooseBotBoingoJesterBallMove) - every other holder still resolves
+    // via the normal pass-vs-take chooser.
+    const move = acting === 'boingo'
+      ? chooseBotBoingoJesterBallMove(character, room.game)
+      : chooseBotJesterBallMove(character, room.game);
     finishJesterBall(room.game, move.choice, move.targetId);
     // Draxus's Deathless Fury bonus turn, forfeited: resolving the ball -
     // Take OR Pass, either one - consumes his ENTIRE bonus turn per spec.
@@ -1722,8 +1728,13 @@ function handleJesterBallChoice(room, sessionId, { characterId, choice, targetId
   if (!jb || jb.holderCharacterId !== characterId) return;
   const seat = seatForCharacter(room, characterId);
   if (!seat || seat.playerId !== sessionId) return;
-  if (choice === 'pass' && jb.passCount >= 5) return;
+  if (choice === 'pass' && jb.passCount >= 10) return;
   if (choice === 'pass' && !isJesterBallPassTarget(room.game, characterId, targetId)) return;
+  // Keep is Boingo's exclusive third option (see boingo.js's
+  // jesterBallResolution.keep) - only legal for him specifically, since
+  // he's the one who gets a checkpoint heal / eventual big payoff from the
+  // ball, not a generic stalling tool for anyone else.
+  if (choice === 'keep' && characterId !== 'boingo') return;
   finishJesterBall(room.game, choice, targetId);
   // Draxus's Deathless Fury bonus turn, forfeited: resolving the ball -
   // Take OR Pass, either one - consumes his ENTIRE bonus turn per spec.

@@ -65,24 +65,14 @@ function baseSpecialFor(id) {
     case 'velorya':
       return { lastTargetId: null, hasActedOnce: false, eclipseAttacksSinceCast: 0 };
     case 'boingo':
-      // jesterBallsUsed: gates Jester Ball's own isLegal (boingo.js) - 2
-      // total throws per match instead of the usual 1 (buffed after live
-      // win-rate data showed him as the clear roster outlier at 0/15 wins -
-      // the ball's one real safety valve, being passed back to him for a
-      // free +4 heal, gets rationally denied by every other bot in an FFA
-      // since it's bad for them, leaving Chaos Gamble's real ~34% miss
-      // rate with nothing to fall back on). A second throw doesn't fix
-      // that underlying gap directly, but gives him twice the board
-      // presence/tempo-disruption and twice the chances for the return-
-      // heal to actually land. Deliberately its OWN counter, not reusing
-      // the generic usedSpecial boolean every other character's signature
-      // move shares - usedSpecial is read by name in several places
-      // (Zerathys/Draxus bot-AI banked-special checks, Rowan's Silence
-      // Lock target filter) as a plain "has this character's ONE special
-      // move been used" boolean, and none of those call sites are Boingo-
-      // specific, so overloading it to count to 2 for him alone would
-      // silently break every one of those generic checks the moment he
-      // still has a second throw banked.
+      // jesterBallsUsed: gates Jester Ball's own isLegal (boingo.js) - back
+      // to 1 throw per match (an earlier 2-throw buff was reverted
+      // alongside this rework). Deliberately its OWN counter rather than
+      // reusing the generic usedSpecial boolean, matching every other
+      // multi-flag character's pattern (Chronox's rewindUsesRemaining,
+      // Tharox's glorySmashesUsed) even though it now only ever reaches 1 -
+      // keeps the shape consistent and avoids re-plumbing every call site
+      // that reads jesterBallsUsed directly.
       return { jesterBallsUsed: 0 };
     case 'blade':
       return { streakTargetId: null, streakCount: 0, rebirthUsed: false };

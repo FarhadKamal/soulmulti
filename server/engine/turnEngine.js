@@ -834,7 +834,19 @@ export function resolveJesterBall(game, holderCharacterId, choice, extra) {
     }
     : null;
   const result = res.execute(game, log, extra);
-  if (preSnapshot && game.characters.chronox) {
+  // Only commit the snapshot if the ball resolution actually did something
+  // to Chronox himself (hearts/isKO changed) - same "shield-tap griefing"
+  // two-phase guard buildActionAgainstChronoxRecord/chronoxStateActually
+  // Changed already use for every other action in the game, just applied
+  // here too. Without this, a genuinely harmless outcome while he's the
+  // holder (a Pass that doesn't explode, or the new Keep-adjacent
+  // pass-through cases) would silently overwrite an earlier, genuinely
+  // valuable pending Rewind record with a no-op - confirmed reachable via
+  // direct testing: Chronox takes a real hit from someone else, then later
+  // the ball lands on him and he Passes it onward with zero effect on his
+  // own hearts, and the earlier record was gone.
+  if (preSnapshot && game.characters.chronox
+    && chronoxStateActuallyChanged(game.characters.chronox, preSnapshot.chronoxSnapshot, null, null)) {
     game.characters.chronox.special.lastActionAgainstMe = preSnapshot;
   }
   if (result?.rebirthLogEntry) log.push(result.rebirthLogEntry);

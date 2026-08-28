@@ -199,6 +199,13 @@ export function handleLogEntryForEffects(entry, game) {
     return;
   }
 
+  // Same golden glow, smaller stakes - the ball passing through Boingo
+  // mid-sequence for its +1 checkpoint heal.
+  if (entry.type === 'jester-ball-checkpoint-heal') {
+    if (entry.healed > 0 && !entry.wasKO) addEffect(entry.boingoId, 'divine', EFFECT_DURATION_MS.divine);
+    return;
+  }
+
   // Athena's Curse Strike: a big eye-flash burst on the TARGET the instant
   // the curse takes hold - a scaled-up version of the existing pulsing 👁
   // icon (cursed-mark, style.css) with a radial purple shockwave ring, so

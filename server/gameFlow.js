@@ -147,7 +147,13 @@ export function getActingCharacterId(game) {
 export function finishJesterBall(game, choice, targetId) {
   const holderId = game.jesterBall.holderCharacterId;
   resolveJesterBall(game, holderId, choice, targetId);
-  if (choice !== 'take') {
+  // Take: never consumes the turn (lets the holder still act normally
+  // after taking the explosion damage). Keep (Boingo-only, confirmed
+  // ruling): also never consumes the turn - he's explicitly choosing to
+  // act normally this turn (e.g. Chaos Gamble) while leaving the ball
+  // parked on himself for a later turn, not resolving anything now. Pass
+  // is the only choice that still consumes the whole turn.
+  if (choice !== 'take' && choice !== 'keep') {
     markCharacterActed(game, holderId);
   }
 }
