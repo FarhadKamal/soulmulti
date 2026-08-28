@@ -110,11 +110,28 @@ const GAME_OVER_FREEZE_MS = 1200;
 const GAME_OVER_VICTORY_MS = 3800;
 const BOT_SHOW_GAME_OVER_FREEZE_MS = 2500;
 const BOT_SHOW_GAME_OVER_VICTORY_MS = 6000;
+// Tharox's Earthshatter runs MUCH longer than every other action's flash/
+// sound/voice (4.5s portrait, 5.2s sound effect - see portraitFlash.js's
+// EARTHSHATTER_FLASH_DURATION_MS / sound.js's EARTHSHATTER_SOUND_LOCK_MS).
+// If it happens to be the killing blow, the normal 1200ms freeze was
+// cutting away to the victory screen while Earthshatter's own animation/
+// audio were still very much mid-playback - confirmed live report ("i have
+// seen wining image coming too first"). Matches the longer of its two
+// durations so the freeze genuinely outlasts everything it triggered.
+const EARTHSHATTER_GAME_OVER_FREEZE_MS = 5200;
 function startGameOverSequence(game) {
   if (gameOverSequenceStarted) return;
   gameOverSequenceStarted = true;
   const isBotShow = state.room?.roomType === 'bots4';
-  const freezeMs = isBotShow ? BOT_SHOW_GAME_OVER_FREEZE_MS : GAME_OVER_FREEZE_MS;
+  // finalizeAction (turnEngine.js) always appends an 'end-action' entry as
+  // the very last thing in the log after any action resolves, carrying the
+  // same actionId - if the finishing blow was Earthshatter, hold the
+  // freeze stage long enough for its own effects to fully play out before
+  // cutting to victory art.
+  const wasEarthshatter = game.log[game.log.length - 1]?.actionId === 'earthshatter';
+  const freezeMs = wasEarthshatter
+    ? EARTHSHATTER_GAME_OVER_FREEZE_MS
+    : (isBotShow ? BOT_SHOW_GAME_OVER_FREEZE_MS : GAME_OVER_FREEZE_MS);
   const victoryMs = isBotShow ? BOT_SHOW_GAME_OVER_VICTORY_MS : GAME_OVER_VICTORY_MS;
   state.gameOverStage = 'freeze';
   setTimeout(() => {
