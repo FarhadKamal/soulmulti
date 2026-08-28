@@ -113,6 +113,14 @@ export const actions = {
           sourceCharacterId: character.id,
           targetCharacterId: tid,
           amount,
+          // Confirmed ruling: bypasses untargetable (e.g. Velorya mid-Lunar
+          // Eclipse) same as Illyra's Mirage Burst - a devastating
+          // world-shaking AoE isn't something evasion should be able to
+          // dodge entirely. Without this, applyDamage's own defensive
+          // untargetable re-check would silently zero out any random
+          // points that happened to land on her, same gap Mirage Burst had
+          // before it was fixed.
+          ignoresUntargetable: true,
         });
         hits.push({ targetId: tid, ...result });
       }
