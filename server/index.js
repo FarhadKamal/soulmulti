@@ -1395,21 +1395,25 @@ function leaveRoom(sessionId, ws) {
   // A 'bots4' room's viewer never owns a seat (see rooms.js's
   // spectatorIds) - once they leave/disconnect, nothing is watching a
   // bot-only spectacle anymore, so the whole room is torn down immediately
-  // rather than left running forever for no one (the same tradeoff every
-  // other "all humans leave" case already makes, just via a different check
-  // since there's no human seat here to notice leaving).
+  // rather than left running forever for no one.
   //
   // A real '4p' room's Guest (spectatorIds is now also the general Guest
   // mechanism there, not just bots4's own viewer - see rooms.js's own
-  // comment) must NOT trigger this same teardown - other real human
-  // players can still be actively playing. Only clean up this one Guest's
-  // own entries and let the room carry on.
+  // comment) must NOT trigger that SAME unconditional teardown - other
+  // real human players can still be actively playing. But if this Guest
+  // leaving was the LAST real person in the room at all (every seat
+  // already bot-filled via Make All Bots, no other Guests watching -
+  // confirmed ruling: "if all human left, and only 4 bot playing, then we
+  // can destroy the room"), the room should still be torn down, just via
+  // the same anyoneStillInRoom check every other "did the last human
+  // leave" path uses, not the unconditional bots4-only rule above.
   if (room.spectatorIds.has(sessionId)) {
     room.spectatorIds.delete(sessionId);
     room.guestNames.delete(sessionId);
     room.reseatCooldowns.delete(sessionId);
     if (ws) send(ws, 'left-room', {});
-    if (room.roomType === 'bots4') {
+    if (room.roomType === 'bots4' || !anyoneStillInRoom(room)) {
+      clearTurnTimer(room);
       deleteRoom(room.code);
     } else {
       broadcastLobby(room);
