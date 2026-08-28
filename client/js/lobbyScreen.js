@@ -357,18 +357,28 @@ function renderRoomLobby(room, topControls, rerender) {
     const actions = document.createElement('span');
     actions.className = 'seat-actions';
 
+    // Icon-only seat-action buttons (title attribute carries the label for
+    // hover/accessibility) - a seat can now show up to 3 of these at once
+    // (e.g. an owner-who-is-also-a-Guest sees both their own owner actions
+    // and their own Guest one), and text labels wrapped into a cramped,
+    // hard-to-read mess on a narrow screen even after giving actions their
+    // own row (confirmed live report). Icons take a fraction of the width.
     if (seat.kind === 'empty' && room.youAreOwner) {
       const botBtn = document.createElement('button');
-      botBtn.textContent = 'Fill with Bot';
+      botBtn.className = 'seat-icon-btn';
+      botBtn.title = 'Fill with Bot (random character)';
+      botBtn.textContent = '🎲';
       botBtn.onclick = () => send('fill-bot', { seatIndex: seat.index });
       actions.appendChild(botBtn);
-      // "Choose..." toggles an inline character grid for THIS seat (same
-      // no-popup, inline-expand convention as the kick confirmation above)
-      // rather than a random draw - picking one sends fill-bot-with-character
-      // and collapses the picker; the random "Fill with Bot" button above
-      // stays available for whoever doesn't care which character it gets.
+      // Toggles an inline character grid for THIS seat (same no-popup,
+      // inline-expand convention as the kick confirmation above) rather
+      // than a random draw - picking one sends fill-bot-with-character and
+      // collapses the picker; the random Fill-with-Bot button above stays
+      // available for whoever doesn't care which character it gets.
       const chooseBtn = document.createElement('button');
-      chooseBtn.textContent = choosingBotSeatIndex === seat.index ? 'Choose... ▴' : 'Choose... ▾';
+      chooseBtn.className = 'seat-icon-btn';
+      chooseBtn.title = 'Choose a specific bot character';
+      chooseBtn.textContent = choosingBotSeatIndex === seat.index ? '📋▴' : '📋▾';
       chooseBtn.onclick = () => {
         choosingBotSeatIndex = choosingBotSeatIndex === seat.index ? null : seat.index;
         rerender();
@@ -381,14 +391,17 @@ function renderRoomLobby(room, topControls, rerender) {
     // all short of leaving and rejoining by code from the entry screen.
     if (seat.kind === 'empty' && room.youAreGuest) {
       const takeSeatBtn = document.createElement('button');
-      takeSeatBtn.className = 'take-seat-btn';
-      takeSeatBtn.textContent = 'Take This Seat';
+      takeSeatBtn.className = 'seat-icon-btn take-seat-btn';
+      takeSeatBtn.title = 'Take This Seat';
+      takeSeatBtn.textContent = '🙋';
       takeSeatBtn.onclick = () => send('claim-seat', { seatIndex: seat.index });
       actions.appendChild(takeSeatBtn);
     }
     if (seat.kind === 'bot' && room.youAreOwner) {
       const removeBtn = document.createElement('button');
-      removeBtn.textContent = 'Remove Bot';
+      removeBtn.className = 'seat-icon-btn';
+      removeBtn.title = 'Remove Bot';
+      removeBtn.textContent = '❌';
       removeBtn.onclick = () => send('remove-bot', { seatIndex: seat.index });
       actions.appendChild(removeBtn);
     }
@@ -400,8 +413,9 @@ function renderRoomLobby(room, topControls, rerender) {
     // step back and keep watching" option). Confirmed gap, fixed directly.
     if (seat.kind === 'human' && seat.isMe) {
       const becomeGuestBtn = document.createElement('button');
-      becomeGuestBtn.className = 'become-guest-btn';
-      becomeGuestBtn.textContent = 'Become a Guest';
+      becomeGuestBtn.className = 'seat-icon-btn become-guest-btn';
+      becomeGuestBtn.title = 'Become a Guest (step back and watch)';
+      becomeGuestBtn.textContent = '👋';
       becomeGuestBtn.onclick = () => send('become-guest');
       actions.appendChild(becomeGuestBtn);
     }
@@ -435,8 +449,9 @@ function renderRoomLobby(room, topControls, rerender) {
         actions.appendChild(noBtn);
       } else {
         const kickBtn = document.createElement('button');
-        kickBtn.className = 'kick-btn';
-        kickBtn.textContent = 'Unseat';
+        kickBtn.className = 'seat-icon-btn kick-btn';
+        kickBtn.title = 'Unseat (move to Guest)';
+        kickBtn.textContent = '🔻';
         kickBtn.onclick = () => { confirmingKickSeatIndex = seat.index; rerender(); };
         actions.appendChild(kickBtn);
       }

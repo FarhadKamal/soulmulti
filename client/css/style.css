@@ -116,6 +116,16 @@ input {
 }
 .seat-actions:empty { display: none; }
 .seat-actions button { font-size: 0.85em; padding: 6px 10px; }
+/* Compact square icon buttons (title attribute carries the label for
+   hover/accessibility) - a seat can show up to 3 of these at once, and
+   text labels wrapped into a cramped mess even after giving actions their
+   own row (confirmed live report). Smaller than the top-corner icon
+   buttons (.exit-icon-btn etc., 38px) since several sit side by side
+   inside a compact seat card rather than alone in a page corner. */
+.seat-icon-btn {
+  min-width: 32px; height: 32px; padding: 0 4px; font-size: 1em; line-height: 1;
+  display: flex; align-items: center; justify-content: center; flex: 0 0 auto;
+}
 .seat-reorder-controls { flex: 0 0 auto; display: flex; flex-direction: column; gap: 2px; }
 .seat-reorder-btn {
   width: 26px; height: 20px; padding: 0; font-size: 0.7em; line-height: 1;
