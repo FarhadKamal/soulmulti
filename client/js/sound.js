@@ -107,7 +107,7 @@ const ACTION_SOUND = {
   titanToss: 'toss',
   titanSmash: 'smash',
   glorySmash: 'smash',
-  finalSmash: 'smash',
+  earthshatter: 'earthshatter',
   chargeUp: 'charge',
   thunderWrath: 'thunder',
   soulSwap: 'soulswap',

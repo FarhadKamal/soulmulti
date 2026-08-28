@@ -46,15 +46,18 @@ function baseSpecialFor(id) {
         lockedActionTurnsRemaining: 0,
       };
     case 'tharox':
-      // usedFinalSmash: separate one-time flag from usedSpecial (which
+      // usedEarthshatter: separate one-time flag from usedSpecial (which
       // Glory Smash owns) - the two specials are fully independent, either
-      // can fire once per match regardless of order (confirmed ruling).
-      // finalSmashAvailable: set true the first time Titan Smash lands
-      // (see tharox.js), independent of hasCharge entirely - Final Smash is
-      // a standalone banked one-time option once unlocked, not a same-turn
-      // follow-up, so it doesn't interact with the normal charge state at
-      // all (confirmed ruling: optional, usable on any later turn).
-      return { hasCharge: false, finalSmashAvailable: false, usedFinalSmash: false };
+      // can fire once per match regardless of order. Earthshatter itself
+      // doesn't touch hasCharge at all - its only gate is his own hearts
+      // (see tharox.js's isLegal).
+      // glorySmashesUsed: Glory Smash is now good for 2 casts per match
+      // (confirmed ruling), same "counter instead of a single boolean"
+      // pattern as Boingo's jesterBallsUsed - usedSpecial only flips true
+      // once BOTH are spent (see tharox.js), so this counter is what lets
+      // the UI show "1/2 used, one still in reserve" instead of just a
+      // flat used/unused flag.
+      return { hasCharge: false, usedEarthshatter: false, glorySmashesUsed: 0 };
     case 'zerathys':
       return { chargeCount: 0 };
     case 'akyros':

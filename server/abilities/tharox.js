@@ -1,5 +1,11 @@
 import { applyDamage, applyHeal, applyShield, decayShieldIfDue } from '../engine/damagePipeline.js';
 
+// Total damage points Earthshatter scatters, regardless of alive-count -
+// confirmed ruling: unlike Illyra's Mirage Overload, headcount doesn't
+// matter for Tharox at all (no scaling table) - always 7, split across
+// however many opponents happen to be alive when he casts it.
+const EARTHSHATTER_TOTAL_DAMAGE = 7;
+
 export function onTurnStart(character, game, log) {
   decayShieldIfDue(character);
 }
@@ -40,20 +46,6 @@ export const actions = {
         targetCharacterId: targetId,
         amount: 3,
       });
-      // Unlocks Final Smash (below) the first time this connects, if not
-      // already used - confirmed ruling: it's a banked one-time option from
-      // then on, not a same-turn-only follow-up, and doesn't block/replace
-      // Smash/Toss/a later Titan Smash in the meantime. Deliberately does
-      // NOT touch hasCharge at all (stays false here like before this
-      // feature existed) - finalSmashAvailable is a fully independent flag,
-      // checked only by finalSmash's own isLegal, so the normal combo loop
-      // (Toss -> Titan Smash -> ...) keeps working exactly as it always
-      // has, with Final Smash just sitting available on the side until he
-      // chooses to spend it (which can be many turns and several more
-      // Titan Smashes later).
-      if (!character.special.usedFinalSmash) {
-        character.special.finalSmashAvailable = true;
-      }
       log.push({ type: 'attack', characterId: character.id, actionId: 'titanSmash', targetId, ...result });
       return result;
     },
@@ -62,9 +54,18 @@ export const actions = {
     label: 'Glory Smash',
     needsTarget: true,
     special: true,
-    isLegal: (character) => character.special.hasCharge && !character.usedSpecial,
+    // 2 total casts per match (confirmed ruling, buffed from 1) - same
+    // counter-instead-of-flat-flag pattern as Boingo's jesterBallsUsed.
+    isLegal: (character) => character.special.hasCharge && character.special.glorySmashesUsed < 2,
     execute(character, targetId, game, log) {
-      character.usedSpecial = true;
+      character.special.glorySmashesUsed += 1;
+      // Only flips the shared usedSpecial flag once BOTH casts are spent -
+      // same reasoning as jesterBall's own comment: usedSpecial is read
+      // generically elsewhere as "has this character's signature move been
+      // used at all," and none of those checks are Tharox-aware, so
+      // setting it after just the FIRST cast would wrongly report him as
+      // fully spent while he still has a second Glory Smash banked.
+      if (character.special.glorySmashesUsed >= 2) character.usedSpecial = true;
       // Consumes the current charge and grants a brand-new one.
       const result = applyDamage(game, log, {
         sourceCharacterId: character.id,
@@ -78,33 +79,45 @@ export const actions = {
       return result;
     },
   },
-  // Final Smash: mechanically identical to Glory Smash (2 dmg / +2 self-
-  // heal / +2 decaying shield), but unlocked by landing Titan Smash at
-  // least once rather than gated on holding any particular charge -
-  // confirmed ruling: same numbers, fully independent one-time flag from
-  // Glory Smash (either/both usable in one match, in any order), and
-  // OPTIONAL/standalone once unlocked - he can freely keep using Smash/
-  // Toss/Titan Smash as normal and cash Final Smash in whenever he likes on
-  // any later turn, not forced to use it immediately after the Titan Smash
-  // that unlocked it. needsTarget but no charge requirement at all - it
-  // doesn't consume or interact with hasCharge in either direction.
-  finalSmash: {
-    label: 'Final Smash',
-    needsTarget: true,
+  // Earthshatter: his desperate no-target nuke - one-time use, legal only
+  // while he's still reasonably healthy (hearts >= 3, confirmed ruling -
+  // the inverse gate direction from Illyra's Mirage Overload, which
+  // triggers when SHE'S low). No headcount scaling at all (unlike Mirage
+  // Overload's OVERLOAD_STACKS_BY_ALIVE_COUNT table) - always scatters a
+  // flat EARTHSHATTER_TOTAL_DAMAGE (7) points of damage, one point at a
+  // time, fully independently at random across every currently-alive
+  // OPPONENT (confirmed ruling: never lands on himself). Completely
+  // replaces the old "Final Smash" design (a single-target Glory-Smash
+  // clone unlocked by landing Titan Smash) - no charge interaction, no
+  // self-heal/shield, no relationship to hasCharge/titanSmash at all.
+  earthshatter: {
+    label: 'Earthshatter',
+    needsTarget: false,
     special: true,
-    isLegal: (character) => character.special.finalSmashAvailable && !character.special.usedFinalSmash,
+    isLegal: (character) => character.hearts >= 3 && !character.special.usedEarthshatter,
     execute(character, targetId, game, log) {
-      character.special.usedFinalSmash = true;
-      character.special.finalSmashAvailable = false;
-      const result = applyDamage(game, log, {
-        sourceCharacterId: character.id,
-        targetCharacterId: targetId,
-        amount: 2,
-      });
-      applyHeal(game, character.id, 2);
-      applyShield(game, character.id, 2, { decaying: true });
-      log.push({ type: 'special', characterId: character.id, actionId: 'finalSmash', targetId, ...result });
-      return result;
+      character.special.usedEarthshatter = true;
+      const others = Object.values(game.characters).filter((c) => c.id !== character.id && !c.isKO);
+      const landedOn = {};
+      // Fully independent random assignment per point, same reasoning as
+      // Mirage Overload - deliberately NOT an even/balanced split, a
+      // lopsided or single-target result is normal, not a bug.
+      for (let i = 0; i < EARTHSHATTER_TOTAL_DAMAGE; i++) {
+        if (others.length === 0) break;
+        const target = others[Math.floor(Math.random() * others.length)];
+        landedOn[target.id] = (landedOn[target.id] || 0) + 1;
+      }
+      const hits = [];
+      for (const [tid, amount] of Object.entries(landedOn)) {
+        const result = applyDamage(game, log, {
+          sourceCharacterId: character.id,
+          targetCharacterId: tid,
+          amount,
+        });
+        hits.push({ targetId: tid, ...result });
+      }
+      log.push({ type: 'special', characterId: character.id, actionId: 'earthshatter', hits });
+      return { hits };
     },
   },
 };

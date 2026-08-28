@@ -1101,18 +1101,20 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
 // unlike the timed action-flash portraits/tile effects above.
 function statusBadges(character) {
   const badges = [];
-  // Boingo gets his own dedicated "Jester Ball: N/2" badge below instead of
-  // the generic one - he has 2 throws per match (see state.js's
-  // jesterBallsUsed), and usedSpecial only flips true once BOTH are spent,
-  // so the generic badge alone would only ever announce "fully out," never
-  // show he still has a throw in reserve after using just one.
-  if (character.usedSpecial && character.id !== 'boingo') badges.push({ text: 'Special used', cls: 'warn' });
+  // Boingo and Tharox both get their own dedicated "N/2" badge below
+  // instead of the generic one - each has 2 uses of their signature move
+  // per match (jesterBallsUsed / glorySmashesUsed), and usedSpecial only
+  // flips true once BOTH are spent, so the generic badge alone would only
+  // ever announce "fully out," never show a use still in reserve after
+  // spending just one.
+  if (character.usedSpecial && character.id !== 'boingo' && character.id !== 'tharox') badges.push({ text: 'Special used', cls: 'warn' });
   switch (character.id) {
     case 'chronox':
       badges.push({ text: `Rewind: ${character.special.rewindUsesRemaining}/2` });
       break;
     case 'tharox':
       if (character.special.hasCharge) badges.push({ text: 'Charge ready', cls: 'warn' });
+      badges.push({ text: `Glory Smash: ${character.special.glorySmashesUsed}/2` });
       break;
     case 'zerathys':
       badges.push({ text: `Charge: ${character.special.chargeCount}/2` });
@@ -1590,7 +1592,7 @@ function fallbackCopy(text, onDone) {
 // since action ids are stable, non-secret game data.
 const ACTION_LABELS = {
   cyclonePunch: 'Cyclone Punch', timeFreeze: 'Time Freeze', rewind: 'Rewind',
-  smash: 'Smash', titanToss: 'Titan Toss', titanSmash: 'Titan Smash', glorySmash: 'Glory Smash', finalSmash: 'Final Smash',
+  smash: 'Smash', titanToss: 'Titan Toss', titanSmash: 'Titan Smash', glorySmash: 'Glory Smash', earthshatter: 'Earthshatter',
   chargeUp: 'Charge Up', thunderWrath: 'Thunder Wrath', soulSwap: 'Soul Swap', soulSwapWrath: 'Thunder Wrath (free)',
   hiddenMark: 'Hidden Mark', fatalSlash: 'Fatal Slash', shadowExecution: 'Shadow Execution',
   lunarStrike: 'Lunar Strike', moonstep: 'Moonstep', lunarEclipse: 'Lunar Eclipse',
@@ -1656,6 +1658,20 @@ function describeLogEntry(entry) {
         const landed = Object.entries(entry.landedOn || {});
         const parts = landed.map(([tid, count]) => `${name(tid)} (+${count})`);
         return `${name(entry.characterId)} unleashed Mirage Overload - scattered ${entry.totalStacks} mirage stacks: ${parts.join(', ')}`;
+      }
+      if (entry.actionId === 'earthshatter') {
+        // No single target - scatters a flat 7 damage points randomly
+        // across every alive opponent at once, so list every victim who
+        // actually took a hit (entry.hits is empty only if he somehow cast
+        // this with zero living opponents, though that shouldn't be
+        // reachable in real play).
+        if (!entry.hits || entry.hits.length === 0) {
+          return `${name(entry.characterId)} unleashed Earthshatter - the ground cracked, but no one was left to hit!`;
+        }
+        const parts = entry.hits.map((h) =>
+          `${name(h.targetId)} (${h.amountDealt != null ? `${h.amountDealt} dmg` : '0 dmg'}${h.koTriggered ? ' - KO!' : ''})`
+        );
+        return `${name(entry.characterId)} unleashed Earthshatter - ${parts.join(', ')}`;
       }
       if (entry.actionId === 'runeVision') {
         if (entry.stage === 1) {

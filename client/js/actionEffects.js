@@ -334,6 +334,21 @@ export function handleLogEntryForEffects(entry, game) {
     return;
   }
 
+  if (entry.type === 'special' && entry.actionId === 'earthshatter') {
+    for (const hit of entry.hits || []) {
+      if (!isKO(hit.targetId) && hit.amountDealt > 0) {
+        applyHitFlash(hit.targetId, hit.amountDealt);
+        addEffect(hit.targetId, 'shake', EFFECT_DURATION_MS.shake);
+        // Same big radial shatter Titan Smash/Glory Smash use on a single
+        // target - Earthshatter just fires it on every victim it actually
+        // landed on at once, matching "one overwhelming blow" scaled up to
+        // hit everyone rather than a new bespoke effect.
+        addEffect(hit.targetId, 'bigshatter', EFFECT_DURATION_MS.bigshatter);
+      }
+    }
+    return;
+  }
+
   if (entry.type !== 'attack' && entry.type !== 'special') return;
   const { characterId, actionId, targetId, dodged, amountDealt, streak, flip, outcome, grudgeCount, isNewTarget, wasMarked } = entry;
 
@@ -345,7 +360,7 @@ export function handleLogEntryForEffects(entry, game) {
   // as the main game). Purify heals to full AND cleanses every negative
   // status, so this same golden glow fits doubly well - it already reads
   // as "something good just happened to you."
-  if ((actionId === 'divineRestore' || actionId === 'glorySmash' || actionId === 'finalSmash' || actionId === 'purify') && !isKO(characterId)) {
+  if ((actionId === 'divineRestore' || actionId === 'glorySmash' || actionId === 'purify') && !isKO(characterId)) {
     addEffect(characterId, 'divine', EFFECT_DURATION_MS.divine);
   }
 
@@ -487,7 +502,7 @@ export function handleLogEntryForEffects(entry, game) {
   // single-impact version of Kaelis's scattered crack clusters (same visual
   // family, just scaled up for "one overwhelming blow" instead of an
   // escalating stack) - NOT his plain 'smash', only these two heavy hits.
-  if ((actionId === 'titanSmash' || actionId === 'glorySmash' || actionId === 'finalSmash') && targetId && !dodged && amountDealt > 0) {
+  if ((actionId === 'titanSmash' || actionId === 'glorySmash') && targetId && !dodged && amountDealt > 0) {
     addEffect(targetId, 'shake', EFFECT_DURATION_MS.shake);
     addEffect(targetId, 'bigshatter', EFFECT_DURATION_MS.bigshatter);
   }

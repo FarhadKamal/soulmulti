@@ -324,7 +324,7 @@ export function handleLogEntryForFlash(entry, game) {
       break;
     case 'glorySmash':
       setFlash(characterId, 'assets/images/tharox/glory.jpg'); break;
-    case 'finalSmash':
+    case 'earthshatter':
       setFlash(characterId, 'assets/images/tharox/final.jpg'); break;
     case 'titanToss':
       setFlash(characterId, 'assets/images/tharox/toss.jpg'); break;

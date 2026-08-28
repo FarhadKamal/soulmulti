@@ -616,6 +616,27 @@ function mirageBurstTargetsChronox(game, characterId, actionId) {
   return (caster?.special.mirageMarks?.get('chronox') || 0) > 0;
 }
 
+// Tharox's Earthshatter is also needsTarget: false, but unlike Mirage
+// Burst there's no pre-existing per-target state to check in advance -
+// WHO gets hit is decided by fresh randomness inside execute() itself, so
+// there's no way to know beforehand whether Chronox will be among the
+// victims. Rather than trying to predict it, treat every Earthshatter
+// cast (while Chronox is alive) as a candidate "action against Chronox"
+// unconditionally - this is safe because buildActionAgainstChronoxRecord/
+// chronoxStateActuallyChanged's own two-phase commit (see executeAction)
+// already only actually saves the record if Chronox's own state (or the
+// caster's) demonstrably changed afterward. A cast that happens to miss
+// him entirely just produces a candidate that gets built and then
+// silently discarded post-execute, same as any other 0-effect hit -
+// exactly the "shield-tap griefing" guard this two-phase design already
+// exists for, just reused here for "no-effect-at-all" instead of
+// "fully-absorbed."
+function earthshatterMayTargetChronox(game, characterId, actionId) {
+  if (actionId !== 'earthshatter') return false;
+  const chronoxChar = game.characters.chronox;
+  return !!chronoxChar && !chronoxChar.isKO;
+}
+
 // Oraclus's Rune Vision: checks a pending prediction against the VERY NEXT
 // genuine attack anyone takes (see oraclus.js's runeVision.execute for how
 // the guess itself is stored) - written generically here in turnEngine.js,
@@ -683,7 +704,8 @@ export function resolveOraclusPredictionIfPending(game, log, characterId, action
 }
 
 export function executeAction(game, characterId, actionId, targetId, extra) {
-  const effectiveTargetId = mirageBurstTargetsChronox(game, characterId, actionId) ? 'chronox' : targetId;
+  const effectiveTargetId = (mirageBurstTargetsChronox(game, characterId, actionId) || earthshatterMayTargetChronox(game, characterId, actionId))
+    ? 'chronox' : targetId;
   const candidateRecord = buildActionAgainstChronoxRecord(game, characterId, actionId, effectiveTargetId);
   const character = game.characters[characterId];
   const mod = ABILITY_MODULES[characterId];
