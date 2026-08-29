@@ -1,5 +1,5 @@
 import { cloneGame } from './state.js';
-import { applyDamage, applyHeal, applyShield, isSilenced } from './damagePipeline.js';
+import { applyDamage, applyHeal, applyShield, isSilenced, isFrozenByChronox } from './damagePipeline.js';
 import * as chronox from '../abilities/chronox.js';
 import * as tharox from '../abilities/tharox.js';
 import * as zerathys from '../abilities/zerathys.js';
@@ -71,9 +71,8 @@ export function isValidTarget(game, characterId, actionId, targetId) {
 // live: Melyssa could puppet a still-frozen character during exactly that
 // window, before this check existed.
 function isCurrentlyFrozen(game, targetId) {
-  return Object.values(game.characters).some(
-    (c) => c.id === 'chronox' && !c.isKO && c.special.freezeActive && c.special.freezeTargetId === targetId
-  );
+  const character = game.characters[targetId];
+  return !!character && isFrozenByChronox(character, game);
 }
 
 // Melyssa's Mind Control is the one action in the game allowed to target

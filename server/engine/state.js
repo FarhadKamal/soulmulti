@@ -48,8 +48,10 @@ function baseSpecialFor(id) {
       // frozen group (confirmed ruling: simpler than per-target countdowns)
       // - worldStopsFrozenIds is the Set of character ids who were frozen
       // at cast time, worldStopsSkipsApplied mirrors freezeSkipsApplied's
-      // own 2-round-total shape but ticks once for the whole group
-      // together, not per target.
+      // own countdown shape (see chronox.js's WORLD_STOPS_TOTAL_ROUNDS,
+      // 4 rounds total - confirmed ruling, double Time Freeze's own
+      // duration) but ticks once for the whole group together, not per
+      // target.
       return {
         freezeActive: false, freezeTargetId: null, freezeSkipsApplied: 0, hasActedOnce: false,
         rewindUsesRemaining: 2,

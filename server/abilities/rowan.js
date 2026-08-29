@@ -1,4 +1,10 @@
 import { applyDamage, applyHeal, tryTriggerCleanSlate, tryIllyraDodgeStatus } from '../engine/damagePipeline.js';
+// NOTE: worldStops-aware cleanse lives directly in this file's purify
+// action below (removes Rowan alone from a shared frozen group, same
+// partial-cleanse reasoning as damagePipeline.js's own
+// clearNegativeStatuses for World Stops) rather than importing
+// isFrozenByChronox, since the existing per-status loop here already
+// mutates `c.special` fields directly one at a time.
 
 // The full discoverable spell pool - Arcane Study draws one of whichever
 // aren't in special.discoveredSpells yet, so each ever appears at most once
@@ -105,6 +111,14 @@ export const actions = {
         if (c.special?.freezeActive && c.special.freezeTargetId === character.id) {
           c.special.freezeActive = false;
           c.special.freezeTargetId = null;
+        }
+        // World Stops equivalent - removes Rowan alone from a shared
+        // frozen group without ending it for anyone else still frozen
+        // (confirmed audit gap: this loop previously had zero awareness of
+        // World Stops at all).
+        if (c.special?.worldStopsActive && c.special.worldStopsFrozenIds?.has(character.id)) {
+          c.special.worldStopsFrozenIds.delete(character.id);
+          if (c.special.worldStopsFrozenIds.size === 0) c.special.worldStopsActive = false;
         }
         if (c.special?.marks?.has(character.id)) c.special.marks.delete(character.id);
         if (c.special?.revealedMarks?.has(character.id)) c.special.revealedMarks.delete(character.id);

@@ -1,6 +1,13 @@
 import { applyDamage, isSilenced, tryTriggerCleanSlate, tryIllyraDodgeStatus } from '../engine/damagePipeline.js';
 import { flipCoin } from '../engine/random.js';
 
+// Total rounds World Stops' freeze lasts (confirmed ruling - 4, doubled
+// from an initial 2). Round 1 is applied immediately at cast time
+// (worldStops.execute sets skipNextTurn + worldStopsSkipsApplied = 1);
+// this constant gates the remaining continuation ticks in onTurnStart
+// below, so the group is frozen for this many of their own turns total.
+const WORLD_STOPS_TOTAL_ROUNDS = 4;
+
 export function onTurnStart(character, game, log) {
   // Chrono Guard: shield RESETS to exactly 1 each turn - does not stack.
   // Rowan's Silence Lock suppresses this entirely while active (blocks
@@ -30,14 +37,16 @@ export function onTurnStart(character, game, log) {
     }
   }
 
-  // World Stops: same flat 2-round duration/shape as Time Freeze, but a
-  // single SHARED countdown re-applied to the whole frozen group together
-  // each tick (confirmed ruling) rather than per-target - simpler, and the
-  // group was locked in at cast time (worldStopsFrozenIds), so it's stable
-  // even if someone in the group is later KO'd by something else (the
-  // `!frozen.isKO` guard just skips re-applying to them, no error).
+  // World Stops: flat 4-round duration (confirmed ruling, raised from an
+  // initial 2 - double Time Freeze's own duration, matching the scale of
+  // freezing everyone at once rather than a single target), a single
+  // SHARED countdown re-applied to the whole frozen group together each
+  // tick rather than per-target - simpler, and the group was locked in at
+  // cast time (worldStopsFrozenIds), so it's stable even if someone in the
+  // group is later KO'd by something else (the `!frozen.isKO` guard just
+  // skips re-applying to them, no error).
   if (character.special.worldStopsActive) {
-    if (character.special.worldStopsSkipsApplied < 2) {
+    if (character.special.worldStopsSkipsApplied < WORLD_STOPS_TOTAL_ROUNDS) {
       for (const frozenId of character.special.worldStopsFrozenIds) {
         const frozen = game.characters[frozenId];
         if (frozen && !frozen.isKO) frozen.skipNextTurn = true;

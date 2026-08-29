@@ -17,6 +17,28 @@ export function isSilenced(character, game) {
   );
 }
 
+// True if `character` is currently frozen by EITHER of Chronox's two freeze
+// sources - Time Freeze (single target, freezeActive/freezeTargetId) or
+// World Stops (multiple targets at once, worldStopsActive/
+// worldStopsFrozenIds). Both live on Chronox's own object, not the frozen
+// character's, same as every other "is X affected by Y" check in this file.
+// This is the SINGLE generic check every freeze-aware call site in the
+// codebase should use - confirmed via audit that turnEngine.js's own
+// isCurrentlyFrozen, damagePipeline.js's hasNegativeStatus/
+// clearNegativeStatuses, Blade's Rebirth cleanup, Chronox's own KO cleanup,
+// Rowan's Purify, and botPlayer.js's rowanHasUrgentNegativeStatus ALL only
+// ever checked freezeActive/freezeTargetId, silently missing World Stops
+// entirely - reachable bugs, not hypothetical (e.g. Chronox dying while
+// World Stops is active left every frozen target stuck frozen forever,
+// since nothing else was ever tracking/clearing worldStopsFrozenIds).
+export function isFrozenByChronox(character, game) {
+  const chronox = game.characters.chronox;
+  if (!chronox || chronox.isKO) return false;
+  if (chronox.special.freezeActive && chronox.special.freezeTargetId === character.id) return true;
+  if (chronox.special.worldStopsActive && chronox.special.worldStopsFrozenIds?.has(character.id)) return true;
+  return false;
+}
+
 // True if character currently has any of the 5 genuine debuff-style
 // negative statuses another character has placed on them (Athena's curse,
 // Chronox's freeze, Akyros's Hidden Mark, Rowan's Silence Lock, Grimtal's
@@ -33,12 +55,12 @@ export function isSilenced(character, game) {
 // confirmed scope decision, she's still vulnerable to Rowan's poison same
 // as anyone else.
 export function hasNegativeStatus(character, game) {
+  if (isFrozenByChronox(character, game)) return true;
   return Object.values(game.characters).some((c) => {
     if (c.id === character.id) return false;
     const s = c.special;
     if (!s) return false;
     if (s.curseTargetCharacterId === character.id) return true;
-    if (s.freezeActive && s.freezeTargetId === character.id) return true;
     if (s.marks?.has(character.id)) return true;
     if (s.silenceTargets?.has(character.id)) return true;
     if (s.headacheVictimId === character.id && s.headacheRollPending) return true;
@@ -69,6 +91,18 @@ export function clearNegativeStatuses(character, game, log) {
       s.freezeTargetId = null;
       character.skipNextTurn = false;
       log.push({ type: 'freeze-end', targetCharacterId: character.id });
+    }
+    // World Stops is a SHARED countdown across a whole group - cleansing
+    // just THIS character removes them alone from the frozen set (un-skips
+    // their turn), it does NOT end the freeze for everyone else still in
+    // it. Only clears worldStopsActive entirely if removing this character
+    // happens to empty the set (matches how the natural onTurnStart
+    // countdown already treats "no one left frozen" - see chronox.js).
+    if (s.worldStopsActive && s.worldStopsFrozenIds?.has(character.id)) {
+      s.worldStopsFrozenIds.delete(character.id);
+      character.skipNextTurn = false;
+      if (s.worldStopsFrozenIds.size === 0) s.worldStopsActive = false;
+      log.push({ type: 'world-stops-end', targetCharacterId: character.id });
     }
     if (s.marks?.has(character.id)) s.marks.delete(character.id);
     if (s.revealedMarks?.has(character.id)) s.revealedMarks.delete(character.id);
@@ -185,10 +219,20 @@ export function applyDamage(game, log, {
 
   let amt = amount;
 
+  // Confirmed ruling: a character currently frozen (Time Freeze OR World
+  // Stops - see isFrozenByChronox) cannot use ANY of their own dodge
+  // mechanics against other incoming attacks while frozen - a sitting
+  // target, no exceptions. Computed once and gates all four dodge blocks
+  // below identically. Illyra specifically: her 50% passive is suppressed
+  // the same way while she's frozen, resuming automatically the instant
+  // her own frozen status is lifted (no separate flag needed - this check
+  // is always live against her CURRENT frozen state).
+  const isFrozen = isFrozenByChronox(target, game);
+
   // Akyros Dodge: only applies to direct attacks, never to mirrored damage
   // (confirmed ruling: Athena's curse mirror bypasses Dodge). ignoresDodge
   // (Illyra's Mirage Burst) also bypasses it, same reasoning.
-  if (target.id === 'akyros' && !isMirror && !ignoresDodge) {
+  if (target.id === 'akyros' && !isMirror && !ignoresDodge && !isFrozen) {
     if (!target.special.dodgedAttackerIds.has(sourceCharacterId)) {
       target.special.dodgedAttackerIds.add(sourceCharacterId);
       result.dodged = true;
@@ -203,7 +247,7 @@ export function applyDamage(game, log, {
   // the shared pool regardless of who's attacking, until all 3 are spent
   // (no recharge). Same !isMirror exclusion as Akyros above - a mirrored
   // hit (Athena's curse-mirror) always bypasses dodge.
-  if (target.id === 'marin' && !isMirror && !ignoresDodge && target.special.veilChargesRemaining > 0) {
+  if (target.id === 'marin' && !isMirror && !ignoresDodge && !isFrozen && target.special.veilChargesRemaining > 0) {
     target.special.veilChargesRemaining -= 1;
     result.dodged = true;
     log.push({ type: 'dodge', attackerId: sourceCharacterId, targetCharacterId });
@@ -219,7 +263,7 @@ export function applyDamage(game, log, {
   // since there's then no "earlier hitter" to set the condition up - falls
   // out naturally from the >=1-prior-attacker check, no explicit headcount
   // branch needed. Same !isMirror exclusion as every other dodge above.
-  if (target.id === 'grimtal' && !isMirror && !ignoresDodge) {
+  if (target.id === 'grimtal' && !isMirror && !ignoresDodge && !isFrozen) {
     const cycle = target.special.lastHitByThisCycle;
     if (cycle.size > 0 && !cycle.has(sourceCharacterId)) {
       cycle.add(sourceCharacterId);
@@ -263,8 +307,12 @@ export function applyDamage(game, log, {
   // something her illusion can retroactively avoid, matching how poison
   // already bypasses every other dodge/shield in the game. !ignoresDodge
   // lets her OWN Mirage Burst (and any future ignoresDodge source) bypass
-  // this too, same as it bypasses Akyros/Marin/Grimtal.
-  if (target.id === 'illyra' && !isMirror && !isPoisonTick && !ignoresDodge && Math.random() < 0.5) {
+  // this too, same as it bypasses Akyros/Marin/Grimtal. !isFrozen: while
+  // she's under an active Time Freeze/World Stops, her 50% is suppressed
+  // entirely (confirmed ruling, explicit) - resumes automatically the
+  // instant her own frozen status lifts, no separate tracking needed since
+  // isFrozen is re-derived from her live state on every single hit.
+  if (target.id === 'illyra' && !isMirror && !isPoisonTick && !ignoresDodge && !isFrozen && Math.random() < 0.5) {
     result.dodged = true;
     log.push({ type: 'dodge', attackerId: sourceCharacterId, targetCharacterId });
     return result;
@@ -387,6 +435,18 @@ export function applyDamage(game, log, {
       chronox.special.freezeActive = false;
       chronox.special.freezeTargetId = null;
     }
+    // World Stops equivalent of the Time Freeze cleanup just above - same
+    // reasoning, just removing Blade alone from the shared frozen group
+    // rather than ending the whole thing for everyone else still frozen.
+    const chronoxWorldStops = Object.values(game.characters).find(
+      (c) => c.id === 'chronox' && c.special.worldStopsActive && c.special.worldStopsFrozenIds?.has(target.id)
+    );
+    if (chronoxWorldStops) {
+      chronoxWorldStops.special.worldStopsFrozenIds.delete(target.id);
+      if (chronoxWorldStops.special.worldStopsFrozenIds.size === 0) {
+        chronoxWorldStops.special.worldStopsActive = false;
+      }
+    }
     // Akyros's current Hidden Mark on Blade doesn't survive his death
     // either - he's coming back fresh, so Fatal Slash/Shadow Execution
     // shouldn't still get the marked bonus against him. Only the CURRENT
@@ -484,6 +544,23 @@ export function applyDamage(game, log, {
       target.special.freezeActive = false;
       target.special.freezeTargetId = null;
       log.push({ type: 'freeze-end', targetCharacterId: frozenId });
+    }
+    // Same reasoning for World Stops (confirmed real, reachable gap via
+    // audit - previously nothing cleared this at all, so a Chronox KO'd
+    // mid-World-Stops left every frozen target stuck frozen forever, since
+    // he was the only one whose onTurnStart could ever continue/end it).
+    // Frees the WHOLE group at once, unlike Blade's own Rebirth cleanup
+    // above (which only removes Blade himself from an otherwise-still-live
+    // group) - Chronox dying ends the effect entirely for everyone in it.
+    if (target.id === 'chronox' && target.special.worldStopsActive) {
+      const frozenIds = [...target.special.worldStopsFrozenIds];
+      for (const frozenId of frozenIds) {
+        const frozen = game.characters[frozenId];
+        if (frozen) frozen.skipNextTurn = false;
+      }
+      target.special.worldStopsActive = false;
+      target.special.worldStopsFrozenIds = new Set();
+      log.push({ type: 'world-stops-end', frozenIds });
     }
     // Athena's curse ends the instant she's KO'd - no one left to trigger
     // the mirror going forward (her own isKO guard at the top of this

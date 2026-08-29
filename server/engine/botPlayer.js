@@ -1,6 +1,7 @@
 import {
   getUsableActions, isValidTarget, isValidPuppetTarget, isValidMindControlTarget, isMelyssaLoneDuel, LONE_DUEL_EXCEPTIONS,
 } from './turnEngine.js';
+import { isFrozenByChronox } from './damagePipeline.js';
 
 // Pure decision logic for PC-controlled characters - no DOM, no side
 // effects. Given a character whose turn it is, returns the action+target
@@ -899,12 +900,12 @@ function chooseDraxusMove(character, game, usable) {
 // before it matters how much blood is left" reasoning as any other
 // immediate-threat check in this file.
 function rowanHasUrgentNegativeStatus(game, character) {
+  if (isFrozenByChronox(character, game)) return true;
   return Object.values(game.characters).some((c) => {
     if (c.id === character.id) return false;
     const s = c.special;
     if (!s) return false;
     if (s.curseTargetCharacterId === character.id) return true;
-    if (s.freezeActive && s.freezeTargetId === character.id) return true;
     if (s.poisonTargets?.has(character.id)) return true;
     if (s.silenceTargets?.has(character.id)) return true;
     return false;
