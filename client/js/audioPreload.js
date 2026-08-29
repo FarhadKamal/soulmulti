@@ -40,7 +40,7 @@ const SOUND_EFFECT_FILES = [
   'sword_thud.mp3', 'bullet_hit.mp3', 'head_spin.mp3',
   'illusion.mp3', 'mirage_mark.mp3', 'mirage_burst.mp3', 'mirage_overload.mp3', 'rewind.mp3',
   'rune_strike.mp3', 'rune_strike_strong.mp3', 'predict.mp3', 'correct.mp3', 'wrong.mp3',
-  'earthshatter.mp3',
+  'earthshatter.mp3', 'world_stop.mp3',
 ];
 
 let started = false;

@@ -23,6 +23,14 @@ let musicTrack = null; // 'menu' | 'battle' | null
 
 const BATTLE_TRACKS = ['bgm-battle.mp3', 'bgm-battle-2.mp3', 'bgm-battle-3.mp3'];
 const MENU_TRACKS = ['bgm-menu.mp3', 'bgm-menu-2.mp3', 'bgm-menu-3.mp3'];
+// Tharox's Earthshatter/Boingo's ball etc. don't touch background music at
+// all - Chronox's World Stops is the one exception (confirmed ruling):
+// while every opponent is frozen, the normal battle track is replaced by a
+// dedicated tick-tock ambient track for the duration, reverting to
+// whichever track was actually playing before once the full freeze ends
+// (main.js's 'world-stops-end' handler calls revertFromFrozenMusic).
+const FROZEN_TRACK = 'bgm-frozen.mp3';
+let preFrozenTrack = null; // 'menu' | 'battle' | null - remembers what to restore
 
 // Browsers block audio autoplay until the user has interacted with the
 // page. Two distinct failure modes seen in practice: (1) a play() call
@@ -81,6 +89,34 @@ export function startBattleMusic() {
   startMusic('battle', file, 0.25);
 }
 
+// Chronox's World Stops: swaps in a dedicated tick-tock ambient track for
+// as long as every opponent is frozen. Remembers whichever track was
+// actually playing (menu or battle) so revertFromFrozenMusic can restore
+// the correct one afterward, rather than assuming it was always battle
+// music (a freeze cast mid-victory-sequence or similar edge case could
+// otherwise wrongly force menu music back to battle music).
+export function startFrozenMusic() {
+  if (musicTrack === 'frozen') return;
+  preFrozenTrack = musicTrack;
+  startMusic('frozen', FROZEN_TRACK, 0.28);
+}
+
+export function revertFromFrozenMusic() {
+  if (musicTrack !== 'frozen') return;
+  const restoreTo = preFrozenTrack;
+  preFrozenTrack = null;
+  musicTrack = null; // force startMusic's own "already on this track" guard to actually re-trigger
+  if (restoreTo === 'menu') {
+    startMenuMusic();
+  } else {
+    // Also the safe default for restoreTo === null (frozen music started
+    // before any track had genuinely begun playing yet - shouldn't happen
+    // in practice mid-match, but battle music is the correct fallback
+    // during an active match regardless).
+    startBattleMusic();
+  }
+}
+
 export function stopMusic() {
   if (musicAudio) {
     musicAudio.pause();
@@ -125,6 +161,7 @@ export function playSound(name) {
 const ACTION_SOUND = {
   cyclonePunch: 'cyclonepunch',
   timeFreeze: 'freeze',
+  worldStops: 'world_stop',
   smash: 'smash',
   titanToss: 'toss',
   titanSmash: 'smash',

@@ -131,8 +131,7 @@ export function renderBattle(root, state) {
   // freezeActive check just below, which is inherently already false once
   // he's KO'd (his freeze cleanup runs in that same server-side block).
   const cursedId = athena && !athena.isKO ? athena.special.curseTargetCharacterId : null;
-  const chronox = Object.values(game.characters).find((c) => c.id === 'chronox');
-  const frozenId = chronox && chronox.special.freezeActive ? chronox.special.freezeTargetId : null;
+  const frozenIdsSet = computeFrozenIdsSet(game);
   const puppetHighlightId = state.awaitingMindControlAction ? state.mindControlPuppetId : null;
   // Broader than puppetHighlightId (which only covers the selection-click
   // moment): character.special.controlling is real server state that spans
@@ -207,7 +206,7 @@ export function renderBattle(root, state) {
       isDazed: isDazedFor(character.id),
       mirageMarkCount: mirageMarksFor(character.id),
       isCursed: character.id === cursedId,
-      isFrozenVisual: character.id === frozenId,
+      isFrozenVisual: frozenIdsSet.has(character.id),
       isPuppet: character.id === puppetHighlightId || character.id === activePuppetId,
       isHypnotized: character.id === activePuppetId,
     }));
@@ -396,8 +395,7 @@ function renderFrozenBoard(game, { showVictorious = false } = {}) {
   const ballHolderId = game.jesterBall ? game.jesterBall.holderCharacterId : null;
   const athena = Object.values(game.characters).find((c) => c.id === 'athena');
   const cursedId = athena && !athena.isKO ? athena.special.curseTargetCharacterId : null;
-  const chronox = Object.values(game.characters).find((c) => c.id === 'chronox');
-  const frozenId = chronox && chronox.special.freezeActive ? chronox.special.freezeTargetId : null;
+  const frozenIdsSet = computeFrozenIdsSet(game);
   // Only meaningful during the 'victory' stage AND once a winner actually
   // exists (a draw has no winnerPlayerId, nothing to highlight) - the
   // winning side's own surviving characters get the victory-art swap and
@@ -413,7 +411,7 @@ function renderFrozenBoard(game, { showVictorious = false } = {}) {
       onTargetClick: () => {},
       isHoldingBall: character.id === ballHolderId,
       isCursed: character.id === cursedId,
-      isFrozenVisual: character.id === frozenId,
+      isFrozenVisual: frozenIdsSet.has(character.id),
       isVictorious: !!winner && winner.characterIds.includes(character.id) && !character.isKO,
     }));
   });
@@ -446,6 +444,29 @@ function renderVictoryPortraits(game) {
   });
   container.appendChild(portraitsRow);
   return container;
+}
+
+// Who's genuinely still frozen right now, from EITHER of Chronox's two
+// freeze sources - same "driven off Chronox's ongoing active-flag state,
+// NOT the target's skipNextTurn" reasoning as the main game's
+// characterCard.js frozenCharacterId: skipNextTurn flickers back to false
+// the instant a frozen turn is actually skipped, even though the freeze is
+// still conceptually active until Chronox's own next turn resolves it.
+// Time Freeze (freezeActive/freezeTargetId) is a single target;
+// World Stops (worldStopsActive/worldStopsFrozenIds) can be several at
+// once - both feed the same shared .ice-frozen visual, just from
+// different underlying state shapes.
+function computeFrozenIdsSet(game) {
+  const chronox = Object.values(game.characters).find((c) => c.id === 'chronox');
+  const ids = new Set();
+  if (!chronox) return ids;
+  if (chronox.special.freezeActive && chronox.special.freezeTargetId) {
+    ids.add(chronox.special.freezeTargetId);
+  }
+  if (chronox.special.worldStopsActive) {
+    for (const id of chronox.special.worldStopsFrozenIds || []) ids.add(id);
+  }
+  return ids;
 }
 
 function renderCharacterTile(character, { isActing, isMine, isTargetable, onTargetClick, isHoldingBall, isCursed, isFrozenVisual, isVictorious, isPuppet, isHypnotized, grudgeCount, isPoisoned, silencedTurns, isDazed, mirageMarkCount }) {
@@ -1113,6 +1134,16 @@ function statusBadges(character) {
   switch (character.id) {
     case 'chronox':
       badges.push({ text: `Rewind: ${character.special.rewindUsesRemaining}/2` });
+      // World Stops has its own dedicated usedWorldStops flag (separate
+      // from usedSpecial, which Time Freeze owns) - only surfaced here
+      // while its 2-round effect is actively ongoing (matching the action
+      // button list, not this badge row, being the source of truth for
+      // "is it available to cast right now" - a pre-threshold "ready"
+      // badge would misleadingly imply it's castable before hearts <= 3
+      // actually applies).
+      if (character.special.worldStopsActive) {
+        badges.push({ text: 'World Stops active', cls: 'warn' });
+      }
       break;
     case 'tharox':
       if (character.special.hasCharge) badges.push({ text: 'Charge ready', cls: 'warn' });
@@ -1612,7 +1643,7 @@ function fallbackCopy(text, onDone) {
 // as a client-side lookup rather than plumbed through every log entry,
 // since action ids are stable, non-secret game data.
 const ACTION_LABELS = {
-  cyclonePunch: 'Cyclone Punch', timeFreeze: 'Time Freeze', rewind: 'Rewind',
+  cyclonePunch: 'Cyclone Punch', timeFreeze: 'Time Freeze', rewind: 'Rewind', worldStops: 'World Stops',
   smash: 'Smash', titanToss: 'Titan Toss', titanSmash: 'Titan Smash', glorySmash: 'Glory Smash', earthshatter: 'Earthshatter',
   chargeUp: 'Charge Up', thunderWrath: 'Thunder Wrath', soulSwap: 'Soul Swap', soulSwapWrath: 'Thunder Wrath (free)',
   hiddenMark: 'Hidden Mark', fatalSlash: 'Fatal Slash', shadowExecution: 'Shadow Execution',
@@ -1714,6 +1745,19 @@ function describeLogEntry(entry) {
         }
         return `${name(entry.characterId)} used Rewind - undid ${name(entry.rewoundCasterId)}'s ${actionLabel(entry.rewoundActionId)}!`;
       }
+      if (entry.actionId === 'worldStops') {
+        // No single targetId (freezes everyone at once) - list who actually
+        // got frozen, and separately call out anyone Clean Slate blocked
+        // (the one thing that can still resist it - see chronox.js's
+        // worldStops.isLegal/execute comments).
+        const frozenText = entry.frozenIds.length > 0
+          ? `froze ${entry.frozenIds.map(name).join(', ')}`
+          : 'froze no one';
+        const blockedText = entry.blockedIds && entry.blockedIds.length > 0
+          ? ` (${entry.blockedIds.map(name).join(', ')} blocked by Clean Slate)`
+          : '';
+        return `${name(entry.characterId)} unleashed World Stops - ${frozenText}${blockedText}`;
+      }
       return `${name(entry.characterId)} used their SPECIAL: ${actionLabel(entry.actionId)}${entry.targetId ? ` on ${name(entry.targetId)}` : ''}${entry.blocked ? ' - blocked by Clean Slate!' : ''}`;
     case 'setup':
       if (entry.actionId === 'mirageMark') {
@@ -1742,6 +1786,10 @@ function describeLogEntry(entry) {
       return `Time Freeze continues on ${name(entry.targetCharacterId)}`;
     case 'freeze-end':
       return `Time Freeze ends on ${name(entry.targetCharacterId)}`;
+    case 'world-stops-continue':
+      return `World Stops continues - ${entry.frozenIds.map(name).join(', ')} still frozen`;
+    case 'world-stops-end':
+      return `World Stops ends - time resumes for everyone`;
     case 'eclipse-end':
       return `${name(entry.characterId)}'s Lunar Eclipse ends`;
     case 'jester-ball-take':

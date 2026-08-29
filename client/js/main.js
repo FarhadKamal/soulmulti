@@ -3,7 +3,7 @@ import { renderLobby } from './lobbyScreen.js';
 import { renderBattle } from './battleScreen.js';
 import { addChatMessage, clearChatMessages } from './chatPanel.js';
 import {
-  startMenuMusic, startBattleMusic, stopMusic,
+  startMenuMusic, startBattleMusic, stopMusic, startFrozenMusic, revertFromFrozenMusic,
   playActionSound, playSound, playKO, playVictory, playDodge, playRebirth, playCoin,
 } from './sound.js';
 import { handleLogEntryForFlash, handleDodgeForFlash, checkIdlePortrait, registerFlashRerender, queueGrimtalPowerFlash } from './portraitFlash.js';
@@ -298,6 +298,15 @@ function playLogEntrySound(entry, game) {
     if (entry.koTriggered) setTimeout(() => playKoedFor(entry.toCharacterId, game, entry.fromCharacterId), 200);
     return;
   }
+  // Chronox's World Stops fully ending (both rounds of the freeze complete
+  // for the whole group) - reverts the frozen-world ambient track back to
+  // whichever music was actually playing before the freeze started (see
+  // sound.js's revertFromFrozenMusic). No sound/voice of its own, purely a
+  // music-state transition.
+  if (entry.type === 'world-stops-end') {
+    revertFromFrozenMusic();
+    return;
+  }
   if (entry.type === 'jester-ball-pass') {
     playSound('kick');
     return;
@@ -486,6 +495,16 @@ function playLogEntrySound(entry, game) {
     playSound('rune_strike_strong');
     playMoveVoice('oraclus', 'runeStrikeStrong');
     return;
+  }
+  // Chronox's World Stops: on top of its own generic sound/voice (handled
+  // below like any other action), swaps the background music to a
+  // dedicated frozen-world ambient track for as long as the freeze is
+  // active - reverted by the 'world-stops-end' handler further down once
+  // the full 2-round effect ends. Fires here rather than in the generic
+  // dispatch below since it's the one action in the game with this side
+  // effect.
+  if (entry.actionId === 'worldStops') {
+    startFrozenMusic();
   }
   playActionSound(entry.actionId);
   // Layered on top of the effect sound just played above, never replacing

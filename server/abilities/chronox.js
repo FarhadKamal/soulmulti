@@ -29,6 +29,27 @@ export function onTurnStart(character, game, log) {
       log.push({ type: 'freeze-end', targetCharacterId: frozenId });
     }
   }
+
+  // World Stops: same flat 2-round duration/shape as Time Freeze, but a
+  // single SHARED countdown re-applied to the whole frozen group together
+  // each tick (confirmed ruling) rather than per-target - simpler, and the
+  // group was locked in at cast time (worldStopsFrozenIds), so it's stable
+  // even if someone in the group is later KO'd by something else (the
+  // `!frozen.isKO` guard just skips re-applying to them, no error).
+  if (character.special.worldStopsActive) {
+    if (character.special.worldStopsSkipsApplied < 2) {
+      for (const frozenId of character.special.worldStopsFrozenIds) {
+        const frozen = game.characters[frozenId];
+        if (frozen && !frozen.isKO) frozen.skipNextTurn = true;
+      }
+      character.special.worldStopsSkipsApplied += 1;
+      log.push({ type: 'world-stops-continue', frozenIds: [...character.special.worldStopsFrozenIds] });
+    } else {
+      character.special.worldStopsActive = false;
+      character.special.worldStopsFrozenIds = new Set();
+      log.push({ type: 'world-stops-end' });
+    }
+  }
 }
 
 export const actions = {
@@ -80,6 +101,43 @@ export const actions = {
       if (target) target.skipNextTurn = true;
       log.push({ type: 'special', characterId: character.id, actionId: 'timeFreeze', targetId });
       return { targetCharacterId: targetId };
+    },
+  },
+  // World Stops: his desperate last-stand special (confirmed ruling) -
+  // one-time use, legal only once he's genuinely on the brink (hearts <= 3,
+  // same gate direction as Illyra's Mirage Overload/Tharox's Earthshatter -
+  // NOT the hasActedOnce gate Time Freeze uses). No-target: freezes every
+  // currently-alive opponent at once, same flat 2-round skip shape as Time
+  // Freeze but with one SHARED countdown for the whole group (see
+  // onTurnStart above). Confirmed ruling on resist mechanics: bypasses
+  // dodge (Akyros/Marin's veil/Grimtal/Illyra's passive), untargetable
+  // (Velorya's Lunar Eclipse), AND Illyra's own 50% status-resist - none of
+  // those are checked here at all. The ONE exception that still works
+  // against it is Marin's Clean Slate (confirmed ruling) - she alone can
+  // still block the frozen status on herself.
+  worldStops: {
+    label: 'World Stops',
+    needsTarget: false,
+    special: true,
+    isLegal: (character) => character.hearts <= 3 && !character.special.usedWorldStops,
+    execute(character, targetId, game, log) {
+      character.special.usedWorldStops = true;
+      const opponents = Object.values(game.characters).filter((c) => c.id !== character.id && !c.isKO);
+      const frozenIds = [];
+      const blockedIds = [];
+      for (const opponent of opponents) {
+        if (tryTriggerCleanSlate(opponent, game, log)) {
+          blockedIds.push(opponent.id);
+          continue;
+        }
+        opponent.skipNextTurn = true;
+        frozenIds.push(opponent.id);
+      }
+      character.special.worldStopsActive = frozenIds.length > 0;
+      character.special.worldStopsFrozenIds = new Set(frozenIds);
+      character.special.worldStopsSkipsApplied = 1;
+      log.push({ type: 'special', characterId: character.id, actionId: 'worldStops', frozenIds, blockedIds });
+      return { frozenIds, blockedIds };
     },
   },
   rewind: {

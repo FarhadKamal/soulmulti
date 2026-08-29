@@ -15,6 +15,12 @@ const FLASH_DURATION_MS = 1600;
 // than the sound's own full length, per explicit choice.
 const EARTHSHATTER_FLASH_DURATION_MS = 4500;
 
+// Chronox's World Stops portrait similarly stays up longer than the
+// default flash - sized to roughly match its own voice line (~4.68s) and
+// sound effect (~4.03s, see sound.js's ACTION_SOUND.worldStops) so the
+// image doesn't revert to idle while either is still playing out.
+const WORLD_STOPS_FLASH_DURATION_MS = 4500;
+
 // Grimtal's power.jpg follow-up: fires AFTER his own strike flash has fully
 // finished playing (not simultaneously), same "let the first beat read
 // before the second starts" sequencing Rowan's mirror-shard effect uses
@@ -353,6 +359,8 @@ export function handleLogEntryForFlash(entry, game) {
       break;
     case 'timeFreeze':
       setFlash(characterId, 'assets/images/chronox/time.jpg'); break;
+    case 'worldStops':
+      setFlash(characterId, 'assets/images/chronox/world_stop.jpg', WORLD_STOPS_FLASH_DURATION_MS); break;
     case 'rewind':
       setFlash(characterId, 'assets/images/chronox/rewind.jpg'); break;
     case 'cyclonePunch':

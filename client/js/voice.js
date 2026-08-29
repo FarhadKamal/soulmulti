@@ -165,7 +165,7 @@ const VOICE_LINES = {
 // too (titanToss - the wind-up before titanSmash - added alongside his
 // existing titanSmash/glorySmash lines), Akyros has two.
 const ACTION_VOICE_LINES = {
-  chronox: { timeFreeze: 'time_freeze', rewind: 'rewind' },
+  chronox: { timeFreeze: 'time_freeze', rewind: 'rewind', worldStops: 'world_stop' },
   velorya: { lunarEclipse: 'eclipse' },
   boingo: { jesterBall: 'jerster' },
   athena: { divineRestore: 'devine', divineSacrifice: 'sacrifice' },

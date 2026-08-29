@@ -415,6 +415,16 @@ function chooseChronoxMove(character, game, usable) {
   if (byId.rewind) {
     return { actionId: 'rewind', targetId: null };
   }
+  // World Stops: a desperation move, only legal once hearts <= 3 (same gate
+  // direction as Illyra's Mirage Overload/Tharox's Earthshatter). No real
+  // downside to casting it the instant it's available - it locks down
+  // every living opponent at once for 2 rounds, strictly better than
+  // holding onto it hoping for a "better" moment when he's already this
+  // low. Same "cast eagerly once legal" policy as every other one-time
+  // desperation special in the roster.
+  if (byId.worldStops) {
+    return { actionId: 'worldStops', targetId: null };
+  }
   // Time Freeze is best spent either defensively (Chronox himself is low
   // and needs to lock down whoever's been hurting him) or offensively on
   // the biggest live threat once available - it denies 2 of their turns.

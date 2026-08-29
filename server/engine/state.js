@@ -37,9 +37,23 @@ function baseSpecialFor(id) {
       // the whole lock, restoring the caster's normal options from their
       // turn after that onward. Enforced generically in turnEngine.js's
       // isValidTarget.
+      // worldStopsActive/worldStopsFrozenIds/worldStopsSkipsApplied: his
+      // second special (confirmed ruling) - a one-time, all-opponents
+      // version of Time Freeze, legal only at hearts <= 3 (same
+      // desperation-move gate as Illyra's Mirage Overload/Tharox's
+      // Earthshatter, not the hasActedOnce gate Time Freeze uses). Own
+      // dedicated usedWorldStops flag, separate from usedSpecial (already
+      // spoken for by Time Freeze) - same multi-special pattern as
+      // rewindUsesRemaining above. Single SHARED countdown for the whole
+      // frozen group (confirmed ruling: simpler than per-target countdowns)
+      // - worldStopsFrozenIds is the Set of character ids who were frozen
+      // at cast time, worldStopsSkipsApplied mirrors freezeSkipsApplied's
+      // own 2-round-total shape but ticks once for the whole group
+      // together, not per target.
       return {
         freezeActive: false, freezeTargetId: null, freezeSkipsApplied: 0, hasActedOnce: false,
         rewindUsesRemaining: 2,
+        worldStopsActive: false, worldStopsFrozenIds: new Set(), worldStopsSkipsApplied: 0, usedWorldStops: false,
         lastActionAgainstMe: null,
         lockedActionCasterId: null,
         lockedActionId: null,
