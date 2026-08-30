@@ -308,16 +308,26 @@ export const actions = {
       // again" concept for a shared ball with no single decision-maker).
       // Just undo Chronox's own damage and put the ball back in play.
       if (record.casterId === null) {
-        // Same "Chronox's own one-time-use flags must survive this
-        // restore" protection as the normal (non-null-caster) branch below
-        // - see its own comment for why. A Jester Ball explosion is still
-        // just an attack landing on him, same reachability argument.
+        // Same "Chronox's own one-time-use flags AND live freeze-state must
+        // survive this restore" protection as the normal (non-null-caster)
+        // branch below - see its own comments for why. A Jester Ball
+        // explosion is still just an attack landing on him, same
+        // reachability argument.
         const usedSpecialNoCaster = character.usedSpecial;
         const usedWorldStopsNoCaster = character.special.usedWorldStops;
+        const freezeStateNoCaster = {
+          freezeActive: character.special.freezeActive,
+          freezeTargetId: character.special.freezeTargetId,
+          freezeSkipsApplied: character.special.freezeSkipsApplied,
+          worldStopsActive: character.special.worldStopsActive,
+          worldStopsFrozenIds: character.special.worldStopsFrozenIds,
+          worldStopsSkipsApplied: character.special.worldStopsSkipsApplied,
+        };
         Object.assign(character, structuredClone(record.chronoxSnapshot));
         character.special.rewindUsesRemaining = rewindUsesRemaining;
         character.usedSpecial = usedSpecialNoCaster;
         character.special.usedWorldStops = usedWorldStopsNoCaster;
+        Object.assign(character.special, freezeStateNoCaster);
         if (record.jesterBallSnapshot !== undefined) {
           game.jesterBall = structuredClone(record.jesterBallSnapshot);
         }
@@ -392,13 +402,38 @@ export const actions = {
       // happened to predate his own first World Stops cast let him cast it
       // a second time later in the same match, even though hearts <= 3 was
       // independently, separately satisfied both times by real damage.
+      //
+      // Same reasoning extends to his LIVE freeze-progress state
+      // (freezeActive/freezeTargetId/freezeSkipsApplied for Time Freeze,
+      // worldStopsActive/worldStopsFrozenIds/worldStopsSkipsApplied for
+      // World Stops) - these sit right next to the used-flags above on the
+      // same .special object and are equally vulnerable: restoring a stale
+      // chronoxSnapshot silently resurrects a freeze that had already
+      // legitimately ended (its own onTurnStart already logged "ends" and
+      // cleared it), and each subsequent onTurnStart tick then reads the
+      // resurrected state as still-active, logging spurious "continues"
+      // lines and re-skipping the target's turns. Confirmed
+      // live/reachable: rewinding a hit whose snapshot predated Time
+      // Freeze's own natural end (captured while a target was frozen and
+      // unable to generate any newer record to overwrite the stale one)
+      // brought Time Freeze back from the dead for 2 more full cycles
+      // after it had already ended.
       const usedSpecial = character.usedSpecial;
       const usedWorldStops = character.special.usedWorldStops;
+      const freezeState = {
+        freezeActive: character.special.freezeActive,
+        freezeTargetId: character.special.freezeTargetId,
+        freezeSkipsApplied: character.special.freezeSkipsApplied,
+        worldStopsActive: character.special.worldStopsActive,
+        worldStopsFrozenIds: character.special.worldStopsFrozenIds,
+        worldStopsSkipsApplied: character.special.worldStopsSkipsApplied,
+      };
       Object.assign(caster, structuredClone(record.casterSnapshot));
       Object.assign(character, structuredClone(record.chronoxSnapshot));
       character.special.rewindUsesRemaining = rewindUsesRemaining; // re-assert past the restore
       character.usedSpecial = usedSpecial;
       character.special.usedWorldStops = usedWorldStops;
+      Object.assign(character.special, freezeState);
       caster.special.controlling = controlling;
       caster.special.puppetCharacterId = puppetCharacterId;
       if (deathproofActive !== undefined) caster.special.deathproofActive = deathproofActive;
