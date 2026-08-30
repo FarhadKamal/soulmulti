@@ -308,8 +308,16 @@ export const actions = {
       // again" concept for a shared ball with no single decision-maker).
       // Just undo Chronox's own damage and put the ball back in play.
       if (record.casterId === null) {
+        // Same "Chronox's own one-time-use flags must survive this
+        // restore" protection as the normal (non-null-caster) branch below
+        // - see its own comment for why. A Jester Ball explosion is still
+        // just an attack landing on him, same reachability argument.
+        const usedSpecialNoCaster = character.usedSpecial;
+        const usedWorldStopsNoCaster = character.special.usedWorldStops;
         Object.assign(character, structuredClone(record.chronoxSnapshot));
         character.special.rewindUsesRemaining = rewindUsesRemaining;
+        character.usedSpecial = usedSpecialNoCaster;
+        character.special.usedWorldStops = usedWorldStopsNoCaster;
         if (record.jesterBallSnapshot !== undefined) {
           game.jesterBall = structuredClone(record.jesterBallSnapshot);
         }
@@ -371,9 +379,26 @@ export const actions = {
       // turnInstance "same combo" guard in recordActionAgainstChronoxIfApplicable),
       // so restoring it un-consumes exactly the strikes Rewind is undoing.
       const deathproofActive = caster.special.deathproofActive;
+      // Chronox's OWN one-time-use flags (usedSpecial for Time Freeze,
+      // usedWorldStops for World Stops) must survive this restore too, for
+      // a different reason than the caster-side fields above: this record
+      // is always an attack AGAINST Chronox (buildActionAgainstChronoxRecord
+      // requires targetId === 'chronox' - he can never be his own recorded
+      // caster here), so there is no "rewind my own cast to refund it"
+      // scenario reachable through this path. Without this, restoring an
+      // old chronoxSnapshot silently rolls his already-legitimately-spent
+      // specials back to whatever they were at that earlier snapshot
+      // moment - confirmed live/reachable: rewinding an attacker's hit that
+      // happened to predate his own first World Stops cast let him cast it
+      // a second time later in the same match, even though hearts <= 3 was
+      // independently, separately satisfied both times by real damage.
+      const usedSpecial = character.usedSpecial;
+      const usedWorldStops = character.special.usedWorldStops;
       Object.assign(caster, structuredClone(record.casterSnapshot));
       Object.assign(character, structuredClone(record.chronoxSnapshot));
       character.special.rewindUsesRemaining = rewindUsesRemaining; // re-assert past the restore
+      character.usedSpecial = usedSpecial;
+      character.special.usedWorldStops = usedWorldStops;
       caster.special.controlling = controlling;
       caster.special.puppetCharacterId = puppetCharacterId;
       if (deathproofActive !== undefined) caster.special.deathproofActive = deathproofActive;
