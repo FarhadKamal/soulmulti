@@ -219,6 +219,19 @@ export function renderBattle(root, state) {
 
   if (isMyBallDecision) {
     scroll.appendChild(renderJesterBallPrompt(game, actingCharacterId, armedAction, state));
+    // Keep/Take (unlike Pass) deliberately do NOT consume the holder's
+    // turn (see finishJesterBall, server/index.js/gameFlow.js) - Boingo
+    // still owes his own normal action afterward, every time. Without
+    // this, the ball prompt's exclusive `if` branch left him stuck seeing
+    // only Keep/Pass forever, with no way to ever reach Chaos Gamble -
+    // confirmed live report ("i can't keep it to use action"). Always
+    // rendering both together (rather than trying to track "has he acted
+    // yet" client-side, which isn't broadcast) is safe - handleAction
+    // (server/index.js) independently re-validates whose decision it
+    // actually still is via settleToNextDecision before accepting
+    // anything, so there's no way to double-submit even if this shows
+    // slightly ahead of a state the server would actually accept.
+    scroll.appendChild(renderActionPanel(actingCharacterId, usableActions, armedAction, state));
   } else if (isMyTurn && state.awaitingMindControlAction) {
     scroll.appendChild(renderMindControlActionPanel(game, actingCharacterId, state));
   } else if (isMyTurn) {
