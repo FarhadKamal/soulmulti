@@ -378,20 +378,6 @@ export function applyDamage(game, log, {
     runOnAnyDeath(target.id, sourceCharacterId, isMirror, game, log);
   }
 
-  // Melyssa's reactive shield: whenever damage actually reaches her hearts
-  // (result.amountDealt, computed above - already reduced by absorption for
-  // a normal hit, or the full raw amount for an ignoresShield hit since
-  // those skip absorption entirely), she gains new shield EXACTLY equal to
-  // that leaked-through amount, REPLACING whatever shield she had left (not
-  // additive - see applyShield below, which is +=). Reuses the same
-  // decaying:true persistence Tharox/Athena already have (clears only at
-  // the start of HER OWN next turn, via decayShieldIfDue in melyssa.js's
-  // onTurnStart). Fires even when amountDealt is 0 (a fully-absorbed hit) -
-  // REPLACE semantics mean a stale leftover shield must be explicitly
-  // zeroed that turn too, not just left alone. Gated on !isKO purely for a
-  // clean broadcast snapshot on a dead character (harmless either way,
-  // since applyDamage's own early isKO guard blocks any future hit from
-  // ever reading it again).
   // onHitLanded dispatch (see engine/categories/onHitLanded.js): Melyssa's
   // reactive shield, Kaelis's grudge accumulation, and Athena's curse-mirror
   // all now live in their own ability files' registered callbacks - each
@@ -438,5 +424,20 @@ export function decayShieldIfDue(character) {
   if (character.shieldDecaying) {
     character.shield = 0;
     character.shieldDecaying = false;
+  }
+}
+
+// Runs decayShieldIfDue for every character, BEFORE poison/silence/headache
+// ticks fire this turn (see beginCharacterTurn in turnEngine.js). Without
+// this, a decaying shield that expires on a character's own turn can be
+// re-granted by that same turn's poison tick (Melyssa's reactive shield off
+// Rowan's Poison Cloud) and then immediately wiped moments later by that
+// character's own onTurnStart decay call, in the same beginCharacterTurn
+// pass - the shield never provides any benefit. Running decay first means
+// only a shield that was already stale from a PRIOR turn gets cleared here;
+// anything granted during this turn's own tick sequence survives.
+export function decayAllDueShields(game) {
+  for (const character of Object.values(game.characters)) {
+    decayShieldIfDue(character);
   }
 }

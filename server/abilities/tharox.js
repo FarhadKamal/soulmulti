@@ -1,4 +1,4 @@
-import { applyDamage, applyHeal, applyShield, decayShieldIfDue } from '../engine/damagePipeline.js';
+import { applyDamage, applyHeal, applyShield } from '../engine/damagePipeline.js';
 import { makeSetupAction } from '../engine/categories/neutralAction.js';
 
 // Total damage points Earthshatter scatters, regardless of alive-count -
@@ -6,10 +6,6 @@ import { makeSetupAction } from '../engine/categories/neutralAction.js';
 // matter for Tharox at all (no scaling table) - always 7, split across
 // however many opponents happen to be alive when he casts it.
 const EARTHSHATTER_TOTAL_DAMAGE = 7;
-
-export function onTurnStart(character, game, log) {
-  decayShieldIfDue(character);
-}
 
 export const actions = {
   smash: {

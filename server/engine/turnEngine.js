@@ -1,5 +1,5 @@
 import { cloneGame } from './state.js';
-import { applyDamage, applyHeal, applyShield, isSilenced, isFrozenByChronox, heartsSnapshot } from './damagePipeline.js';
+import { applyDamage, applyHeal, applyShield, isSilenced, isFrozenByChronox, heartsSnapshot, decayAllDueShields } from './damagePipeline.js';
 import * as chronox from '../abilities/chronox.js';
 import * as tharox from '../abilities/tharox.js';
 import * as zerathys from '../abilities/zerathys.js';
@@ -367,6 +367,13 @@ export function tickChronoxLockoutIfAny(character, game, log) {
 }
 
 export function beginCharacterTurn(character, game, log) {
+  // Decay due shields before anything else this turn (poison ticks
+  // included) - see decayAllDueShields's own comment for why this must run
+  // first, not just before this character's own onTurnStart.
+  // Decay due shields before anything else this turn (poison ticks
+  // included) - see decayAllDueShields's own comment for why this must run
+  // first, not just before this character's own onTurnStart.
+  decayAllDueShields(game);
   tickPoisonIfAny(character, game, log);
   tickSilenceIfAny(character, game, log);
   resolveHeadacheIfDue(character, game, log);

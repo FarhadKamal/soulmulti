@@ -1,15 +1,5 @@
-import { applyDamage, applyHeal, applyShield, decayShieldIfDue } from '../engine/damagePipeline.js';
+import { applyDamage, applyHeal, applyShield } from '../engine/damagePipeline.js';
 import { rollChaosGamble } from '../engine/random.js';
-
-// Nothing in his current kit grants him DECAYING shield anymore (Chaos
-// Gamble's old +1 decaying shield on a "win" roll was removed, confirmed
-// ruling - the Jester Ball toll-booth's own shield reward, see
-// jesterBallResolution.pass below, is deliberately permanent/stacking, not
-// decaying). Kept as a defensive no-op rather than removed outright, in
-// case a future addition to his kit ever does grant him a decaying shield.
-export function onTurnStart(character, game, log) {
-  decayShieldIfDue(character);
-}
 
 export const actions = {
   chaosGamble: {

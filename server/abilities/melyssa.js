@@ -1,4 +1,4 @@
-import { decayShieldIfDue, isSilenced } from '../engine/damagePipeline.js';
+import { isSilenced } from '../engine/damagePipeline.js';
 import { registerOnHitLanded } from '../engine/categories/onHitLanded.js';
 
 // Reactive shield (see engine/categories/onHitLanded.js): whenever damage
@@ -7,8 +7,10 @@ import { registerOnHitLanded } from '../engine/categories/onHitLanded.js';
 // hit since those skip absorption entirely), she gains new shield EXACTLY
 // equal to that leaked-through amount, REPLACING whatever shield she had
 // left (not additive). Reuses the same decaying:true persistence Tharox/
-// Athena already have (clears only at the start of HER OWN next turn, via
-// decayShieldIfDue in this file's onTurnStart). Fires even when amountDealt
+// Athena already have (clears via decayAllDueShields, run at the very start
+// of beginCharacterTurn - BEFORE this turn's own poison tick, so a shield
+// granted by a poison tick landing on her own turn survives instead of
+// being wiped moments later). Fires even when amountDealt
 // is 0 (a fully-absorbed hit) - REPLACE semantics mean a stale leftover
 // shield must be explicitly zeroed that turn too, not just left alone.
 // No isMirror/isPoisonTick exclusion (unlike Kaelis's grudge) - matches the
@@ -59,12 +61,3 @@ export const actions = {
     },
   },
 };
-
-// Shield decay symmetry with Tharox's Glory Smash / Athena's Divine
-// Restore - her reactive shield (see damagePipeline.js's applyDamage) uses
-// the identical decaying:true mechanic, which only ever clears via this
-// same onTurnStart hook already called generically for every character by
-// turnEngine.js's beginCharacterTurn.
-export function onTurnStart(character, game, log) {
-  decayShieldIfDue(character);
-}

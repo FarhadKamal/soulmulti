@@ -1,11 +1,7 @@
-import { applyDamage, applyHeal, applyShield, decayShieldIfDue, tryTriggerCleanSlate, tryIllyraDodgeStatus } from '../engine/damagePipeline.js';
+import { applyDamage, applyHeal, applyShield, tryTriggerCleanSlate, tryIllyraDodgeStatus } from '../engine/damagePipeline.js';
 import { registerOnOtherRevived } from '../engine/categories/onOtherRevived.js';
 import { registerOnOwnDeath } from '../engine/categories/onOwnDeath.js';
 import { registerOnHitLanded } from '../engine/categories/onHitLanded.js';
-
-export function onTurnStart(character, game, log) {
-  decayShieldIfDue(character);
-}
 
 // Revival cleanup (see engine/categories/onOtherRevived.js) - her curse
 // doesn't survive the cursed character's own revival (e.g. Blade's
