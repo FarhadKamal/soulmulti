@@ -1,18 +1,23 @@
 import { applyDamage } from '../engine/damagePipeline.js';
+import { makeSetupAction } from '../engine/categories/neutralAction.js';
 
 const DAMAGE_BY_CHARGE = [1, 2, 3];
 
 export const actions = {
-  chargeUp: {
+  // Neutral Action (see engine/categories/neutralAction.js): increments a
+  // bounded counter (cap enforced by isLegal), feeding thunderWrath's
+  // damage tier below. thunderWrath is ALWAYS legal and resets the counter
+  // regardless of whether it was ever incremented, so a 0-charge cast still
+  // deals DAMAGE_BY_CHARGE[0].
+  chargeUp: makeSetupAction({
     label: 'Charge Up',
-    needsTarget: false,
+    actionId: 'chargeUp',
     isLegal: (character) => character.special.chargeCount < 2,
-    execute(character, targetId, game, log) {
+    mutate(character) {
       character.special.chargeCount += 1;
-      log.push({ type: 'setup', characterId: character.id, actionId: 'chargeUp', chargeCount: character.special.chargeCount });
-      return {};
     },
-  },
+    extraLogFields: (character) => ({ chargeCount: character.special.chargeCount }),
+  }),
   thunderWrath: {
     label: 'Thunder Wrath',
     needsTarget: true,

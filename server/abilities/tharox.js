@@ -1,4 +1,5 @@
 import { applyDamage, applyHeal, applyShield, decayShieldIfDue } from '../engine/damagePipeline.js';
+import { makeSetupAction } from '../engine/categories/neutralAction.js';
 
 // Total damage points Earthshatter scatters, regardless of alive-count -
 // confirmed ruling: unlike Illyra's Mirage Overload, headcount doesn't
@@ -25,16 +26,16 @@ export const actions = {
       return result;
     },
   },
-  titanToss: {
+  // Neutral Action (see engine/categories/neutralAction.js): sets a boolean
+  // flag, mutual-exclusion toggle with titanSmash which consumes it.
+  titanToss: makeSetupAction({
     label: 'Titan Toss',
-    needsTarget: false,
+    actionId: 'titanToss',
     isLegal: (character) => !character.special.hasCharge,
-    execute(character, targetId, game, log) {
+    mutate(character) {
       character.special.hasCharge = true;
-      log.push({ type: 'setup', characterId: character.id, actionId: 'titanToss' });
-      return {};
     },
-  },
+  }),
   titanSmash: {
     label: 'Titan Smash',
     needsTarget: true,

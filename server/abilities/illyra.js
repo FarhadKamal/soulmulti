@@ -1,4 +1,6 @@
 import { applyDamage } from '../engine/damagePipeline.js';
+import { registerDodgeDefense } from '../engine/categories/dodgeDefenseRegistry.js';
+import { registerOnOtherRevived } from '../engine/categories/onOtherRevived.js';
 
 // Mirage Burst's per-target damage: each stack is worth 1.5 damage,
 // rounded down - confirmed ruling, matches the exact sequence given
@@ -14,6 +16,30 @@ function burstDamageFor(stackCount) {
 // headcount gate on casting it at all - only her own hearts <= 3 gates
 // legality, see isLegal below).
 const OVERLOAD_STACKS_BY_ALIVE_COUNT = { 4: 7, 3: 5, 2: 2 };
+
+// Dodge Defense category registration (see
+// engine/categories/dodgeDefense.js) - additive, not yet consumed by
+// applyDamage's own inline dodge block. A flat, unconditional 50% chance on
+// every hit - memoryless, no per-attacker or charge-pool tracking. Also
+// excludes poison ticks (ctx.isPoisonTick) - an already-applied DoT isn't
+// something her illusion can retroactively avoid.
+registerDodgeDefense('illyra', {
+  canDodge(target, game, sourceCharacterId, ctx) {
+    return !ctx.isPoisonTick && Math.random() < 0.5;
+  },
+  consume() {},
+});
+
+// Revival cleanup (see engine/categories/onOtherRevived.js) - her Mirage
+// Mark stacks don't survive a target's own revival either, same "comes
+// back fresh" reasoning as every other stale-reference cleanup - otherwise
+// a banked stack from before they died would still be sitting there ready
+// to detonate on their reborn self, even though they never should have
+// carried it over.
+registerOnOtherRevived((revivedCharacterId, game) => {
+  const illyra = game.characters.illyra;
+  if (illyra) illyra.special.mirageMarks.delete(revivedCharacterId);
+});
 
 export const actions = {
   mirageMark: {

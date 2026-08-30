@@ -3,6 +3,16 @@
 // absorption, Akyros's Dodge, Blade's Rebirth, and Athena's curse mirror
 // are all handled in one place instead of duplicated per character.
 
+import { resolveDodgeDefense } from './categories/dodgeDefense.js';
+import { runOnOwnDeath } from './categories/onOwnDeath.js';
+import { runOnOtherRevived } from './categories/onOtherRevived.js';
+import { registerRebirth, getRebirthResetter } from './categories/rebirthRegistry.js';
+import { runOnHitLanded } from './categories/onHitLanded.js';
+import { runOnHitLandedEarly } from './categories/onHitLandedEarly.js';
+import { runOnAnyDeath } from './categories/onAnyDeath.js';
+
+export { registerRebirth };
+
 // True if ANY character currently has characterId locked under their own
 // Silence Lock (Rowan's special.silenceTargets Map) - written generically
 // (scans every character's .special rather than assuming Rowan specifically)
@@ -229,92 +239,15 @@ export function applyDamage(game, log, {
   // is always live against her CURRENT frozen state).
   const isFrozen = isFrozenByChronox(target, game);
 
-  // Akyros Dodge: only applies to direct attacks, never to mirrored damage
-  // (confirmed ruling: Athena's curse mirror bypasses Dodge). ignoresDodge
-  // (Illyra's Mirage Burst) also bypasses it, same reasoning.
-  if (target.id === 'akyros' && !isMirror && !ignoresDodge && !isFrozen) {
-    if (!target.special.dodgedAttackerIds.has(sourceCharacterId)) {
-      target.special.dodgedAttackerIds.add(sourceCharacterId);
-      result.dodged = true;
-      log.push({ type: 'dodge', attackerId: sourceCharacterId, targetCharacterId });
-      return result;
-    }
-  }
-
-  // Marin's Threefold Veil: a flat pool of exactly 3 dodge charges against
-  // ANY hit from anyone, unlike Akyros's dodge (tracked per-attacker,
-  // dodges each unique attacker once) - here every consecutive hit consumes
-  // the shared pool regardless of who's attacking, until all 3 are spent
-  // (no recharge). Same !isMirror exclusion as Akyros above - a mirrored
-  // hit (Athena's curse-mirror) always bypasses dodge.
-  if (target.id === 'marin' && !isMirror && !ignoresDodge && !isFrozen && target.special.veilChargesRemaining > 0) {
-    target.special.veilChargesRemaining -= 1;
+  // Dodge Defense (category-driven, see engine/categories/dodgeDefense.js):
+  // dispatches to whichever of Akyros/Marin/Grimtal/Illyra's own registered
+  // provider matches `target.id`, replacing what used to be 4 separate
+  // inline `if (target.id === '<name>' ...)` blocks here. Behavior
+  // (including exact ordering/short-circuiting) is unchanged - see the
+  // provider registrations in each character's own abilities/*.js file for
+  // the per-character rules this now dispatches to generically.
+  if (resolveDodgeDefense(game, log, target, sourceCharacterId, { isMirror, ignoresDodge, isFrozen, isPoisonTick })) {
     result.dodged = true;
-    log.push({ type: 'dodge', attackerId: sourceCharacterId, targetCharacterId });
-    return result;
-  }
-
-  // Grim Ward (Grimtal's passive, always-on, no cast needed): dodges live
-  // the moment a SECOND distinct attacker targets him in the same cycle
-  // (since his own last turn ended) - confirmed via detailed walkthrough:
-  // the FIRST attacker each cycle always lands (even a 0-damage hit still
-  // "counts" as having attacked), every attacker after that dodges. Fully
-  // fades out once only 1 living attacker remains (2 characters alive total)
-  // since there's then no "earlier hitter" to set the condition up - falls
-  // out naturally from the >=1-prior-attacker check, no explicit headcount
-  // branch needed. Same !isMirror exclusion as every other dodge above.
-  if (target.id === 'grimtal' && !isMirror && !ignoresDodge && !isFrozen) {
-    const cycle = target.special.lastHitByThisCycle;
-    if (cycle.size > 0 && !cycle.has(sourceCharacterId)) {
-      cycle.add(sourceCharacterId);
-      result.dodged = true;
-      log.push({ type: 'dodge', attackerId: sourceCharacterId, targetCharacterId });
-      // Reward scales with current alive headcount: 4 alive -> 2 points,
-      // 3 alive -> 1 point, 2 alive -> Grim Ward never triggers at all (see
-      // the cycle.size > 0 guard above, which is already false with only 1
-      // possible attacker). Each point heals 1 (if not at max hearts) or
-      // grants 1 stacking, non-decaying shield (if already full) -
-      // confirmed ruling: points spill from heal into shield within the
-      // same reward, not an all-or-nothing choice.
-      const aliveCount = Object.values(game.characters).filter((c) => !c.isKO).length;
-      const points = aliveCount >= 4 ? 2 : aliveCount === 3 ? 1 : 0;
-      let healed = 0;
-      let shielded = 0;
-      for (let i = 0; i < points; i++) {
-        if (target.hearts < target.maxHearts) {
-          target.hearts += 1;
-          healed += 1;
-        } else {
-          target.shield += 1;
-          shielded += 1;
-        }
-      }
-      log.push({ type: 'grim-ward-reward', targetCharacterId, healed, shielded });
-      return result;
-    }
-    cycle.add(sourceCharacterId);
-  }
-
-  // Illyra's passive (always-on, no cast needed): a flat, unconditional 50%
-  // chance that ANY direct attack or negative-status application against
-  // her simply fails - a fresh coin flip every single time, with no memory
-  // of prior attackers or rolls (confirmed ruling - deliberately NOT
-  // per-attacker like Akyros, and NOT a finite charge pool like Marin's
-  // Threefold Veil). Same !isMirror exclusion as every other dodge above
-  // (a curse mirror always lands, matching game-wide precedent - confirmed
-  // ruling she is NOT a special exception here). Also excludes poison
-  // ticks (isPoisonTick) - confirmed ruling: an already-applied DoT isn't
-  // something her illusion can retroactively avoid, matching how poison
-  // already bypasses every other dodge/shield in the game. !ignoresDodge
-  // lets her OWN Mirage Burst (and any future ignoresDodge source) bypass
-  // this too, same as it bypasses Akyros/Marin/Grimtal. !isFrozen: while
-  // she's under an active Time Freeze/World Stops, her 50% is suppressed
-  // entirely (confirmed ruling, explicit) - resumes automatically the
-  // instant her own frozen status lifts, no separate tracking needed since
-  // isFrozen is re-derived from her live state on every single hit.
-  if (target.id === 'illyra' && !isMirror && !isPoisonTick && !ignoresDodge && !isFrozen && Math.random() < 0.5) {
-    result.dodged = true;
-    log.push({ type: 'dodge', attackerId: sourceCharacterId, targetCharacterId });
     return result;
   }
 
@@ -329,185 +262,37 @@ export function applyDamage(game, log, {
   target.hearts = Math.max(0, target.hearts - amt);
   result.amountDealt = amt;
 
-  // Chronox's Rewind pending-snapshot drift correction: his snapshot
-  // (special.lastActionAgainstMe.chronoxSnapshot.hearts) is captured at
-  // some point in the PAST - the moment right before whichever action is
-  // currently the "most recent action against him." If damage lands on him
-  // from a source that ISN'T that recorded action (poison ticks, a
-  // curse-mirror bounce, Mirror Reflect's counter-hit, anything not routed
-  // through the normal recording flow), the snapshot itself must shift down
-  // by that same amount too - otherwise Rewind would restore him past
-  // damage it was never meant to touch, i.e. free healing for damage from
-  // an unrelated source, confirmed reachable via audit (a banked Rewind
-  // erasing several rounds of poison ticks at once, while the poison itself
-  // keeps ticking since it's never part of what gets restored).
-  //
-  // EXCLUDED: damage from the SAME caster+turnInstance as the currently
-  // pending record - this is a chained follow-up within the same combo
-  // (Soul Swap's soulSwapWrath, Draxus's bonus strikes), and that damage
-  // genuinely SHOULD be absorbed into the existing snapshot's own
-  // before-state, not corrected away as "unrelated." Confirmed as a real
-  // regression during testing without this exclusion: a Soul Swap +
-  // soulSwapWrath combo's own Wrath damage was being treated as drift and
-  // silently un-recorded, so Rewind stopped undoing it at all. Matches the
-  // same turnInstance-based combo detection turnEngine.js's
-  // buildActionAgainstChronoxRecord already uses.
-  if (target.id === 'chronox' && target.special?.lastActionAgainstMe) {
-    const record = target.special.lastActionAgainstMe;
-    // mindControl (Melyssa's puppet SELECTION step) is excluded from combo
-    // continuation here too, matching turnEngine.js's
-    // buildActionAgainstChronoxRecord - see its own comment for why. A
-    // pending mindControl record's snapshot must still drift-correct
-    // against any damage that follows in the same turn (e.g. Self Choke),
-    // not be treated as "part of the same combo" and skipped.
-    const isSameComboContinuation = record.casterId === sourceCharacterId
-      && game.turnInstanceFor?.get(sourceCharacterId) === record.casterTurnInstance
-      && record.actionId !== 'mindControl';
-    if (!isSameComboContinuation) {
-      const drift = heartsBefore - target.hearts;
-      if (drift > 0) {
-        record.chronoxSnapshot.hearts = Math.max(0, record.chronoxSnapshot.hearts - drift);
-      }
-    }
-  }
+  // Populated by onOwnDeath callbacks that need to hand data forward to the
+  // LATER onHitLanded dispatch within this same applyDamage call (e.g.
+  // Athena's { preClearCursedId } - see athena.js).
+  const hitLandedCtxExtra = {};
 
-  // Set below if this hit KOs a cursed Athena - captures curseTargetCharacterId
-  // before the KO branch clears it, so the killing blow can still mirror.
-  let preClearCursedId = null;
+  // Early onHitLanded dispatch (see engine/categories/onHitLandedEarly.js) -
+  // at this SAME original call site, before the KO/Rebirth branch, for
+  // reactions that need to see hearts exactly as reduced by absorption
+  // above. See rowan.js's own registerOnHitLandedEarly call for the actual
+  // Mirror Reflect logic.
+  const earlyExtra = runOnHitLandedEarly(target, game, log, {
+    amountDealt: result.amountDealt, isMirror, isPoisonTick, sourceCharacterId, heartsBefore,
+  });
+  if (earlyExtra) Object.assign(result, earlyExtra);
 
-  // Rowan's Mirror Reflect: any direct (non-mirrored) hit that lands real
-  // damage on him while it's active, and that he SURVIVES (target.hearts
-  // already reflects the reduction above, so > 0 here means he's still
-  // alive), automatically deals 3 damage back to the attacker - on top of
-  // Rowan still taking the original hit normally (this doesn't block/
-  // reduce anything). Modeled directly on Athena's own curse-mirror below:
-  // a nested applyDamage call with isMirror: true, which both prevents
-  // Akyros's Dodge from applying to the reflected hit and prevents
-  // infinite mirror recursion. Confirmed ruling: Mirror Reflect stays
-  // active indefinitely across any number of Rowan's own turns - it does
-  // NOT auto-clear at his next turn start (rowan.js's onTurnStart no longer
-  // touches it) - only ending once it actually fires, right here.
-  if (target.id === 'rowan' && target.special.mirrorReflectActive && !isMirror
-    && result.amountDealt > 0 && target.hearts > 0 && sourceCharacterId !== 'rowan') {
-    target.special.mirrorReflectActive = false;
-    result.mirrorReflectResult = applyDamage(game, log, {
-      sourceCharacterId: target.id,
-      targetCharacterId: sourceCharacterId,
-      amount: 3,
-      isMirror: true,
-    });
-    result.mirrorReflectLogEntry = {
-      type: 'mirror-reflect',
-      fromCharacterId: target.id,
-      toCharacterId: sourceCharacterId,
-      amount: 3,
-      koTriggered: result.mirrorReflectResult.koTriggered,
-      revived: result.mirrorReflectResult.revived,
-    };
-  }
-
-  // Blade Rebirth: automatic, intercepts the KO the instant it would happen.
-  if (target.id === 'blade' && target.hearts === 0 && !target.special.rebirthUsed) {
-    target.hearts = 2;
-    target.special.rebirthUsed = true;
-    target.usedSpecial = true;
+  // Rebirth (category-driven, see engine/categories/rebirthRegistry.js +
+  // onOtherRevived.js): automatic, intercepts the KO the instant it would
+  // happen. `rebirthResetter` looks up whichever character's own module
+  // registered a Rebirth reset (currently only Blade) - `!target.special.
+  // rebirthUsed` still gates it here rather than inside the resetter, since
+  // "already used" is a universal one-shot Rebirth precondition, not
+  // something specific to any one character's reset logic.
+  const rebirthResetter = getRebirthResetter(target.id);
+  if (rebirthResetter && target.hearts === 0 && !target.special.rebirthUsed) {
+    rebirthResetter(target, game, log);
     result.revived = true;
-    // Comes back fresh: clear any lingering negative status rather than
-    // carrying it over from the moment he died.
-    target.skipNextTurn = false;
-    target.special.streakTargetId = null;
-    target.special.streakCount = 0;
-    const athena = Object.values(game.characters).find(
-      (c) => c.id === 'athena' && c.special.curseTargetCharacterId === target.id
-    );
-    if (athena) athena.special.curseTargetCharacterId = null;
-    // Chronox's Time Freeze doesn't just set skipNextTurn once - it's
-    // re-applied on CHRONOX's own next turn via freezeActive/freezeTargetId
-    // (see chronox.js onTurnStart), which has no awareness that its target
-    // died and came back in between. Clearing skipNextTurn above alone
-    // isn't enough - Chronox would just re-freeze the reborn Blade on his
-    // next turn since he's still tracked as the frozen target. Ending the
-    // freeze here too matches "comes back fresh with no negative energy."
-    const chronox = Object.values(game.characters).find(
-      (c) => c.id === 'chronox' && c.special.freezeActive && c.special.freezeTargetId === target.id
-    );
-    if (chronox) {
-      chronox.special.freezeActive = false;
-      chronox.special.freezeTargetId = null;
-    }
-    // World Stops equivalent of the Time Freeze cleanup just above - same
-    // reasoning, just removing Blade alone from the shared frozen group
-    // rather than ending the whole thing for everyone else still frozen.
-    const chronoxWorldStops = Object.values(game.characters).find(
-      (c) => c.id === 'chronox' && c.special.worldStopsActive && c.special.worldStopsFrozenIds?.has(target.id)
-    );
-    if (chronoxWorldStops) {
-      chronoxWorldStops.special.worldStopsFrozenIds.delete(target.id);
-      if (chronoxWorldStops.special.worldStopsFrozenIds.size === 0) {
-        chronoxWorldStops.special.worldStopsActive = false;
-      }
-    }
-    // Akyros's current Hidden Mark on Blade doesn't survive his death
-    // either - he's coming back fresh, so Fatal Slash/Shadow Execution
-    // shouldn't still get the marked bonus against him. Only the CURRENT
-    // mark is cleared (marks/revealedMarks) - everMarkedIds is left alone,
-    // so Akyros still can't place a brand-new mark on him later (same
-    // "once marked, never again" rule as everyone else).
-    const akyros = Object.values(game.characters).find((c) => c.id === 'akyros');
-    if (akyros) {
-      akyros.special.marks.delete(target.id);
-      akyros.special.revealedMarks.delete(target.id);
-    }
-    // Kaelis's grudge COUNT against the reviving character doesn't carry
-    // over - he/she comes back "fresh," same reasoning as the Akyros
-    // mark/Chronox freeze/Athena curse cleanup above. Deleting the map key
-    // is equivalent to resetting the count to 0 (grudgeCounts.get() falls
-    // back to 0 for an absent key). Looked up generically (not assumed to
-    // be Blade specifically) so this also covers any future revive-capable
-    // character without needing changes here.
-    const kaelis = Object.values(game.characters).find((c) => c.id === 'kaelis');
-    if (kaelis) kaelis.special.grudgeCounts.delete(target.id);
-    // Rowan's Poison Cloud doesn't survive Rebirth either, same "comes back
-    // fresh" reasoning as the grudge-count clear above - otherwise the very
-    // next poison tick on his own turn would immediately start killing him
-    // again with no way to ever escape it.
-    const rowan = Object.values(game.characters).find((c) => c.id === 'rowan');
-    if (rowan) rowan.special.poisonTargets.delete(target.id);
-    // Grimtal's Skull Crack headache doesn't survive Rebirth either, same
-    // "comes back fresh" reasoning as poison above - covers two distinct
-    // stale-state risks: (1) a pending, not-yet-rolled headache from before
-    // he died would otherwise still resolve on his reborn self's next turn,
-    // and (2) if the roll had ALREADY resolved to a skip before he died,
-    // skipHeadacheTurn would still be sitting true, costing his very next
-    // turn back to a headache from before he was even reborn.
-    target.skipHeadacheTurn = false;
-    const grimtal = Object.values(game.characters).find((c) => c.id === 'grimtal');
-    if (grimtal && grimtal.special.headacheVictimId === target.id) {
-      grimtal.special.headacheVictimId = null;
-      grimtal.special.headacheRollPending = false;
-    }
-    // Illyra's Mirage Mark stacks don't survive Rebirth either, same
-    // "comes back fresh" reasoning as poison/headache above - otherwise a
-    // banked stack from before he died would still be sitting there ready
-    // to detonate on his reborn self, even though he never should have
-    // carried it over.
-    const illyra = Object.values(game.characters).find((c) => c.id === 'illyra');
-    if (illyra) illyra.special.mirageMarks.delete(target.id);
-    // Chronox's Rewind snapshot must be invalidated if IT was recorded
-    // against this now-revived character as the caster - otherwise
-    // casting Rewind later would restore a STALE pre-death snapshot of
-    // them, silently erasing their Rebirth entirely (their hearts revert
-    // to whatever they were before the fatal hit, rebirthUsed reverts to
-    // false, letting them "die and revive" a second time for free).
-    // Confirmed live-reasoning gap: isLegal's own "caster still alive"
-    // check doesn't catch this, since rebirthUsed flips isKO straight back
-    // to false - the caster looks alive again by the time Rewind is cast,
-    // even though the snapshot itself now predates a death/revival it
-    // knows nothing about.
-    const chronoxForRewind = Object.values(game.characters).find((c) => c.id === 'chronox');
-    if (chronoxForRewind && chronoxForRewind.special.lastActionAgainstMe?.casterId === target.id) {
-      chronoxForRewind.special.lastActionAgainstMe = null;
-    }
+    // Every OTHER character's stale reference to the now-revived target
+    // (curse, freeze, marks, grudge, poison, headache, mirage stacks, a
+    // stale Rewind snapshot) is handled generically here - see each
+    // affected character's own onOtherRevived registration.
+    runOnOtherRevived(target.id, game, log);
     // Deferred (not pushed to `log` here) and returned on the result so
     // executeAction() can push it AFTER the triggering attack's own log
     // entry - otherwise it lands BEFORE that entry in the log, since this
@@ -528,71 +313,20 @@ export function applyDamage(game, log, {
   } else if (target.hearts === 0) {
     target.isKO = true;
     result.koTriggered = true;
-    // Akyros's marks (hidden and revealed) die with him - no point keeping
-    // track of them once he can never use Fatal Slash/Shadow Execution again.
-    if (target.id === 'akyros') {
-      target.special.marks.clear();
-      target.special.revealedMarks.clear();
-    }
-    // Chronox's Time Freeze ends immediately if he's KO'd - no one left to
-    // keep re-applying the skip each round, so the frozen target is freed
-    // rather than being stuck frozen with no way for it to ever lift.
-    if (target.id === 'chronox' && target.special.freezeActive) {
-      const frozenId = target.special.freezeTargetId;
-      const frozen = game.characters[frozenId];
-      if (frozen) frozen.skipNextTurn = false;
-      target.special.freezeActive = false;
-      target.special.freezeTargetId = null;
-      log.push({ type: 'freeze-end', targetCharacterId: frozenId });
-    }
-    // Same reasoning for World Stops (confirmed real, reachable gap via
-    // audit - previously nothing cleared this at all, so a Chronox KO'd
-    // mid-World-Stops left every frozen target stuck frozen forever, since
-    // he was the only one whose onTurnStart could ever continue/end it).
-    // Frees the WHOLE group at once, unlike Blade's own Rebirth cleanup
-    // above (which only removes Blade himself from an otherwise-still-live
-    // group) - Chronox dying ends the effect entirely for everyone in it.
-    if (target.id === 'chronox' && target.special.worldStopsActive) {
-      const frozenIds = [...target.special.worldStopsFrozenIds];
-      for (const frozenId of frozenIds) {
-        const frozen = game.characters[frozenId];
-        if (frozen) frozen.skipNextTurn = false;
-      }
-      target.special.worldStopsActive = false;
-      target.special.worldStopsFrozenIds = new Set();
-      log.push({ type: 'world-stops-end', frozenIds });
-    }
-    // Athena's curse ends the instant she's KO'd - no one left to trigger
-    // the mirror going forward (her own isKO guard at the top of this
-    // function blocks any FUTURE hit from ever reading it again), but
-    // curseTargetCharacterId itself was otherwise never cleared, leaving the
-    // client's cursed-mark visual (battleScreen.js) and bot AI's
-    // isCursedByLiveAthena-style checks with stale state to read.
-    // preClearCursedId below captures the value BEFORE this clear so the
-    // mirror-trigger block further down (which runs after this KO branch,
-    // in the same applyDamage call) still sees who was cursed - the killing
-    // blow itself landed while she was alive and should still mirror, only
-    // hits AFTER her death shouldn't. Confirmed bug: without capturing this,
-    // the exact hit that killed a cursed Athena silently dropped its own
-    // mirror, since curseTargetCharacterId was already null by the time the
-    // mirror check ran.
-    if (target.id === 'athena' && target.special.curseTargetCharacterId) {
-      preClearCursedId = target.special.curseTargetCharacterId;
-      target.special.curseTargetCharacterId = null;
-    }
-    // Rowan's own death ends every effect HE cast on anyone else
-    // immediately - Poison Cloud stops ticking, Silence Lock's remaining
-    // turns are cleared (targets freed), and a still-pending Mirror
-    // Reflect window is cancelled. Does not undo damage already dealt by
-    // past ticks/reflects, only stops future ones (confirmed explicit
-    // design rule). Effects live on Rowan's own .special (matching every
-    // other caster-side effect in the codebase), so this is a direct
-    // clear, no cross-character scan needed.
-    if (target.id === 'rowan') {
-      target.special.poisonTargets.clear();
-      target.special.silenceTargets.clear();
-      target.special.mirrorReflectActive = false;
-    }
+    // KO-branch cleanup (see engine/categories/onOwnDeath.js): dispatches
+    // to Akyros/Athena/Chronox/Rowan/Grimtal's own registered onOwnDeath
+    // callback, replacing what used to be separate
+    // `if (target.id === '<name>') { ...cleanup... }` blocks here. A
+    // callback's return value (e.g. Athena's { preClearCursedId }) is
+    // merged onto `hitLandedCtxExtra`, threaded into the LATER onHitLanded
+    // dispatch further down this same call - see athena.js's own
+    // registerOnOwnDeath/registerOnHitLanded pair for why: her curse-mirror
+    // trigger (a late onHitLanded callback) needs to still see who was
+    // cursed even though this earlier callback already cleared it - the
+    // killing blow itself landed while she was alive and should still
+    // mirror, only hits AFTER her death shouldn't.
+    const ownDeathExtra = runOnOwnDeath(target, game, log);
+    if (ownDeathExtra) Object.assign(hitLandedCtxExtra, ownDeathExtra);
     // The Jester Ball is orphaned if its current holder dies from a hit
     // that has nothing to do with the ball itself (e.g. a normal attack,
     // not them choosing to Take it) - nothing else in the codebase ever
@@ -604,54 +338,17 @@ export function applyDamage(game, log, {
     // (isLegal requires !game.jesterBall) because a KO'd Marin was still
     // recorded as the holder from several turns earlier. Just clears the
     // ball state here rather than resolving a real explosion - the
-    // holder's already dead, there's no one left to deal damage to.
+    // holder's already dead, there's no one left to deal damage to. Not
+    // character-specific (no ability module "owns" this), so it stays
+    // generic engine logic rather than a registered callback.
     if (game.jesterBall && game.jesterBall.holderCharacterId === target.id) {
       game.jesterBall = null;
     }
-    // Grimtal's own death ends Skull Crack's pending headache immediately -
-    // no one left to have caused it, same "caster's death cancels their own
-    // ongoing effects" rule as Rowan's poison/silence/mirror cleanup above.
-    // Grim Ward simply stops mattering once he's dead (applyDamage's own
-    // isKO guard at the top blocks any future hit from ever reading
-    // lastHitByThisCycle again), so no explicit clear needed for that part.
-    if (target.id === 'grimtal') {
-      target.special.headacheVictimId = null;
-      target.special.headacheRollPending = false;
-    }
-    // Chronox's own death ends any pending Rewind opportunity and lockout
-    // immediately - not strictly load-bearing today (he has no revival
-    // mechanic, and applyDamage's own isKO guard at the top already blocks
-    // any future action from ever targeting a dead Chronox), but matches
-    // the same defensive "caster's death cancels their own state" cleanup
-    // every other character gets here, in case a future mechanic ever
-    // revives him.
-    if (target.id === 'chronox') {
-      target.special.lastActionAgainstMe = null;
-      target.special.lockedActionCasterId = null;
-      target.special.lockedActionId = null;
-      target.special.lockedActionTurnsRemaining = 0;
-    }
-    // Grim Strike's own-kill/claimed-kill tracking: a kill Grimtal
-    // personally lands (any of his attacks, not just grimStrike) grants
-    // power automatically - increments ownKillCount right here, no button
-    // needed. A kill anyone ELSE lands just banks as an unclaimed kill;
-    // Grimtal only gains power from it once he spends a whole turn on the
-    // Claim the Kill action (grimtal.js). isMirror excluded from the
-    // "his own kill" case for the same reasoning as every other attacker-
-    // attribution check in this file (a mirrored/reflected kill isn't a
-    // direct attack of his), but still banks as an unclaimed kill via the
-    // else branch below (someone/something else's kill either way, from
-    // Grimtal's perspective).
-    if (target.id !== 'grimtal') {
-      const grimtalChar = game.characters.grimtal;
-      if (grimtalChar && !grimtalChar.isKO) {
-        if (sourceCharacterId === 'grimtal' && !isMirror) {
-          grimtalChar.special.ownKillCount += 1;
-        } else {
-          grimtalChar.special.unclaimedKillCount += 1;
-        }
-      }
-    }
+    // onAnyDeath dispatch (see engine/categories/onAnyDeath.js): Grimtal's
+    // Grim Strike own-kill/unclaimed-kill bookkeeping now lives in his own
+    // ability file's registered callback, replacing the inline
+    // `if (target.id !== 'grimtal') { ... }` block that used to be here.
+    runOnAnyDeath(target.id, sourceCharacterId, isMirror, game, log);
   }
 
   // Melyssa's reactive shield: whenever damage actually reaches her hearts
@@ -668,61 +365,21 @@ export function applyDamage(game, log, {
   // clean broadcast snapshot on a dead character (harmless either way,
   // since applyDamage's own early isKO guard blocks any future hit from
   // ever reading it again).
-  if (target.id === 'melyssa' && !target.isKO) {
-    // Rowan's Silence Lock suppresses every shield source while active
-    // (see isSilenced above) - including this reactive one, so a silenced
-    // Melyssa gets 0 here instead of the normal leaked-damage amount.
-    target.shield = isSilenced(target, game) ? 0 : result.amountDealt;
-    target.shieldDecaying = true;
-  }
-
-  // Kaelis's grudge: whenever a REAL (non-mirrored) hit lands on her, that
-  // attacker's per-attacker hit COUNT increments by 1 - a stacking counter,
-  // not a boolean flag, so 5 hits before she retaliates means her next
-  // Grudge Strike against that attacker deals 5 damage (see kaelis.js).
-  // Reset to 0 only when SHE later lands a Grudge Strike against that same
-  // attacker, or when that attacker revives (see the Rebirth block above).
-  // Gated identically to Athena's own curse-trigger check just below
-  // (!isMirror && result.amountDealt > 0) - a fully shield-absorbed or
-  // mirrored hit does not count as "attacking her" for this purpose.
-  // isPoisonTick is also excluded: Poison Cloud is a single cast ("one
-  // attack") that then deals passive recurring damage on the victim's own
-  // turns with no further action from Rowan - only the initial cast should
-  // register as a grudge-worthy attack, not every tick afterward. Confirmed
-  // bug report: a Kaelis poisoned by Rowan was racking up a fresh grudge
-  // point on every single tick, turning one cast into an ever-growing
-  // Grudge Strike far beyond what "one hit" should earn.
-  if (target.id === 'kaelis' && !isMirror && !isPoisonTick && result.amountDealt > 0 && sourceCharacterId !== 'kaelis') {
-    const counts = target.special.grudgeCounts;
-    counts.set(sourceCharacterId, (counts.get(sourceCharacterId) || 0) + 1);
-  }
-
-  // Athena curse mirror: triggered by damage actually landing on Athena.
-  // The mirror log entry is deferred (returned on the result, not pushed to
-  // `log` here) and pushed by executeAction() after the triggering ability's
-  // own log entries - otherwise it lands in the log BEFORE the attack line
-  // that caused it, since applyDamage() runs before the caller's own push.
-  if (target.id === 'athena' && !isMirror && result.amountDealt > 0) {
-    const cursedId = target.special.curseTargetCharacterId ?? preClearCursedId;
-    if (cursedId && game.characters[cursedId] && !game.characters[cursedId].isKO) {
-      result.mirrorResult = applyDamage(game, log, {
-        sourceCharacterId,
-        targetCharacterId: cursedId,
-        amount: result.amountDealt,
-        ignoresShield: false,
-        ignoresUntargetable: true,
-        isMirror: true,
-      });
-      result.mirrorLogEntry = {
-        type: 'curse-mirror',
-        fromCharacterId: 'athena',
-        toCharacterId: cursedId,
-        amount: result.amountDealt,
-        koTriggered: result.mirrorResult.koTriggered,
-        revived: result.mirrorResult.revived,
-      };
-    }
-  }
+  // onHitLanded dispatch (see engine/categories/onHitLanded.js): Melyssa's
+  // reactive shield, Kaelis's grudge accumulation, and Athena's curse-mirror
+  // all now live in their own ability files' registered callbacks - each
+  // applies its own extra gating inside its own callback rather than here,
+  // since those exclusions differ per-character (e.g. Athena's mirror must
+  // still fire on the exact hit that just KO'd her - see her own
+  // registration for why this call site is NOT gated on `!target.isKO` the
+  // way it used to be; Melyssa/Kaelis's own callbacks each check isKO
+  // internally instead, where that exclusion is actually meaningful for
+  // them specifically). hitLandedCtxExtra carries anything an earlier
+  // onOwnDeath callback handed forward this same call (see above).
+  const hitLandedExtra = runOnHitLanded(target, game, log, {
+    amountDealt: result.amountDealt, isMirror, isPoisonTick, sourceCharacterId, ...hitLandedCtxExtra,
+  });
+  if (hitLandedExtra) Object.assign(result, hitLandedExtra);
 
   return result;
 }

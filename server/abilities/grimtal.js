@@ -1,4 +1,66 @@
 import { applyDamage, tryTriggerCleanSlate, tryIllyraDodgeStatus } from '../engine/damagePipeline.js';
+import { registerDodgeDefense } from '../engine/categories/dodgeDefenseRegistry.js';
+import { makeSetupAction } from '../engine/categories/neutralAction.js';
+import { registerOnOwnDeath } from '../engine/categories/onOwnDeath.js';
+import { registerOnOtherRevived } from '../engine/categories/onOtherRevived.js';
+import { registerOnAnyDeath } from '../engine/categories/onAnyDeath.js';
+
+// KO-branch cleanup (see engine/categories/onOwnDeath.js) - his own death
+// ends Skull Crack's pending headache immediately, no one left to have
+// caused it, same "caster's death cancels their own ongoing effects" rule
+// as Rowan's poison/silence/mirror cleanup. Grim Ward simply stops
+// mattering once he's dead (applyDamage's own isKO guard blocks any future
+// hit from ever reading lastHitByThisCycle again), so no explicit clear
+// needed for that part.
+registerOnOwnDeath('grimtal', (character) => {
+  character.special.headacheVictimId = null;
+  character.special.headacheRollPending = false;
+});
+
+// Kill-credit bookkeeping (see engine/categories/onAnyDeath.js) - Grim
+// Strike's damage is 1 + ownKillCount + claimedKillCount:
+// - ownKillCount: KOs GRIMTAL HIMSELF personally lands (any of his attacks,
+//   not just grimStrike) - increments automatically, no button needed.
+// - claimedKillCount: KOs someone ELSE landed that Grimtal has since spent
+//   a whole turn actively claiming via the Claim the Kill action (see
+//   actions.claimKill below) - does NOT increment automatically just
+//   because a death happened; unclaimedKillCount below is what banks up
+//   waiting for that.
+// isMirror excluded from the "his own kill" case for the same reasoning as
+// every other attacker-attribution check in the codebase (a mirrored/
+// reflected kill isn't a direct attack of his), but still banks as an
+// unclaimed kill via the else branch (someone/something else's kill either
+// way, from Grimtal's perspective). Fires on EVERY death in the game except
+// his own (diedCharacterId !== 'grimtal') and only while he's alive himself
+// to receive credit.
+registerOnAnyDeath((diedCharacterId, sourceCharacterId, isMirror, game) => {
+  if (diedCharacterId === 'grimtal') return;
+  const grimtal = game.characters.grimtal;
+  if (!grimtal || grimtal.isKO) return;
+  if (sourceCharacterId === 'grimtal' && !isMirror) {
+    grimtal.special.ownKillCount += 1;
+  } else {
+    grimtal.special.unclaimedKillCount += 1;
+  }
+});
+
+// Revival cleanup (see engine/categories/onOtherRevived.js) - his Skull
+// Crack headache doesn't survive a target's own revival either, same
+// "comes back fresh" reasoning - covers two distinct stale-state risks:
+// (1) a pending, not-yet-rolled headache from before they died would
+// otherwise still resolve on their reborn self's next turn, and (2) if the
+// roll had ALREADY resolved to a skip before they died, their own
+// skipHeadacheTurn flag would still be sitting true (that half is cleared
+// on the revived character's OWN object, alongside their other own-state
+// resets, not here - this callback only clears GRIMTAL's own tracking of
+// them as a pending headache victim).
+registerOnOtherRevived((revivedCharacterId, game) => {
+  const grimtal = game.characters.grimtal;
+  if (grimtal && grimtal.special.headacheVictimId === revivedCharacterId) {
+    grimtal.special.headacheVictimId = null;
+    grimtal.special.headacheRollPending = false;
+  }
+});
 
 // Grim Ward and the headache-roll from Skull Crack both need to run BEFORE
 // the acting character's own legal-action set is computed, so they live in
@@ -11,6 +73,43 @@ export function onTurnStart(character, game, log) {
   // for whoever hits him from this point on.
   character.special.lastHitByThisCycle.clear();
 }
+
+// Dodge Defense category registration (see
+// engine/categories/dodgeDefense.js) - additive, not yet consumed by
+// applyDamage's own inline dodge block. Grim Ward: the FIRST attacker each
+// cycle (since his own last turn ended) always lands; every DISTINCT
+// attacker after that dodges (repeat hits from an attacker already recorded
+// this cycle do NOT dodge again). The dodge check itself must run BEFORE
+// recording this hit (matching the original inline block's own
+// has()-before-add ordering exactly) - recordHit is kept as a separate hook
+// (rather than folding the add() into consume()) because the original
+// block adds the attacker to the cycle on BOTH the dodge and no-dodge
+// paths, not only on a successful dodge.
+registerDodgeDefense('grimtal', {
+  canDodge(target, game, sourceCharacterId) {
+    const cycle = target.special.lastHitByThisCycle;
+    return cycle.size > 0 && !cycle.has(sourceCharacterId);
+  },
+  recordHit(target, game, sourceCharacterId) {
+    target.special.lastHitByThisCycle.add(sourceCharacterId);
+  },
+  consume(target, game, sourceCharacterId, log) {
+    const aliveCount = Object.values(game.characters).filter((c) => !c.isKO).length;
+    const points = aliveCount >= 4 ? 2 : aliveCount === 3 ? 1 : 0;
+    let healed = 0;
+    let shielded = 0;
+    for (let i = 0; i < points; i++) {
+      if (target.hearts < target.maxHearts) {
+        target.hearts += 1;
+        healed += 1;
+      } else {
+        target.shield += 1;
+        shielded += 1;
+      }
+    }
+    log.push({ type: 'grim-ward-reward', targetCharacterId: target.id, healed, shielded });
+  },
+});
 
 export const actions = {
   grimStrike: {
@@ -29,23 +128,24 @@ export const actions = {
       return result;
     },
   },
-  claimKill: {
+  // Neutral Action (see engine/categories/neutralAction.js): transfers
+  // between two counters, externally driven (unclaimedKillCount is banked
+  // by OTHER characters' KO events elsewhere in applyDamage, not
+  // self-initiated). Costs his entire turn (no attack this same turn) -
+  // plain repeatable action, not his special (Skull Crack already holds
+  // that slot). Legal only while there's an actual unclaimed kill banked -
+  // the button disappears entirely once everything banked has been
+  // claimed, same "hidden via isLegal alone" pattern Rowan's discoverable
+  // spells use (no separate hidden field needed).
+  claimKill: makeSetupAction({
     label: 'Claim the Kill',
-    needsTarget: false,
-    // Costs his entire turn (no attack this same turn) - plain repeatable
-    // action, not his special (Skull Crack already holds that slot).
-    // Legal only while there's an actual unclaimed kill banked - the
-    // button disappears entirely once everything banked has been claimed,
-    // same "hidden via isLegal alone" pattern Rowan's discoverable spells
-    // use (no separate hidden field needed).
+    actionId: 'claimKill',
     isLegal: (character) => character.special.unclaimedKillCount > 0,
-    execute(character, targetId, game, log) {
+    mutate(character) {
       character.special.unclaimedKillCount -= 1;
       character.special.claimedKillCount += 1;
-      log.push({ type: 'setup', characterId: character.id, actionId: 'claimKill' });
-      return {};
     },
-  },
+  }),
   skullCrack: {
     label: 'Skull Crack',
     needsTarget: true,

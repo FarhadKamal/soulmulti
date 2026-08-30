@@ -1,8 +1,75 @@
 import { applyDamage, applyHeal, applyShield, decayShieldIfDue, tryTriggerCleanSlate, tryIllyraDodgeStatus } from '../engine/damagePipeline.js';
+import { registerOnOtherRevived } from '../engine/categories/onOtherRevived.js';
+import { registerOnOwnDeath } from '../engine/categories/onOwnDeath.js';
+import { registerOnHitLanded } from '../engine/categories/onHitLanded.js';
 
 export function onTurnStart(character, game, log) {
   decayShieldIfDue(character);
 }
+
+// Revival cleanup (see engine/categories/onOtherRevived.js) - her curse
+// doesn't survive the cursed character's own revival (e.g. Blade's
+// Rebirth); they come back "fresh" with no negative energy carried over.
+registerOnOtherRevived((revivedCharacterId, game) => {
+  const athena = game.characters.athena;
+  if (athena && athena.special.curseTargetCharacterId === revivedCharacterId) {
+    athena.special.curseTargetCharacterId = null;
+  }
+});
+
+// KO-branch cleanup (see engine/categories/onOwnDeath.js) - her curse ends
+// the instant she's KO'd - no one left to trigger the mirror going forward
+// (her own isKO guard at the top of applyDamage blocks any FUTURE hit from
+// ever reading it again), but curseTargetCharacterId itself was otherwise
+// never cleared, leaving the client's cursed-mark visual (battleScreen.js)
+// and bot AI's isCursedByLiveAthena-style checks with stale state to read.
+// Returns { preClearCursedId } so the curse-mirror callback below (which
+// runs LATER in this same applyDamage call, after this clear) can still
+// see who was cursed - the killing blow itself landed while she was alive
+// and should still mirror, only hits AFTER her death shouldn't. Confirmed
+// bug (pre-generalization): without this hand-off, the exact hit that
+// killed a cursed Athena silently dropped its own mirror, since
+// curseTargetCharacterId was already null by the time the mirror check ran.
+registerOnOwnDeath('athena', (character) => {
+  if (!character.special.curseTargetCharacterId) return;
+  const preClearCursedId = character.special.curseTargetCharacterId;
+  character.special.curseTargetCharacterId = null;
+  return { preClearCursedId };
+});
+
+// Curse mirror (see engine/categories/onHitLanded.js): triggered by damage
+// actually landing on Athena. Reads ctx.preClearCursedId as a fallback for
+// the exact hit that just KO'd her (see the onOwnDeath registration above -
+// curseTargetCharacterId is already null by the time this runs on that same
+// call, since onOwnDeath's clear happens first). The mirror log entry is
+// deferred (returned, not pushed to `log` here) and pushed by executeAction()
+// after the triggering ability's own log entries - otherwise it lands in the
+// log BEFORE the attack line that caused it, since applyDamage() runs before
+// the caller's own push.
+registerOnHitLanded('athena', (character, game, log, ctx) => {
+  if (ctx.isMirror || ctx.amountDealt <= 0) return;
+  const cursedId = character.special.curseTargetCharacterId ?? ctx.preClearCursedId;
+  if (!cursedId || !game.characters[cursedId] || game.characters[cursedId].isKO) return;
+  const mirrorResult = applyDamage(game, log, {
+    sourceCharacterId: ctx.sourceCharacterId,
+    targetCharacterId: cursedId,
+    amount: ctx.amountDealt,
+    ignoresShield: false,
+    ignoresUntargetable: true,
+    isMirror: true,
+  });
+  return {
+    mirrorResult,
+    mirrorLogEntry: {
+      type: 'curse-mirror',
+      fromCharacterId: 'athena',
+      toCharacterId: cursedId,
+      amount: ctx.amountDealt,
+      koTriggered: mirrorResult.koTriggered,
+      revived: mirrorResult.revived,
+    },
+  };
+});
 
 export const actions = {
   curseStrike: {

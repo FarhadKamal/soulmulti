@@ -1,5 +1,121 @@
 import { applyDamage, isSilenced, tryTriggerCleanSlate, tryIllyraDodgeStatus } from '../engine/damagePipeline.js';
 import { flipCoin } from '../engine/random.js';
+import { registerOnOwnDeath } from '../engine/categories/onOwnDeath.js';
+import { registerOnOtherRevived } from '../engine/categories/onOtherRevived.js';
+import { registerOnHitLandedEarly } from '../engine/categories/onHitLandedEarly.js';
+
+// Rewind pending-snapshot drift correction (see
+// engine/categories/onHitLandedEarly.js): his snapshot
+// (special.lastActionAgainstMe.chronoxSnapshot.hearts) is captured at some
+// point in the PAST - the moment right before whichever action is
+// currently the "most recent action against him." If damage lands on him
+// from a source that ISN'T that recorded action (poison ticks, a
+// curse-mirror bounce, Mirror Reflect's counter-hit, anything not routed
+// through the normal recording flow), the snapshot itself must shift down
+// by that same amount too - otherwise Rewind would restore him past damage
+// it was never meant to touch, i.e. free healing for damage from an
+// unrelated source.
+//
+// EXCLUDED: damage from the SAME caster+turnInstance as the currently
+// pending record - this is a chained follow-up within the same combo
+// (Soul Swap's soulSwapWrath, Draxus's bonus strikes), and that damage
+// genuinely SHOULD be absorbed into the existing snapshot's own
+// before-state, not corrected away as "unrelated." mindControl (Melyssa's
+// puppet SELECTION step) is excluded from combo continuation too - a
+// pending mindControl record's snapshot must still drift-correct against
+// any damage that follows in the same turn (e.g. Self Choke), not be
+// treated as "part of the same combo" and skipped. Matches the same
+// turnInstance-based combo detection turnEngine.js's
+// buildActionAgainstChronoxRecord already uses.
+registerOnHitLandedEarly('chronox', (character, game, log, ctx) => {
+  const record = character.special?.lastActionAgainstMe;
+  if (!record) return;
+  const isSameComboContinuation = record.casterId === ctx.sourceCharacterId
+    && game.turnInstanceFor?.get(ctx.sourceCharacterId) === record.casterTurnInstance
+    && record.actionId !== 'mindControl';
+  if (isSameComboContinuation) return;
+  const drift = ctx.heartsBefore - character.hearts;
+  if (drift > 0) {
+    record.chronoxSnapshot.hearts = Math.max(0, record.chronoxSnapshot.hearts - drift);
+  }
+});
+
+// Revival cleanup (see engine/categories/onOtherRevived.js) - 3 separate
+// stale-reference risks, all against the now-revived character specifically.
+registerOnOtherRevived((revivedCharacterId, game) => {
+  const chronox = game.characters.chronox;
+  if (!chronox) return;
+  // Time Freeze doesn't just set skipNextTurn once - it's re-applied on
+  // CHRONOX's own next turn via freezeActive/freezeTargetId (see this
+  // file's own onTurnStart), which has no awareness that its target died
+  // and came back in between. Ending the freeze here matches "comes back
+  // fresh with no negative energy."
+  if (chronox.special.freezeActive && chronox.special.freezeTargetId === revivedCharacterId) {
+    chronox.special.freezeActive = false;
+    chronox.special.freezeTargetId = null;
+  }
+  // World Stops equivalent - removes the revived character alone from the
+  // shared frozen group rather than ending the whole thing for everyone
+  // else still frozen.
+  if (chronox.special.worldStopsActive && chronox.special.worldStopsFrozenIds?.has(revivedCharacterId)) {
+    chronox.special.worldStopsFrozenIds.delete(revivedCharacterId);
+    if (chronox.special.worldStopsFrozenIds.size === 0) {
+      chronox.special.worldStopsActive = false;
+    }
+  }
+  // A Rewind snapshot must be invalidated if IT was recorded against this
+  // now-revived character as the caster - otherwise casting Rewind later
+  // would restore a STALE pre-death snapshot of them, silently erasing
+  // their revival entirely (their hearts revert to whatever they were
+  // before the fatal hit, their own "used" flag reverts to false, letting
+  // them "die and revive" a second time for free). Confirmed live-reasoning
+  // gap: isLegal's own "caster still alive" check doesn't catch this, since
+  // the revival flips isKO straight back to false - the caster looks alive
+  // again by the time Rewind is cast, even though the snapshot itself now
+  // predates a death/revival it knows nothing about.
+  if (chronox.special.lastActionAgainstMe?.casterId === revivedCharacterId) {
+    chronox.special.lastActionAgainstMe = null;
+  }
+});
+
+// KO-branch cleanup (see engine/categories/onOwnDeath.js).
+registerOnOwnDeath('chronox', (character, game, log) => {
+  // Time Freeze ends immediately if he's KO'd - no one left to keep
+  // re-applying the skip each round, so the frozen target is freed rather
+  // than being stuck frozen with no way for it to ever lift.
+  if (character.special.freezeActive) {
+    const frozenId = character.special.freezeTargetId;
+    const frozen = game.characters[frozenId];
+    if (frozen) frozen.skipNextTurn = false;
+    character.special.freezeActive = false;
+    character.special.freezeTargetId = null;
+    log.push({ type: 'freeze-end', targetCharacterId: frozenId });
+  }
+  // Same reasoning for World Stops - frees the WHOLE group at once, unlike
+  // Blade's own Rebirth cleanup (which only removes Blade himself from an
+  // otherwise-still-live group) - Chronox dying ends the effect entirely
+  // for everyone in it.
+  if (character.special.worldStopsActive) {
+    const frozenIds = [...character.special.worldStopsFrozenIds];
+    for (const frozenId of frozenIds) {
+      const frozen = game.characters[frozenId];
+      if (frozen) frozen.skipNextTurn = false;
+    }
+    character.special.worldStopsActive = false;
+    character.special.worldStopsFrozenIds = new Set();
+    log.push({ type: 'world-stops-end', frozenIds });
+  }
+  // His own death ends any pending Rewind opportunity and lockout
+  // immediately - not strictly load-bearing today (he has no revival
+  // mechanic, and applyDamage's own isKO guard blocks any future action
+  // from ever targeting a dead Chronox), but matches the same defensive
+  // "caster's death cancels their own state" cleanup every other character
+  // gets, in case a future mechanic ever revives him.
+  character.special.lastActionAgainstMe = null;
+  character.special.lockedActionCasterId = null;
+  character.special.lockedActionId = null;
+  character.special.lockedActionTurnsRemaining = 0;
+});
 
 // Total rounds World Stops' freeze lasts (confirmed ruling - 4, doubled
 // from an initial 2). Round 1 is applied immediately at cast time

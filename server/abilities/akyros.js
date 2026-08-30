@@ -1,4 +1,7 @@
 import { applyDamage, tryTriggerCleanSlate, tryIllyraDodgeStatus } from '../engine/damagePipeline.js';
+import { registerDodgeDefense } from '../engine/categories/dodgeDefenseRegistry.js';
+import { registerOnOwnDeath } from '../engine/categories/onOwnDeath.js';
+import { registerOnOtherRevived } from '../engine/categories/onOtherRevived.js';
 
 function anyEnemyIsMarked(game, akyrosId) {
   const akyros = game.characters[akyrosId];
@@ -6,6 +9,41 @@ function anyEnemyIsMarked(game, akyrosId) {
     (c) => c.ownerId !== akyros.ownerId && !c.isKO && akyros.special.marks.has(c.id)
   );
 }
+
+// Dodge Defense category registration (see
+// engine/categories/dodgeDefense.js) - additive, not yet consumed by
+// applyDamage's own inline dodge block. Per-attacker, one-time: dodges each
+// unique attacker once, tracked in dodgedAttackerIds, no recharge.
+registerDodgeDefense('akyros', {
+  canDodge(target, game, sourceCharacterId) {
+    return !target.special.dodgedAttackerIds.has(sourceCharacterId);
+  },
+  consume(target, game, sourceCharacterId) {
+    target.special.dodgedAttackerIds.add(sourceCharacterId);
+  },
+});
+
+// KO-branch cleanup (see engine/categories/onOwnDeath.js) - marks (hidden
+// and revealed) die with him, no point keeping track once he can never use
+// Fatal Slash/Shadow Execution again.
+registerOnOwnDeath('akyros', (character) => {
+  character.special.marks.clear();
+  character.special.revealedMarks.clear();
+});
+
+// Revival cleanup (see engine/categories/onOtherRevived.js) - his current
+// Hidden Mark on a now-revived character doesn't survive their death
+// either - they're coming back fresh, so Fatal Slash/Shadow Execution
+// shouldn't still get the marked bonus against them. Only the CURRENT mark
+// is cleared (marks/revealedMarks) - everMarkedIds is left alone, so he
+// still can't place a brand-new mark on them later (same "once marked,
+// never again" rule as everyone else).
+registerOnOtherRevived((revivedCharacterId, game) => {
+  const akyros = game.characters.akyros;
+  if (!akyros) return;
+  akyros.special.marks.delete(revivedCharacterId);
+  akyros.special.revealedMarks.delete(revivedCharacterId);
+});
 
 export const actions = {
   hiddenMark: {

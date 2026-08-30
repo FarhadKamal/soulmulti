@@ -1,4 +1,65 @@
 import { applyDamage, applyHeal, tryTriggerCleanSlate, tryIllyraDodgeStatus } from '../engine/damagePipeline.js';
+import { registerOnOwnDeath } from '../engine/categories/onOwnDeath.js';
+import { registerOnOtherRevived } from '../engine/categories/onOtherRevived.js';
+import { registerOnHitLandedEarly } from '../engine/categories/onHitLandedEarly.js';
+import { makeDiscoveryKit } from '../engine/categories/discoveryKit.js';
+
+// Mirror Reflect counter (see engine/categories/onHitLanded.js): any direct
+// (non-mirrored) hit that lands real damage on him while it's active, and
+// that he SURVIVES (post-damage hearts > 0), automatically deals 3 damage
+// back to the attacker - on top of Rowan still taking the original hit
+// normally (this doesn't block/reduce anything). Modeled directly on
+// Athena's own curse-mirror: a nested applyDamage call with isMirror: true,
+// which both prevents Akyros's Dodge from applying to the reflected hit and
+// prevents infinite mirror recursion. Confirmed ruling: stays active
+// indefinitely across any number of Rowan's own turns - it does NOT
+// auto-clear at his next turn start, only ending once it actually fires,
+// right here. Returns { mirrorReflectResult, mirrorReflectLogEntry } for
+// the dispatcher to merge onto applyDamage's own result object.
+registerOnHitLandedEarly('rowan', (character, game, log, ctx) => {
+  if (!character.special.mirrorReflectActive) return;
+  if (ctx.isMirror || ctx.amountDealt <= 0 || character.hearts <= 0 || ctx.sourceCharacterId === character.id) return;
+  character.special.mirrorReflectActive = false;
+  const mirrorReflectResult = applyDamage(game, log, {
+    sourceCharacterId: character.id,
+    targetCharacterId: ctx.sourceCharacterId,
+    amount: 3,
+    isMirror: true,
+  });
+  return {
+    mirrorReflectResult,
+    mirrorReflectLogEntry: {
+      type: 'mirror-reflect',
+      fromCharacterId: character.id,
+      toCharacterId: ctx.sourceCharacterId,
+      amount: 3,
+      koTriggered: mirrorReflectResult.koTriggered,
+      revived: mirrorReflectResult.revived,
+    },
+  };
+});
+
+// KO-branch cleanup (see engine/categories/onOwnDeath.js) - his own death
+// ends every effect HE cast on anyone else immediately: Poison Cloud stops
+// ticking, Silence Lock's remaining turns are cleared (targets freed), and
+// a still-pending Mirror Reflect window is cancelled. Does not undo damage
+// already dealt by past ticks/reflects, only stops future ones (confirmed
+// explicit design rule).
+registerOnOwnDeath('rowan', (character) => {
+  character.special.poisonTargets.clear();
+  character.special.silenceTargets.clear();
+  character.special.mirrorReflectActive = false;
+});
+
+// Revival cleanup (see engine/categories/onOtherRevived.js) - his Poison
+// Cloud doesn't survive a target's own revival either, same "comes back
+// fresh" reasoning - otherwise the very next poison tick on their own turn
+// would immediately start killing them again with no way to ever escape it.
+registerOnOtherRevived((revivedCharacterId, game) => {
+  const rowan = game.characters.rowan;
+  if (rowan) rowan.special.poisonTargets.delete(revivedCharacterId);
+});
+
 // NOTE: worldStops-aware cleanse lives directly in this file's purify
 // action below (removes Rowan alone from a shared frozen group, same
 // partial-cleanse reasoning as damagePipeline.js's own
@@ -8,14 +69,11 @@ import { applyDamage, applyHeal, tryTriggerCleanSlate, tryIllyraDodgeStatus } fr
 
 // The full discoverable spell pool - Arcane Study draws one of whichever
 // aren't in special.discoveredSpells yet, so each ever appears at most once
-// per match.
+// per match. Rowan's onDiscover is a no-op (unlike Marin's) - none of his
+// 5 spells auto-activate; each becomes a separate manually-cast action,
+// gated by discoveredSpells.has(id) && !usedSpells.has(id) below.
 const ALL_SPELL_IDS = ['poisonCloud', 'purify', 'wildLightning', 'mirrorReflect', 'silenceLock'];
-
-function pickUndiscoveredSpell(character) {
-  const remaining = ALL_SPELL_IDS.filter((id) => !character.special.discoveredSpells.has(id));
-  if (remaining.length === 0) return null;
-  return remaining[Math.floor(Math.random() * remaining.length)];
-}
+const discoveryKit = makeDiscoveryKit({ spellIds: ALL_SPELL_IDS });
 
 // Fires once at the start of Rowan's own turn (turnEngine.js's
 // beginCharacterTurn, gated by game.turnStartFiredFor). Resolves the
@@ -27,17 +85,7 @@ function pickUndiscoveredSpell(character) {
 // damagePipeline.js's mirror-trigger block, which clears the flag itself
 // right after firing).
 export function onTurnStart(character, game, log) {
-  if (character.special.arcaneStudyPending) {
-    const spellId = pickUndiscoveredSpell(character);
-    character.special.arcaneStudyPending = false;
-    if (spellId) {
-      character.special.discoveredSpells.add(spellId);
-      log.push({ type: 'spell-discovered', characterId: character.id, spellId });
-    }
-  }
-  if (character.special.arcaneStudyOnCooldown) {
-    character.special.arcaneStudyOnCooldown = false;
-  }
+  discoveryKit.resolveOnTurnStart(character, game, log);
 }
 
 export const actions = {
@@ -51,19 +99,7 @@ export const actions = {
       return result;
     },
   },
-  arcaneStudy: {
-    label: 'Arcane Study',
-    needsTarget: false,
-    special: true,
-    isLegal: (character) => !character.special.arcaneStudyOnCooldown
-      && character.special.discoveredSpells.size < ALL_SPELL_IDS.length,
-    execute(character, targetId, game, log) {
-      character.special.arcaneStudyPending = true;
-      character.special.arcaneStudyOnCooldown = true;
-      log.push({ type: 'setup', characterId: character.id, actionId: 'arcaneStudy' });
-      return {};
-    },
-  },
+  arcaneStudy: discoveryKit.arcaneStudy,
   poisonCloud: {
     label: 'Poison Cloud',
     needsTarget: true,
