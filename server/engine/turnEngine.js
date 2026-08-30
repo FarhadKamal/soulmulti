@@ -854,14 +854,18 @@ export function resolveJesterBall(game, holderCharacterId, choice, extra) {
   return result;
 }
 
-// Snapshot of every character's current hearts (or 'KO'), taken right after
-// an action fully resolves - attached to the end-action marker so the log
-// can show a running health readout after each turn without needing the
-// reader to hand-tally damage across the whole match.
+// Snapshot of every character's current hearts (or 'KO') AND shield, taken
+// right after an action fully resolves - attached to the end-action marker
+// so the log can show a running health/shield readout after each turn
+// without needing the reader to hand-tally damage across the whole match.
+// Shield included alongside hearts (2026-08-30, user request) specifically
+// to make hand-tracing bugs like the Rewind/usedWorldStops and
+// Rewind/freeze-resurrection issues faster to verify directly against the
+// log instead of needing a fresh code trace each time.
 function heartsSnapshot(game) {
   const snap = {};
   for (const c of Object.values(game.characters)) {
-    snap[c.id] = c.isKO ? 'KO' : c.hearts;
+    snap[c.id] = c.isKO ? 'KO' : { hearts: c.hearts, shield: c.shield };
   }
   return snap;
 }

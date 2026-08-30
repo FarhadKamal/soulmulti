@@ -1572,12 +1572,55 @@ function renderLog(log) {
   return panel;
 }
 
+// Formats one entry's end-action hearts/shield snapshot (see turnEngine.js's
+// heartsSnapshot - {hearts, shield} per living character, or the string
+// 'KO') into a compact "Name:H/S" readout, sorted by character id for a
+// stable column-like order. Appended to each real event's own text line
+// (2026-08-30, user request) so a pasted match log can be hand-traced/
+// verified directly against the numbers shown, without needing a fresh
+// code investigation every time a damage-arithmetic bug is suspected.
+function formatHeartsSnapshot(snapshot) {
+  if (!snapshot) return '';
+  const parts = Object.keys(snapshot).sort().map((id) => {
+    const s = snapshot[id];
+    const label = CHARACTERS[id]?.name || id;
+    if (s === 'KO') return `${label}:KO`;
+    return `${label}:${s.hearts}${s.shield > 0 ? `+${s.shield}sh` : ''}`;
+  });
+  return parts.join(' ');
+}
+
 // Full, uncapped match log for the game-over screen (unlike renderLog's
 // live 20-line window during play) - the whole point here is a permanent
 // record of exactly what happened, in the order it happened, that the
-// winner/loser can copy out and keep or share.
+// winner/loser can copy out and keep or share. Each real event line is
+// suffixed with a [Name:H+Ssh ...] readout of every character's hearts/
+// shield right after the WHOLE action that produced it fully resolved -
+// finalizeAction (turnEngine.js) pushes one entire action's worth of log
+// entries (the main attack/special line, plus any deferred rebirth/
+// curse-mirror/mirror-reflect lines) as one batch, followed by exactly ONE
+// end-action marker for that batch - so every entry in a batch shares the
+// SAME upcoming end-action, found by scanning forward (not just checking
+// the immediately-next entry, which would be wrong for a multi-entry batch
+// like a curse-mirror KO). end-action itself is a pure bookkeeping entry
+// with no text of its own (see describeLogEntry), never rendered as its
+// own line, only consumed here for its snapshot.
 function renderFullLogWithCopy(log) {
-  const lines = log.map((entry) => describeLogEntry(entry)).filter(Boolean);
+  const lines = [];
+  for (let i = 0; i < log.length; i++) {
+    const entry = log[i];
+    if (entry.type === 'end-action') continue;
+    const text = describeLogEntry(entry);
+    if (!text) continue;
+    let snapshotText = '';
+    for (let j = i + 1; j < log.length; j++) {
+      if (log[j].type === 'end-action') {
+        snapshotText = formatHeartsSnapshot(log[j].hearts);
+        break;
+      }
+    }
+    lines.push(snapshotText ? `${text}  [${snapshotText}]` : text);
+  }
   const wrap = document.createElement('div');
   wrap.className = 'final-log-panel';
 
