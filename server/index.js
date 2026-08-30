@@ -15,7 +15,7 @@ import {
   isMelyssaLoneDuel, LONE_DUEL_EXCEPTIONS, buildActionAgainstChronoxRecord, chronoxStateActuallyChanged,
   resolveOraclusPredictionIfPending, isValidRuneVisionAttackerPick, isValidRuneVisionTargetPick,
 } from './engine/turnEngine.js';
-import { applyDamage } from './engine/damagePipeline.js';
+import { applyDamage, heartsSnapshot } from './engine/damagePipeline.js';
 import {
   chooseBotMove, chooseBotJesterBallMove, chooseBotBoingoJesterBallMove, chooseSoulSwapWrathTarget,
   chooseBotMelyssaPuppetAction, chooseRuneVisionTargetPick,
@@ -584,7 +584,7 @@ function armTurnTimer(room, characterId) {
       // owner-gated) became unusable for the rest of that room's life,
       // even though its owner never actually left.
       broadcastLobby(room);
-      room.game.log.push({ type: 'passive', characterId, text: 'Turn timed out - a bot takes over.' });
+      room.game.log.push({ type: 'passive', characterId, text: 'Turn timed out - a bot takes over.', hearts: heartsSnapshot(room.game) });
     }
     runBotTurnsIfAny(room);
   }, TURN_TIMER_DURATION_MS);
@@ -739,6 +739,7 @@ function stepBotTurn(room) {
           room.game.log.push({
             type: 'special', characterId: 'oraclus', actionId: 'runeVision',
             predictedAttackerId: move.targetId, predictedTargetId: predictionTarget, stage: 2,
+            hearts: heartsSnapshot(room.game),
           });
         }
       }
@@ -1624,6 +1625,7 @@ function handleRuneVisionTargetPick(room, sessionId, { characterId, targetId }) 
   room.game.log.push({
     type: 'special', characterId: 'oraclus', actionId: 'runeVision',
     predictedAttackerId: oraclusChar.special.predictedAttackerId, predictedTargetId: targetId, stage: 2,
+    hearts: heartsSnapshot(room.game),
   });
   markCharacterActed(room.game, characterId);
   broadcastGameState(room);

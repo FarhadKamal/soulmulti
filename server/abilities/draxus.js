@@ -1,4 +1,4 @@
-import { applyDamage } from '../engine/damagePipeline.js';
+import { applyDamage, heartsSnapshot } from '../engine/damagePipeline.js';
 
 const DYING_BLOW_TIERS = [
   { min: 6, amount: 1 },
@@ -21,7 +21,7 @@ export function onTurnStart(character, game, log) {
   if (character.special.deathproofActive) {
     character.special.deathproofActive = false;
     character.special.bonusActionsRemaining = 3;
-    log.push({ type: 'deathless-fury-end', characterId: character.id });
+    log.push({ type: 'deathless-fury-end', characterId: character.id, hearts: heartsSnapshot(game) });
   }
 }
 

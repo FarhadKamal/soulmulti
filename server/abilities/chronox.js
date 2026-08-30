@@ -1,4 +1,4 @@
-import { applyDamage, isSilenced, tryTriggerCleanSlate, tryIllyraDodgeStatus } from '../engine/damagePipeline.js';
+import { applyDamage, isSilenced, tryTriggerCleanSlate, tryIllyraDodgeStatus, heartsSnapshot } from '../engine/damagePipeline.js';
 import { flipCoin } from '../engine/random.js';
 import { registerOnOwnDeath } from '../engine/categories/onOwnDeath.js';
 import { registerOnOtherRevived } from '../engine/categories/onOtherRevived.js';
@@ -133,7 +133,7 @@ export function onTurnStart(character, game, log) {
     character.shield = 0;
   } else {
     character.shield = 1;
-    log.push({ type: 'passive', characterId: character.id, text: `${character.id}'s shield resets to 1 (Chrono Guard)` });
+    log.push({ type: 'passive', characterId: character.id, text: `${character.id}'s shield resets to 1 (Chrono Guard)`, hearts: heartsSnapshot(game) });
   }
 
   // Time Freeze: flat 2-round duration, no coin flip. Casting already skips
@@ -145,11 +145,11 @@ export function onTurnStart(character, game, log) {
       const frozen = game.characters[frozenId];
       if (frozen && !frozen.isKO) frozen.skipNextTurn = true;
       character.special.freezeSkipsApplied += 1;
-      log.push({ type: 'freeze-continue', targetCharacterId: frozenId });
+      log.push({ type: 'freeze-continue', targetCharacterId: frozenId, hearts: heartsSnapshot(game) });
     } else {
       character.special.freezeActive = false;
       character.special.freezeTargetId = null;
-      log.push({ type: 'freeze-end', targetCharacterId: frozenId });
+      log.push({ type: 'freeze-end', targetCharacterId: frozenId, hearts: heartsSnapshot(game) });
     }
   }
 
@@ -168,11 +168,11 @@ export function onTurnStart(character, game, log) {
         if (frozen && !frozen.isKO) frozen.skipNextTurn = true;
       }
       character.special.worldStopsSkipsApplied += 1;
-      log.push({ type: 'world-stops-continue', frozenIds: [...character.special.worldStopsFrozenIds] });
+      log.push({ type: 'world-stops-continue', frozenIds: [...character.special.worldStopsFrozenIds], hearts: heartsSnapshot(game) });
     } else {
       character.special.worldStopsActive = false;
       character.special.worldStopsFrozenIds = new Set();
-      log.push({ type: 'world-stops-end' });
+      log.push({ type: 'world-stops-end', hearts: heartsSnapshot(game) });
     }
   }
 }

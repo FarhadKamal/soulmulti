@@ -13,6 +13,33 @@ import { runOnAnyDeath } from './categories/onAnyDeath.js';
 
 export { registerRebirth };
 
+// Snapshot of every character's current hearts (or 'KO') AND shield, taken
+// at the exact moment of a log.push() call - stamped onto EVERY log entry
+// at its own push site (not just the end-action marker executeAction/
+// finalizeAction push), so the client can read entry.hearts directly
+// per-line with no forward-scanning/pairing logic needed. Lives here (not
+// turnEngine.js, where end-action's own usage originated) so every ability
+// file can call it directly to stamp its own standalone log.push() sites
+// (e.g. chronox.js's onTurnStart passives, kaelis.js's Ashka heal tick) -
+// ability files already import safely from this file, and this file has
+// zero imports of its own, so this avoids the same circular-import problem
+// the whole category-driven refactor deliberately avoided throughout.
+// Confirmed necessary 2026-08-30: a live match log showed several
+// standalone log entries (turn-start passives, frozen/headache turn-skips)
+// displaying a LATER action's snapshot instead of their own, because the
+// original "find the next end-action" client-side approach silently
+// grabbed whatever real action happened to resolve next - possibly several
+// turns and several OTHER characters' actions later during a busy
+// World-Stops/multi-KO stretch. Purely a display bug - no combat-
+// resolution damage was ever actually misapplied.
+export function heartsSnapshot(game) {
+  const snap = {};
+  for (const c of Object.values(game.characters)) {
+    snap[c.id] = c.isKO ? 'KO' : { hearts: c.hearts, shield: c.shield };
+  }
+  return snap;
+}
+
 // True if ANY character currently has characterId locked under their own
 // Silence Lock (Rowan's special.silenceTargets Map) - written generically
 // (scans every character's .special rather than assuming Rowan specifically)
@@ -100,7 +127,7 @@ export function clearNegativeStatuses(character, game, log) {
       s.freezeActive = false;
       s.freezeTargetId = null;
       character.skipNextTurn = false;
-      log.push({ type: 'freeze-end', targetCharacterId: character.id });
+      log.push({ type: 'freeze-end', targetCharacterId: character.id, hearts: heartsSnapshot(game) });
     }
     // World Stops is a SHARED countdown across a whole group - cleansing
     // just THIS character removes them alone from the frozen set (un-skips
@@ -112,7 +139,7 @@ export function clearNegativeStatuses(character, game, log) {
       s.worldStopsFrozenIds.delete(character.id);
       character.skipNextTurn = false;
       if (s.worldStopsFrozenIds.size === 0) s.worldStopsActive = false;
-      log.push({ type: 'world-stops-end', targetCharacterId: character.id });
+      log.push({ type: 'world-stops-end', targetCharacterId: character.id, hearts: heartsSnapshot(game) });
     }
     if (s.marks?.has(character.id)) s.marks.delete(character.id);
     if (s.revealedMarks?.has(character.id)) s.revealedMarks.delete(character.id);

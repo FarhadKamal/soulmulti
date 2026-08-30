@@ -1,5 +1,5 @@
 import { cloneGame } from './state.js';
-import { applyDamage, applyHeal, applyShield, isSilenced, isFrozenByChronox } from './damagePipeline.js';
+import { applyDamage, applyHeal, applyShield, isSilenced, isFrozenByChronox, heartsSnapshot } from './damagePipeline.js';
 import * as chronox from '../abilities/chronox.js';
 import * as tharox from '../abilities/tharox.js';
 import * as zerathys from '../abilities/zerathys.js';
@@ -254,15 +254,15 @@ function tickPoisonIfAny(character, game, log) {
     ignoresUntargetable: true,
     isPoisonTick: true,
   });
-  log.push({ type: 'poison-tick', casterId: caster.id, targetCharacterId: character.id, ...result });
+  log.push({ type: 'poison-tick', casterId: caster.id, targetCharacterId: character.id, ...result, hearts: heartsSnapshot(game) });
   // Same deferred-log-entry handling as finalizeAction: applyDamage returns
   // curse-mirror/rebirth entries on the result rather than pushing them
   // itself, so a poison tick that kills a cursed Athena (mirroring damage
   // onto her cursed target) needs this path to push them too, or that
   // mirror hit happens with no corresponding log line at all.
-  if (result.rebirthLogEntry) log.push(result.rebirthLogEntry);
-  if (result.mirrorLogEntry) log.push(result.mirrorLogEntry);
-  if (result.mirrorResult?.rebirthLogEntry) log.push(result.mirrorResult.rebirthLogEntry);
+  if (result.rebirthLogEntry) log.push({ ...result.rebirthLogEntry, hearts: heartsSnapshot(game) });
+  if (result.mirrorLogEntry) log.push({ ...result.mirrorLogEntry, hearts: heartsSnapshot(game) });
+  if (result.mirrorResult?.rebirthLogEntry) log.push({ ...result.mirrorResult.rebirthLogEntry, hearts: heartsSnapshot(game) });
 }
 
 // Rowan's Silence Lock, same victim-turn-tick shape as poison above.
@@ -279,7 +279,7 @@ function tickSilenceIfAny(character, game, log) {
     if (turnsRemaining === undefined) continue;
     if (turnsRemaining <= 0) {
       caster.special.silenceTargets.delete(character.id);
-      log.push({ type: 'silence-end', casterId: caster.id, targetCharacterId: character.id });
+      log.push({ type: 'silence-end', casterId: caster.id, targetCharacterId: character.id, hearts: heartsSnapshot(game) });
       continue;
     }
     caster.special.silenceTargets.set(character.id, turnsRemaining - 1);
@@ -310,7 +310,7 @@ function resolveHeadacheIfDue(character, game, log) {
   // back to back, even though no freeze was ever involved. See
   // consumeSkipIfHeadache below for the matching dedicated consume path.
   if (skipped) character.skipHeadacheTurn = true;
-  log.push({ type: 'headache-roll', casterId: caster.id, targetCharacterId: character.id, skipped });
+  log.push({ type: 'headache-roll', casterId: caster.id, targetCharacterId: character.id, skipped, hearts: heartsSnapshot(game) });
 }
 
 // Grim Ward's per-cycle attacker tracking (lastHitByThisCycle) is cleared by
@@ -688,7 +688,7 @@ export function resolveOraclusPredictionIfPending(game, log, characterId, action
   oraclusChar.special.predictedAttackerId = null;
   oraclusChar.special.predictedTargetId = null;
   if (!isMatch) {
-    log.push({ type: 'prediction-result', characterId: 'oraclus', matched: false });
+    log.push({ type: 'prediction-result', characterId: 'oraclus', matched: false, hearts: heartsSnapshot(game) });
     return;
   }
   oraclusChar.special.predictionWins += 1;
@@ -699,6 +699,7 @@ export function resolveOraclusPredictionIfPending(game, log, characterId, action
     type: 'prediction-result', characterId: 'oraclus', matched: true,
     predictedAttackerId: characterId, predictedTargetId: targetId,
     predictionWins: oraclusChar.special.predictionWins,
+    hearts: heartsSnapshot(game),
   });
 }
 
@@ -740,7 +741,17 @@ export function finalizeAction(game, log, result, characterId, actionId, targetI
   // until here so they land AFTER the triggering attack's own log entry,
   // not before it. Rebirth can also fire on the MIRROR hit itself (curse
   // damage killing Blade), so check both the direct result and, once the
-  // mirror's own entry is queued, the mirror result too.
+  // mirror's own entry is queued, the mirror result too. Deliberately NOT
+  // stamped with their own hearts here (unlike the standalone sites this
+  // whole hearts-snapshot fix targets) - `log` is always this action's own
+  // execute()-local batch array (confirmed: every finalizeAction caller
+  // passes a local array, never game.log directly), always immediately
+  // followed by this SAME batch's single shared end-action push below,
+  // which already carries the correct final snapshot. Stamping these too
+  // would make the client's own "stop at the first hearts-bearing entry"
+  // fallback scan incorrectly treat them as a new standalone boundary,
+  // cutting the PRECEDING attack line off from ever reaching this batch's
+  // real end-action - confirmed as a real regression caught by testing.
   if (result?.rebirthLogEntry) log.push(result.rebirthLogEntry);
   if (result?.mirrorLogEntry) log.push(result.mirrorLogEntry);
   if (result?.mirrorResult?.rebirthLogEntry) log.push(result.mirrorResult.rebirthLogEntry);
@@ -848,27 +859,20 @@ export function resolveJesterBall(game, holderCharacterId, choice, extra) {
     && chronoxStateActuallyChanged(game.characters.chronox, preSnapshot.chronoxSnapshot, null, null)) {
     game.characters.chronox.special.lastActionAgainstMe = preSnapshot;
   }
+  // Not stamped with its own hearts - same reasoning as finalizeAction's
+  // own deferred pushes above (this log array is local, followed by this
+  // same call's own end-action a few lines down).
   if (result?.rebirthLogEntry) log.push(result.rebirthLogEntry);
   applyEndOfActionChecks(game);
   game.log.push(...log, { type: 'end-action', round: game.round, characterId: holderCharacterId, actionId: `jesterBall:${choice}`, hearts: heartsSnapshot(game) });
   return result;
 }
 
-// Snapshot of every character's current hearts (or 'KO') AND shield, taken
-// right after an action fully resolves - attached to the end-action marker
-// so the log can show a running health/shield readout after each turn
-// without needing the reader to hand-tally damage across the whole match.
-// Shield included alongside hearts (2026-08-30, user request) specifically
-// to make hand-tracing bugs like the Rewind/usedWorldStops and
-// Rewind/freeze-resurrection issues faster to verify directly against the
-// log instead of needing a fresh code trace each time.
-function heartsSnapshot(game) {
-  const snap = {};
-  for (const c of Object.values(game.characters)) {
-    snap[c.id] = c.isKO ? 'KO' : { hearts: c.hearts, shield: c.shield };
-  }
-  return snap;
-}
+// heartsSnapshot moved to damagePipeline.js (2026-08-30, imported above
+// alongside applyDamage/etc.) so every ability file - which imports FROM
+// damagePipeline.js, not the reverse - can call it directly to stamp its
+// own standalone log.push() sites, without creating a circular import back
+// into this file.
 
 function applyEndOfActionChecks(game) {
   for (const player of game.players) {

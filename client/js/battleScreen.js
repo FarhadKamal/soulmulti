@@ -1595,16 +1595,28 @@ function formatHeartsSnapshot(snapshot) {
 // record of exactly what happened, in the order it happened, that the
 // winner/loser can copy out and keep or share. Each real event line is
 // suffixed with a [Name:H+Ssh ...] readout of every character's hearts/
-// shield right after the WHOLE action that produced it fully resolved -
-// finalizeAction (turnEngine.js) pushes one entire action's worth of log
-// entries (the main attack/special line, plus any deferred rebirth/
-// curse-mirror/mirror-reflect lines) as one batch, followed by exactly ONE
-// end-action marker for that batch - so every entry in a batch shares the
-// SAME upcoming end-action, found by scanning forward (not just checking
-// the immediately-next entry, which would be wrong for a multi-entry batch
-// like a curse-mirror KO). end-action itself is a pure bookkeeping entry
-// with no text of its own (see describeLogEntry), never rendered as its
-// own line, only consumed here for its snapshot.
+// shield right after THAT SPECIFIC entry resolved.
+//
+// Server-side (2026-08-30), every log entry that's pushed STANDALONE -
+// outside executeAction/finalizeAction's own batching (gameFlow.js's turn-
+// skip branches, chronox.js/kaelis.js/marin.js/draxus.js's onTurnStart
+// passives, turnEngine.js's tick helpers, index.js's Rune-Vision-stage-2/
+// timeout messages) - now stamps its own hearts snapshot directly at push
+// time (see damagePipeline.js's heartsSnapshot). This was a real, confirmed
+// display bug before that fix: the ORIGINAL version of this function scanned
+// forward for the next 'end-action' marker's snapshot for every entry
+// uniformly, which was WRONG for any standalone entry (no end-action of its
+// own to find) - it would silently borrow a LATER, unrelated action's
+// snapshot instead, showing damage/shield changes on lines with no action
+// logged against that character at all. Confirmed via a live match log.
+// Purely a display bug; no combat-resolution damage was ever misapplied.
+//
+// The entries that DON'T carry their own hearts field are exactly the ones
+// that were always correctly bundled: an action's main attack/special/dodge
+// line, still pushed into an execute()-local `log` array that finalizeAction
+// later bundles as one batch ending in a single shared 'end-action' marker.
+// For those (and only those - every standalone site above is now covered),
+// the forward-scan to that batch's own end-action is legitimate and safe.
 function renderFullLogWithCopy(log) {
   const lines = [];
   for (let i = 0; i < log.length; i++) {
@@ -1612,13 +1624,14 @@ function renderFullLogWithCopy(log) {
     if (entry.type === 'end-action') continue;
     const text = describeLogEntry(entry);
     if (!text) continue;
-    let snapshotText = '';
-    for (let j = i + 1; j < log.length; j++) {
-      if (log[j].type === 'end-action') {
-        snapshotText = formatHeartsSnapshot(log[j].hearts);
-        break;
+    let hearts = entry.hearts;
+    if (!hearts) {
+      for (let j = i + 1; j < log.length; j++) {
+        if (log[j].type === 'end-action') { hearts = log[j].hearts; break; }
+        if (log[j].hearts) break; // hit the next STANDALONE entry's own snapshot first - stop, don't borrow past it
       }
     }
+    const snapshotText = formatHeartsSnapshot(hearts);
     lines.push(snapshotText ? `${text}  [${snapshotText}]` : text);
   }
   const wrap = document.createElement('div');

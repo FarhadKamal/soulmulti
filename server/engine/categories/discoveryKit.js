@@ -1,3 +1,5 @@
+import { heartsSnapshot } from '../damagePipeline.js';
+
 // Factory for the "Discovery/Unlock" category (a Neutral Action variant,
 // see the taxonomy in project memory: soulclash_mechanic_taxonomy.md #25) -
 // Arcane Study's shared mechanism: a fixed spell pool, one random
@@ -54,7 +56,7 @@ export function makeDiscoveryKit({ spellIds, onDiscover }) {
       character.special.arcaneStudyPending = false;
       if (spellId) {
         character.special.discoveredSpells.add(spellId);
-        log.push({ type: 'spell-discovered', characterId: character.id, spellId });
+        log.push({ type: 'spell-discovered', characterId: character.id, spellId, hearts: heartsSnapshot(game) });
         onDiscoverResult = onDiscover?.(character, game, log, spellId);
       }
     }

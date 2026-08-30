@@ -12,6 +12,7 @@ import {
   hasCharacterActedThisTurn, charactersActingThisTurn, resolveJesterBall, endTurn,
   tickChronoxLockoutIfAny,
 } from './engine/turnEngine.js';
+import { heartsSnapshot } from './engine/damagePipeline.js';
 
 // Zeroes out a stalled Draxus bonus turn (see draxus.js's onTurnStart) when
 // getActingCharacterId itself ends his turn via markCharacterActed below,
@@ -83,15 +84,22 @@ export function getActingCharacterId(game) {
         // jesterBallResolution.keep exactly) until a turn he can actually
         // act on comes around - every other character still gets the
         // forced explosion, since only he has this exemption.
+        // Snapshot taken BEFORE finishJesterBall (matches the log entry's
+        // own position, which is pushed before it too) - a 'take' can deal
+        // real explosion damage, so this line's own hearts readout should
+        // reflect state right before that damage lands, not after; the
+        // explosion's own consequence shows up on whatever log entry comes
+        // next instead (finishJesterBall/resolveJesterBall's own pushes,
+        // not this file's concern).
         if (character.id === 'boingo') {
-          game.log.push({ type: 'passive', characterId: character.id, text: `${CHARACTERS[character.id].name} is frozen and can't resolve the Jester Ball - it stays with them.` });
+          game.log.push({ type: 'passive', characterId: character.id, text: `${CHARACTERS[character.id].name} is frozen and can't resolve the Jester Ball - it stays with them.`, hearts: heartsSnapshot(game) });
           finishJesterBall(game, 'keep', undefined);
         } else {
-          game.log.push({ type: 'passive', characterId: character.id, text: `${CHARACTERS[character.id].name} is frozen and can't resolve the Jester Ball - it bursts on them!` });
+          game.log.push({ type: 'passive', characterId: character.id, text: `${CHARACTERS[character.id].name} is frozen and can't resolve the Jester Ball - it bursts on them!`, hearts: heartsSnapshot(game) });
           finishJesterBall(game, 'take', undefined);
         }
       } else {
-        game.log.push({ type: 'passive', characterId: character.id, text: `${CHARACTERS[character.id].name} is frozen and skips their turn.` });
+        game.log.push({ type: 'passive', characterId: character.id, text: `${CHARACTERS[character.id].name} is frozen and skips their turn.`, hearts: heartsSnapshot(game) });
       }
       clearStalledBonusTurn(character);
       markCharacterActed(game, character.id);
@@ -107,14 +115,14 @@ export function getActingCharacterId(game) {
       if (isBallHolder) {
         // Same Boingo exemption as the freeze branch above.
         if (character.id === 'boingo') {
-          game.log.push({ type: 'passive', characterId: character.id, text: `${CHARACTERS[character.id].name}'s headache is too much to resolve the Jester Ball - it stays with them.` });
+          game.log.push({ type: 'passive', characterId: character.id, text: `${CHARACTERS[character.id].name}'s headache is too much to resolve the Jester Ball - it stays with them.`, hearts: heartsSnapshot(game) });
           finishJesterBall(game, 'keep', undefined);
         } else {
-          game.log.push({ type: 'passive', characterId: character.id, text: `${CHARACTERS[character.id].name}'s headache is too much to resolve the Jester Ball - it bursts on them!` });
+          game.log.push({ type: 'passive', characterId: character.id, text: `${CHARACTERS[character.id].name}'s headache is too much to resolve the Jester Ball - it bursts on them!`, hearts: heartsSnapshot(game) });
           finishJesterBall(game, 'take', undefined);
         }
       } else {
-        game.log.push({ type: 'passive', characterId: character.id, text: `${CHARACTERS[character.id].name}'s headache is too much - they skip their turn.` });
+        game.log.push({ type: 'passive', characterId: character.id, text: `${CHARACTERS[character.id].name}'s headache is too much - they skip their turn.`, hearts: heartsSnapshot(game) });
       }
       clearStalledBonusTurn(character);
       markCharacterActed(game, character.id);
@@ -144,7 +152,7 @@ export function getActingCharacterId(game) {
       tickChronoxLockoutIfAny(character, game, game.log);
     }
     if (!isBallHolder && getUsableActions(character, game).length === 0) {
-      game.log.push({ type: 'passive', characterId: character.id, text: `${CHARACTERS[character.id].name} has no valid targets and skips their turn.` });
+      game.log.push({ type: 'passive', characterId: character.id, text: `${CHARACTERS[character.id].name} has no valid targets and skips their turn.`, hearts: heartsSnapshot(game) });
       clearStalledBonusTurn(character);
       markCharacterActed(game, character.id);
       continue;

@@ -1,4 +1,4 @@
-import { applyDamage, applyHeal, hasNegativeStatus, clearNegativeStatuses } from '../engine/damagePipeline.js';
+import { applyDamage, applyHeal, hasNegativeStatus, clearNegativeStatuses, heartsSnapshot } from '../engine/damagePipeline.js';
 import { registerDodgeDefense } from '../engine/categories/dodgeDefenseRegistry.js';
 import { makeDiscoveryKit } from '../engine/categories/discoveryKit.js';
 
@@ -29,7 +29,7 @@ const discoveryKit = makeDiscoveryKit({
       if (hasNegativeStatus(character, game)) {
         clearNegativeStatuses(character, game, log);
         character.special.cleanSlateImmuneTurnsRemaining = 3;
-        log.push({ type: 'clean-slate-trigger', characterId: character.id });
+        log.push({ type: 'clean-slate-trigger', characterId: character.id, hearts: heartsSnapshot(game) });
         return { immunityJustStarted: true };
       }
       character.special.cleanSlateArmed = true;
@@ -92,7 +92,7 @@ export function onTurnStart(character, game, log) {
       const healed = applyHeal(game, character.id, 1);
       if (healed > 0) {
         character.special.everbloomFirstTickDone = true;
-        log.push({ type: 'everbloom-tick', characterId: character.id, healed, isFirstTick });
+        log.push({ type: 'everbloom-tick', characterId: character.id, healed, isFirstTick, hearts: heartsSnapshot(game) });
       }
     }
   }
@@ -103,7 +103,7 @@ export function onTurnStart(character, game, log) {
   if (character.special.cleanSlateImmuneTurnsRemaining > 0 && !immunityJustStartedThisCall) {
     character.special.cleanSlateImmuneTurnsRemaining -= 1;
     if (character.special.cleanSlateImmuneTurnsRemaining === 0) {
-      log.push({ type: 'clean-slate-immunity-end', characterId: character.id });
+      log.push({ type: 'clean-slate-immunity-end', characterId: character.id, hearts: heartsSnapshot(game) });
     }
   }
 }

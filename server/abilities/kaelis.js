@@ -1,4 +1,4 @@
-import { applyDamage, applyHeal } from '../engine/damagePipeline.js';
+import { applyDamage, applyHeal, heartsSnapshot } from '../engine/damagePipeline.js';
 import { registerOnOtherRevived } from '../engine/categories/onOtherRevived.js';
 import { registerOnHitLanded } from '../engine/categories/onHitLanded.js';
 
@@ -42,7 +42,7 @@ export function onTurnStart(character, game, log) {
   if (character.special.ashkaHealsRemaining > 0) {
     const healed = applyHeal(game, character.id, 2);
     character.special.ashkaHealsRemaining -= 1;
-    log.push({ type: 'ashka-heal', characterId: character.id, healed });
+    log.push({ type: 'ashka-heal', characterId: character.id, healed, hearts: heartsSnapshot(game) });
   }
 }
 
