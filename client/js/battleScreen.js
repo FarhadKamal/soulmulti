@@ -235,14 +235,18 @@ export function renderBattle(root, state) {
     // independently re-validates whose decision it actually still is via
     // settleToNextDecision before accepting anything.
     //
-    // Once he's clicked Keep THIS turn, hide the ball panel and leave just
-    // the normal action panel - confirmed UX ask ("upper two button
-    // should disappear after held"). Compared by actingCharacterId (not a
-    // plain boolean) so it's automatically stale/ignored once it becomes
-    // a different character's turn, with no separate reset needed.
-    if (state.jesterBallKeptThisTurnFor !== actingCharacterId) {
-      scroll.appendChild(renderJesterBallPrompt(game, actingCharacterId, armedAction, state));
-    }
+    // Always shown together, every time isMyBallDecision is true - an
+    // earlier attempt hid this panel for "the rest of the turn" after a
+    // Keep click (keyed on jesterBallKeptThisTurnFor === actingCharacterId)
+    // but that flag couldn't tell "still this exact turn" apart from "a
+    // LATER turn, same character acting again" - confirmed live report
+    // ("after keep it prev round. how will i pass again"): once he'd
+    // clicked Keep once, the panel silently never came back on ANY future
+    // turn, permanently blocking Pass for the rest of the match. Reverted
+    // rather than patched with a turn-instance key - the cosmetic
+    // "buttons disappear right after Keep" polish isn't worth the risk of
+    // this bug class recurring.
+    scroll.appendChild(renderJesterBallPrompt(game, actingCharacterId, armedAction, state));
     scroll.appendChild(renderActionPanel(actingCharacterId, usableActions, armedAction, state));
   } else if (isMyTurn && state.awaitingMindControlAction) {
     scroll.appendChild(renderMindControlActionPanel(game, actingCharacterId, state));
@@ -1549,16 +1553,16 @@ function renderJesterBallPrompt(game, characterId, armedAction, state) {
     // character's hearts/shield changes, so a click otherwise looks
     // completely unresponsive (confirmed live report: "keep button not
     // working"). Give it the same click sound every other action button
-    // gets (was missing here specifically), then hide this whole ball
-    // panel for the rest of THIS turn (see the jesterBallKeptThisTurnFor
-    // check above) so only the normal action panel remains - confirmed UX
-    // ask, replacing an earlier disable-and-relabel attempt that left the
-    // panel reappearing on the next render and reading as still broken.
+    // gets (was missing here specifically) plus a brief own label change,
+    // so the click itself is unmistakably acknowledged even though the
+    // game state around it stays identical. (An earlier attempt instead
+    // hid this whole panel after a click, but that broke re-showing it on
+    // a LATER turn - see isMyBallDecision's own comment - reverted.)
     keepBtn.onclick = () => {
       playUiClick();
+      keepBtn.disabled = true;
+      keepBtn.textContent = 'Held!';
       send('jester-ball-choice', { characterId, choice: 'keep' });
-      state.jesterBallKeptThisTurnFor = characterId;
-      state.rerender();
     };
     btnRow.appendChild(keepBtn);
   }
