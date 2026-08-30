@@ -20,7 +20,7 @@ import {
   chooseBotMove, chooseBotJesterBallMove, chooseBotBoingoJesterBallMove, chooseSoulSwapWrathTarget,
   chooseBotMelyssaPuppetAction, chooseRuneVisionTargetPick,
 } from './engine/botPlayer.js';
-import { settleToNextDecision, finishJesterBall } from './gameFlow.js';
+import { settleToNextDecision, finishJesterBall, peekPendingHeadacheVictim } from './gameFlow.js';
 import {
   createRoom, getRoom, deleteRoom, findRoomBySessionId, roomShapeFor,
   availableSeats, availableCharacterIds, seatIsReady, resetRoomToLobby, TURN_TIMER_DURATION_MS,
@@ -499,6 +499,40 @@ function broadcastMindControlStage(room, melyssaId, puppetId, usableActions) {
 }
 
 function broadcastGameState(room) {
+  // Grimtal's Skull Crack headache: the 50% skip roll resolves (and clears
+  // headacheVictimId/headacheRollPending) SYNCHRONOUSLY the instant the
+  // victim's own turn begins, inside settleToNextDecision below - before
+  // this function ever gets a chance to broadcast anything. Since the
+  // victim is very often the very next character to act (same player's
+  // next character, or the next player's first character - either way, no
+  // OTHER broadcast happens in between), the client's dazed-badge state
+  // (isDazedFor in battleScreen.js) could never actually be observed in
+  // practice - confirmed live report ("i have never seen headache status
+  // during skull crush action"). Fix: peek the CURRENT pending state
+  // (peekPendingHeadacheVictim, gameFlow.js - pure read-only, no
+  // mutation) and, the first time it's seen for this specific pending
+  // roll, emit one extra broadcast showing it still pending BEFORE the
+  // resolving settleToNextDecision call runs. Deduped via
+  // room.headacheBadgeShownForVictimId so a burst of unrelated
+  // broadcastGameState calls while still pending doesn't spam duplicate
+  // "pending" messages - reset back to null once nothing is pending
+  // anymore, so a later fresh Skull Crack can show its own badge again.
+  const pendingHeadacheVictimId = peekPendingHeadacheVictim(room.game);
+  if (pendingHeadacheVictimId) {
+    if (room.headacheBadgeShownForVictimId !== pendingHeadacheVictimId) {
+      room.headacheBadgeShownForVictimId = pendingHeadacheVictimId;
+      broadcastRoom(room, 'game-state', {
+        game: sanitizeGameForBroadcast(room.game),
+        actingCharacterId: null,
+        usableActions: [],
+        turnDeadline: room.turnTimer ? room.turnDeadline : null,
+        pendingHeadacheVictimId,
+      });
+    }
+  } else {
+    room.headacheBadgeShownForVictimId = null;
+  }
+
   const acting = settleToNextDecision(room.game);
   if (room.game.phase === 'game-over') {
     // Guard BEFORE flipping room.phase - this whole branch re-enters on
@@ -1082,6 +1116,12 @@ function startFreshBotShowMatch(room) {
   }));
   room.game = createGame(room.roomType, playerPicks);
   room.phase = 'in-match';
+  // Reset the headache-badge dedup key (see broadcastGameState) - it's
+  // keyed by characterId, which is stable across matches (same 16-hero
+  // roster every time), so a stale value here could wrongly suppress a
+  // genuinely fresh Skull Crack's pending broadcast in THIS new match if
+  // it happens to target the same character id last shown before.
+  room.headacheBadgeShownForVictimId = null;
 }
 
 function handlePickCharacter(room, sessionId, { characterId }) {
@@ -1304,6 +1344,12 @@ function handleStartMatch(room, sessionId) {
   }));
   room.game = createGame(room.roomType, playerPicks);
   room.phase = 'in-match';
+  // Reset the headache-badge dedup key (see broadcastGameState) - it's
+  // keyed by characterId, which is stable across matches (same 16-hero
+  // roster every time), so a stale value here could wrongly suppress a
+  // genuinely fresh Skull Crack's pending broadcast in THIS new match if
+  // it happens to target the same character id last shown before.
+  room.headacheBadgeShownForVictimId = null;
   broadcastLobby(room);
   // Broadcast the fresh game state immediately, before any bot turns start
   // stepping - lobbyScreen.js switches straight to the battle screen the

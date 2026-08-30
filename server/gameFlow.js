@@ -162,6 +162,37 @@ export function getActingCharacterId(game) {
   return null;
 }
 
+// Read-only peek: is the very next character whose turn is about to begin
+// (beginCharacterTurn hasn't fired for them yet this round) currently
+// sitting on an UNRESOLVED Grimtal Skull Crack headache roll? Mirrors
+// getActingCharacterId's own "who's up next" walk (charactersActingThisTurn,
+// actedThisTurn, turnStartFiredFor) and resolveHeadacheIfDue's own
+// headacheVictimId/headacheRollPending lookup (turnEngine.js), but performs
+// no mutation at all - purely so index.js's broadcastGameState can decide
+// whether to show the dazed badge for one real beat BEFORE calling
+// settleToNextDecision, which would otherwise resolve-and-clear the roll
+// synchronously in the same tick with no broadcast ever catching the
+// pending state in between. Returns the victim's characterId, or null.
+// Confirmed bug (2026-08-30, live report: "i have never seen headache
+// status during skull crush action") - whenever the victim's own turn was
+// the very next decision point (no other broadcast in between), the badge
+// window was always zero-width and could never actually render.
+export function peekPendingHeadacheVictim(game) {
+  const acting = charactersActingThisTurn(game);
+  for (const character of acting) {
+    if (hasCharacterActedThisTurn(game, character.id)) continue;
+    if (game.turnStartFiredFor.has(character.id)) continue;
+    // First not-yet-acted, not-yet-turn-started character in the walk is
+    // the one beginCharacterTurn would fire for next - matches
+    // getActingCharacterId's own loop order exactly.
+    const caster = Object.values(game.characters).find(
+      (c) => c.special?.headacheVictimId === character.id && c.special.headacheRollPending
+    );
+    return caster ? character.id : null;
+  }
+  return null;
+}
+
 // Resolves a Jester Ball holder's choice (pass/take) - passing TO Boingo
 // (heals him, ends the ball) and an un-intercepted 5th pass (auto-resolves
 // as an explosion on the RECEIVER) are both still reached via 'pass', not

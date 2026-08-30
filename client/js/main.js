@@ -644,6 +644,13 @@ onMessage((msg) => {
       state.validRuneVisionTargets = msg.validRuneVisionTargets || [];
       state.awaitingMindControlAction = !!msg.awaitingMindControlAction;
       state.mindControlPuppetId = msg.mindControlPuppetId ?? null;
+      // Grimtal's Skull Crack headache dazed badge (battleScreen.js's
+      // isDazedFor) - explicit field, not derived from raw
+      // grimtal.special state (see broadcastGameState/isDazedFor's own
+      // comments for why). null on the normal (resolving) broadcast that
+      // immediately follows, so the badge naturally disappears the moment
+      // the roll actually resolves.
+      state.pendingHeadacheVictimId = msg.pendingHeadacheVictimId ?? null;
       state.armedAction = null;
       state.turnDeadline = msg.turnDeadline || null;
       processNewLogEntries(msg.game);

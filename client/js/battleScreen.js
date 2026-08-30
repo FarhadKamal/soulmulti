@@ -173,16 +173,22 @@ export function renderBattle(root, state) {
     return rowan.special?.silenceTargets?.[characterId] || 0;
   };
   // Grimtal's Skull Crack headache - same "badge on the VICTIM's own tile"
-  // reasoning as poison/silence above. Strictly one-shot: true only from
-  // the moment the hit lands until the victim's own next turn resolves the
-  // 50% skip roll (headacheRollPending flips false either way, win or
-  // lose), then this reads false again - never multi-turn, never re-armed
-  // without a fresh Skull Crack.
-  const grimtal = Object.values(game.characters).find((c) => c.id === 'grimtal');
-  const isDazedFor = (characterId) => {
-    if (!grimtal || grimtal.isKO || grimtal.id === characterId) return false;
-    return grimtal.special?.headacheVictimId === characterId && !!grimtal.special?.headacheRollPending;
-  };
+  // reasoning as poison/silence above. Reads state.pendingHeadacheVictimId
+  // (broadcast explicitly by index.js's broadcastGameState), NOT
+  // grimtal.special.headacheVictimId/headacheRollPending directly - the
+  // roll resolves and clears those two flags SYNCHRONOUSLY the instant the
+  // victim's own turn begins, before the server ever gets a chance to
+  // broadcast the "still pending" state, so reading them straight off
+  // `game` here could never actually catch the pending window in practice
+  // (confirmed live report: "i have never seen headache status during
+  // skull crush action"). The server now peeks the pending state and
+  // emits one extra broadcast carrying it explicitly, one beat before the
+  // resolving broadcast - see peekPendingHeadacheVictim/
+  // broadcastGameState. pendingHeadacheVictimId is null on every OTHER
+  // (resolving) broadcast, so this naturally reads false again the moment
+  // the roll actually resolves - same one-shot, never-multi-turn behavior
+  // as before, just now actually observable.
+  const isDazedFor = (characterId) => state.pendingHeadacheVictimId === characterId;
   // Illyra's Mirage Mark - same "badge on the VICTIM's own tile" reasoning
   // as Kaelis's grudge badge above (a per-relationship stack count, not
   // something that fits cleanly on Illyra's own tile). mirageMarks arrives
