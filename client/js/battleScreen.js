@@ -1519,7 +1519,20 @@ function renderJesterBallPrompt(game, characterId, armedAction, state) {
   if (characterId === 'boingo') {
     const keepBtn = document.createElement('button');
     keepBtn.textContent = 'Keep it for now';
-    keepBtn.onclick = () => send('jester-ball-choice', { characterId, choice: 'keep' });
+    // Keep is a deliberate no-op server-side (see boingo.js's
+    // jesterBallResolution.keep) - nothing about game.jesterBall or any
+    // character's hearts/shield changes, so a click otherwise looks
+    // completely unresponsive (confirmed live report: "keep button not
+    // working"). Give it the same click sound every other action button
+    // gets (was missing here specifically) plus a brief own label change,
+    // so the click itself is unmistakably acknowledged even though the
+    // game state around it stays identical.
+    keepBtn.onclick = () => {
+      playUiClick();
+      keepBtn.disabled = true;
+      keepBtn.textContent = 'Held!';
+      send('jester-ball-choice', { characterId, choice: 'keep' });
+    };
     btnRow.appendChild(keepBtn);
   }
 
