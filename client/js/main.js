@@ -23,6 +23,14 @@ const state = {
   actingCharacterId: null,
   usableActions: [],
   awaitingSoulSwapWrath: false,
+  // Boingo's Keep choice (battleScreen.js's renderJesterBallPrompt) - set
+  // to the characterId ('boingo') right after he clicks Keep, purely to
+  // hide the ball panel for the rest of THAT turn once he's made his
+  // choice, leaving just his normal action panel. Compared against
+  // actingCharacterId rather than used as a plain boolean, so it goes
+  // stale/ignored automatically once it becomes someone else's turn, with
+  // no separate reset needed anywhere.
+  jesterBallKeptThisTurnFor: null,
   // Mirrors awaitingSoulSwapWrath's pattern for Oraclus's own two-stage
   // Rune Vision cast - true from the moment he picks the predicted
   // ATTACKER through to picking the predicted TARGET. predictedAttackerId/

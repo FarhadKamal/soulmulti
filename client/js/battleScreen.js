@@ -218,19 +218,25 @@ export function renderBattle(root, state) {
   const isMyBallDecision = isMyTurn && jb && jb.holderCharacterId === actingCharacterId;
 
   if (isMyBallDecision) {
-    scroll.appendChild(renderJesterBallPrompt(game, actingCharacterId, armedAction, state));
     // Keep/Take (unlike Pass) deliberately do NOT consume the holder's
     // turn (see finishJesterBall, server/index.js/gameFlow.js) - Boingo
     // still owes his own normal action afterward, every time. Without
-    // this, the ball prompt's exclusive `if` branch left him stuck seeing
-    // only Keep/Pass forever, with no way to ever reach Chaos Gamble -
-    // confirmed live report ("i can't keep it to use action"). Always
-    // rendering both together (rather than trying to track "has he acted
-    // yet" client-side, which isn't broadcast) is safe - handleAction
-    // (server/index.js) independently re-validates whose decision it
-    // actually still is via settleToNextDecision before accepting
-    // anything, so there's no way to double-submit even if this shows
-    // slightly ahead of a state the server would actually accept.
+    // showing both panels together, he'd be stuck seeing only Keep/Pass
+    // forever with no way to ever reach Chaos Gamble - confirmed live
+    // report ("i can't keep it to use action"). Safe to show them
+    // together regardless of client-side "has he acted yet" tracking
+    // (which isn't broadcast anyway) - handleAction (server/index.js)
+    // independently re-validates whose decision it actually still is via
+    // settleToNextDecision before accepting anything.
+    //
+    // Once he's clicked Keep THIS turn, hide the ball panel and leave just
+    // the normal action panel - confirmed UX ask ("upper two button
+    // should disappear after held"). Compared by actingCharacterId (not a
+    // plain boolean) so it's automatically stale/ignored once it becomes
+    // a different character's turn, with no separate reset needed.
+    if (state.jesterBallKeptThisTurnFor !== actingCharacterId) {
+      scroll.appendChild(renderJesterBallPrompt(game, actingCharacterId, armedAction, state));
+    }
     scroll.appendChild(renderActionPanel(actingCharacterId, usableActions, armedAction, state));
   } else if (isMyTurn && state.awaitingMindControlAction) {
     scroll.appendChild(renderMindControlActionPanel(game, actingCharacterId, state));
@@ -1537,14 +1543,16 @@ function renderJesterBallPrompt(game, characterId, armedAction, state) {
     // character's hearts/shield changes, so a click otherwise looks
     // completely unresponsive (confirmed live report: "keep button not
     // working"). Give it the same click sound every other action button
-    // gets (was missing here specifically) plus a brief own label change,
-    // so the click itself is unmistakably acknowledged even though the
-    // game state around it stays identical.
+    // gets (was missing here specifically), then hide this whole ball
+    // panel for the rest of THIS turn (see the jesterBallKeptThisTurnFor
+    // check above) so only the normal action panel remains - confirmed UX
+    // ask, replacing an earlier disable-and-relabel attempt that left the
+    // panel reappearing on the next render and reading as still broken.
     keepBtn.onclick = () => {
       playUiClick();
-      keepBtn.disabled = true;
-      keepBtn.textContent = 'Held!';
       send('jester-ball-choice', { characterId, choice: 'keep' });
+      state.jesterBallKeptThisTurnFor = characterId;
+      state.rerender();
     };
     btnRow.appendChild(keepBtn);
   }
