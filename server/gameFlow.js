@@ -76,8 +76,20 @@ export function getActingCharacterId(game) {
     }
     if (consumeSkipIfFrozen(character)) {
       if (isBallHolder) {
-        game.log.push({ type: 'passive', characterId: character.id, text: `${CHARACTERS[character.id].name} is frozen and can't resolve the Jester Ball - it bursts on them!` });
-        finishJesterBall(game, 'take', undefined);
+        // Boingo can NEVER self-explode his own ball, full stop (confirmed
+        // ruling, emphatic - same rule already enforced for his own
+        // voluntary Take, extended here to this FORCED-resolution case
+        // too). He just keeps holding it (a no-op, matches
+        // jesterBallResolution.keep exactly) until a turn he can actually
+        // act on comes around - every other character still gets the
+        // forced explosion, since only he has this exemption.
+        if (character.id === 'boingo') {
+          game.log.push({ type: 'passive', characterId: character.id, text: `${CHARACTERS[character.id].name} is frozen and can't resolve the Jester Ball - it stays with them.` });
+          finishJesterBall(game, 'keep', undefined);
+        } else {
+          game.log.push({ type: 'passive', characterId: character.id, text: `${CHARACTERS[character.id].name} is frozen and can't resolve the Jester Ball - it bursts on them!` });
+          finishJesterBall(game, 'take', undefined);
+        }
       } else {
         game.log.push({ type: 'passive', characterId: character.id, text: `${CHARACTERS[character.id].name} is frozen and skips their turn.` });
       }
@@ -93,8 +105,14 @@ export function getActingCharacterId(game) {
     // this is the actual turn-skip consequence of that roll.
     if (consumeSkipIfHeadache(character)) {
       if (isBallHolder) {
-        game.log.push({ type: 'passive', characterId: character.id, text: `${CHARACTERS[character.id].name}'s headache is too much to resolve the Jester Ball - it bursts on them!` });
-        finishJesterBall(game, 'take', undefined);
+        // Same Boingo exemption as the freeze branch above.
+        if (character.id === 'boingo') {
+          game.log.push({ type: 'passive', characterId: character.id, text: `${CHARACTERS[character.id].name}'s headache is too much to resolve the Jester Ball - it stays with them.` });
+          finishJesterBall(game, 'keep', undefined);
+        } else {
+          game.log.push({ type: 'passive', characterId: character.id, text: `${CHARACTERS[character.id].name}'s headache is too much to resolve the Jester Ball - it bursts on them!` });
+          finishJesterBall(game, 'take', undefined);
+        }
       } else {
         game.log.push({ type: 'passive', characterId: character.id, text: `${CHARACTERS[character.id].name}'s headache is too much - they skip their turn.` });
       }
