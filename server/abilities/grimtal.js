@@ -220,13 +220,14 @@ export const actions = {
   // Earthshatter/Mirage Overload - a lopsided or single-target result,
   // even all 4 landing on one unlucky opponent, is completely normal, not
   // a bug). Modeled as separate hit EVENTS (not pre-aggregated damage
-  // points like Earthshatter) because each one needs
-  // its own independent headache-roll attempt - two different targets
-  // hit by the SAME cast can each end up with their own pending headache
-  // only in the sense that the LAST hit to land wins (headacheVictimId is
-  // a single slot, not a list, same "most recent cast/hit wins" reasoning
-  // as Skull Crack's own comment above) - confirmed ruling: each hit rolls
-  // independently rather than only the first hit on a repeat target.
+  // points like Earthshatter) since the headache-arming attempt needs to
+  // be gated per hit. The FIRST hit that successfully arms the headache
+  // wins and locks it in for the rest of the cast - later hits never
+  // re-attempt or overwrite it, even if they themselves also land real
+  // damage (confirmed ruling, corrected 2026-08-31 from an earlier "each
+  // hit rolls independently" version, which let a later successful hit
+  // silently overwrite an earlier one - live report: repeatedly never
+  // seeing headache land from this move traced back to exactly this).
   //
   // Each hit is Environmental Attack (ignoresDodge: true, shield still
   // absorbs normally - NOT ignoresShield, unlike Skull Crack's own pierce
@@ -241,6 +242,17 @@ export const actions = {
       character.special.usedGrimBarrage = true;
       const others = Object.values(game.characters).filter((c) => c.id !== character.id && !c.isKO);
       const hits = [];
+      // Confirmed ruling (2026-08-31, corrected from "each hit rolls
+      // independently"): the FIRST hit in the sequence that successfully
+      // arms the headache wins and locks it in for the rest of this cast -
+      // no later hit, successful or not, re-attempts or overwrites it.
+      // Without this, a later hit that dealt 0 damage (fully shield-
+      // absorbed) or KO'd its target left the flags untouched (correct),
+      // but a later hit that ALSO landed real damage on a valid target
+      // would silently re-arm/overwrite an already-armed headache - not
+      // wrong exactly, just not what was wanted: the first success should
+      // be the one that counts, full stop.
+      let headacheArmed = false;
       for (let i = 0; i < GRIM_BARRAGE_TOTAL_HITS; i++) {
         if (others.length === 0) break;
         const target = others[Math.floor(Math.random() * others.length)];
@@ -251,14 +263,16 @@ export const actions = {
           ignoresDodge: true,
         });
         // Same landed/blocked/headache-arming logic as Skull Crack's own
-        // execute above, just repeated per hit instead of once.
+        // execute above, just repeated per hit instead of once - skipped
+        // entirely once headacheArmed is already true.
         let blocked = false;
-        if (result.amountDealt > 0 && !result.koTriggered) {
+        if (!headacheArmed && result.amountDealt > 0 && !result.koTriggered) {
           if (tryTriggerCleanSlate(target, game, log) || tryIllyraDodgeStatus(target, game, log, character.id)) {
             blocked = true;
           } else {
             character.special.headacheVictimId = target.id;
             character.special.headacheRollPending = true;
+            headacheArmed = true;
           }
         }
         hits.push({ targetId: target.id, blocked, ...result });
