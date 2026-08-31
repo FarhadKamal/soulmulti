@@ -5,9 +5,10 @@ import { registerOnOwnDeath } from '../engine/categories/onOwnDeath.js';
 import { registerOnOtherRevived } from '../engine/categories/onOtherRevived.js';
 import { registerOnAnyDeath } from '../engine/categories/onAnyDeath.js';
 
-// Grim Barrage: 3 independent random-target hits, 2 damage each (confirmed
-// ruling) - see the action definition below for the full reasoning.
-const GRIM_BARRAGE_TOTAL_HITS = 3;
+// Grim Barrage: 4 independent random-target hits (raised from 3, confirmed
+// ruling), 2 damage each - see the action definition below for the full
+// reasoning.
+const GRIM_BARRAGE_TOTAL_HITS = 4;
 const GRIM_BARRAGE_DAMAGE_PER_HIT = 2;
 
 // KO-branch cleanup (see engine/categories/onOwnDeath.js) - his own death
@@ -213,12 +214,13 @@ export const actions = {
   // opener). No-target, one-time use, own dedicated usedGrimBarrage flag
   // (separate from usedSpecial, already spoken for by Skull Crack).
   //
-  // 3 independent hits, each fully independently random across every
-  // currently-alive OPPONENT (same "no even split, no minimum-per-target
-  // guarantee" reasoning as Earthshatter/Mirage Overload - a lopsided or
-  // single-target result, even all 3 landing on one unlucky opponent, is
-  // completely normal, not a bug). Modeled as 3 separate hit EVENTS (not
-  // pre-aggregated damage points like Earthshatter) because each one needs
+  // 4 independent hits (raised from 3, confirmed ruling), each fully
+  // independently random across every currently-alive OPPONENT (same "no
+  // even split, no minimum-per-target guarantee" reasoning as
+  // Earthshatter/Mirage Overload - a lopsided or single-target result,
+  // even all 4 landing on one unlucky opponent, is completely normal, not
+  // a bug). Modeled as separate hit EVENTS (not pre-aggregated damage
+  // points like Earthshatter) because each one needs
   // its own independent headache-roll attempt - two different targets
   // hit by the SAME cast can each end up with their own pending headache
   // only in the sense that the LAST hit to land wins (headacheVictimId is
