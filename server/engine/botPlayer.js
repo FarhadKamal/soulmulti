@@ -1614,54 +1614,26 @@ export function chooseBotJesterBallMove(character, game) {
   return { choice: 'take' };
 }
 
-// Boingo's own decision when the ball lands on HIM specifically - he's now
-// a genuine holder like anyone else rather than an automatic end-of-line
-// (confirmed ruling), with an exclusive third option (Keep) nobody else
-// gets. Prioritizes Keep whenever it's genuinely free value: it doesn't
-// consume his turn (he still gets his normal Chaos Gamble/etc. that same
-// turn) and doesn't burn one of the 10 passes, so there's no real cost to
-// sitting on it for a turn UNLESS the match could plausibly end (someone's
-// close to a kill and stalling risks never cashing in the eventual +4) -
-// keeping this simple rather than trying to model that, since Keep is
-// still available again next turn if this one doesn't pan out.
+// Boingo's own decision when the ball lands on HIM specifically - he's a
+// genuine holder like anyone else (confirmed ruling), always Passes it on
+// (there used to be an exclusive third option, Keep, letting him stall for
+// free - removed 2026-08-31 alongside the human-facing button, confirmed
+// redundant: it was a pure no-op that changed nothing about game state, so
+// it added no real choice over a human just picking his normal action
+// directly). Take is never a legal choice for him either way - it would
+// explode his own ball on himself for a flat -4 with no benefit (see
+// resolveExplosion's sourceCharacterId/targetCharacterId both resolving to
+// him).
 export function chooseBotBoingoJesterBallMove(character, game) {
-  const jb = game.jesterBall;
-  const canPass = jb.passCount < MAX_JESTER_BALL_PASSES;
-  // Take is NEVER a sensible choice for Boingo - it explodes his own ball
-  // on himself for a flat -4 with no benefit (see resolveExplosion's
-  // sourceCharacterId/targetCharacterId both resolving to him; confirmed
-  // live report - the UI shouldn't even offer him this button, and the
-  // bot must never choose it either). In practice canPass should always be
-  // true here anyway - reaching the pass cap auto-resolves entirely inside
-  // pass.execute() itself (boingo.js), tearing down game.jesterBall before
-  // this function would ever be asked to decide again - but Keep as a
-  // defensive fallback instead of Take either way, never self-harm.
-  if (!canPass) {
-    return { choice: 'keep' };
-  }
-  // Deliberately keep it more often than not while healthy - it's free
-  // tempo/board presence (an opponent still has to deal with a live ball
-  // hanging over the match) and racks up nothing lost, but don't loop on
-  // it forever: once he's already comfortably healthy (above half hearts)
-  // and the ball has already paid out a few checkpoint heals this
-  // sequence, passing it back out keeps the game moving rather than
-  // stalling turn after turn for no further benefit. A simple 50/50 avoids
-  // needing to track "how many times has it visited him this chain"
-  // explicitly.
-  if (character.hearts > character.maxHearts / 2 && Math.random() < 0.5) {
-    return { choice: 'keep' };
-  }
-  // Otherwise pass it on toward the biggest remaining enemy threat, same
-  // targeting logic every other holder uses.
+  // canPass should always be true here in practice - reaching the pass cap
+  // auto-resolves entirely inside pass.execute() itself (boingo.js),
+  // tearing down game.jesterBall before this function would ever be asked
+  // to decide again. No fallback needed if it somehow weren't: a 4-player
+  // free-for-all has no teammates, so Boingo being the sole living
+  // character left holding the ball would already mean the match is over
+  // before this could ever be called.
   const candidates = livingEnemies(game, character).filter((c) => c.id !== character.id);
-  if (candidates.length > 0) {
-    const targetId = biggestThreatTarget(game, character, candidates.map((c) => c.id))
-      || lowestHeartsTarget(game, candidates.map((c) => c.id));
-    if (targetId) return { choice: 'pass', targetId };
-  }
-  // No enemy left to target - just keep holding it rather than passing to
-  // a teammate for no benefit (mirrors chooseBotJesterBallMove's own
-  // no-candidate fallback, but Keep instead of a teammate-Boingo pass
-  // since there's no teammate-Boingo case when Boingo himself is holding).
-  return { choice: 'keep' };
+  const targetId = biggestThreatTarget(game, character, candidates.map((c) => c.id))
+    || lowestHeartsTarget(game, candidates.map((c) => c.id));
+  return { choice: 'pass', targetId };
 }

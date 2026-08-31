@@ -80,20 +80,16 @@ export function getActingCharacterId(game) {
         // Boingo can NEVER self-explode his own ball, full stop (confirmed
         // ruling, emphatic - same rule already enforced for his own
         // voluntary Take, extended here to this FORCED-resolution case
-        // too). He just keeps holding it (a no-op, matches
-        // jesterBallResolution.keep exactly) until a turn he can actually
-        // act on comes around - every other character still gets the
-        // forced explosion, since only he has this exemption.
-        // Snapshot taken BEFORE finishJesterBall (matches the log entry's
-        // own position, which is pushed before it too) - a 'take' can deal
-        // real explosion damage, so this line's own hearts readout should
-        // reflect state right before that damage lands, not after; the
-        // explosion's own consequence shows up on whatever log entry comes
-        // next instead (finishJesterBall/resolveJesterBall's own pushes,
-        // not this file's concern).
+        // too). Just leave game.jesterBall completely untouched until a
+        // turn he can actually act on comes around - every other
+        // character still gets the forced explosion, since only he has
+        // this exemption. (Used to route through
+        // finishJesterBall(game, 'keep', ...) - removed 2026-08-31
+        // alongside the Keep action/button itself, confirmed redundant;
+        // this branch never needed anything beyond the log line below in
+        // the first place, since 'keep' was always a pure no-op.)
         if (character.id === 'boingo') {
           game.log.push({ type: 'passive', characterId: character.id, text: `${CHARACTERS[character.id].name} is frozen and can't resolve the Jester Ball - it stays with them.`, hearts: heartsSnapshot(game) });
-          finishJesterBall(game, 'keep', undefined);
         } else {
           game.log.push({ type: 'passive', characterId: character.id, text: `${CHARACTERS[character.id].name} is frozen and can't resolve the Jester Ball - it bursts on them!`, hearts: heartsSnapshot(game) });
           finishJesterBall(game, 'take', undefined);
@@ -116,7 +112,6 @@ export function getActingCharacterId(game) {
         // Same Boingo exemption as the freeze branch above.
         if (character.id === 'boingo') {
           game.log.push({ type: 'passive', characterId: character.id, text: `${CHARACTERS[character.id].name}'s headache is too much to resolve the Jester Ball - it stays with them.`, hearts: heartsSnapshot(game) });
-          finishJesterBall(game, 'keep', undefined);
         } else {
           game.log.push({ type: 'passive', characterId: character.id, text: `${CHARACTERS[character.id].name}'s headache is too much to resolve the Jester Ball - it bursts on them!`, hearts: heartsSnapshot(game) });
           finishJesterBall(game, 'take', undefined);
@@ -194,23 +189,24 @@ export function peekPendingHeadacheVictim(game) {
 }
 
 // Resolves a Jester Ball holder's choice (pass/take) - passing TO Boingo
-// (heals him, ends the ball) and an un-intercepted 5th pass (auto-resolves
-// as an explosion on the RECEIVER) are both still reached via 'pass', not
-// a separate choice. Pass consumes the holder's turn action regardless of
-// which of those three outcomes it resolves to, since the PASSER made a
-// choice either way; Take does not - the holder still gets their normal
-// action afterward in the same turn (matches finishJesterBall in
-// dashboardScreen.js).
+// (heals him, ends the ball) and an un-intercepted final pass (auto-
+// resolves as an explosion on the RECEIVER) are both still reached via
+// 'pass', not a separate choice. Pass consumes the holder's turn action
+// regardless of which of those outcomes it resolves to, since the PASSER
+// made a choice either way; Take does not - the holder still gets their
+// normal action afterward in the same turn.
 export function finishJesterBall(game, choice, targetId) {
   const holderId = game.jesterBall.holderCharacterId;
   resolveJesterBall(game, holderId, choice, targetId);
   // Take: never consumes the turn (lets the holder still act normally
-  // after taking the explosion damage). Keep (Boingo-only, confirmed
-  // ruling): also never consumes the turn - he's explicitly choosing to
-  // act normally this turn (e.g. Chaos Gamble) while leaving the ball
-  // parked on himself for a later turn, not resolving anything now. Pass
-  // is the only choice that still consumes the whole turn.
-  if (choice !== 'take' && choice !== 'keep') {
+  // after taking the explosion damage). Pass is the only choice that
+  // still consumes the whole turn. (There used to be a third choice,
+  // Keep, Boingo-exclusive - removed 2026-08-31, confirmed redundant: it
+  // was a pure no-op that changed nothing about game.jesterBall, so a
+  // human could already get the identical effect by simply picking his
+  // normal action, e.g. Chaos Gamble, directly instead of resolving the
+  // ball at all that turn.)
+  if (choice !== 'take') {
     markCharacterActed(game, holderId);
   }
 }

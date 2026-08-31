@@ -370,10 +370,13 @@ function mindControlOptionsFor(game, melyssaId, puppetId) {
     // by his own choice, not even puppeted by Melyssa) - it would explode
     // on himself for a flat -4 with zero benefit to anyone. Omit the Take
     // option entirely for him rather than offering it and rejecting it
-    // server-side; he instead gets his own exclusive Keep option (see
-    // boingo.js's jesterBallResolution.keep), same as his own real turn.
+    // server-side; he only ever gets Pass here (same as his own real
+    // turn - no dedicated Keep option either, removed 2026-08-31 alongside
+    // the human-facing button, confirmed redundant since it was a pure
+    // no-op; puppeting him into "doing nothing with the ball" already
+    // works by simply not selecting __mcJesterBallPass).
     const jbOptions = puppetId === 'boingo'
-      ? [{ actionId: '__mcJesterBallKeep', label: 'Keep it for now', needsTarget: false, special: false, validTargetIds: [] }]
+      ? []
       : [{ actionId: '__mcJesterBallTake', label: 'Take the Jester Ball (-4 hearts)', needsTarget: false, special: false, validTargetIds: [] }];
     if (jb.passCount < 10) {
       jbOptions.push({ actionId: '__mcJesterBallPass', label: 'Pass the Jester Ball', needsTarget: true, special: false, validTargetIds: passTargets });
@@ -696,10 +699,10 @@ function stepBotTurn(room) {
   const character = room.game.characters[acting];
   const isBallHolder = room.game.jesterBall && room.game.jesterBall.holderCharacterId === acting;
   if (isBallHolder) {
-    // Boingo gets his own exclusive Keep option (see boingo.js's
-    // jesterBallResolution.keep / botPlayer.js's
-    // chooseBotBoingoJesterBallMove) - every other holder still resolves
-    // via the normal pass-vs-take chooser.
+    // Boingo gets his own dedicated chooser (botPlayer.js's
+    // chooseBotBoingoJesterBallMove - always Pass, never Take) since Take
+    // is never legal for him; every other holder resolves via the normal
+    // pass-vs-take chooser.
     const move = acting === 'boingo'
       ? chooseBotBoingoJesterBallMove(character, room.game)
       : chooseBotJesterBallMove(character, room.game);
@@ -1744,14 +1747,6 @@ function handleMindControlAction(room, sessionId, { characterId, puppetId, actio
     if (!room.game.characters[puppetId].isKO) {
       followUp = { puppetId, options: mindControlOptionsFor(room.game, characterId, puppetId) };
     }
-  } else if (actionId === '__mcJesterBallKeep') {
-    // Boingo-only (see mindControlOptionsFor above) - same "doesn't consume
-    // the turn" treatment as Take gets for every other puppet, matching his
-    // own real-turn Keep behavior exactly. He can never be KO'd by this
-    // (it's a pure no-op on game state), so unlike the Take branch above
-    // there's no KO check needed before offering the follow-up.
-    finishJesterBall(room.game, 'keep', undefined);
-    followUp = { puppetId, options: mindControlOptionsFor(room.game, characterId, puppetId) };
   } else if (actionId === '__mcJesterBallPass') {
     finishJesterBall(room.game, 'pass', targetId);
     // Pass DOES consume the holder's action - Mind Control turn is complete.
@@ -1792,11 +1787,6 @@ function handleJesterBallChoice(room, sessionId, { characterId, choice, targetId
   if (!seat || seat.playerId !== sessionId) return;
   if (choice === 'pass' && jb.passCount >= 10) return;
   if (choice === 'pass' && !isJesterBallPassTarget(room.game, characterId, targetId)) return;
-  // Keep is Boingo's exclusive third option (see boingo.js's
-  // jesterBallResolution.keep) - only legal for him specifically, since
-  // he's the one who gets a checkpoint heal / eventual big payoff from the
-  // ball, not a generic stalling tool for anyone else.
-  if (choice === 'keep' && characterId !== 'boingo') return;
   // Take is never legal for Boingo - it would explode his own ball on
   // himself for a flat -4 with no benefit at all (see resolveExplosion's
   // sourceCharacterId/targetCharacterId both resolving to him). The client

@@ -329,11 +329,6 @@ function playLogEntrySound(entry, game) {
     playLaughVoiceIfAlive(entry.boingoId, game);
     return;
   }
-  // Boingo choosing to sit on the ball for now - no sound of its own, it's
-  // a quiet non-event (nothing about game state changed at all).
-  if (entry.type === 'jester-ball-keep') {
-    return;
-  }
   if (entry.type === 'jester-ball-take') {
     // Explodes on the holder UNLESS it triggered Blade's Rebirth instead -
     // that case gets its own dedicated 'rebirth' entry right after this

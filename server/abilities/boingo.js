@@ -125,13 +125,18 @@ export const jesterBallResolution = {
       // original "always heals and ends immediately" behavior) - he grants
       // himself a small +1 checkpoint heal every time it lands on him (see
       // below), then becomes a REAL holder just like anyone else: his own
-      // next turn, he gets a genuine choice between keep/pass/take (see
-      // jesterBallResolution.keep below - his exclusive third option).
+      // next turn, he can Pass it on (Take was never offered to him - see
+      // resolveExplosion's own comment). No dedicated "keep it" choice
+      // either (removed 2026-08-31, confirmed redundant - a human can
+      // already achieve the identical effect just by picking his normal
+      // action, e.g. Chaos Gamble, directly instead of resolving the ball
+      // at all that turn; the old Keep button/action was a genuine no-op
+      // that changed nothing about game state, so it added no real choice
+      // over simply not touching the ball).
       // Only the FINAL landing (passCount reaching MAX_JESTER_BALL_PASSES,
       // or an earlier voluntary Take by anyone) decides the big outcome:
       // landing on Boingo there grants the full +4, landing on anyone else
-      // explodes for damage - see the passCount-cap branch further down
-      // and jesterBallResolution.keep's own "cash in on Take" path.
+      // explodes for damage - see the passCount-cap branch further down.
       // A landing that reaches MAX_JESTER_BALL_PASSES is the FINAL outcome
       // (full +4 below, not the smaller +1 checkpoint) - computed up front
       // so the checkpoint-heal branch can correctly skip itself on exactly
@@ -211,22 +216,6 @@ export const jesterBallResolution = {
         resolveExplosion(game, log, newHolderCharacterId);
         return;
       }
-    },
-  },
-  // Boingo-only third option (see index.js's handleJesterBallChoice, which
-  // gates this to the current holder actually being Boingo): sit on the
-  // ball for this turn without resolving it at all. Confirmed ruling: does
-  // NOT consume his turn (he still gets a normal action, e.g. Chaos
-  // Gamble, the same turn) and does NOT count toward
-  // MAX_JESTER_BALL_PASSES - purely a "not yet" choice, the ball just
-  // stays parked on him exactly as it was until a later turn where he
-  // picks keep/pass/take again.
-  keep: {
-    label: 'Keep it for now',
-    isLegal: () => true,
-    execute(game, log) {
-      // Deliberately a no-op - nothing about game.jesterBall changes.
-      log.push({ type: 'jester-ball-keep', boingoId: game.jesterBall.holderCharacterId });
     },
   },
   take: {

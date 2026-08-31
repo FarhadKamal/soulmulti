@@ -1529,42 +1529,19 @@ function renderJesterBallPrompt(game, characterId, armedAction, state) {
   // Take deals its 4 damage to WHOEVER'S HOLDING IT - for Boingo that
   // would mean exploding his own ball on himself for a flat -4 with zero
   // upside, since he's the one whose whole special is built around this
-  // ball being GOOD for him. Genuinely never a sensible choice for him
-  // (Keep/Pass both strictly beat it), so the button is hidden entirely
-  // rather than just being a trap option - confirmed live report ("why is
-  // this showing on boingo").
+  // ball being GOOD for him. Genuinely never a sensible choice for him, so
+  // the button is hidden entirely rather than just being a trap option -
+  // confirmed live report ("why is this showing on boingo"). He only ever
+  // gets Pass here (no dedicated Keep button either - removed 2026-08-31,
+  // confirmed redundant: Keep was a pure no-op server-side, so a human
+  // could already get the identical effect by simply picking his normal
+  // action, e.g. Chaos Gamble, directly instead of resolving the ball at
+  // all that turn).
   if (characterId !== 'boingo') {
     const takeBtn = document.createElement('button');
     takeBtn.textContent = 'Take it (-4 hearts)';
     takeBtn.onclick = () => send('jester-ball-choice', { characterId, choice: 'take' });
     btnRow.appendChild(takeBtn);
-  }
-
-  // Boingo's exclusive third option (see boingo.js's jesterBallResolution.
-  // keep / index.js's handleJesterBallChoice gate) - sit on the ball this
-  // turn without resolving it, still taking a normal action too (doesn't
-  // consume his turn, unlike Pass). Only ever shown to him, never to any
-  // other holder.
-  if (characterId === 'boingo') {
-    const keepBtn = document.createElement('button');
-    keepBtn.textContent = 'Keep it for now';
-    // Keep is a deliberate no-op server-side (see boingo.js's
-    // jesterBallResolution.keep) - nothing about game.jesterBall or any
-    // character's hearts/shield changes, so a click otherwise looks
-    // completely unresponsive (confirmed live report: "keep button not
-    // working"). Give it the same click sound every other action button
-    // gets (was missing here specifically) plus a brief own label change,
-    // so the click itself is unmistakably acknowledged even though the
-    // game state around it stays identical. (An earlier attempt instead
-    // hid this whole panel after a click, but that broke re-showing it on
-    // a LATER turn - see isMyBallDecision's own comment - reverted.)
-    keepBtn.onclick = () => {
-      playUiClick();
-      keepBtn.disabled = true;
-      keepBtn.textContent = 'Held!';
-      send('jester-ball-choice', { characterId, choice: 'keep' });
-    };
-    btnRow.appendChild(keepBtn);
   }
 
   // Passing is now repeatable up to 10 times (jb.passCount, raised from 5 -
@@ -1908,8 +1885,6 @@ function describeLogEntry(entry) {
       if (entry.shielded) parts.push(`+${entry.shielded} shield`);
       return `The Jester Ball passes through ${name(entry.boingoId)}${parts.length ? ` - ${parts.join(', ')}` : ''}`;
     }
-    case 'jester-ball-keep':
-      return `${name(entry.boingoId)} holds onto the Jester Ball for now`;
     case 'spell-discovered':
       return entry.spellId
         ? `${name(entry.characterId)} discovered a new spell: ${SPELL_NAMES[entry.spellId] || entry.spellId}!`
