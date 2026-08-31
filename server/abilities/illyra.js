@@ -12,10 +12,10 @@ function burstDamageFor(stackCount) {
 
 // Total mirage stack-points Mirage Overload throws, keyed by how many
 // characters (including her) are currently alive - confirmed ruling: 7 at
-// 4 alive, 5 at 3 alive, 2 at 2 alive (a 1v1 is explicitly allowed, no
-// headcount gate on casting it at all - only her own hearts <= 3 gates
-// legality, see isLegal below).
-const OVERLOAD_STACKS_BY_ALIVE_COUNT = { 4: 7, 3: 5, 2: 2 };
+// 4 alive, 5 at 3 alive, 3 at 2 alive (raised from 2, confirmed ruling) - a
+// 1v1 is explicitly allowed, no headcount gate on casting it at all - only
+// her own hearts <= 3 gates legality, see isLegal below).
+const OVERLOAD_STACKS_BY_ALIVE_COUNT = { 4: 7, 3: 5, 2: 3 };
 
 // Dodge Defense category registration (see
 // engine/categories/dodgeDefense.js) - additive, not yet consumed by
