@@ -273,6 +273,14 @@ export const actions = {
           targetCharacterId: target.id,
           amount: GRIM_BARRAGE_DAMAGE_PER_HIT,
           ignoresDodge: true,
+          // Confirmed bug (2026-08-31, live report: "is grimtal barrage
+          // not landing on velorya eclipse? it is environmental attack") -
+          // Environmental Attack bypasses Untargetable entirely by
+          // definition (same taxonomy rule Earthshatter/Mirage Burst
+          // already follow), but this call was missing the flag - a hit
+          // randomly landing on an untargetable target (e.g. Velorya
+          // mid-Lunar Eclipse) silently no-op'd instead, wasting the swing.
+          ignoresUntargetable: true,
         });
         // Same landed/blocked/headache-arming logic as Skull Crack's own
         // execute above, just repeated per hit instead of once - skipped
