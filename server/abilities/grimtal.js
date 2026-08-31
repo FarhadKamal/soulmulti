@@ -5,6 +5,11 @@ import { registerOnOwnDeath } from '../engine/categories/onOwnDeath.js';
 import { registerOnOtherRevived } from '../engine/categories/onOtherRevived.js';
 import { registerOnAnyDeath } from '../engine/categories/onAnyDeath.js';
 
+// Grim Barrage: 3 independent random-target hits, 2 damage each (confirmed
+// ruling) - see the action definition below for the full reasoning.
+const GRIM_BARRAGE_TOTAL_HITS = 3;
+const GRIM_BARRAGE_DAMAGE_PER_HIT = 2;
+
 // KO-branch cleanup (see engine/categories/onOwnDeath.js) - his own death
 // ends Skull Crack's pending headache immediately, no one left to have
 // caused it, same "caster's death cancels their own ongoing effects" rule
@@ -200,6 +205,64 @@ export const actions = {
       }
       log.push({ type: 'special', characterId: character.id, actionId: 'skullCrack', targetId, blocked, ...result });
       return result;
+    },
+  },
+  // Grim Barrage: his desperation special (confirmed ruling), legal only
+  // once he's genuinely on the brink (hearts <= 3 - same gate direction as
+  // Tharox's Earthshatter/Illyra's Mirage Overload, a comeback move, not an
+  // opener). No-target, one-time use, own dedicated usedGrimBarrage flag
+  // (separate from usedSpecial, already spoken for by Skull Crack).
+  //
+  // 3 independent hits, each fully independently random across every
+  // currently-alive OPPONENT (same "no even split, no minimum-per-target
+  // guarantee" reasoning as Earthshatter/Mirage Overload - a lopsided or
+  // single-target result, even all 3 landing on one unlucky opponent, is
+  // completely normal, not a bug). Modeled as 3 separate hit EVENTS (not
+  // pre-aggregated damage points like Earthshatter) because each one needs
+  // its own independent headache-roll attempt - two different targets
+  // hit by the SAME cast can each end up with their own pending headache
+  // only in the sense that the LAST hit to land wins (headacheVictimId is
+  // a single slot, not a list, same "most recent cast/hit wins" reasoning
+  // as Skull Crack's own comment above) - confirmed ruling: each hit rolls
+  // independently rather than only the first hit on a repeat target.
+  //
+  // Each hit is Environmental Attack (ignoresDodge: true, shield still
+  // absorbs normally - NOT ignoresShield, unlike Skull Crack's own pierce
+  // damage) - confirmed ruling, deliberately different shield interaction
+  // from his normal-turn Skull Crack.
+  grimBarrage: {
+    label: 'Grim Barrage',
+    needsTarget: false,
+    special: true,
+    isLegal: (character) => character.hearts <= 3 && !character.special.usedGrimBarrage,
+    execute(character, targetId, game, log) {
+      character.special.usedGrimBarrage = true;
+      const others = Object.values(game.characters).filter((c) => c.id !== character.id && !c.isKO);
+      const hits = [];
+      for (let i = 0; i < GRIM_BARRAGE_TOTAL_HITS; i++) {
+        if (others.length === 0) break;
+        const target = others[Math.floor(Math.random() * others.length)];
+        const result = applyDamage(game, log, {
+          sourceCharacterId: character.id,
+          targetCharacterId: target.id,
+          amount: GRIM_BARRAGE_DAMAGE_PER_HIT,
+          ignoresDodge: true,
+        });
+        // Same landed/blocked/headache-arming logic as Skull Crack's own
+        // execute above, just repeated per hit instead of once.
+        let blocked = false;
+        if (result.amountDealt > 0 && !result.koTriggered) {
+          if (tryTriggerCleanSlate(target, game, log) || tryIllyraDodgeStatus(target, game, log, character.id)) {
+            blocked = true;
+          } else {
+            character.special.headacheVictimId = target.id;
+            character.special.headacheRollPending = true;
+          }
+        }
+        hits.push({ targetId: target.id, blocked, ...result });
+      }
+      log.push({ type: 'special', characterId: character.id, actionId: 'grimBarrage', hits });
+      return { hits };
     },
   },
 };

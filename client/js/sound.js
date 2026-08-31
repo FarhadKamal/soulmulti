@@ -205,6 +205,7 @@ const ACTION_SOUND = {
   wandDiscover: 'wand_discover',
   grimStrike: 'sword_thud',
   skullCrack: 'bullet_hit',
+  grimBarrage: 'grim_barrage',
   // Reuses Grimtal's spear-thrust impact sound - fitting for her own
   // spear-lunge sacrifice attack, per explicit request.
   divineSacrifice: 'sword_thud',

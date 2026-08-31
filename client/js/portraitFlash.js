@@ -15,6 +15,13 @@ const FLASH_DURATION_MS = 1600;
 // than the sound's own full length, per explicit choice.
 const EARTHSHATTER_FLASH_DURATION_MS = 4500;
 
+// Grimtal's Grim Barrage portrait stays up slightly longer than the
+// default flash - sized to roughly match its own sound effect (~2.7s, see
+// sound.js's ACTION_SOUND.grimBarrage - no exclusive lock unlike
+// Earthshatter's, confirmed ruling, but the flash still shouldn't revert
+// to idle mid-clip).
+const GRIM_BARRAGE_FLASH_DURATION_MS = 2800;
+
 // Chronox's World Stops portrait similarly stays up longer than the
 // default flash - sized to roughly match its own voice line (~4.68s) and
 // sound effect (~4.03s, see sound.js's ACTION_SOUND.worldStops) so the
@@ -444,6 +451,8 @@ export function handleLogEntryForFlash(entry, game) {
       break;
     case 'claimKill':
       setFlash(characterId, 'assets/images/grimtal/claim_kill.jpg'); break;
+    case 'grimBarrage':
+      setFlash(characterId, 'assets/images/grimtal/grim_barrage.jpg', GRIM_BARRAGE_FLASH_DURATION_MS); break;
     case 'mirageMark':
       setFlash(characterId, 'assets/images/illyra/mirage_mark.jpg'); break;
     case 'mirageBurst':

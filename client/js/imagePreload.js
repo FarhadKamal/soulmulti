@@ -86,6 +86,7 @@ const FLASH_IMAGES = [
   'assets/images/grimtal/skull_crack.jpg',
   'assets/images/grimtal/power.jpg',
   'assets/images/grimtal/claim_kill.jpg',
+  'assets/images/grimtal/grim_barrage.jpg',
   'assets/images/illyra/idle.jpg',
   'assets/images/illyra/illusion.jpg',
   'assets/images/illyra/mirage_mark.jpg',

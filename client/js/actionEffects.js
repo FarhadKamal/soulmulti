@@ -359,6 +359,23 @@ export function handleLogEntryForEffects(entry, game) {
     return;
   }
 
+  // Grim Barrage: same "one overwhelming blow, scaled up to hit everyone
+  // it landed on" reuse of the bigshatter effect as Earthshatter above -
+  // 3 independent random-target hits rather than pre-aggregated points, so
+  // the SAME target can legitimately fire this effect more than once in a
+  // row if the random assignment landed on them repeatedly (each entry in
+  // entry.hits is its own separate swing).
+  if (entry.type === 'special' && entry.actionId === 'grimBarrage') {
+    for (const hit of entry.hits || []) {
+      if (!isKO(hit.targetId) && hit.amountDealt > 0) {
+        applyHitFlash(hit.targetId, hit.amountDealt);
+        addEffect(hit.targetId, 'shake', EFFECT_DURATION_MS.shake);
+        addEffect(hit.targetId, 'bigshatter', EFFECT_DURATION_MS.bigshatter);
+      }
+    }
+    return;
+  }
+
   if (entry.type !== 'attack' && entry.type !== 'special') return;
   const { characterId, actionId, targetId, dodged, amountDealt, streak, flip, outcome, grudgeCount, isNewTarget, wasMarked } = entry;
 

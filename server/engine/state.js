@@ -242,12 +242,20 @@ function baseSpecialFor(id) {
       // elsewhere as a flat "has the ONE special been used" flag, and only
       // flips true here once all 3 casts are spent).
       // headacheVictimId/headacheRoll: set together the instant Skull Crack
-      // lands - headacheRoll is decided live at the START of the VICTIM's
-      // own next turn (not at cast time - confirmed ruling), then both are
-      // cleared the instant that turn's roll resolves, win or lose. Lives
-      // on Grimtal (the caster) rather than the victim, matching every
-      // other caster-side effect in the codebase (Akyros's marks, Athena's
-      // curseTargetCharacterId, Rowan's poisonTargets).
+      // (or Grim Barrage) lands - headacheRoll is decided live at the START
+      // of the VICTIM's own next turn (not at cast time - confirmed
+      // ruling), then both are cleared the instant that turn's roll
+      // resolves, win or lose. Lives on Grimtal (the caster) rather than
+      // the victim, matching every other caster-side effect in the
+      // codebase (Akyros's marks, Athena's curseTargetCharacterId, Rowan's
+      // poisonTargets).
+      // usedGrimBarrage: his desperation special (hearts <= 3, confirmed
+      // ruling) - own dedicated one-time flag, separate from usedSpecial
+      // (already spoken for by Skull Crack), same multi-special pattern as
+      // Chronox's usedWorldStops. 3 independent random-target hits, each
+      // Environmental Attack (bypasses dodge, shield still absorbs) and
+      // each rolling its own headache-roll attempt on whoever it lands on
+      // - see grimtal.js's grimBarrage action.
       return {
         ownKillCount: 0,
         claimedKillCount: 0,
@@ -256,6 +264,7 @@ function baseSpecialFor(id) {
         skullCrackUsed: 0,
         headacheVictimId: null,
         headacheRollPending: true,
+        usedGrimBarrage: false,
       };
     case 'illyra':
       // mirageMarks: Map<targetCharacterId, stackCount> - how many

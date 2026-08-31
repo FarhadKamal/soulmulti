@@ -1735,7 +1735,7 @@ const ACTION_LABELS = {
   mirrorReflect: 'Mirror Reflect', silenceLock: 'Silence Lock',
   everbloom: 'Everbloom', threefoldVeil: 'Threefold Veil', cleanSlate: 'Clean Slate',
   piercingWand: 'Piercing Wand', wandMastery: 'Wand Mastery',
-  grimStrike: 'Grim Strike', skullCrack: 'Skull Crack', claimKill: 'Claim the Kill',
+  grimStrike: 'Grim Strike', skullCrack: 'Skull Crack', claimKill: 'Claim the Kill', grimBarrage: 'Grim Barrage',
   mirageMark: 'Mirage Mark', mirageBurst: 'Mirage Burst', mirageOverload: 'Mirage Overload',
   runeStrike: 'Rune Strike', runeVision: 'Rune Vision', runeVisionTargetPick: 'Rune Vision',
 };
@@ -1801,6 +1801,19 @@ function describeLogEntry(entry) {
           `${name(h.targetId)} (${h.amountDealt != null ? `${h.amountDealt} dmg` : '0 dmg'}${h.koTriggered ? ' - KO!' : ''})`
         );
         return `${name(entry.characterId)} unleashed Earthshatter - ${parts.join(', ')}`;
+      }
+      if (entry.actionId === 'grimBarrage') {
+        // 3 independent random-target hits (not pre-aggregated points like
+        // Earthshatter) - each entry in entry.hits is its own separate
+        // swing, so the SAME target can legitimately appear more than once
+        // if the random assignment landed on them repeatedly.
+        if (!entry.hits || entry.hits.length === 0) {
+          return `${name(entry.characterId)} unleashed Grim Barrage - the barrage found no one left to strike!`;
+        }
+        const parts = entry.hits.map((h) =>
+          `${name(h.targetId)} (${h.amountDealt != null ? `${h.amountDealt} dmg` : '0 dmg'}${h.koTriggered ? ' - KO!' : ''}${h.blocked ? ', headache blocked' : ''})`
+        );
+        return `${name(entry.characterId)} unleashed Grim Barrage - ${parts.join(', ')}`;
       }
       if (entry.actionId === 'runeVision') {
         if (entry.stage === 1) {

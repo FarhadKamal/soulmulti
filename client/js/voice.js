@@ -245,6 +245,11 @@ const ACTION_VOICE_LINES = {
     // a normal type: 'setup' entry, same shape as Rowan's arcaneStudy) -
     // no special-casing needed, unlike power above.
     claimKill: 'claim_kill',
+    // Grim Barrage: dispatched through the generic playMoveVoice
+    // bottom-of-switch path same as claimKill above - it's a normal
+    // type: 'special' entry with actionId 'grimBarrage', no special-casing
+    // needed.
+    grimBarrage: 'grimtal_barrage',
   },
   illyra: {
     mirageMark: 'mark',
