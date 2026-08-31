@@ -117,12 +117,12 @@ registerOnOwnDeath('chronox', (character, game, log) => {
   character.special.lockedActionTurnsRemaining = 0;
 });
 
-// Total rounds World Stops' freeze lasts (confirmed ruling - 3, reduced
-// from 4). Round 1 is applied immediately at cast time
+// Total rounds World Stops' freeze lasts (confirmed ruling - back up to 4,
+// raised from 3). Round 1 is applied immediately at cast time
 // (worldStops.execute sets skipNextTurn + worldStopsSkipsApplied = 1);
 // this constant gates the remaining continuation ticks in onTurnStart
 // below, so the group is frozen for this many of their own turns total.
-const WORLD_STOPS_TOTAL_ROUNDS = 3;
+const WORLD_STOPS_TOTAL_ROUNDS = 4;
 
 export function onTurnStart(character, game, log) {
   // Chrono Guard: shield RESETS to exactly 1 each turn - does not stack.
@@ -153,8 +153,8 @@ export function onTurnStart(character, game, log) {
     }
   }
 
-  // World Stops: flat 3-round duration (confirmed ruling, reduced from 4),
-  // a single SHARED countdown re-applied to the whole frozen group together
+  // World Stops: flat 4-round duration (confirmed ruling), a single SHARED
+  // countdown re-applied to the whole frozen group together
   // each tick rather than per-target - simpler, and the group was locked in
   // at cast time (worldStopsFrozenIds), so it's stable even if someone in
   // the group is later KO'd by something else (the `!frozen.isKO` guard
