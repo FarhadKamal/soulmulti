@@ -240,7 +240,7 @@ export const actions = {
     isLegal: (character) => character.hearts <= 3 && !character.special.usedGrimBarrage,
     execute(character, targetId, game, log) {
       character.special.usedGrimBarrage = true;
-      const others = Object.values(game.characters).filter((c) => c.id !== character.id && !c.isKO);
+      let others = Object.values(game.characters).filter((c) => c.id !== character.id && !c.isKO);
       const hits = [];
       // Confirmed ruling (2026-08-31, corrected from "each hit rolls
       // independently"): the FIRST hit in the sequence that successfully
@@ -253,6 +253,18 @@ export const actions = {
       // wrong exactly, just not what was wanted: the first success should
       // be the one that counts, full stop.
       let headacheArmed = false;
+      // First mid-cast Rebirth save (if any) - surfaced as the top-level
+      // rebirthLogEntry return field, matching the single-field contract
+      // finalizeAction() already checks for every other ability (see
+      // turnEngine.js) - same fix as Earthshatter's own (2026-08-31). Same
+      // reasoning extended to mirrorLogEntry (Athena's curse mirror) and
+      // mirrorReflectLogEntry (Rowan's Mirror Reflect) - each hit's own
+      // result already carries these via the `...result` spread below, but
+      // finalizeAction only ever reads them from the top-level return
+      // value, never from inside an array element.
+      let rebirthLogEntry = null;
+      let mirrorLogEntry = null;
+      let mirrorReflectLogEntry = null;
       for (let i = 0; i < GRIM_BARRAGE_TOTAL_HITS; i++) {
         if (others.length === 0) break;
         const target = others[Math.floor(Math.random() * others.length)];
@@ -275,10 +287,25 @@ export const actions = {
             headacheArmed = true;
           }
         }
+        if (result.rebirthLogEntry && !rebirthLogEntry) rebirthLogEntry = result.rebirthLogEntry;
+        if (result.mirrorLogEntry && !mirrorLogEntry) mirrorLogEntry = result.mirrorLogEntry;
+        if (result.mirrorResult?.rebirthLogEntry && !rebirthLogEntry) rebirthLogEntry = result.mirrorResult.rebirthLogEntry;
+        if (result.mirrorReflectLogEntry && !mirrorReflectLogEntry) mirrorReflectLogEntry = result.mirrorReflectLogEntry;
+        if (result.mirrorReflectResult?.rebirthLogEntry && !rebirthLogEntry) rebirthLogEntry = result.mirrorReflectResult.rebirthLogEntry;
         hits.push({ targetId: target.id, blocked, ...result });
+        // A hit that KO's its target removes them from the pool for any
+        // REMAINING hits this same cast - confirmed ruling (2026-08-31,
+        // live report: a 4-hit barrage killed Tharox on hit 1, then wasted
+        // all 3 remaining hits re-rolling his already-dead body instead of
+        // redirecting to Illyra, the only other living opponent). Tharox's
+        // own Earthshatter has the same fix (2026-08-31) for the same
+        // underlying reason.
+        if (result.koTriggered) {
+          others = others.filter((c) => c.id !== target.id);
+        }
       }
       log.push({ type: 'special', characterId: character.id, actionId: 'grimBarrage', hits });
-      return { hits };
+      return { hits, rebirthLogEntry, mirrorLogEntry, mirrorReflectLogEntry };
     },
   },
 };

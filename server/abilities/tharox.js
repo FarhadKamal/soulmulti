@@ -94,22 +94,51 @@ export const actions = {
     isLegal: (character) => character.hearts <= 3 && !character.special.usedEarthshatter,
     execute(character, targetId, game, log) {
       character.special.usedEarthshatter = true;
-      const others = Object.values(game.characters).filter((c) => c.id !== character.id && !c.isKO);
-      const landedOn = {};
-      // Fully independent random assignment per point, same reasoning as
+      let others = Object.values(game.characters).filter((c) => c.id !== character.id && !c.isKO);
+      // Fully independent random target per point, same reasoning as
       // Mirage Overload - deliberately NOT an even/balanced split, a
-      // lopsided or single-target result is normal, not a bug.
+      // lopsided or single-target result is normal, not a bug. Applied ONE
+      // POINT AT A TIME (not pre-assigned then applied as a lump sum per
+      // target) so a target who dies partway through absorbing their
+      // assigned points is removed from the pool for any REMAINING points -
+      // confirmed ruling (2026-08-31, same fix as Grim Barrage's own
+      // mid-cast KO redirect): the old pre-assign-then-apply design could
+      // waste points as pure overkill on an already-dead target (e.g. 6 of
+      // 7 points assigned to someone with only 3 hearts worth of health)
+      // that were never actually available to redirect to another living
+      // opponent, since the assignment happened before any damage was
+      // dealt. Shield-absorption math is unaffected by this change - a
+      // shield absorbs the same total whether given N points at once or
+      // one at a time (Math.min(shield, amt) per hit, damagePipeline.js).
+      const dealtByTarget = {};
+      const koTriggeredByTarget = {};
+      // First mid-cast Rebirth save (if any) - surfaced as the top-level
+      // rebirthLogEntry return field, matching the single-field contract
+      // finalizeAction() already checks for every other ability (see
+      // turnEngine.js) - confirmed a pre-existing gap even before this
+      // point-by-point rewrite (the old lump-sum version never surfaced
+      // this either), fixed here while already restructuring this code.
+      // Only the FIRST save is captured since Rebirth is one-shot per
+      // character per match - a second character being saved in the same
+      // cast is exceedingly unlikely (only Blade has Rebirth today) and
+      // finalizeAction has no way to show more than one entry here anyway.
+      // Same reasoning/fix extended to mirrorLogEntry (Athena's curse
+      // mirror) and mirrorReflectLogEntry (Rowan's Mirror Reflect) - both
+      // were ALSO silently dropped by the old per-target lump-sum code
+      // (confirmed via direct comparison against the pre-fix version, not
+      // introduced by this change) since they sat on individual hit result
+      // objects that were spread into `hits` but never read back out by
+      // finalizeAction, which only ever checks the top-level return value.
+      let rebirthLogEntry = null;
+      let mirrorLogEntry = null;
+      let mirrorReflectLogEntry = null;
       for (let i = 0; i < EARTHSHATTER_TOTAL_DAMAGE; i++) {
         if (others.length === 0) break;
         const target = others[Math.floor(Math.random() * others.length)];
-        landedOn[target.id] = (landedOn[target.id] || 0) + 1;
-      }
-      const hits = [];
-      for (const [tid, amount] of Object.entries(landedOn)) {
         const result = applyDamage(game, log, {
           sourceCharacterId: character.id,
-          targetCharacterId: tid,
-          amount,
+          targetCharacterId: target.id,
+          amount: 1,
           // Confirmed ruling: bypasses untargetable (e.g. Velorya mid-Lunar
           // Eclipse) same as Illyra's Mirage Burst - a devastating
           // world-shaking AoE isn't something evasion should be able to
@@ -127,10 +156,28 @@ export const actions = {
           // still evade.
           ignoresDodge: true,
         });
-        hits.push({ targetId: tid, ...result });
+        dealtByTarget[target.id] = (dealtByTarget[target.id] || 0) + (result.amountDealt || 0);
+        if (result.rebirthLogEntry && !rebirthLogEntry) rebirthLogEntry = result.rebirthLogEntry;
+        if (result.mirrorLogEntry && !mirrorLogEntry) mirrorLogEntry = result.mirrorLogEntry;
+        if (result.mirrorResult?.rebirthLogEntry && !rebirthLogEntry) rebirthLogEntry = result.mirrorResult.rebirthLogEntry;
+        if (result.mirrorReflectLogEntry && !mirrorReflectLogEntry) mirrorReflectLogEntry = result.mirrorReflectLogEntry;
+        if (result.mirrorReflectResult?.rebirthLogEntry && !rebirthLogEntry) rebirthLogEntry = result.mirrorReflectResult.rebirthLogEntry;
+        if (result.koTriggered) {
+          koTriggeredByTarget[target.id] = true;
+          others = others.filter((c) => c.id !== target.id);
+        }
       }
+      // Re-aggregated into one entry per target (matching the client's
+      // existing describeLogEntry/actionEffects display, which groups by
+      // target rather than showing all 7 individual points) despite being
+      // computed point-by-point above.
+      const hits = Object.entries(dealtByTarget).map(([tid, amountDealt]) => ({
+        targetId: tid,
+        amountDealt,
+        koTriggered: !!koTriggeredByTarget[tid],
+      }));
       log.push({ type: 'special', characterId: character.id, actionId: 'earthshatter', hits });
-      return { hits };
+      return { hits, rebirthLogEntry, mirrorLogEntry, mirrorReflectLogEntry };
     },
   },
 };
