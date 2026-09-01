@@ -1,9 +1,9 @@
 import 'dotenv/config';
 import { WebSocketServer } from 'ws';
 import { createServer } from 'http';
-import { randomUUID } from 'crypto';
-import { readFile, stat } from 'fs/promises';
-import { join, extname, normalize } from 'path';
+import { randomUUID, createHash } from 'crypto';
+import { readFile, stat, readdir } from 'fs/promises';
+import { join, extname, normalize, relative, sep } from 'path';
 import { fileURLToPath } from 'url';
 
 import { CHARACTER_IDS } from '../client/js/characters.js';
@@ -64,6 +64,64 @@ const MIME_TYPES = {
   '.svg': 'image/svg+xml',
   '.ico': 'image/x-icon',
 };
+
+// Per-file content-hash cache-busting for images/audio (confirmed ruling,
+// 2026-09-01) - replaces assetVersion.js's old behavior of stamping every
+// asset URL with the SAME session-wide timestamp on Hard Refresh, which
+// forced a full re-download of the entire ~53MB asset set (332 files)
+// every single time, even though almost none of it had actually changed.
+// Root cause reported directly: "if user already have everything their
+// client pc memory... supposed only new/updated asset will download. why
+// full?" - a fair expectation the old design couldn't meet, since a single
+// shared version token makes every asset's URL change together regardless
+// of whether that specific file's content did.
+//
+// Computed ONCE at server boot by hashing each asset file's actual bytes
+// (content hash, not mtime - a git checkout/deploy can reset file
+// timestamps to "now" for everything regardless of real content changes,
+// which would silently reintroduce the exact all-files-change-together
+// problem this exists to fix; a content hash only ever changes when the
+// file's bytes genuinely do). Exposed to the client via GET
+// /asset-manifest.json (see the dispatch in httpServer's request handler
+// below) - assetVersion.js fetches it once on page load and uses each
+// file's own hash as that file's OWN query-string version, so an asset
+// whose content hasn't changed keeps the exact same URL (and stays
+// browser-cached) across deploys and Hard Refresh clicks alike; only
+// files that actually changed get a new URL and a real re-fetch.
+const ASSET_MANIFEST_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.svg', '.ico', '.mp3']);
+let assetManifestJson = '{}';
+
+async function buildAssetManifest() {
+  const manifest = {};
+  const assetsRoot = join(CLIENT_DIR, 'assets');
+  async function walk(dir) {
+    let entries;
+    try {
+      entries = await readdir(dir, { withFileTypes: true });
+    } catch {
+      return; // assets/ missing entirely (shouldn't happen in a real checkout) - manifest just stays empty
+    }
+    for (const entry of entries) {
+      const fullPath = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        await walk(fullPath);
+        continue;
+      }
+      const ext = extname(entry.name).toLowerCase();
+      if (!ASSET_MANIFEST_EXTENSIONS.has(ext)) continue;
+      const bytes = await readFile(fullPath);
+      const hash = createHash('md5').update(bytes).digest('hex').slice(0, 10);
+      // Key format matches exactly what assetVersion.js's v() receives as
+      // its `path` argument elsewhere in this codebase, e.g.
+      // 'assets/portraits/blade.jpg' - always forward slashes, regardless
+      // of the host OS's own path separator.
+      const key = `assets/${relative(assetsRoot, fullPath).split(sep).join('/')}`;
+      manifest[key] = hash;
+    }
+  }
+  await walk(assetsRoot);
+  return manifest;
+}
 
 async function serveStaticFile(req, res) {
   // Strip query string, decode percent-encoding, and normalize away any
@@ -141,6 +199,12 @@ async function serveStaticFile(req, res) {
 }
 
 const httpServer = createServer((req, res) => {
+  const urlPath = (req.url || '/').split('?')[0];
+  if (urlPath === '/asset-manifest.json') {
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' });
+    res.end(assetManifestJson);
+    return;
+  }
   serveStaticFile(req, res);
 });
 const wss = new WebSocketServer({ server: httpServer });
@@ -1931,6 +1995,26 @@ wss.on('connection', (ws) => {
 
 startHeartbeat();
 
-httpServer.listen(PORT, () => {
-  console.log(`Soul Clash multiplayer server listening on port ${PORT}`);
-});
+// Build the per-file asset manifest before accepting any requests - cheap
+// (332 small files, well under a second) but real async file I/O, so this
+// delays httpServer.listen() itself rather than racing it; a request
+// landing before the manifest is ready would otherwise see the empty '{}'
+// default and every asset would look "unchanged" to assetVersion.js until
+// the build finished moments later - avoided entirely by just waiting.
+buildAssetManifest()
+  .then((manifest) => {
+    assetManifestJson = JSON.stringify(manifest);
+    httpServer.listen(PORT, () => {
+      console.log(`Soul Clash multiplayer server listening on port ${PORT}`);
+    });
+  })
+  .catch((err) => {
+    // Never let a manifest-build failure take the whole server down - fall
+    // back to the empty manifest (assetVersion.js's own fallback then
+    // behaves like today's global-token scheme) rather than refusing to
+    // boot at all.
+    console.error('Failed to build asset manifest, starting with an empty one:', err);
+    httpServer.listen(PORT, () => {
+      console.log(`Soul Clash multiplayer server listening on port ${PORT}`);
+    });
+  });
