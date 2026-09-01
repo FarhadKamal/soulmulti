@@ -189,22 +189,26 @@ export const actions = {
       // Marin's Clean Slate: consumes/blocks the headache status itself,
       // same as Rowan's Silence Lock - the 2 pierce damage above still
       // lands normally regardless, only the headache side effect is
-      // suppressed.
-      let blocked = false;
+      // suppressed. blockedBy names WHICH mechanic actually fired
+      // (confirmed bug, 2026-09-01 - see chronox.js's identical fix/
+      // comment on Time Freeze for the full reasoning).
+      let blockedBy = null;
       if (!result.dodged && result.amountDealt > 0 && !result.koTriggered) {
         const target = game.characters[targetId];
         // Illyra's passive checked alongside Clean Slate - same "50%
         // chance the STATUS side effect itself doesn't take" reasoning as
         // every other status-application site, independent of whatever
         // roll may have already applied to the 2 pierce damage above.
-        if (tryTriggerCleanSlate(target, game, log) || tryIllyraDodgeStatus(target, game, log, character.id)) {
-          blocked = true;
+        if (tryTriggerCleanSlate(target, game, log)) {
+          blockedBy = 'cleanSlate';
+        } else if (tryIllyraDodgeStatus(target, game, log, character.id)) {
+          blockedBy = 'illyra';
         } else {
           character.special.headacheVictimId = targetId;
           character.special.headacheRollPending = true;
         }
       }
-      log.push({ type: 'special', characterId: character.id, actionId: 'skullCrack', targetId, blocked, ...result });
+      log.push({ type: 'special', characterId: character.id, actionId: 'skullCrack', targetId, blockedBy, ...result });
       return result;
     },
   },
@@ -299,11 +303,16 @@ export const actions = {
         });
         // Same landed/blocked/headache-arming logic as Skull Crack's own
         // execute above, just repeated per hit instead of once - skipped
-        // entirely once headacheArmed is already true.
-        let blocked = false;
+        // entirely once headacheArmed is already true. blockedBy names
+        // WHICH mechanic actually fired (confirmed bug, 2026-09-01 - see
+        // chronox.js's identical fix/comment on Time Freeze for the full
+        // reasoning).
+        let blockedBy = null;
         if (!headacheArmed && result.amountDealt > 0 && !result.koTriggered) {
-          if (tryTriggerCleanSlate(target, game, log) || tryIllyraDodgeStatus(target, game, log, character.id)) {
-            blocked = true;
+          if (tryTriggerCleanSlate(target, game, log)) {
+            blockedBy = 'cleanSlate';
+          } else if (tryIllyraDodgeStatus(target, game, log, character.id)) {
+            blockedBy = 'illyra';
           } else {
             character.special.headacheVictimId = target.id;
             character.special.headacheRollPending = true;
@@ -320,7 +329,7 @@ export const actions = {
         if (result.mirrorResult?.rebirthLogEntry && !rebirthLogEntry) rebirthLogEntry = result.mirrorResult.rebirthLogEntry;
         if (result.mirrorReflectLogEntry && !mirrorReflectLogEntry) mirrorReflectLogEntry = result.mirrorReflectLogEntry;
         if (result.mirrorReflectResult?.rebirthLogEntry && !rebirthLogEntry) rebirthLogEntry = result.mirrorReflectResult.rebirthLogEntry;
-        hits.push({ targetId: target.id, blocked, ...result });
+        hits.push({ targetId: target.id, blockedBy, ...result });
         // A hit that KO's its target removes them from the pool for any
         // REMAINING hits this same cast - confirmed ruling (2026-08-31,
         // live report: a 4-hit barrage killed Tharox on hit 1, then wasted

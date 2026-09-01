@@ -55,9 +55,15 @@ export const actions = {
       // Marin's Clean Slate: consumes/blocks the mark itself - deliberately
       // does NOT add to everMarkedIds, since the mark never actually took;
       // "once marked, never again" shouldn't apply to an attempt that was
-      // cleansed before it landed.
+      // cleansed before it landed. blockedBy names WHICH mechanic actually
+      // fired (confirmed bug, 2026-09-01 - see chronox.js's identical
+      // fix/comment on Time Freeze for the full reasoning). Also fixes a
+      // second gap on this specific ability: the client never displayed
+      // `blocked` for hidden-mark entries at all, so a blocked mark
+      // attempt used to silently read as a successful one in the log -
+      // see battleScreen.js's describeLogEntry for the matching client fix.
       if (tryTriggerCleanSlate(target, game, log)) {
-        log.push({ type: 'hidden-mark', characterId: character.id, targetId, hidden: true, blocked: true });
+        log.push({ type: 'hidden-mark', characterId: character.id, targetId, hidden: true, blockedBy: 'cleanSlate' });
         return {};
       }
       // Illyra's passive: a 50% chance the mark itself simply doesn't
@@ -65,7 +71,7 @@ export const actions = {
       // Slate case just above, an attempt that never actually lands
       // shouldn't burn her "once ever" mark eligibility.
       if (tryIllyraDodgeStatus(target, game, log, character.id)) {
-        log.push({ type: 'hidden-mark', characterId: character.id, targetId, hidden: true, blocked: true });
+        log.push({ type: 'hidden-mark', characterId: character.id, targetId, hidden: true, blockedBy: 'illyra' });
         return {};
       }
       character.special.marks.add(targetId);

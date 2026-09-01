@@ -207,15 +207,22 @@ export const actions = {
       const target = game.characters[targetId];
       // Marin's Clean Slate: consumes/blocks the freeze itself - the cast
       // still spends his special, it just never actually freezes her.
+      // blockedBy names WHICH mechanic actually fired (confirmed bug,
+      // 2026-09-01: this used to be a flat blocked: true regardless of
+      // which of the two checks below succeeded, so the client always
+      // displayed "blocked by Clean Slate!" even when it was really
+      // Illyra's Illusion passive that fired - live report traced a real
+      // match log showing exactly that mislabeling against Illyra, who
+      // was the actual target, in a match Marin wasn't even in).
       if (tryTriggerCleanSlate(target, game, log)) {
-        log.push({ type: 'special', characterId: character.id, actionId: 'timeFreeze', targetId, blocked: true });
+        log.push({ type: 'special', characterId: character.id, actionId: 'timeFreeze', targetId, blockedBy: 'cleanSlate' });
         return { targetCharacterId: targetId };
       }
       // Illyra's passive: a 50% chance the freeze itself simply doesn't
       // take - the cast still spends his special either way, same
       // reasoning as the Clean Slate case above.
       if (tryIllyraDodgeStatus(target, game, log, character.id)) {
-        log.push({ type: 'special', characterId: character.id, actionId: 'timeFreeze', targetId, blocked: true });
+        log.push({ type: 'special', characterId: character.id, actionId: 'timeFreeze', targetId, blockedBy: 'illyra' });
         return { targetCharacterId: targetId };
       }
       character.special.freezeActive = true;

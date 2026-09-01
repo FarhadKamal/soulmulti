@@ -1716,6 +1716,20 @@ function fallbackCopy(text, onDone) {
   document.body.removeChild(ta);
 }
 
+// Describes which status-block mechanic actually intercepted a
+// curse/mark/freeze/silence/headache attempt - reads entry.blockedBy
+// (confirmed bug fix, 2026-09-01: every status-application site used to
+// log an ambiguous `blocked: true` regardless of whether Marin's Clean
+// Slate or Illyra's Illusion passive actually fired, so this text always
+// said "blocked by Clean Slate!" even in matches Marin wasn't even in -
+// live report traced this exact mislabeling against Illyra's own dodge).
+// Returns '' for anything that landed normally (blockedBy null/undefined).
+function blockedByText(blockedBy) {
+  if (blockedBy === 'cleanSlate') return ' - blocked by Clean Slate!';
+  if (blockedBy === 'illyra') return ' - blocked by Illusion!';
+  return '';
+}
+
 // Mirrors each ability's `label` field server-side (abilities/*.js) - kept
 // as a client-side lookup rather than plumbed through every log entry,
 // since action ids are stable, non-secret game data.
@@ -1811,7 +1825,7 @@ function describeLogEntry(entry) {
           return `${name(entry.characterId)} unleashed Grim Barrage - the barrage found no one left to strike!`;
         }
         const parts = entry.hits.map((h) =>
-          `${name(h.targetId)} (${h.amountDealt != null ? `${h.amountDealt} dmg` : '0 dmg'}${h.koTriggered ? ' - KO!' : ''}${h.blocked ? ', headache blocked' : ''})`
+          `${name(h.targetId)} (${h.amountDealt != null ? `${h.amountDealt} dmg` : '0 dmg'}${h.koTriggered ? ' - KO!' : ''}${h.blockedBy ? `, headache blocked by ${h.blockedBy === 'cleanSlate' ? 'Clean Slate' : 'Illusion'}` : ''})`
         );
         return `${name(entry.characterId)} unleashed Grim Barrage - ${parts.join(', ')}`;
       }
@@ -1848,16 +1862,20 @@ function describeLogEntry(entry) {
           : '';
         return `${name(entry.characterId)} unleashed World Stops - ${frozenText}${blockedText}`;
       }
-      return `${name(entry.characterId)} used their SPECIAL: ${actionLabel(entry.actionId)}${entry.targetId ? ` on ${name(entry.targetId)}` : ''}${entry.blocked ? ' - blocked by Clean Slate!' : ''}`;
+      return `${name(entry.characterId)} used their SPECIAL: ${actionLabel(entry.actionId)}${entry.targetId ? ` on ${name(entry.targetId)}` : ''}${blockedByText(entry.blockedBy)}`;
     case 'setup':
       if (entry.actionId === 'mirageMark') {
         return `${name(entry.characterId)} used Mirage Mark on ${name(entry.targetId)} - ${entry.stackCount} stack${entry.stackCount > 1 ? 's' : ''}`;
       }
       return `${name(entry.characterId)} used ${actionLabel(entry.actionId)}${entry.chargeCount ? ` (${entry.chargeCount}/2)` : ''}`;
     case 'hidden-mark':
-      return `${name(entry.characterId)} placed a Hidden Mark`;
+      // Previously always read "placed a Hidden Mark" even when it was
+      // actually blocked (confirmed bug, 2026-09-01) - the client never
+      // displayed the block at all for this entry type, so a failed
+      // attempt silently read as a successful one.
+      return `${name(entry.characterId)} placed a Hidden Mark${blockedByText(entry.blockedBy)}`;
     case 'curse':
-      return `${name(entry.characterId)} cast Curse Strike on ${name(entry.targetId)}${entry.blocked ? ' - blocked by Clean Slate!' : ''}`;
+      return `${name(entry.characterId)} cast Curse Strike on ${name(entry.targetId)}${blockedByText(entry.blockedBy)}`;
     case 'curse-mirror':
       return `Curse mirrors ${entry.amount} damage to ${name(entry.toCharacterId)}${entry.koTriggered ? ' - KO!' : ''}`;
     case 'ashka-heal':

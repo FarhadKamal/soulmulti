@@ -214,16 +214,20 @@ export const actions = {
       const target = game.characters[targetId];
       // Marin's Clean Slate: consumes/blocks the silence itself - the cast
       // still spends Rowan's one-time use of this spell, it just never
-      // actually locks her special ability away.
+      // actually locks her special ability away. blockedBy names WHICH
+      // mechanic actually fired (confirmed bug, 2026-09-01 - see
+      // chronox.js's identical fix/comment on Time Freeze for the full
+      // reasoning: this used to be an ambiguous blocked: true regardless
+      // of which check below succeeded).
       if (tryTriggerCleanSlate(target, game, log)) {
-        log.push({ type: 'special', characterId: character.id, actionId: 'silenceLock', targetId, blocked: true });
+        log.push({ type: 'special', characterId: character.id, actionId: 'silenceLock', targetId, blockedBy: 'cleanSlate' });
         return {};
       }
       // Illyra's passive: a 50% chance the silence itself simply doesn't
       // take - the cast still spends this one-time spell either way, same
       // reasoning as the Clean Slate case above.
       if (tryIllyraDodgeStatus(target, game, log, character.id)) {
-        log.push({ type: 'special', characterId: character.id, actionId: 'silenceLock', targetId, blocked: true });
+        log.push({ type: 'special', characterId: character.id, actionId: 'silenceLock', targetId, blockedBy: 'illyra' });
         return {};
       }
       character.special.silenceTargets.set(targetId, 3);

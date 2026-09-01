@@ -76,15 +76,18 @@ export const actions = {
       const target = game.characters[targetId];
       // Marin's Clean Slate: consumes/blocks the curse itself rather than
       // letting it land - the cast still happens (this counts as her turn),
-      // it just has no lasting effect on the target.
+      // it just has no lasting effect on the target. blockedBy names WHICH
+      // mechanic actually fired (confirmed bug, 2026-09-01 - see
+      // chronox.js's identical fix/comment on Time Freeze for the full
+      // reasoning).
       if (tryTriggerCleanSlate(target, game, log)) {
-        log.push({ type: 'curse', characterId: character.id, targetId, blocked: true });
+        log.push({ type: 'curse', characterId: character.id, targetId, blockedBy: 'cleanSlate' });
         return {};
       }
       // Illyra's passive: a 50% chance the curse status itself simply
       // doesn't take, checked alongside Clean Slate at the same point.
       if (tryIllyraDodgeStatus(target, game, log, character.id)) {
-        log.push({ type: 'curse', characterId: character.id, targetId, blocked: true });
+        log.push({ type: 'curse', characterId: character.id, targetId, blockedBy: 'illyra' });
         return {};
       }
       character.special.curseTargetCharacterId = targetId;
