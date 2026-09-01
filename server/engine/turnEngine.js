@@ -370,9 +370,6 @@ export function beginCharacterTurn(character, game, log) {
   // Decay due shields before anything else this turn (poison ticks
   // included) - see decayAllDueShields's own comment for why this must run
   // first, not just before this character's own onTurnStart.
-  // Decay due shields before anything else this turn (poison ticks
-  // included) - see decayAllDueShields's own comment for why this must run
-  // first, not just before this character's own onTurnStart.
   decayAllDueShields(game);
   tickPoisonIfAny(character, game, log);
   tickSilenceIfAny(character, game, log);
