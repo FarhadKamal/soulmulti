@@ -215,6 +215,7 @@ export function renderBattle(root, state) {
       isFrozenVisual: frozenIdsSet.has(character.id),
       isPuppet: character.id === puppetHighlightId || character.id === activePuppetId,
       isHypnotized: character.id === activePuppetId,
+      isMassiveFartActive: !!game.massiveFartActive,
     }));
   });
   scroll.appendChild(board);
@@ -498,7 +499,7 @@ function computeFrozenIdsSet(game) {
   return ids;
 }
 
-function renderCharacterTile(character, { isActing, isMine, isTargetable, onTargetClick, isHoldingBall, isCursed, isFrozenVisual, isVictorious, isPuppet, isHypnotized, grudgeCount, isPoisoned, silencedTurns, isDazed, mirageMarkCount }) {
+function renderCharacterTile(character, { isActing, isMine, isTargetable, onTargetClick, isHoldingBall, isCursed, isFrozenVisual, isVictorious, isPuppet, isHypnotized, grudgeCount, isPoisoned, silencedTurns, isDazed, mirageMarkCount, isMassiveFartActive }) {
   const def = CHARACTERS[character.id];
   const tile = document.createElement('div');
   tile.className = 'char-tile';
@@ -1010,6 +1011,20 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
     mirage.textContent = `🪞${mirageMarkCount}`;
     mirage.title = `Illyra's Mirage Mark: ${mirageMarkCount} stack${mirageMarkCount > 1 ? 's' : ''} (her Mirage Burst on you would deal ${mirageMarkCount})`;
     tile.appendChild(mirage);
+  }
+
+  if (isMassiveFartActive && !character.isKO) {
+    // Boingo's Massive Fart (Global Confusion #30) - unlike every other
+    // badge above (a per-relationship status tied to one specific
+    // caster/victim pair), this is a battlefield-wide effect shown on
+    // EVERY living character's own tile for the whole duration, not just
+    // Boingo's - top-center is the one remaining free badge slot (every
+    // corner already used, bottom-center taken by Illyra's mirage badge).
+    const fart = document.createElement('div');
+    fart.className = 'massive-fart-badge';
+    fart.textContent = '💨';
+    fart.title = "Boingo's Massive Fart is in effect - attacks are landing on random targets";
+    tile.appendChild(fart);
   }
 
   if (isPoisoned && !character.isKO) {

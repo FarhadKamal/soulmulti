@@ -515,6 +515,29 @@ input {
   50% { transform: rotate(8deg) scale(1.08); }
 }
 
+/* Boingo's Massive Fart - battlefield-wide badge shown on EVERY living
+   character's own tile for the whole 4-round duration (unlike every badge
+   above, which is a per-relationship caster/victim status). Top-center is
+   the one remaining free slot - every corner is taken (top-left: Jester
+   Ball, top-right: grudge, bottom-left: poison, bottom-right: silence) and
+   bottom-center is Illyra's mirage badge. Gentle drifting/pulsing loop
+   (tile-fart-waft) so it reads as an ongoing ambient effect rather than a
+   static icon, distinct from the sharper tile-ball-wobble used for an
+   actively-held item. */
+.massive-fart-badge {
+  position: absolute; top: 6px; left: 50%; translate: -50% 0;
+  background: rgba(235, 71, 158, 0.85); color: #fff;
+  font-size: 0.9em; font-weight: 700;
+  padding: 2px 6px; border-radius: 10px;
+  box-shadow: 0 0 6px rgba(235, 71, 158, 0.6);
+  pointer-events: none; z-index: 5;
+  animation: tile-fart-waft 1.8s ease-in-out infinite;
+}
+@keyframes tile-fart-waft {
+  0%, 100% { transform: translateY(0) rotate(-4deg); opacity: 0.85; }
+  50% { transform: translateY(-3px) rotate(4deg); opacity: 1; }
+}
+
 .claw-scratch {
   position: absolute; inset: 0; pointer-events: none; z-index: 4;
   overflow: hidden; border-radius: inherit;

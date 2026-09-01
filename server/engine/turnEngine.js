@@ -20,10 +20,11 @@ import * as oraclus from '../abilities/oraclus.js';
 const ABILITY_MODULES = { chronox, tharox, zerathys, akyros, velorya, boingo, blade, athena, melyssa, kaelis, draxus, rowan, marin, grimtal, illyra, oraclus };
 
 // Boingo's Massive Fart total duration (Global Confusion, see project
-// memory: soulclash_mechanic_taxonomy.md #30) - flat 2-round duration,
-// confirmed ruling. Round 1 applies immediately at cast time; this
-// constant gates the one remaining continuation tick in endTurn below.
-const MASSIVE_FART_TOTAL_ROUNDS = 2;
+// memory: soulclash_mechanic_taxonomy.md #30) - flat 4-round duration
+// (raised from 2, confirmed ruling - "more fun"). Round 1 applies
+// immediately at cast time; this constant gates the remaining
+// continuation ticks in endTurn below.
+const MASSIVE_FART_TOTAL_ROUNDS = 4;
 
 export function getAbilityModule(characterId) {
   return ABILITY_MODULES[characterId];
