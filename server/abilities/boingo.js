@@ -64,15 +64,17 @@ export const actions = {
       return {};
     },
   },
-  // Massive Fart: his desperation special (confirmed ruling), legal only
-  // once he's genuinely on the brink (hearts <= 3 - same gate direction as
-  // Tharox's Earthshatter/Illyra's Mirage Overload/Chronox's World Stops/
-  // Grimtal's Grim Barrage, a comeback move, not an opener). No-target,
+  // Massive Fart: his desperation special (confirmed ruling), legal once
+  // he's below hearts <= 5 (raised from <=3, confirmed ruling - a looser
+  // gate than the other comeback specials since this one's chaos benefits
+  // everyone equally rather than being a guaranteed personal payoff, same
+  // gate direction as Tharox's Earthshatter/Illyra's Mirage Overload/
+  // Chronox's World Stops/Grimtal's Grim Barrage regardless). No-target,
   // one-time use, own dedicated usedMassiveFart flag (separate from
   // usedSpecial, already spoken for by Jester Ball).
   //
   // Global Confusion (see project memory: soulclash_mechanic_taxonomy.md
-  // #30) - for 2 full game rounds, every genuine single-target
+  // #30) - for 4 full game rounds, every genuine single-target
   // damage-dealing attack from ANY character (Boingo included) is
   // redirected to a random OTHER living character instead of its
   // originally chosen target, bypassing both Untargetable and Dodge
@@ -80,14 +82,14 @@ export const actions = {
   // same way. The actual redirect logic lives in damagePipeline.js's
   // applyDamage (gated on game.massiveFartActive) and this file's own
   // jesterBallResolution.pass - this action itself only arms the
-  // game-level flag and logs the cast; the 2-round countdown itself ticks
+  // game-level flag and logs the cast; the 4-round countdown itself ticks
   // generically in turnEngine.js's endTurn (a game-level effect, not tied
   // to any single character's own turn cycle).
   massiveFart: {
     label: 'Massive Fart',
     needsTarget: false,
     special: true,
-    isLegal: (character) => character.hearts <= 3 && !character.special.usedMassiveFart,
+    isLegal: (character) => character.hearts <= 5 && !character.special.usedMassiveFart,
     execute(character, targetId, game, log) {
       character.special.usedMassiveFart = true;
       game.massiveFartActive = true;
