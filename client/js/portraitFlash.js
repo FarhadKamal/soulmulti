@@ -15,12 +15,12 @@ const FLASH_DURATION_MS = 1600;
 // than the sound's own full length, per explicit choice.
 const EARTHSHATTER_FLASH_DURATION_MS = 4500;
 
-// Grimtal's Grim Barrage portrait stays up slightly longer than the
-// default flash - sized to roughly match its own sound effect (~2.7s, see
-// sound.js's ACTION_SOUND.grimBarrage - no exclusive lock unlike
-// Earthshatter's, confirmed ruling, but the flash still shouldn't revert
-// to idle mid-clip).
-const GRIM_BARRAGE_FLASH_DURATION_MS = 2800;
+// Grimtal's Grim Barrage portrait stays up longer than the default flash -
+// raised to match Earthshatter's own 4.5s duration (confirmed ruling,
+// 2026-09-01), even though its sound effect itself is shorter (~2.7s, see
+// sound.js's ACTION_SOUND.grimBarrage) and it has no exclusive sound lock
+// unlike Earthshatter's.
+const GRIM_BARRAGE_FLASH_DURATION_MS = 4500;
 
 // Chronox's World Stops portrait similarly stays up longer than the
 // default flash - sized to roughly match its own voice line (~4.68s) and
