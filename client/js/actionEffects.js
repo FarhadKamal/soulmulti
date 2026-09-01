@@ -377,7 +377,16 @@ export function handleLogEntryForEffects(entry, game) {
   }
 
   if (entry.type !== 'attack' && entry.type !== 'special') return;
-  const { characterId, actionId, targetId, dodged, amountDealt, streak, flip, outcome, grudgeCount, isNewTarget, wasMarked } = entry;
+  const { characterId, actionId, dodged, amountDealt, streak, flip, outcome, grudgeCount, isNewTarget, wasMarked } = entry;
+  // Boingo's Massive Fart can redirect a single-target attack onto a
+  // DIFFERENT character than the one actually chosen - entry.targetId is
+  // always the ORIGINAL choice, entry.targetCharacterId (present whenever
+  // this entry went through applyDamage) is the real outcome. Without
+  // this, the hit-flash animation would fire on the character who was
+  // never actually hit, while the real victim shows no reaction at all -
+  // same underlying bug as battleScreen.js's own describeLogEntry text fix
+  // (actualAttackTargetId), just in the animation layer instead.
+  const targetId = entry.targetCharacterId ?? entry.targetId;
 
   applyHitFlash(targetId, amountDealt);
 

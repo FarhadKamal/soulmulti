@@ -1,4 +1,4 @@
-import { applyDamage, applyHeal, applyShield } from '../engine/damagePipeline.js';
+import { applyDamage, applyHeal, applyShield, heartsSnapshot } from '../engine/damagePipeline.js';
 import { rollChaosGamble } from '../engine/random.js';
 
 export const actions = {
@@ -64,6 +64,38 @@ export const actions = {
       return {};
     },
   },
+  // Massive Fart: his desperation special (confirmed ruling), legal only
+  // once he's genuinely on the brink (hearts <= 3 - same gate direction as
+  // Tharox's Earthshatter/Illyra's Mirage Overload/Chronox's World Stops/
+  // Grimtal's Grim Barrage, a comeback move, not an opener). No-target,
+  // one-time use, own dedicated usedMassiveFart flag (separate from
+  // usedSpecial, already spoken for by Jester Ball).
+  //
+  // Global Confusion (see project memory: soulclash_mechanic_taxonomy.md
+  // #30) - for 2 full game rounds, every genuine single-target
+  // damage-dealing attack from ANY character (Boingo included) is
+  // redirected to a random OTHER living character instead of its
+  // originally chosen target, bypassing both Untargetable and Dodge
+  // Defense on whoever it lands on. Also redirects Jester Ball passes the
+  // same way. The actual redirect logic lives in damagePipeline.js's
+  // applyDamage (gated on game.massiveFartActive) and this file's own
+  // jesterBallResolution.pass - this action itself only arms the
+  // game-level flag and logs the cast; the 2-round countdown itself ticks
+  // generically in turnEngine.js's endTurn (a game-level effect, not tied
+  // to any single character's own turn cycle).
+  massiveFart: {
+    label: 'Massive Fart',
+    needsTarget: false,
+    special: true,
+    isLegal: (character) => character.hearts <= 3 && !character.special.usedMassiveFart,
+    execute(character, targetId, game, log) {
+      character.special.usedMassiveFart = true;
+      game.massiveFartActive = true;
+      game.massiveFartSkipsApplied = 1;
+      log.push({ type: 'special', characterId: character.id, actionId: 'massiveFart' });
+      return {};
+    },
+  },
 };
 
 // Applies a Jester-Ball-landing-on-Boingo reward: heals him up to `amount`,
@@ -119,6 +151,32 @@ export const jesterBallResolution = {
     isLegal: (game) => game.jesterBall.passCount < MAX_JESTER_BALL_PASSES,
     execute(game, log, newHolderCharacterId) {
       const fromCharacterId = game.jesterBall.holderCharacterId;
+      // Boingo's Massive Fart (Global Confusion, see project memory:
+      // soulclash_mechanic_taxonomy.md #30) - confirmed ruling: also
+      // redirects Jester Ball passes, not just damage-dealing attacks
+      // (the one confirmed exception to "attacks only," since this
+      // ability is fundamentally "your choice doesn't matter," not
+      // narrowly "your attacks miss"). Same no-self-pass exclusion as the
+      // damage-pipeline redirect (damagePipeline.js's own applyDamage).
+      // Bypasses Illyra's own 50% pass-fumble chance too if redirected
+      // onto her - "the redirect itself is unavoidable" applies here the
+      // same as it does to dodge/untargetable on the damage side, so this
+      // reassignment happens BEFORE the Illyra-fumble check further down,
+      // and is excluded from re-triggering redirect a second time (this
+      // is the only redirect roll for this pass, not a fresh attack the
+      // fumble check should treat as redirectable again).
+      let wasRedirectedByMassiveFart = false;
+      if (game.massiveFartActive) {
+        const pool = Object.values(game.characters).filter((c) => c.id !== fromCharacterId && !c.isKO);
+        if (pool.length > 0) {
+          const original = newHolderCharacterId;
+          newHolderCharacterId = pool[Math.floor(Math.random() * pool.length)].id;
+          if (newHolderCharacterId !== original) {
+            wasRedirectedByMassiveFart = true;
+            log.push({ type: 'massive-fart-redirect', sourceCharacterId: fromCharacterId, originalTargetId: original, redirectedTargetId: newHolderCharacterId, hearts: heartsSnapshot(game) });
+          }
+        }
+      }
       game.jesterBall.passCount += 1;
       // Landing on Boingo (the original thrower) mid-sequence no longer
       // auto-ends the whole thing (confirmed ruling, reworked from the
@@ -165,7 +223,7 @@ export const jesterBallResolution = {
       // checkpoint-heal target and the failed-pass-to-Illyra case in the
       // same call (those are two different newHolderCharacterId values),
       // so no interaction to worry about between the two branches.
-      if (newHolderCharacterId === 'illyra' && Math.random() < 0.5) {
+      if (!wasRedirectedByMassiveFart && newHolderCharacterId === 'illyra' && Math.random() < 0.5) {
         log.push({ type: 'dodge', attackerId: fromCharacterId, targetCharacterId: 'illyra' });
         // Confirmed ruling: this must NEVER be Boingo himself - a failed
         // pass FROM Boingo TO Illyra should never explode 4 damage onto

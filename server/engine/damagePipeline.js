@@ -235,6 +235,47 @@ export function applyDamage(game, log, {
   // individually, this single flag gates all of them at once.
   ignoresDodge = false,
 }) {
+  // Boingo's Massive Fart (Global Confusion, see project memory:
+  // soulclash_mechanic_taxonomy.md #30) - while active, every genuine
+  // single-target damage-dealing attack is redirected to a random OTHER
+  // living character instead of its originally chosen target. Gated on
+  // !ignoresDodge as the exemption signal (confirmed via code audit,
+  // documented in the taxonomy entry): every AoE/pre-committed-target call
+  // site (Earthshatter, Mirage Burst, Grim Barrage, Jester Ball
+  // explosions) already sets ignoresDodge: true for its own unrelated
+  // reasons, which happens to be exactly the same "this hit's target is
+  // already locked in, not a fresh player choice" set that should also be
+  // exempt from redirect - no new flag needed. Also excluded: isMirror
+  // (curse-mirror/Mirror Reflect - the ORIGINAL hit that triggered them
+  // already went through this same redirect check once; the reflected
+  // damage bouncing back is a reaction, not a fresh choice) and
+  // isPoisonTick (an already-applied DoT, same reasoning Untargetable #7
+  // itself already uses to let a poison tick through regardless).
+  // sourceCharacterId must resolve to a real, living character to have
+  // something to exclude from the random pool at all - if it doesn't
+  // (shouldn't happen for a real attack, but defensive), redirect simply
+  // doesn't apply rather than risk excluding nothing/erroring.
+  if (
+    game.massiveFartActive && !ignoresDodge && !isMirror && !isPoisonTick
+    && sourceCharacterId && game.characters[sourceCharacterId] && !game.characters[sourceCharacterId].isKO
+  ) {
+    const pool = Object.values(game.characters).filter((c) => c.id !== sourceCharacterId && !c.isKO);
+    if (pool.length > 0) {
+      const original = targetCharacterId;
+      targetCharacterId = pool[Math.floor(Math.random() * pool.length)].id;
+      if (targetCharacterId !== original) {
+        log.push({ type: 'massive-fart-redirect', sourceCharacterId, originalTargetId: original, redirectedTargetId: targetCharacterId, hearts: heartsSnapshot(game) });
+      }
+      // Once redirected, the hit is guaranteed to land on whoever it was
+      // reassigned to - bypasses both Untargetable and every Dodge
+      // Defense mechanic, same "the redirect itself is unavoidable, no
+      // double-randomness stacking a second roll on top of it" rule
+      // (confirmed ruling) already applied to the Jester Ball Pass
+      // redirect's own bypass of Illyra's fumble chance.
+      ignoresUntargetable = true;
+      ignoresDodge = true;
+    }
+  }
   const target = game.characters[targetCharacterId];
   const result = {
     targetCharacterId,

@@ -179,6 +179,7 @@ const ACTION_SOUND = {
   lunarEclipse: 'eclipse',
   chaosGamble: 'punch',
   jesterBall: 'jesterball',
+  massiveFart: 'massive_fart',
   bloodHunt: 'sword',
   curseStrike: 'curse',
   divineRestore: 'divinerestore',

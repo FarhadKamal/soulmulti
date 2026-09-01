@@ -30,6 +30,7 @@ const FLASH_IMAGES = [
   'assets/images/boingo/circus.jpg',
   'assets/images/boingo/hardpunch.jpg',
   'assets/images/boingo/laughing.jpg',
+  'assets/images/boingo/massive_fart.jpg',
   'assets/images/boingo/miss.jpg',
   'assets/images/boingo/normalpunch.jpg',
   'assets/images/boingo/throwing.jpg',

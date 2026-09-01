@@ -167,7 +167,7 @@ const VOICE_LINES = {
 const ACTION_VOICE_LINES = {
   chronox: { timeFreeze: 'time_freeze', rewind: 'rewind', worldStops: 'world_stop' },
   velorya: { lunarEclipse: 'eclipse' },
-  boingo: { jesterBall: 'jerster' },
+  boingo: { jesterBall: 'jerster', massiveFart: 'massive_fart' },
   athena: { divineRestore: 'devine', divineSacrifice: 'sacrifice' },
   zerathys: { chargeUp: 'charge', thunderWrath: 'release', soulSwap: 'soul_swap' },
   tharox: { titanToss: 'titan_toss', titanSmash: 'titan_smash', glorySmash: 'glory', earthshatter: 'earthshatter' },

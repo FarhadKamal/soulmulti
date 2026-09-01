@@ -28,6 +28,12 @@ const GRIM_BARRAGE_FLASH_DURATION_MS = 4500;
 // image doesn't revert to idle while either is still playing out.
 const WORLD_STOPS_FLASH_DURATION_MS = 4500;
 
+// Boingo's Massive Fart portrait - matches the same 4.5s default every
+// other multi-round special special uses (Earthshatter/Grim Barrage/World
+// Stops) - adjust once real sound/voice assets exist and their actual
+// length is known, same as those three originally were.
+const MASSIVE_FART_FLASH_DURATION_MS = 4500;
+
 // Grimtal's power.jpg follow-up: fires AFTER his own strike flash has fully
 // finished playing (not simultaneously), same "let the first beat read
 // before the second starts" sequencing Rowan's mirror-shard effect uses
@@ -420,6 +426,8 @@ export function handleLogEntryForFlash(entry, game) {
         else if (entry.outcome === 'draw') setFlash(characterId, 'assets/images/boingo/normalpunch.jpg');
       }
       break;
+    case 'massiveFart':
+      setFlash(characterId, 'assets/images/boingo/massive_fart.jpg', MASSIVE_FART_FLASH_DURATION_MS); break;
     case 'wandStrike':
       // Shared action id (Rowan and Marin both have a Wand Strike) - the
       // image folder differs per character, everything else about the

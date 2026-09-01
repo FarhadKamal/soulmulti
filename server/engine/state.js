@@ -88,7 +88,13 @@ function baseSpecialFor(id) {
       // Tharox's glorySmashesUsed) even though it now only ever reaches 1 -
       // keeps the shape consistent and avoids re-plumbing every call site
       // that reads jesterBallsUsed directly.
-      return { jesterBallsUsed: 0 };
+      // usedMassiveFart: his desperation special (hearts <= 3, confirmed
+      // ruling), own dedicated one-time flag separate from usedSpecial
+      // (already spoken for by Jester Ball) - same multi-special pattern
+      // as Chronox's usedWorldStops/Grimtal's usedGrimBarrage. The actual
+      // effect (massiveFartActive/massiveFartSkipsApplied) lives on `game`
+      // itself, not here - see createGame's own comment.
+      return { jesterBallsUsed: 0, usedMassiveFart: false };
     case 'blade':
       return { streakTargetId: null, streakCount: 0, rebirthUsed: false };
     case 'athena':
@@ -378,6 +384,18 @@ export function createGame(mode, playerPicks) {
     chronoxLockoutTickedFor: new Set(),
     turnInstanceFor: new Map(),
     jesterBall: null,
+    // Boingo's Massive Fart (Global Confusion category #30, see project
+    // memory: soulclash_mechanic_taxonomy.md) - lives on `game` itself
+    // rather than on Boingo's own `special`, since it affects EVERY
+    // character's attacks/passes battlefield-wide, not just his own (same
+    // "game-level, not character-level" reasoning as game.jesterBall).
+    // Mirrors Chronox's worldStopsActive/worldStopsSkipsApplied shape
+    // exactly: round 1 applies immediately at cast time, ticks for 1 more
+    // round via a shared countdown, then ends automatically (2 full game
+    // rounds total, same round-counting convention as Time Freeze/World
+    // Stops - see turnEngine.js's beginCharacterTurn).
+    massiveFartActive: false,
+    massiveFartSkipsApplied: 0,
     winnerPlayerId: null,
     log: [],
   };

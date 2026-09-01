@@ -1730,6 +1730,21 @@ function blockedByText(blockedBy) {
   return '';
 }
 
+// Boingo's Massive Fart can redirect a single-target damage attack to a
+// DIFFERENT character than the one actually chosen - every ability's own
+// log entry still carries the ORIGINAL choice as `targetId` (that's what
+// the player picked; applyDamage's own result, spread in via `...result`,
+// carries the real outcome as the differently-named `targetCharacterId`).
+// Without this, the main attack line would keep naming the original
+// target even while a separate 'massive-fart-redirect' entry correctly
+// announces the damage actually landed elsewhere - two adjacent log lines
+// visibly contradicting each other. Falls back to entry.targetId whenever
+// targetCharacterId is absent (non-applyDamage entries) or matches it
+// anyway (the overwhelmingly common no-redirect case).
+function actualAttackTargetId(entry) {
+  return entry.targetCharacterId ?? entry.targetId;
+}
+
 // Mirrors each ability's `label` field server-side (abilities/*.js) - kept
 // as a client-side lookup rather than plumbed through every log entry,
 // since action ids are stable, non-secret game data.
@@ -1739,7 +1754,7 @@ const ACTION_LABELS = {
   chargeUp: 'Charge Up', thunderWrath: 'Thunder Wrath', soulSwap: 'Soul Swap', soulSwapWrath: 'Thunder Wrath (free)',
   hiddenMark: 'Hidden Mark', fatalSlash: 'Fatal Slash', shadowExecution: 'Shadow Execution',
   lunarStrike: 'Lunar Strike', moonstep: 'Moonstep', lunarEclipse: 'Lunar Eclipse',
-  chaosGamble: 'Chaos Gamble', jesterBall: 'Jester Ball', bloodHunt: 'Blood Hunt',
+  chaosGamble: 'Chaos Gamble', jesterBall: 'Jester Ball', massiveFart: 'Massive Fart', bloodHunt: 'Blood Hunt',
   curseStrike: 'Curse Strike', divineRestore: 'Divine Restore', divineSacrifice: 'Divine Sacrifice',
   selfChoke: 'Self Choke',
   grudgeStrike: 'Grudge Strike', callAshka: 'Call Ashka',
@@ -1779,9 +1794,9 @@ function describeLogEntry(entry) {
         // Shows both sides of the gamble - the guaranteed 3 dealt to the
         // enemy AND the random hearts it actually cost her this cast,
         // including if it happened to KO her too.
-        return `${name(entry.characterId)} used ${actionLabel(entry.actionId)} on ${name(entry.targetId)}${entry.amountDealt != null ? ` - ${entry.amountDealt} damage` : ''}${entry.koTriggered ? ' - KO!' : ''} (sacrificed ${entry.selfCost} heart${entry.selfCost > 1 ? 's' : ''}${entry.selfResult?.koTriggered ? ' - KO!' : ''})`;
+        return `${name(entry.characterId)} used ${actionLabel(entry.actionId)} on ${name(actualAttackTargetId(entry))}${entry.amountDealt != null ? ` - ${entry.amountDealt} damage` : ''}${entry.koTriggered ? ' - KO!' : ''} (sacrificed ${entry.selfCost} heart${entry.selfCost > 1 ? 's' : ''}${entry.selfResult?.koTriggered ? ' - KO!' : ''})`;
       }
-      return `${name(entry.characterId)} used ${actionLabel(entry.actionId)} on ${name(entry.targetId)}${entry.amountDealt != null ? ` - ${entry.amountDealt} damage` : ''}${entry.koTriggered ? ' - KO!' : ''}`;
+      return `${name(entry.characterId)} used ${actionLabel(entry.actionId)} on ${name(actualAttackTargetId(entry))}${entry.amountDealt != null ? ` - ${entry.amountDealt} damage` : ''}${entry.koTriggered ? ' - KO!' : ''}`;
     case 'special':
       if (entry.actionId === 'mirageBurst') {
         // No single target - detonates everyone currently marked at once,
@@ -1862,7 +1877,7 @@ function describeLogEntry(entry) {
           : '';
         return `${name(entry.characterId)} unleashed World Stops - ${frozenText}${blockedText}`;
       }
-      return `${name(entry.characterId)} used their SPECIAL: ${actionLabel(entry.actionId)}${entry.targetId ? ` on ${name(entry.targetId)}` : ''}${blockedByText(entry.blockedBy)}`;
+      return `${name(entry.characterId)} used their SPECIAL: ${actionLabel(entry.actionId)}${entry.targetId ? ` on ${name(actualAttackTargetId(entry))}` : ''}${blockedByText(entry.blockedBy)}`;
     case 'setup':
       if (entry.actionId === 'mirageMark') {
         return `${name(entry.characterId)} used Mirage Mark on ${name(entry.targetId)} - ${entry.stackCount} stack${entry.stackCount > 1 ? 's' : ''}`;
@@ -1898,6 +1913,12 @@ function describeLogEntry(entry) {
       return `World Stops continues - ${entry.frozenIds.map(name).join(', ')} still frozen`;
     case 'world-stops-end':
       return `World Stops ends - time resumes for everyone`;
+    case 'massive-fart-continue':
+      return `The stench still lingers over the battlefield`;
+    case 'massive-fart-end':
+      return `The stench clears - attacks land true again`;
+    case 'massive-fart-redirect':
+      return `${name(entry.sourceCharacterId)}'s attack veered wildly - it landed on ${name(entry.redirectedTargetId)} instead of ${name(entry.originalTargetId)}!`;
     case 'eclipse-end':
       return `${name(entry.characterId)}'s Lunar Eclipse ends`;
     case 'jester-ball-take':

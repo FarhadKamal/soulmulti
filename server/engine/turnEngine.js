@@ -19,6 +19,12 @@ import * as oraclus from '../abilities/oraclus.js';
 
 const ABILITY_MODULES = { chronox, tharox, zerathys, akyros, velorya, boingo, blade, athena, melyssa, kaelis, draxus, rowan, marin, grimtal, illyra, oraclus };
 
+// Boingo's Massive Fart total duration (Global Confusion, see project
+// memory: soulclash_mechanic_taxonomy.md #30) - flat 2-round duration,
+// confirmed ruling. Round 1 applies immediately at cast time; this
+// constant gates the one remaining continuation tick in endTurn below.
+const MASSIVE_FART_TOTAL_ROUNDS = 2;
+
 export function getAbilityModule(characterId) {
   return ABILITY_MODULES[characterId];
 }
@@ -930,6 +936,25 @@ export function endTurn(game) {
   }
   if (next <= game.activePlayerIndex) {
     game.round += 1;
+    // Boingo's Massive Fart (Global Confusion, see project memory:
+    // soulclash_mechanic_taxonomy.md #30) - flat 2-round duration, same
+    // round-counting convention as Chronox's Time Freeze/World Stops
+    // (ticked here, at the one genuine "a full new round has begun"
+    // signal, rather than tied to any single character's own turn - it's
+    // a game-level effect, not owned by Boingo's own onTurnStart the way
+    // Chronox's freezes are owned by his). Round 1 is the cast itself
+    // (massiveFartSkipsApplied set to 1 in boingo.js's own execute); this
+    // ticks the 2nd and final round, then ends.
+    if (game.massiveFartActive) {
+      if (game.massiveFartSkipsApplied < MASSIVE_FART_TOTAL_ROUNDS) {
+        game.massiveFartSkipsApplied += 1;
+        game.log.push({ type: 'massive-fart-continue', hearts: heartsSnapshot(game) });
+      } else {
+        game.massiveFartActive = false;
+        game.massiveFartSkipsApplied = 0;
+        game.log.push({ type: 'massive-fart-end', hearts: heartsSnapshot(game) });
+      }
+    }
   }
   game.activePlayerIndex = next;
 }
