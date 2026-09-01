@@ -122,16 +122,34 @@ export const actions = {
       // character per match - a second character being saved in the same
       // cast is exceedingly unlikely (only Blade has Rebirth today) and
       // finalizeAction has no way to show more than one entry here anyway.
-      // Same reasoning/fix extended to mirrorLogEntry (Athena's curse
-      // mirror) and mirrorReflectLogEntry (Rowan's Mirror Reflect) - both
-      // were ALSO silently dropped by the old per-target lump-sum code
-      // (confirmed via direct comparison against the pre-fix version, not
-      // introduced by this change) since they sat on individual hit result
-      // objects that were spread into `hits` but never read back out by
-      // finalizeAction, which only ever checks the top-level return value.
+      // Same reasoning/fix extended to mirrorReflectLogEntry (Rowan's
+      // Mirror Reflect) - also silently dropped by the old per-target
+      // lump-sum code (confirmed via direct comparison against the pre-fix
+      // version, not introduced by this change) since it sat on an
+      // individual hit result object that was spread into `hits` but never
+      // read back out by finalizeAction, which only ever checks the
+      // top-level return value. Only the first occurrence is captured here
+      // (safe - Mirror Reflect self-deactivates the instant it fires, see
+      // rowan.js's own mirrorReflectActive = false, so it can genuinely
+      // only trigger once per cast).
+      //
+      // Athena's curse-mirror is DIFFERENT and needs its own aggregation
+      // (mirrorTotal/mirrorTarget below, not a single captured entry) -
+      // unlike Rebirth/Mirror Reflect, her curse has no self-deactivating
+      // flag, so EVERY one of Earthshatter's up-to-7 points landing on the
+      // cursed caster independently triggers a fresh mirror hit. Capturing
+      // only the first (as originally fixed here) silently dropped every
+      // subsequent mirror hit's damage from the log line while the damage
+      // itself still correctly applied to hearts - confirmed via live
+      // report + direct reproduction: Tharox took 3 real mirrored damage
+      // across 7 points landing on cursed Athena, but the log showed only
+      // "Curse mirrors 1 damage."
       let rebirthLogEntry = null;
-      let mirrorLogEntry = null;
       let mirrorReflectLogEntry = null;
+      let mirrorTotal = 0;
+      let mirrorTargetId = null;
+      let mirrorKoTriggered = false;
+      let mirrorRevived = false;
       for (let i = 0; i < EARTHSHATTER_TOTAL_DAMAGE; i++) {
         if (others.length === 0) break;
         const target = others[Math.floor(Math.random() * others.length)];
@@ -158,7 +176,18 @@ export const actions = {
         });
         dealtByTarget[target.id] = (dealtByTarget[target.id] || 0) + (result.amountDealt || 0);
         if (result.rebirthLogEntry && !rebirthLogEntry) rebirthLogEntry = result.rebirthLogEntry;
-        if (result.mirrorLogEntry && !mirrorLogEntry) mirrorLogEntry = result.mirrorLogEntry;
+        if (result.mirrorLogEntry) {
+          mirrorTotal += result.mirrorLogEntry.amount;
+          mirrorTargetId = result.mirrorLogEntry.toCharacterId;
+          // Last hit's own koTriggered/revived wins - matches the real
+          // final state of the cursed target after every mirror hit this
+          // cast has resolved (an earlier mirror hit KO'ing them, then a
+          // later one finding them already isKO, never reaches this branch
+          // at all - applyDamage's own isKO guard no-ops it - so this can
+          // only ever be overwritten by a genuinely later, real hit).
+          mirrorKoTriggered = result.mirrorLogEntry.koTriggered;
+          mirrorRevived = result.mirrorLogEntry.revived;
+        }
         if (result.mirrorResult?.rebirthLogEntry && !rebirthLogEntry) rebirthLogEntry = result.mirrorResult.rebirthLogEntry;
         if (result.mirrorReflectLogEntry && !mirrorReflectLogEntry) mirrorReflectLogEntry = result.mirrorReflectLogEntry;
         if (result.mirrorReflectResult?.rebirthLogEntry && !rebirthLogEntry) rebirthLogEntry = result.mirrorReflectResult.rebirthLogEntry;
@@ -177,6 +206,12 @@ export const actions = {
         koTriggered: !!koTriggeredByTarget[tid],
       }));
       log.push({ type: 'special', characterId: character.id, actionId: 'earthshatter', hits });
+      const mirrorLogEntry = mirrorTargetId
+        ? {
+          type: 'curse-mirror', fromCharacterId: 'athena', toCharacterId: mirrorTargetId,
+          amount: mirrorTotal, koTriggered: mirrorKoTriggered, revived: mirrorRevived,
+        }
+        : null;
       return { hits, rebirthLogEntry, mirrorLogEntry, mirrorReflectLogEntry };
     },
   },

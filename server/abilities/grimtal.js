@@ -257,14 +257,29 @@ export const actions = {
       // rebirthLogEntry return field, matching the single-field contract
       // finalizeAction() already checks for every other ability (see
       // turnEngine.js) - same fix as Earthshatter's own (2026-08-31). Same
-      // reasoning extended to mirrorLogEntry (Athena's curse mirror) and
-      // mirrorReflectLogEntry (Rowan's Mirror Reflect) - each hit's own
-      // result already carries these via the `...result` spread below, but
-      // finalizeAction only ever reads them from the top-level return
-      // value, never from inside an array element.
+      // reasoning extended to mirrorReflectLogEntry (Rowan's Mirror
+      // Reflect, safe to capture only the first occurrence since it
+      // self-deactivates the instant it fires - rowan.js's own
+      // mirrorReflectActive = false) - each hit's own result already
+      // carries these via the `...result` spread below, but finalizeAction
+      // only ever reads them from the top-level return value, never from
+      // inside an array element.
+      //
+      // Athena's curse-mirror needs full aggregation instead (mirrorTotal
+      // below, not a single captured entry) - unlike Rebirth/Mirror
+      // Reflect, her curse has no self-deactivating flag, so more than one
+      // of Grim Barrage's up-to-4 hits landing on the cursed caster each
+      // independently triggers a fresh mirror hit. Capturing only the
+      // first silently dropped every subsequent mirror hit's damage from
+      // the log line while the damage itself still correctly applied to
+      // hearts - same real bug confirmed on Earthshatter's own identical
+      // pattern (2026-09-01 live report), fixed here too for consistency.
       let rebirthLogEntry = null;
-      let mirrorLogEntry = null;
       let mirrorReflectLogEntry = null;
+      let mirrorTotal = 0;
+      let mirrorTargetId = null;
+      let mirrorKoTriggered = false;
+      let mirrorRevived = false;
       for (let i = 0; i < GRIM_BARRAGE_TOTAL_HITS; i++) {
         if (others.length === 0) break;
         const target = others[Math.floor(Math.random() * others.length)];
@@ -296,7 +311,12 @@ export const actions = {
           }
         }
         if (result.rebirthLogEntry && !rebirthLogEntry) rebirthLogEntry = result.rebirthLogEntry;
-        if (result.mirrorLogEntry && !mirrorLogEntry) mirrorLogEntry = result.mirrorLogEntry;
+        if (result.mirrorLogEntry) {
+          mirrorTotal += result.mirrorLogEntry.amount;
+          mirrorTargetId = result.mirrorLogEntry.toCharacterId;
+          mirrorKoTriggered = result.mirrorLogEntry.koTriggered;
+          mirrorRevived = result.mirrorLogEntry.revived;
+        }
         if (result.mirrorResult?.rebirthLogEntry && !rebirthLogEntry) rebirthLogEntry = result.mirrorResult.rebirthLogEntry;
         if (result.mirrorReflectLogEntry && !mirrorReflectLogEntry) mirrorReflectLogEntry = result.mirrorReflectLogEntry;
         if (result.mirrorReflectResult?.rebirthLogEntry && !rebirthLogEntry) rebirthLogEntry = result.mirrorReflectResult.rebirthLogEntry;
@@ -313,6 +333,12 @@ export const actions = {
         }
       }
       log.push({ type: 'special', characterId: character.id, actionId: 'grimBarrage', hits });
+      const mirrorLogEntry = mirrorTargetId
+        ? {
+          type: 'curse-mirror', fromCharacterId: 'athena', toCharacterId: mirrorTargetId,
+          amount: mirrorTotal, koTriggered: mirrorKoTriggered, revived: mirrorRevived,
+        }
+        : null;
       return { hits, rebirthLogEntry, mirrorLogEntry, mirrorReflectLogEntry };
     },
   },
