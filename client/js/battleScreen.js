@@ -1194,7 +1194,16 @@ function statusBadges(character) {
       badges.push({ text: `Glory Smash: ${character.special.glorySmashesUsed}/2` });
       break;
     case 'zerathys':
-      badges.push({ text: `Charge: ${character.special.chargeCount}/2` });
+      // Overcharge Collapse (Passive Action #23, no button - see
+      // zerathys.js) - while hearts <= 3, Charge Up is hidden and Thunder
+      // Wrath always hits for a flat 3 regardless of chargeCount, so
+      // showing the normal "Charge: X/2" badge here would be actively
+      // misleading (implying charge still matters when it doesn't).
+      if (character.hearts <= 3) {
+        badges.push({ text: 'Overcharged (Thunder Wrath: 3)', cls: 'warn' });
+      } else {
+        badges.push({ text: `Charge: ${character.special.chargeCount}/2` });
+      }
       break;
     case 'blade':
       if (character.special.streakCount > 0) badges.push({ text: `Streak x${character.special.streakCount}`, cls: 'warn' });
