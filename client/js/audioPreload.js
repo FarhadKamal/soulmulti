@@ -44,6 +44,12 @@ const SOUND_EFFECT_FILES = [
 ];
 
 let started = false;
+// Deliberately NOT gating the battle screen's brief loading wait on this
+// (unlike imagePreload.js's readyPromise, see battleImagesReady there) -
+// this batch is far larger (every sound effect plus every character's
+// voice lines) and would make that wait noticeably longer for no real
+// benefit, since the reported annoyance was specifically about images.
+// Kept simple/fire-and-forget as before.
 
 export function preloadBattleAudio() {
   if (started) return;

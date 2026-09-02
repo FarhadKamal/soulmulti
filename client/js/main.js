@@ -8,14 +8,14 @@ import {
 } from './sound.js';
 import { handleLogEntryForFlash, handleDodgeForFlash, checkIdlePortrait, registerFlashRerender, queueGrimtalPowerFlash } from './portraitFlash.js';
 import { handleLogEntryForEffects, registerEffectRerender } from './actionEffects.js';
-import { preloadBattleImages } from './imagePreload.js';
+import { preloadBattleImages, battleImagesReady } from './imagePreload.js';
 import { preloadBattleAudio } from './audioPreload.js';
 import { hasVoice, playIdleVoice, playInjuredVoice, playKoedVoice, playVictoryVoice, playMoveVoice, playLaughVoice, playRebirthVoice, playDraxusStrikeVoice } from './voice.js';
 
 const root = document.getElementById('app');
 
 const state = {
-  screen: 'lobby', // 'lobby' | 'battle'
+  screen: 'lobby', // 'lobby' | 'preparing' | 'battle'
   room: null,
   error: null,
   connectionLost: false,
@@ -556,12 +556,46 @@ function mySeatCharacterIds() {
   return state.room.seats[state.room.mySeatIndex]?.characterIds || [];
 }
 
+// Confirmed live report: "annoying, when image loading during battle" -
+// entering a match before imagePreload.js's full ~150-image batch has
+// finished meant an early flash/portrait swap could hit a live, visibly-
+// lagging first-time network fetch instead of an instant cache hit. This
+// gives the preload a brief head start by holding the 'preparing' screen
+// (see rerender's own render branch below) until either every image has
+// settled or PREPARING_MAX_WAIT_MS elapses, whichever comes first - a hard
+// cap so a slow/flaky connection can't block the player from ever entering
+// their match. Deliberately does NOT also wait on audio (see
+// audioPreload.js's own comment on why that batch is excluded).
+const PREPARING_MAX_WAIT_MS = 2500;
+
+function enterBattleWhenReady() {
+  state.screen = 'preparing';
+  rerender();
+  const ready = battleImagesReady() || Promise.resolve();
+  const timeout = new Promise((resolve) => setTimeout(resolve, PREPARING_MAX_WAIT_MS));
+  Promise.race([ready, timeout]).then(() => {
+    // Guard against a late resolution firing after the player already left
+    // (e.g. abandoned the match, or a new lobby-update reset the screen
+    // back to 'lobby') - only advance if still genuinely waiting.
+    if (state.screen === 'preparing') {
+      state.screen = 'battle';
+      rerender();
+    }
+  });
+}
+
 function rerender() {
   if (state.screen === 'lobby') {
     renderLobby(root, { room: state.room, error: state.error, connectionLost: state.connectionLost }, {
-      onEnterMatch: () => { state.screen = 'battle'; rerender(); },
+      onEnterMatch: enterBattleWhenReady,
       rerender,
     });
+  } else if (state.screen === 'preparing') {
+    root.innerHTML = '';
+    const wrap = document.createElement('div');
+    wrap.className = 'preparing-battle';
+    wrap.innerHTML = '<div class="preparing-battle-spinner"></div><p>Preparing battle…</p>';
+    root.appendChild(wrap);
   } else {
     // Pass the REAL state object through (not a fresh literal) - battleScreen
     // mutates state.armedAction directly (e.g. arming a targeted action, or

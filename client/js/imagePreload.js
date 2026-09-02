@@ -102,9 +102,17 @@ const FLASH_IMAGES = [
 ];
 
 let started = false;
+// Resolves once every preloaded image has either loaded or failed - used by
+// main.js to gate the battle screen behind a brief "preparing battle" wait
+// (see waitForBattleAssets there) so a match that starts before preload
+// finishes doesn't show a live, visibly-lagging first-time image fetch
+// mid-fight instead (confirmed live report: "annoying, when image loading
+// during battle"). Never rejects - a failed/missing file just resolves its
+// own entry immediately, same as the existing per-image fallback behavior.
+let readyPromise = null;
 
 export function preloadBattleImages() {
-  if (started) return;
+  if (started) return readyPromise;
   started = true;
   const paths = [...FLASH_IMAGES];
   for (const folder of PER_CHARACTER_FOLDERS) {
@@ -113,11 +121,25 @@ export function preloadBattleImages() {
   // Plain Image() objects, never attached to the DOM - the browser caches
   // the response as soon as it loads regardless, so a later portrait.src =
   // same path is served from cache instantly. No onload/onerror handling
-  // needed - a failed/missing file here just means that one swap falls
-  // back to its normal (slower) first-use fetch, same as before this file
-  // existed.
-  for (const path of paths) {
+  // needed for the swap itself - a failed/missing file here just means
+  // that one swap falls back to its normal (slower) first-use fetch, same
+  // as before this file existed. onload/onerror ARE now wired individually
+  // (not required for correctness, only to resolve readyPromise) so
+  // waitForBattleAssets can know when the whole batch has settled.
+  readyPromise = Promise.all(paths.map((path) => new Promise((resolve) => {
     const img = new Image();
+    img.onload = resolve;
+    img.onerror = resolve;
     img.src = v(path);
-  }
+  })));
+  return readyPromise;
+}
+
+// Exposed for main.js's waitForBattleAssets - returns the in-flight promise
+// if preload already started (normal case, since preloadBattleImages fires
+// at page load), or null if called before preloadBattleImages ever ran
+// (shouldn't happen in practice, but the caller races this against a
+// timeout regardless so a null here just resolves that race immediately).
+export function battleImagesReady() {
+  return readyPromise;
 }
