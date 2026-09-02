@@ -1171,6 +1171,15 @@ function chooseMarinMove(character, game, usable) {
 // as Rowan's Arcane Study fallback.
 function chooseGrimtalMove(character, game, usable) {
   const byId = Object.fromEntries(usable.map((a) => [a.actionId, a]));
+  // Grim Barrage: a desperation move, only legal once hearts <= 3. No-target,
+  // no real downside to casting it the instant it's available - same "cast
+  // eagerly once legal" policy as every other one-time desperation special
+  // in the roster (World Stops, Earthshatter, Massive Fart). Checked before
+  // even Claim the Kill - free value with zero opportunity cost beats a
+  // permanent-upside pick that still costs the turn either way.
+  if (byId.grimBarrage) {
+    return { actionId: 'grimBarrage', targetId: null };
+  }
   // Claim the Kill first whenever available - pure permanent upside (a
   // banked unclaimed kill never expires, but claiming it now means every
   // FUTURE Grim Strike hits harder starting immediately) with no downside
