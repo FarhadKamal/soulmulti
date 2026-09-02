@@ -742,6 +742,15 @@ function chooseAthenaMove(character, game, usable) {
 
 function chooseBoingoMove(character, game, usable) {
   const byId = Object.fromEntries(usable.map((a) => [a.actionId, a]));
+  // Massive Fart: a desperation move, only legal once hearts <= 5. No-target,
+  // no real downside to casting it the instant it's available - same "cast
+  // eagerly once legal" policy as every other one-time desperation special
+  // in the roster (World Stops, Earthshatter, Mirage Overload, Grim
+  // Barrage). Checked ahead of Jester Ball since it's free chaos with zero
+  // opportunity cost, unlike the ball's own timing considerations below.
+  if (byId.massiveFart) {
+    return { actionId: 'massiveFart', targetId: null };
+  }
   // Jester Ball is a coin-flip-shaped social weapon - throw it at the
   // biggest threat so either outcome (they eat -4, or they pass/return it
   // and burn a turn deciding) works in Boingo's favor.
