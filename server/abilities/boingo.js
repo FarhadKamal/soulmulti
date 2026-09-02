@@ -64,14 +64,11 @@ export const actions = {
       return {};
     },
   },
-  // Massive Fart: his desperation special (confirmed ruling), legal once
-  // he's below hearts <= 5 (raised from <=3, confirmed ruling - a looser
-  // gate than the other comeback specials since this one's chaos benefits
-  // everyone equally rather than being a guaranteed personal payoff, same
-  // gate direction as Tharox's Earthshatter/Illyra's Mirage Overload/
-  // Chronox's World Stops/Grimtal's Grim Barrage regardless). No-target,
-  // one-time use, own dedicated usedMassiveFart flag (separate from
-  // usedSpecial, already spoken for by Jester Ball).
+  // Massive Fart: no hearts gate at all (confirmed ruling, 2026-09-02 -
+  // dropped the earlier hearts<=5 threshold, "boingo is too weak" -
+  // unlike every other desperation special in the roster, castable ANY
+  // time). Still strictly one-time use, own dedicated usedMassiveFart
+  // flag (separate from usedSpecial, already spoken for by Jester Ball).
   //
   // Global Confusion (see project memory: soulclash_mechanic_taxonomy.md
   // #30) - for 4 full game rounds, every genuine single-target
@@ -89,7 +86,7 @@ export const actions = {
     label: 'Massive Fart',
     needsTarget: false,
     special: true,
-    isLegal: (character) => character.hearts <= 5 && !character.special.usedMassiveFart,
+    isLegal: (character) => !character.special.usedMassiveFart,
     execute(character, targetId, game, log) {
       character.special.usedMassiveFart = true;
       game.massiveFartActive = true;

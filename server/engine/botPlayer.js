@@ -742,12 +742,13 @@ function chooseAthenaMove(character, game, usable) {
 
 function chooseBoingoMove(character, game, usable) {
   const byId = Object.fromEntries(usable.map((a) => [a.actionId, a]));
-  // Massive Fart: a desperation move, only legal once hearts <= 5. No-target,
-  // no real downside to casting it the instant it's available - same "cast
-  // eagerly once legal" policy as every other one-time desperation special
-  // in the roster (World Stops, Earthshatter, Mirage Overload, Grim
-  // Barrage). Checked ahead of Jester Ball since it's free chaos with zero
-  // opportunity cost, unlike the ball's own timing considerations below.
+  // Massive Fart: no hearts gate at all (confirmed ruling, 2026-09-02) -
+  // castable any turn, still one-time use. No-target, no real downside to
+  // casting it the instant it's available (even turn 1) - unlike a true
+  // desperation special, there's no reason to wait for a "better" moment
+  // since it's free chaos with zero opportunity cost, benefiting Boingo's
+  // OWN attacks too for its whole duration once armed. Checked ahead of
+  // Jester Ball for the same "no cost, take it now" reasoning.
   if (byId.massiveFart) {
     return { actionId: 'massiveFart', targetId: null };
   }
