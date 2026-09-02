@@ -1132,6 +1132,25 @@ function chooseRowanMove(character, game, usable) {
       return { actionId: 'poisonCloud', targetId };
     }
   }
+  // Secure an outright kill with plain Wand Strike (1 damage, always legal)
+  // before falling back to Arcane Study below - confirmed bug via a real
+  // match log (2026-09-02): a 1v1 endgame with the only other living enemy
+  // sitting at 1 heart the WHOLE time, and the bot just kept re-discovering
+  // spells (Purify, Mirror Reflect) turn after turn instead of ending the
+  // match with a trivial 1-damage hit, because Arcane Study's "no downside"
+  // reasoning below never accounted for a free kill sitting right there.
+  // Checked here (not folded into the Wand Strike fallback further down)
+  // so it fires even while Arcane Study would otherwise still be legal.
+  {
+    const wandTargets = validTargetsFor(game, character, 'wandStrike');
+    const killTarget = wandTargets.find((tid) => {
+      const t = game.characters[tid];
+      return t.hearts <= Math.max(0, 1 - t.shield);
+    });
+    if (killTarget) {
+      return { actionId: 'wandStrike', targetId: killTarget };
+    }
+  }
   // Nothing currently discovered is worth using this turn (either nothing's
   // been found yet, or every known spell above had no valid/fresh target) -
   // Arcane Study has no downside beyond its own cooldown, so fall back to
@@ -1155,6 +1174,23 @@ function chooseRowanMove(character, game, usable) {
 // Study fallback), and who Wand Strike hits otherwise.
 function chooseMarinMove(character, game, usable) {
   const byId = Object.fromEntries(usable.map((a) => [a.actionId, a]));
+  // Secure an outright kill before studying - same fix/reasoning as
+  // chooseRowanMove's own identical check above (confirmed bug via a real
+  // match log: the bot kept re-discovering spells turn after turn against
+  // a 1-heart enemy instead of ending the match with a trivial 1-damage
+  // Wand Strike). Marin's own Piercing Wand upgrade (Pure Attack once
+  // discovered) still deals the same 1 damage as plain Wand Strike, so no
+  // separate check needed for that variant.
+  {
+    const wandTargets = validTargetsFor(game, character, 'wandStrike');
+    const killTarget = wandTargets.find((tid) => {
+      const t = game.characters[tid];
+      return t.hearts <= Math.max(0, 1 - t.shield);
+    });
+    if (killTarget) {
+      return { actionId: 'wandStrike', targetId: killTarget };
+    }
+  }
   if (byId.arcaneStudy) {
     return { actionId: 'arcaneStudy', targetId: null };
   }
@@ -1180,6 +1216,24 @@ function chooseGrimtalMove(character, game, usable) {
   // permanent-upside pick that still costs the turn either way.
   if (byId.grimBarrage) {
     return { actionId: 'grimBarrage', targetId: null };
+  }
+  // Secure an outright kill with Grim Strike before Claim the Kill - same
+  // fix/reasoning as chooseRowanMove's own check (confirmed bug: a "no
+  // downside, no reason to hold it" fallback action can still wrongly
+  // preempt ending the match right now). Grim Strike's damage is always
+  // >= 1 (1 + ownKillCount + claimedKillCount), so this check only needs
+  // the cheapest possible threshold (1) to be a safe lower bound - it may
+  // undercount his real damage, but never overcounts, so it never
+  // mistakenly calls a non-lethal hit lethal.
+  {
+    const grimTargets = validTargetsFor(game, character, 'grimStrike');
+    const killTarget = grimTargets.find((tid) => {
+      const t = game.characters[tid];
+      return t.hearts <= Math.max(0, 1 - t.shield);
+    });
+    if (killTarget) {
+      return { actionId: 'grimStrike', targetId: killTarget };
+    }
   }
   // Claim the Kill first whenever available - pure permanent upside (a
   // banked unclaimed kill never expires, but claiming it now means every
