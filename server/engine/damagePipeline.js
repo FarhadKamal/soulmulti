@@ -234,6 +234,15 @@ export function applyDamage(game, log, {
   // than adding a bespoke exclusion to each of the 4 dodge blocks
   // individually, this single flag gates all of them at once.
   ignoresDodge = false,
+  // Boingo's Fowl Play - confirmed ruling: "NO SHIELD NO DODGE NO
+  // UNTERGATABBLE NO IMMORTAL during chicken status" - a chicken attack
+  // bypasses every defensive mechanic in the game uniformly, including
+  // Draxus's Deathless Fury floor (the one immortal mechanic in the
+  // roster, hardcoded below rather than category-driven like Dodge
+  // Defense - no existing bypass flag for it before this, since nothing
+  // else in the game has ever needed to skip it). Only chickenAttack sets
+  // this true (executeChickenAttack in turnEngine.js).
+  ignoresImmortal = false,
 }) {
   const target = game.characters[targetCharacterId];
   const result = {
@@ -326,7 +335,7 @@ export function applyDamage(game, log, {
     // runs mid-way through the ability's execute(), before its own
     // log.push() for the attack/special line itself.
     result.rebirthLogEntry = { type: 'rebirth', targetCharacterId };
-  } else if (target.id === 'draxus' && target.hearts === 0 && target.special.deathproofActive) {
+  } else if (target.id === 'draxus' && target.hearts === 0 && target.special.deathproofActive && !ignoresImmortal) {
     // Floors at 1 instead of KO - NOT a revival event (isKO is never set,
     // no "comes back fresh" cleanup like Rebirth's above, since he never
     // actually died: his hearts never truly reach/stay at 0). Deliberately

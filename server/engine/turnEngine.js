@@ -803,8 +803,11 @@ export function resolveOraclusPredictionIfPending(game, log, characterId, action
 // in executeAction below since it's not a real entry in any ability
 // module's `actions` map (it's a character-agnostic override, see
 // CHICKEN_ATTACK_ACTION/getLegalActions above). Confirmed rules:
-// - Chicken vs. chicken: always flat 1 damage, ZERO defense (bypasses
-//   both Dodge and Shield entirely - ignoresDodge AND ignoresShield).
+// - Chicken vs. chicken: always flat 1 damage, ZERO defense of ANY kind
+//   ("NO SHIELD NO DODGE NO UNTERGATABBLE NO IMMORTAL during chicken
+//   status" - pure damage, bypasses every defensive mechanic in the game
+//   uniformly: ignoresDodge, ignoresShield, ignoresUntargetable,
+//   ignoresImmortal all set together).
 // - Chicken vs. Boingo: uses game.fowlPlayHitsOnBoingo, a GLOBAL
 //   cumulative counter shared across every attacking chicken (not
 //   per-attacker) - every 2nd cumulative hit lands 1 damage, the
@@ -822,8 +825,13 @@ function executeChickenAttack(character, targetId, game, log) {
     sourceCharacterId: character.id,
     targetCharacterId: targetId,
     amount,
+    // Confirmed ruling: "NO SHIELD NO DODGE NO UNTERGATABBLE NO IMMORTAL
+    // during chicken status" - pure damage, every defensive mechanic in
+    // the game bypassed uniformly.
     ignoresDodge: true,
     ignoresShield: true,
+    ignoresUntargetable: true,
+    ignoresImmortal: true,
   });
   log.push({ type: 'attack', characterId: character.id, actionId: 'chickenAttack', targetId, ...result });
   return result;

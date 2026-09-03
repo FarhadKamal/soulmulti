@@ -1159,14 +1159,24 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
     tile.appendChild(shield);
   }
 
-  if (character.untargetable) {
+  // Boingo's Fowl Play - hidden while chickenified, same reasoning as the
+  // shield badge above: untargetable status no longer actually protects
+  // against a chicken attack (ignoresUntargetable: true), so showing the
+  // badge would misleadingly claim a protection that isn't real anymore.
+  if (character.untargetable && !character.isChicken) {
     const flag = document.createElement('div');
     flag.className = 'char-flag';
     flag.textContent = 'Untargetable';
     tile.appendChild(flag);
   }
 
-  const badges = statusBadges(character);
+  // Boingo's Fowl Play - every hero-resource badge (Rewind uses, Deathless
+  // Fury active, streak count, etc.) is hidden while chickenified, same
+  // "hero identity fully hidden" reasoning as the whole kit itself being
+  // hidden - showing "Deathless Fury active" while chickenified would be
+  // actively misleading now too, since the immortal floor no longer
+  // protects against a chicken attack (ignoresImmortal: true).
+  const badges = character.isChicken ? [] : statusBadges(character);
   if (badges.length > 0) {
     const badgeRow = document.createElement('div');
     badgeRow.className = 'status-badge-row';
