@@ -711,7 +711,7 @@ onMessage((msg) => {
       // the main game's beginCharacterTurn hook does.
       if (msg.actingCharacterId && msg.actingCharacterId !== previousActingCharacterId) {
         const character = msg.game.characters[msg.actingCharacterId];
-        if (character && checkIdlePortrait(character)) playIdleVoice(character.id);
+        if (character && checkIdlePortrait(character, msg.game.round)) playIdleVoice(character.id);
       }
       previousActingCharacterId = msg.actingCharacterId;
       if (msg.game.phase === 'game-over') startGameOverSequence(msg.game);

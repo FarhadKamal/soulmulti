@@ -8,6 +8,12 @@ import { v } from './assetVersion.js';
 
 const FLASH_DURATION_MS = 1600;
 
+// Confirmed ruling (2026-09-03): idle animations (checkIdlePortrait below)
+// only ever play through this round of the match - round 4 onward, no
+// character flashes to their idle pose again for the rest of that match,
+// regardless of health/hero.
+const IDLE_PORTRAIT_MAX_ROUND = 3;
+
 // Tharox's Earthshatter portrait stays up much longer than the normal
 // 1600ms every other flash uses - confirmed ruling: the image shouldn't
 // revert back to idle while the ground-shattering sound effect (~5.2s, see
@@ -174,8 +180,15 @@ const IDLE_DURATION_MS = {
 // (voice.js's playIdleVoice), so there's exactly one definition of "idle"
 // shared by both the portrait and the voice line, not two separately
 // maintained checks that could drift apart.
-export function checkIdlePortrait(character) {
+export function checkIdlePortrait(character, round) {
   if (character.isKO) return false;
+  // Confirmed ruling (2026-09-03): idle animations only ever play during
+  // the first 3 rounds of a match - round 4 onward, a character just shows
+  // their normal portrait even when fully untouched/healthy, no more idle
+  // flash for the rest of that match. Applies to every hero uniformly
+  // (this function is the single shared idle mechanism, not per-
+  // character), unrelated to Boingo/Fowl Play specifically.
+  if (round > IDLE_PORTRAIT_MAX_ROUND) return false;
   // Draxus's persistent immortality.jpg portrait (getPersistentPortrait
   // above) must never get stomped by a timed idle flash - setFlash's
   // activeFlash entries sit ABOVE the persistent-portrait check in
