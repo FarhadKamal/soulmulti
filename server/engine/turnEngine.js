@@ -805,16 +805,22 @@ export function resolveOraclusPredictionIfPending(game, log, characterId, action
 // CHICKEN_ATTACK_ACTION/getLegalActions above). Confirmed rules:
 // - Chicken vs. chicken: always flat 1 damage, ZERO defense of ANY kind
 //   ("NO SHIELD NO DODGE NO UNTERGATABBLE NO IMMORTAL during chicken
-//   status" + "not even rebirth possible" - pure damage, bypasses every
-//   defensive mechanic in the game uniformly: ignoresDodge, ignoresShield,
-//   ignoresUntargetable, ignoresImmortal, ignoresRebirth all set together -
-//   a chicken-attack KO is final, even against Blade's still-unused
-//   Rebirth).
+//   status" + "not even rebirth possible"). This is now enforced
+//   AUTOMATICALLY by applyDamage itself (damagePipeline.js forces every
+//   ignores* flag true whenever target.isChicken is true) - no flags need
+//   passing here for that case.
 // - Chicken vs. Boingo: uses game.fowlPlayHitsOnBoingo, a GLOBAL
 //   cumulative counter shared across every attacking chicken (not
 //   per-attacker) - every 2nd cumulative hit lands 1 damage, the
-//   alternating hit deals 0 (still bypasses defense either way, it just
-//   doesn't get to roll damage at all on the "miss" beat).
+//   alternating hit deals 0. Boingo himself is NEVER chickenified, so
+//   applyDamage's own target.isChicken bypass does NOT apply to him -
+//   confirmed ruling (2026-09-04, after a real bug: his shield stayed
+//   frozen at the same value across several actual landed hits, since
+//   this function used to pass ignoresShield/ignoresDodge/etc.
+//   UNCONDITIONALLY regardless of target): the landing hit on Boingo
+//   respects his normal shield/dodge like any other genuine attack -
+//   deliberately NOT passing any ignores* flags here lets his real
+//   defenses apply normally.
 function executeChickenAttack(character, targetId, game, log) {
   let amount;
   if (targetId === 'boingo') {
@@ -827,16 +833,6 @@ function executeChickenAttack(character, targetId, game, log) {
     sourceCharacterId: character.id,
     targetCharacterId: targetId,
     amount,
-    // Confirmed ruling: "NO SHIELD NO DODGE NO UNTERGATABBLE NO IMMORTAL
-    // during chicken status" + "not even rebirth possible" - pure damage,
-    // every defensive mechanic in the game bypassed uniformly, including
-    // Blade's Rebirth (a chicken-attack KO is final; his one-time Rebirth
-    // stays unused/banked if this is what kills him).
-    ignoresDodge: true,
-    ignoresShield: true,
-    ignoresUntargetable: true,
-    ignoresImmortal: true,
-    ignoresRebirth: true,
   });
   log.push({ type: 'attack', characterId: character.id, actionId: 'chickenAttack', targetId, ...result });
   return result;
