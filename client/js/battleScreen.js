@@ -1958,8 +1958,10 @@ function describeLogEntry(entry) {
       return `World Stops continues - ${entry.frozenIds.map(name).join(', ')} still frozen`;
     case 'world-stops-end':
       return `World Stops ends - time resumes for everyone`;
-    case 'fowl-play-revert':
-      return `${name(entry.characterId)} turns back into a hero!`;
+    case 'fowl-play-revert': {
+      const revertedNames = (entry.characterIds || []).map(name);
+      return `${revertedNames.join(', ')} turn${revertedNames.length === 1 ? 's' : ''} back into ${revertedNames.length === 1 ? 'a hero' : 'heroes'}!`;
+    }
     case 'eclipse-end':
       return `${name(entry.characterId)}'s Lunar Eclipse ends`;
     case 'jester-ball-take':
