@@ -7,7 +7,7 @@ import {
   startChickenMusic, revertFromChickenMusic,
   playActionSound, playSound, playKO, playVictory, playDodge, playRebirth, playCoin,
 } from './sound.js';
-import { handleLogEntryForFlash, handleDodgeForFlash, checkIdlePortrait, registerFlashRerender, queueGrimtalPowerFlash } from './portraitFlash.js';
+import { handleLogEntryForFlash, handleDodgeForFlash, checkIdlePortrait, registerFlashRerender, queueGrimtalPowerFlash, registerChickenCheck } from './portraitFlash.js';
 import { handleLogEntryForEffects, registerEffectRerender } from './actionEffects.js';
 import { preloadBattleImages, battleImagesReady } from './imagePreload.js';
 import { preloadBattleAudio } from './audioPreload.js';
@@ -754,6 +754,14 @@ onMessage((msg) => {
 
 registerFlashRerender(() => { if (state.screen === 'battle') rerender(); });
 registerEffectRerender(() => { if (state.screen === 'battle') rerender(); });
+// Boingo's Fowl Play - lets portraitFlash.js's setFlash reject any
+// non-chicken image for a currently-chickenified character, no matter
+// which of its many call sites tried to set one (see setFlash's own
+// comment for why this single choke point is safer than auditing each
+// call site individually). Reads live state.game rather than a snapshot,
+// so it's always correct even for a flash queued moments before a
+// game-state broadcast flips someone's isChicken flag.
+registerChickenCheck((characterId) => !!state.game?.characters[characterId]?.isChicken);
 // Keeps the fullscreen button's icon/title correct even when fullscreen is
 // exited via Escape (or any OS-level gesture) rather than the button
 // itself - document.fullscreenElement changes without any click of ours.

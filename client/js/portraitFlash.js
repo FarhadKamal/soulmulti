@@ -62,7 +62,41 @@ export function registerFlashRerender(fn) {
   onFlashExpired = fn;
 }
 
+// Boingo's Fowl Play - the ONLY portrait images allowed to flash on a
+// chickenified character, no matter which call site tries to set one.
+// Confirmed live reports: an idle-flash (checkIdlePortrait, fixed
+// separately) AND a dodge-shaped animation both slipped through while a
+// character was a chicken, because this file has ~15 different setFlash()
+// call sites scattered across handleLogEntryForFlash's big per-actionId
+// switch, handleDodgeForFlash, handleLaughing, queueGrimtalPowerFlash, and
+// checkIdlePortrait - auditing and gating every one of them individually
+// is exactly the kind of thing that's easy to miss one of (as just
+// happened). This is the single low-level choke point EVERY one of those
+// routes through, so gating here is the one fix that can never miss a
+// future call site either. A chickenified character genuinely can't
+// trigger any hero-specific action anymore (their whole kit is hidden
+// server-side - see turnEngine.js's getLegalActions), so any attempt to
+// flash something other than their generic chicken art onto them here
+// reflects a stale/indirect trigger (an idle check, a delayed queued
+// flash, a leftover Jester Ball sequence started before they turned into
+// a chicken, etc.) - silently dropped rather than shown.
+const CHICKEN_FLASH_PATHS = new Set([
+  'assets/images/boingo/chicken.jpg',
+  'assets/images/boingo/chicken_attack.jpg',
+  'assets/images/boingo/chicken_hit.jpg',
+  'assets/images/boingo/foul_play.jpg',
+]);
+
+// Populated by every setFlash caller in this file that already has `game`
+// in scope, via registerChickenCheck below - setFlash itself has no
+// direct access to game/character state, only characterId/src.
+let isCurrentlyChicken = () => false;
+export function registerChickenCheck(fn) {
+  isCurrentlyChicken = fn;
+}
+
 function setFlash(characterId, src, durationMs = FLASH_DURATION_MS) {
+  if (isCurrentlyChicken(characterId) && !CHICKEN_FLASH_PATHS.has(src)) return;
   const existing = activeFlash.get(characterId);
   if (existing) clearTimeout(existing.timer);
   const timer = setTimeout(() => {
@@ -149,6 +183,14 @@ export function checkIdlePortrait(character) {
   // death-proof window would incorrectly hide the immortal portrait for
   // its whole duration. Skip idle entirely while it's active.
   if (character.id === 'draxus' && character.special?.deathproofActive) return false;
+  // Boingo's Fowl Play - same reasoning as the Draxus guard above: a
+  // chickenified character's OWN hero-specific idle image (e.g.
+  // illyra/idle.jpg) must never flash over the chicken.jpg portrait
+  // override for as long as they're chickenified. Confirmed live report:
+  // "chicken status. idle animation played!" - this check was simply
+  // missing, so a chicken who went untouched for a turn briefly flashed
+  // back to their own normal hero idle art mid-transformation.
+  if (character.isChicken) return false;
   const lastHearts = heartsAtLastTurnStart.has(character.id) ? heartsAtLastTurnStart.get(character.id) : null;
   const wasUntouched = lastHearts === null || character.hearts >= lastHearts;
   const isIdle = wasUntouched && character.hearts > character.maxHearts / 2;
