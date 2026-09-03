@@ -265,6 +265,28 @@ export function applyDamage(game, log, {
 
   if (!target || target.isKO) return result;
 
+  // Boingo's Fowl Play - confirmed ruling (repeated live after a real bug):
+  // "dodge will not work during chicken status" - a chickenified TARGET
+  // has zero defense of any kind against ANY attack, not just a Chicken
+  // Attack specifically. Originally only chickenAttack itself passed the
+  // ignores* flags below, which correctly covered chicken-vs-chicken/
+  // chicken-vs-Boingo damage but missed the reverse direction entirely: a
+  // NON-chicken attacker (e.g. Boingo's own Chaos Gamble) landing on a
+  // chickenified target still respected Illyra's dodge passive, since
+  // Chaos Gamble never sets ignoresDodge. Confirmed live: "Illyra dodged
+  // Boingo's attack!" appeared AFTER she'd already been turned into a
+  // chicken. Fixed by making this a property of the TARGET, checked once
+  // here and forced onto every ignores* flag unconditionally, rather than
+  // relying on every possible attacker to opt in individually - covers
+  // every current and future damage source automatically.
+  if (target.isChicken) {
+    ignoresUntargetable = true;
+    ignoresDodge = true;
+    ignoresShield = true;
+    ignoresImmortal = true;
+    ignoresRebirth = true;
+  }
+
   // Untargetable is enforced primarily at the targeting UI layer; this is a
   // defensive re-check so a bug upstream can't sneak damage through.
   if (target.untargetable && !ignoresUntargetable) {
