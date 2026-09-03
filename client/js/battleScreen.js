@@ -215,7 +215,6 @@ export function renderBattle(root, state) {
       isFrozenVisual: frozenIdsSet.has(character.id),
       isPuppet: character.id === puppetHighlightId || character.id === activePuppetId,
       isHypnotized: character.id === activePuppetId,
-      isChicken: !!character.isChicken,
     }));
   });
   scroll.appendChild(board);
@@ -499,7 +498,7 @@ function computeFrozenIdsSet(game) {
   return ids;
 }
 
-function renderCharacterTile(character, { isActing, isMine, isTargetable, onTargetClick, isHoldingBall, isCursed, isFrozenVisual, isVictorious, isPuppet, isHypnotized, grudgeCount, isPoisoned, silencedTurns, isDazed, mirageMarkCount, isChicken }) {
+function renderCharacterTile(character, { isActing, isMine, isTargetable, onTargetClick, isHoldingBall, isCursed, isFrozenVisual, isVictorious, isPuppet, isHypnotized, grudgeCount, isPoisoned, silencedTurns, isDazed, mirageMarkCount }) {
   const def = CHARACTERS[character.id];
   const tile = document.createElement('div');
   tile.className = 'char-tile';
@@ -1011,20 +1010,6 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
     mirage.textContent = `🪞${mirageMarkCount}`;
     mirage.title = `Illyra's Mirage Mark: ${mirageMarkCount} stack${mirageMarkCount > 1 ? 's' : ''} (her Mirage Burst on you would deal ${mirageMarkCount})`;
     tile.appendChild(mirage);
-  }
-
-  if (isChicken && !character.isKO) {
-    // Boingo's Fowl Play - every currently-chickenified character shares
-    // the SAME revert moment (once Boingo completes his own 3rd turn
-    // since casting - see turnEngine.js's tickFowlPlayIfBoingoTurn), so
-    // this is a plain on/off badge rather than a per-character countdown.
-    // Top-center is the free badge slot (every corner already used,
-    // bottom-center taken by Illyra's mirage badge).
-    const chicken = document.createElement('div');
-    chicken.className = 'chicken-badge';
-    chicken.textContent = '🐔';
-    chicken.title = "Chickenified by Boingo's Fowl Play - only Chicken Attack is available until Boingo has had 3 more of his own turns";
-    tile.appendChild(chicken);
   }
 
   if (isPoisoned && !character.isKO) {
