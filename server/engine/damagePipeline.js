@@ -243,6 +243,14 @@ export function applyDamage(game, log, {
   // else in the game has ever needed to skip it). Only chickenAttack sets
   // this true (executeChickenAttack in turnEngine.js).
   ignoresImmortal = false,
+  // Boingo's Fowl Play - confirmed ruling: "not even rebirth possible" -
+  // extends the same "pure damage, no defense of any kind" rule to
+  // Blade's Rebirth too. A chicken-attack KO is final: his one-time
+  // Rebirth stays UNUSED/banked (rebirthUsed never flips true) if a
+  // chicken attack is what kills him, available again as normal the next
+  // time he'd otherwise die to a real attack. Only chickenAttack sets
+  // this true.
+  ignoresRebirth = false,
 }) {
   const target = game.characters[targetCharacterId];
   const result = {
@@ -321,7 +329,7 @@ export function applyDamage(game, log, {
   // "already used" is a universal one-shot Rebirth precondition, not
   // something specific to any one character's reset logic.
   const rebirthResetter = getRebirthResetter(target.id);
-  if (rebirthResetter && target.hearts === 0 && !target.special.rebirthUsed) {
+  if (rebirthResetter && target.hearts === 0 && !target.special.rebirthUsed && !ignoresRebirth) {
     rebirthResetter(target, game, log);
     result.revived = true;
     // Every OTHER character's stale reference to the now-revived target
