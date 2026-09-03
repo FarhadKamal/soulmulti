@@ -88,13 +88,15 @@ function baseSpecialFor(id) {
       // Tharox's glorySmashesUsed) even though it now only ever reaches 1 -
       // keeps the shape consistent and avoids re-plumbing every call site
       // that reads jesterBallsUsed directly.
-      // usedMassiveFart: his desperation special (hearts <= 3, confirmed
+      // usedFowlPlay: his desperation special (hearts <= 3, confirmed
       // ruling), own dedicated one-time flag separate from usedSpecial
       // (already spoken for by Jester Ball) - same multi-special pattern
       // as Chronox's usedWorldStops/Grimtal's usedGrimBarrage. The actual
-      // effect (massiveFartActive/massiveFartSkipsApplied) lives on `game`
-      // itself, not here - see createGame's own comment.
-      return { jesterBallsUsed: 0, usedMassiveFart: false };
+      // battlefield effect (which characters are currently chickenified)
+      // lives per-character on each victim's own state (chickenMovesRemaining),
+      // not here - see createCharacter's own comment and createGame's
+      // fowlPlayHitsOnBoingo counter.
+      return { jesterBallsUsed: 0, usedFowlPlay: false };
     case 'blade':
       return { streakTargetId: null, streakCount: 0, rebirthUsed: false };
     case 'athena':
@@ -348,6 +350,17 @@ export function createCharacter(defId, ownerId) {
     usedSpecial: false,
     untargetable: false,
     special: baseSpecialFor(defId),
+    // Boingo's Fowl Play - 0 means not chickenified. Set to 3 on every
+    // OTHER living character the instant Fowl Play is cast (Boingo himself
+    // is never touched), decremented by exactly 1 in turnEngine.js's
+    // finalizeAction on EVERY resolved action in the whole match (not just
+    // this character's own turns, not once per round) - confirmed ruling:
+    // "3 individual moves," counted globally across all players. Reverts
+    // to normal the instant this hits 0. Lives directly on the character
+    // (not nested in `special`) for the same reason skipNextTurn/
+    // skipHeadacheTurn do - a plain, universally-applicable flag rather
+    // than a per-hero-shaped state blob.
+    chickenMovesRemaining: 0,
   };
 }
 
@@ -384,18 +397,17 @@ export function createGame(mode, playerPicks) {
     chronoxLockoutTickedFor: new Set(),
     turnInstanceFor: new Map(),
     jesterBall: null,
-    // Boingo's Massive Fart (Global Confusion category #30, see project
-    // memory: soulclash_mechanic_taxonomy.md) - lives on `game` itself
-    // rather than on Boingo's own `special`, since it affects EVERY
-    // character's attacks/passes battlefield-wide, not just his own (same
-    // "game-level, not character-level" reasoning as game.jesterBall).
-    // Mirrors Chronox's worldStopsActive/worldStopsSkipsApplied shape
-    // exactly: round 1 applies immediately at cast time, ticks for 1 more
-    // round via a shared countdown, then ends automatically (2 full game
-    // rounds total, same round-counting convention as Time Freeze/World
-    // Stops - see turnEngine.js's beginCharacterTurn).
-    massiveFartActive: false,
-    massiveFartSkipsApplied: 0,
+    // Boingo's Fowl Play - GLOBAL cumulative hit counter for attacks
+    // chickens land specifically on Boingo (confirmed ruling: shared
+    // across every chicken, not tracked per-attacker). Every 2nd
+    // cumulative hit lands 1 damage; the alternating hit deals 0. Lives on
+    // `game` (not per-attacker state) for the same "one shared counter,
+    // not 16 separate ones" reasoning game.jesterBall's own shared state
+    // uses. Never reset mid-match - persists for as long as Fowl Play's
+    // chicken window is active, naturally becoming irrelevant again once
+    // every chicken has reverted (nothing left that can even target
+    // Boingo under the chicken-only-targets-chicken-or-Boingo rule).
+    fowlPlayHitsOnBoingo: 0,
     winnerPlayerId: null,
     log: [],
   };

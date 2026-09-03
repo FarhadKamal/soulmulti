@@ -28,11 +28,9 @@ const GRIM_BARRAGE_FLASH_DURATION_MS = 4500;
 // image doesn't revert to idle while either is still playing out.
 const WORLD_STOPS_FLASH_DURATION_MS = 4500;
 
-// Boingo's Massive Fart portrait - matches the same 4.5s default every
-// other multi-round special special uses (Earthshatter/Grim Barrage/World
-// Stops) - adjust once real sound/voice assets exist and their actual
-// length is known, same as those three originally were.
-const MASSIVE_FART_FLASH_DURATION_MS = 4500;
+// Boingo's Fowl Play cast portrait - matches the same 4.5s default every
+// other multi-round special uses (Earthshatter/Grim Barrage/World Stops).
+const FOWL_PLAY_FLASH_DURATION_MS = 4500;
 
 // Grimtal's power.jpg follow-up: fires AFTER his own strike flash has fully
 // finished playing (not simultaneously), same "let the first beat read
@@ -345,7 +343,7 @@ export function handleLogEntryForFlash(entry, game) {
   }
 
   if (entry.type !== 'attack' && entry.type !== 'special' && entry.type !== 'setup') return;
-  const { characterId, actionId, dodged, amountDealt } = entry;
+  const { characterId, actionId, dodged, amountDealt, targetCharacterId } = entry;
   if (isKO(characterId)) return;
 
   switch (actionId) {
@@ -426,8 +424,26 @@ export function handleLogEntryForFlash(entry, game) {
         else if (entry.outcome === 'draw') setFlash(characterId, 'assets/images/boingo/normalpunch.jpg');
       }
       break;
-    case 'massiveFart':
-      setFlash(characterId, 'assets/images/boingo/massive_fart.jpg', MASSIVE_FART_FLASH_DURATION_MS); break;
+    case 'fowlPlay':
+      setFlash(characterId, 'assets/images/boingo/foul_play.jpg', FOWL_PLAY_FLASH_DURATION_MS); break;
+    case 'chickenAttack':
+      if (!dodged) {
+        setFlash(characterId, 'assets/images/boingo/chicken_attack.jpg');
+        // Distinct victim-side reaction flash (with its own egg-drop gag),
+        // separate from the attacker's own chicken_attack.jpg above -
+        // confirmed ruling: fires on ANY chicken taking damage, a brief
+        // flash rather than a persistent injured-state portrait. amountDealt
+        // > 0 gate matches every other victim reaction in this file (a
+        // dodged/0-damage hit shows no reaction). Boingo himself CAN be the
+        // target here (chickens are allowed to attack him) but he's never
+        // chickenified, so he keeps his own normal hit reaction instead -
+        // this flash is only for a genuinely chickenified target.
+        if (amountDealt > 0 && targetCharacterId && !isKO(targetCharacterId)
+          && game.characters[targetCharacterId]?.chickenMovesRemaining > 0) {
+          setFlash(targetCharacterId, 'assets/images/boingo/chicken_hit.jpg');
+        }
+      }
+      break;
     case 'wandStrike':
       // Shared action id (Rowan and Marin both have a Wand Strike) - the
       // image folder differs per character, everything else about the

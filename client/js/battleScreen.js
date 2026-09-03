@@ -215,7 +215,7 @@ export function renderBattle(root, state) {
       isFrozenVisual: frozenIdsSet.has(character.id),
       isPuppet: character.id === puppetHighlightId || character.id === activePuppetId,
       isHypnotized: character.id === activePuppetId,
-      isMassiveFartActive: !!game.massiveFartActive,
+      chickenMovesRemaining: character.chickenMovesRemaining || 0,
     }));
   });
   scroll.appendChild(board);
@@ -499,7 +499,7 @@ function computeFrozenIdsSet(game) {
   return ids;
 }
 
-function renderCharacterTile(character, { isActing, isMine, isTargetable, onTargetClick, isHoldingBall, isCursed, isFrozenVisual, isVictorious, isPuppet, isHypnotized, grudgeCount, isPoisoned, silencedTurns, isDazed, mirageMarkCount, isMassiveFartActive }) {
+function renderCharacterTile(character, { isActing, isMine, isTargetable, onTargetClick, isHoldingBall, isCursed, isFrozenVisual, isVictorious, isPuppet, isHypnotized, grudgeCount, isPoisoned, silencedTurns, isDazed, mirageMarkCount, chickenMovesRemaining }) {
   const def = CHARACTERS[character.id];
   const tile = document.createElement('div');
   tile.className = 'char-tile';
@@ -1013,18 +1013,17 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
     tile.appendChild(mirage);
   }
 
-  if (isMassiveFartActive && !character.isKO) {
-    // Boingo's Massive Fart (Global Confusion #30) - unlike every other
-    // badge above (a per-relationship status tied to one specific
-    // caster/victim pair), this is a battlefield-wide effect shown on
-    // EVERY living character's own tile for the whole duration, not just
-    // Boingo's - top-center is the one remaining free badge slot (every
-    // corner already used, bottom-center taken by Illyra's mirage badge).
-    const fart = document.createElement('div');
-    fart.className = 'massive-fart-badge';
-    fart.textContent = '💨';
-    fart.title = "Boingo's Massive Fart is in effect - attacks are landing on random targets";
-    tile.appendChild(fart);
+  if (chickenMovesRemaining > 0 && !character.isKO) {
+    // Boingo's Fowl Play - a per-character badge (unlike Massive Fart's
+    // old battlefield-wide one) showing how many of the 3 total chicken
+    // moves this specific character has left. Top-center is the free
+    // badge slot (every corner already used, bottom-center taken by
+    // Illyra's mirage badge).
+    const chicken = document.createElement('div');
+    chicken.className = 'chicken-badge';
+    chicken.textContent = `🐔${chickenMovesRemaining}`;
+    chicken.title = `Chickenified by Boingo's Fowl Play - only Chicken Attack is available for ${chickenMovesRemaining} more move${chickenMovesRemaining > 1 ? 's' : ''} (counted across everyone's moves, not just yours)`;
+    tile.appendChild(chicken);
   }
 
   if (isPoisoned && !character.isKO) {
@@ -1071,8 +1070,24 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
   } else if (persistentSrc) {
     // Already wrapped with v() at its source in portraitFlash.js.
     portrait.src = persistentSrc;
+  } else if (character.isKO && character.chickenMovesRemaining > 0) {
+    // Boingo's Fowl Play - a chicken that gets KO'd shows the fried-
+    // chicken gag art instead of that character's own normal koed.jpg.
+    // Checked ahead of the plain isKO branch below since this is more
+    // specific. chickenMovesRemaining staying > 0 through a KO is
+    // intentional (see turnEngine.js's tickFowlPlayChickens - death
+    // doesn't clear it, there's simply no more decrementing once KO'd).
+    portrait.src = v('assets/images/boingo/chicken_roast.jpg');
   } else if (character.isKO) {
     portrait.src = v(`assets/koed/${character.id}.jpg`);
+  } else if (character.chickenMovesRemaining > 0) {
+    // Boingo's Fowl Play - shared generic chicken art overrides this
+    // character's own idle/injured portrait for as long as they're
+    // chickenified, same "everything hidden" reasoning that also hides
+    // their real action list (confirmed ruling: "chicken can only attack
+    // ... other things will hide"). Checked ahead of the Draxus/injured
+    // branches below since chicken status overrides both.
+    portrait.src = v('assets/images/boingo/chicken.jpg');
   } else if (character.id === 'draxus' && character.special?.deathproofActive) {
     // Belt-and-braces: persistentSrc above already covers this, but a
     // reported-live case still showed injured.jpg during his death-proof
@@ -1754,17 +1769,15 @@ function blockedByText(blockedBy) {
   return '';
 }
 
-// Boingo's Massive Fart can redirect a single-target damage attack to a
-// DIFFERENT character than the one actually chosen - every ability's own
-// log entry still carries the ORIGINAL choice as `targetId` (that's what
-// the player picked; applyDamage's own result, spread in via `...result`,
-// carries the real outcome as the differently-named `targetCharacterId`).
-// Without this, the main attack line would keep naming the original
-// target even while a separate 'massive-fart-redirect' entry correctly
-// announces the damage actually landed elsewhere - two adjacent log lines
-// visibly contradicting each other. Falls back to entry.targetId whenever
-// targetCharacterId is absent (non-applyDamage entries) or matches it
-// anyway (the overwhelmingly common no-redirect case).
+// Generic fallback for any ability whose log entry's own `targetId` (the
+// player's original choice) could ever diverge from applyDamage's own
+// result `targetCharacterId` (the actual outcome, spread in via
+// `...result`) - not currently used by any live redirect mechanic, but
+// kept as the safe default every attack-line formatter below reads
+// through, so a future redirect-shaped ability doesn't need to re-thread
+// this same fallback into each call site again. Falls back to
+// entry.targetId whenever targetCharacterId is absent (non-applyDamage
+// entries) or matches it anyway (the common case).
 function actualAttackTargetId(entry) {
   return entry.targetCharacterId ?? entry.targetId;
 }
@@ -1778,7 +1791,7 @@ const ACTION_LABELS = {
   chargeUp: 'Charge Up', thunderWrath: 'Thunder Wrath', soulSwap: 'Soul Swap', soulSwapWrath: 'Thunder Wrath (free)',
   hiddenMark: 'Hidden Mark', fatalSlash: 'Fatal Slash', shadowExecution: 'Shadow Execution',
   lunarStrike: 'Lunar Strike', moonstep: 'Moonstep', lunarEclipse: 'Lunar Eclipse',
-  chaosGamble: 'Chaos Gamble', jesterBall: 'Jester Ball', massiveFart: 'Massive Fart', bloodHunt: 'Blood Hunt',
+  chaosGamble: 'Chaos Gamble', jesterBall: 'Jester Ball', fowlPlay: 'Fowl Play', chickenAttack: 'Chicken Attack', bloodHunt: 'Blood Hunt',
   curseStrike: 'Curse Strike', divineRestore: 'Divine Restore', divineSacrifice: 'Divine Sacrifice',
   selfChoke: 'Self Choke',
   grudgeStrike: 'Grudge Strike', callAshka: 'Call Ashka',
@@ -1822,6 +1835,10 @@ function describeLogEntry(entry) {
       }
       return `${name(entry.characterId)} used ${actionLabel(entry.actionId)} on ${name(actualAttackTargetId(entry))}${entry.amountDealt != null ? ` - ${entry.amountDealt} damage` : ''}${entry.koTriggered ? ' - KO!' : ''}`;
     case 'special':
+      if (entry.actionId === 'fowlPlay') {
+        const victims = entry.chickenIds || [];
+        return `${name(entry.characterId)} unleashed Fowl Play - ${victims.map(name).join(', ')} turned into chickens!`;
+      }
       if (entry.actionId === 'mirageBurst') {
         // No single target - detonates everyone currently marked at once,
         // each for their own stack count. Lists every victim who actually
@@ -1937,12 +1954,8 @@ function describeLogEntry(entry) {
       return `World Stops continues - ${entry.frozenIds.map(name).join(', ')} still frozen`;
     case 'world-stops-end':
       return `World Stops ends - time resumes for everyone`;
-    case 'massive-fart-continue':
-      return `The stench still lingers over the battlefield`;
-    case 'massive-fart-end':
-      return `The stench clears - attacks land true again`;
-    case 'massive-fart-redirect':
-      return `${name(entry.sourceCharacterId)}'s attack veered wildly - it landed on ${name(entry.redirectedTargetId)} instead of ${name(entry.originalTargetId)}!`;
+    case 'fowl-play-revert':
+      return `${name(entry.characterId)} turns back into a hero!`;
     case 'eclipse-end':
       return `${name(entry.characterId)}'s Lunar Eclipse ends`;
     case 'jester-ball-take':

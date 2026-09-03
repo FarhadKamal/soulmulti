@@ -1,5 +1,6 @@
 import {
   getUsableActions, isValidTarget, isValidPuppetTarget, isValidMindControlTarget, isMelyssaLoneDuel, LONE_DUEL_EXCEPTIONS,
+  isChickenified, FOWL_PLAY_BOINGO_HIT_INTERVAL,
 } from './turnEngine.js';
 import { isFrozenByChronox } from './damagePipeline.js';
 
@@ -742,15 +743,13 @@ function chooseAthenaMove(character, game, usable) {
 
 function chooseBoingoMove(character, game, usable) {
   const byId = Object.fromEntries(usable.map((a) => [a.actionId, a]));
-  // Massive Fart: no hearts gate at all (confirmed ruling, 2026-09-02) -
-  // castable any turn, still one-time use. No-target, no real downside to
-  // casting it the instant it's available (even turn 1) - unlike a true
-  // desperation special, there's no reason to wait for a "better" moment
-  // since it's free chaos with zero opportunity cost, benefiting Boingo's
-  // OWN attacks too for its whole duration once armed. Checked ahead of
-  // Jester Ball for the same "no cost, take it now" reasoning.
-  if (byId.massiveFart) {
-    return { actionId: 'massiveFart', targetId: null };
+  // Fowl Play: a desperation move, only legal once hearts <= 3. No-target,
+  // no real downside to casting it the instant it's available - same "cast
+  // eagerly once legal" policy as every other one-time desperation special
+  // in the roster (World Stops, Earthshatter, Grim Barrage). Checked ahead
+  // of Jester Ball since it's free value with zero opportunity cost.
+  if (byId.fowlPlay) {
+    return { actionId: 'fowlPlay', targetId: null };
   }
   // Jester Ball is a coin-flip-shaped social weapon - throw it at the
   // biggest threat so either outcome (they eat -4, or they pass/return it
@@ -1211,7 +1210,7 @@ function chooseGrimtalMove(character, game, usable) {
   // Grim Barrage: a desperation move, only legal once hearts <= 3. No-target,
   // no real downside to casting it the instant it's available - same "cast
   // eagerly once legal" policy as every other one-time desperation special
-  // in the roster (World Stops, Earthshatter, Massive Fart). Checked before
+  // in the roster (World Stops, Earthshatter, Fowl Play). Checked before
   // even Claim the Kill - free value with zero opportunity cost beats a
   // permanent-upside pick that still costs the turn either way.
   if (byId.grimBarrage) {
@@ -1410,10 +1409,34 @@ function chooseFallbackMove(character, game, usable) {
   return { actionId: action.actionId, targetId: pickDefaultTarget(game, character, action.actionId) };
 }
 
+// Boingo's Fowl Play - generic bot logic for ANY chickenified character,
+// regardless of which hero they actually are (their own real chooser is
+// completely bypassed while chickenified - see chooseBotMove's own
+// interception below, since getLegalActions already only offers
+// chickenAttack in this state). Chicken Attack can only target another
+// living chicken or Boingo himself (turnEngine.js's own isValidTarget
+// case). Prefers attacking Boingo specifically on whichever hit would
+// actually land damage (the 2nd of every 2 cumulative hits on him, per
+// game.fowlPlayHitsOnBoingo - opportunistic rather than wasting attacks
+// on his guaranteed-miss beat), otherwise focuses the lowest-hearts
+// fellow chicken same as the generic lowestHeartsTarget priority used
+// everywhere else in this file.
+function chooseChickenMove(character, game, usable) {
+  const targets = validTargetsFor(game, character, 'chickenAttack');
+  if (targets.length === 0) return null;
+  const boingoHitWouldLand = (game.fowlPlayHitsOnBoingo + 1) % FOWL_PLAY_BOINGO_HIT_INTERVAL === 0;
+  if (boingoHitWouldLand && targets.includes('boingo')) {
+    return { actionId: 'chickenAttack', targetId: 'boingo' };
+  }
+  const otherChickens = targets.filter((tid) => tid !== 'boingo');
+  const targetId = lowestHeartsTarget(game, otherChickens) || pickRandom(targets);
+  return { actionId: 'chickenAttack', targetId };
+}
+
 export function chooseBotMove(character, game) {
   const usable = getUsableActions(character, game);
   if (usable.length === 0) return null;
-  const chooser = MOVE_CHOOSERS[character.id] || chooseFallbackMove;
+  const chooser = isChickenified(character) ? chooseChickenMove : (MOVE_CHOOSERS[character.id] || chooseFallbackMove);
   const move = chooser(character, game, usable);
   if (!move) return chooseFallbackMove(character, game, usable);
   // Safety net: a per-character chooser can return an action that isn't

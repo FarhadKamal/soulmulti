@@ -4,6 +4,7 @@ import { renderBattle } from './battleScreen.js';
 import { addChatMessage, clearChatMessages } from './chatPanel.js';
 import {
   startMenuMusic, startBattleMusic, stopMusic, startFrozenMusic, revertFromFrozenMusic,
+  startChickenMusic, revertFromChickenMusic,
   playActionSound, playSound, playKO, playVictory, playDodge, playRebirth, playCoin,
 } from './sound.js';
 import { handleLogEntryForFlash, handleDodgeForFlash, checkIdlePortrait, registerFlashRerender, queueGrimtalPowerFlash } from './portraitFlash.js';
@@ -194,7 +195,17 @@ function processNewLogEntries(game) {
 // file (curse-mirror, mirror-reflect, jester-ball-take, generic attack/
 // special) without duplicating the check at each of them.
 function playKoedFor(characterId, game, killerCharacterId) {
-  if (!playKoedVoice(characterId)) playKO();
+  // Boingo's Fowl Play - a chicken KO'd while still chickenified gets its
+  // own dedicated "fried" sound instead of any recorded koed voice line or
+  // the generic game-over fallback (checked FIRST, ahead of both) - the
+  // portrait already swaps to chicken_roast.jpg for this same case (see
+  // battleScreen.js), so the audio should match that gag rather than the
+  // character's own normal defeat cue.
+  if (game.characters[characterId]?.chickenMovesRemaining > 0) {
+    playSound('chicken_koed');
+  } else if (!playKoedVoice(characterId)) {
+    playKO();
+  }
   queueGrimtalPowerIfAlive(game, characterId, killerCharacterId);
 }
 
@@ -657,6 +668,19 @@ onMessage((msg) => {
     case 'game-state':
       state.screen = 'battle';
       state.game = msg.game;
+      // Boingo's Fowl Play - unlike World Stops (a single game-level
+      // active/inactive flag with its own dedicated log entries), the
+      // chicken window is tracked per-character (chickenMovesRemaining on
+      // each victim, each reverting independently once THEIR OWN counter
+      // hits 0). No single clean "the whole effect just ended" event
+      // exists to hook a music revert onto, so this checks fresh on every
+      // broadcast instead: chicken music plays for as long as ANYONE is
+      // still chickenified, reverts the instant nobody is.
+      if (Object.values(msg.game.characters).some((c) => c.chickenMovesRemaining > 0)) {
+        startChickenMusic();
+      } else {
+        revertFromChickenMusic();
+      }
       state.actingCharacterId = msg.actingCharacterId;
       state.usableActions = msg.usableActions || [];
       state.awaitingSoulSwapWrath = !!msg.awaitingSoulSwapWrath;

@@ -1,5 +1,12 @@
-import { applyDamage, applyHeal, applyShield, heartsSnapshot } from '../engine/damagePipeline.js';
+import { applyDamage, applyHeal, applyShield } from '../engine/damagePipeline.js';
 import { rollChaosGamble } from '../engine/random.js';
+
+// Kept in sync manually with turnEngine.js's own FOWL_PLAY_TOTAL_MOVES -
+// duplicated here rather than imported to avoid a circular import
+// (turnEngine.js imports every abilities/*.js file, including this one,
+// so this file cannot import back from turnEngine.js - same constraint
+// that already keeps damagePipeline.js's category hooks import-free).
+const FOWL_PLAY_TOTAL_MOVES = 3;
 
 export const actions = {
   chaosGamble: {
@@ -64,34 +71,38 @@ export const actions = {
       return {};
     },
   },
-  // Massive Fart: no hearts gate at all (confirmed ruling, 2026-09-02 -
-  // dropped the earlier hearts<=5 threshold, "boingo is too weak" -
-  // unlike every other desperation special in the roster, castable ANY
-  // time). Still strictly one-time use, own dedicated usedMassiveFart
-  // flag (separate from usedSpecial, already spoken for by Jester Ball).
+  // Fowl Play: hearts <= 3 gate, strictly one-time use (own dedicated
+  // usedFowlPlay flag, separate from usedSpecial which is already spoken
+  // for by Jester Ball) - confirmed ruling, replaces Massive Fart
+  // entirely (retired the same session Fowl Play was designed).
   //
-  // Global Confusion (see project memory: soulclash_mechanic_taxonomy.md
-  // #30) - for 4 full game rounds, every genuine single-target
-  // damage-dealing attack from ANY character (Boingo included) is
-  // redirected to a random OTHER living character instead of its
-  // originally chosen target, bypassing both Untargetable and Dodge
-  // Defense on whoever it lands on. Also redirects Jester Ball passes the
-  // same way. The actual redirect logic lives in damagePipeline.js's
-  // applyDamage (gated on game.massiveFartActive) and this file's own
-  // jesterBallResolution.pass - this action itself only arms the
-  // game-level flag and logs the cast; the 4-round countdown itself ticks
-  // generically in turnEngine.js's endTurn (a game-level effect, not tied
-  // to any single character's own turn cycle).
-  massiveFart: {
-    label: 'Massive Fart',
+  // Environmental Attack for its own cast effect (ignoresDodge: true,
+  // shield still absorbs normally - same convention as Earthshatter/Grim
+  // Barrage). Turns EVERY OTHER living character (never Boingo himself)
+  // into a chicken for FOWL_PLAY_TOTAL_MOVES individual moves, counted
+  // GLOBALLY across every character's own action from this point on (not
+  // rounds, not just the chickenified character's own turns) - ticked in
+  // turnEngine.js's finalizeAction via tickFowlPlayChickens. While
+  // chickenified: every one of that character's own actions is hidden,
+  // replaced by a single Chicken Attack (see turnEngine.js's
+  // CHICKEN_ATTACK_ACTION/isValidTarget/executeChickenAttack) that can
+  // only target another living chicken or Boingo himself. Any in-progress
+  // state (banked charge, discovery progress, active statuses) is left
+  // completely untouched - chickenMovesRemaining is a pure action-
+  // availability gate, nothing more (confirmed ruling: "anything pending
+  // such as studying will not waste... until become hero again").
+  fowlPlay: {
+    label: 'Fowl Play',
     needsTarget: false,
     special: true,
-    isLegal: (character) => !character.special.usedMassiveFart,
+    isLegal: (character) => character.hearts <= 3 && !character.special.usedFowlPlay,
     execute(character, targetId, game, log) {
-      character.special.usedMassiveFart = true;
-      game.massiveFartActive = true;
-      game.massiveFartSkipsApplied = 1;
-      log.push({ type: 'special', characterId: character.id, actionId: 'massiveFart' });
+      character.special.usedFowlPlay = true;
+      const victims = Object.values(game.characters).filter((c) => c.id !== character.id && !c.isKO);
+      for (const victim of victims) {
+        victim.chickenMovesRemaining = FOWL_PLAY_TOTAL_MOVES;
+      }
+      log.push({ type: 'special', characterId: character.id, actionId: 'fowlPlay', chickenIds: victims.map((v) => v.id) });
       return {};
     },
   },
@@ -150,32 +161,6 @@ export const jesterBallResolution = {
     isLegal: (game) => game.jesterBall.passCount < MAX_JESTER_BALL_PASSES,
     execute(game, log, newHolderCharacterId) {
       const fromCharacterId = game.jesterBall.holderCharacterId;
-      // Boingo's Massive Fart (Global Confusion, see project memory:
-      // soulclash_mechanic_taxonomy.md #30) - confirmed ruling: also
-      // redirects Jester Ball passes, not just damage-dealing attacks
-      // (the one confirmed exception to "attacks only," since this
-      // ability is fundamentally "your choice doesn't matter," not
-      // narrowly "your attacks miss"). Same no-self-pass exclusion as the
-      // damage-pipeline redirect (damagePipeline.js's own applyDamage).
-      // Bypasses Illyra's own 50% pass-fumble chance too if redirected
-      // onto her - "the redirect itself is unavoidable" applies here the
-      // same as it does to dodge/untargetable on the damage side, so this
-      // reassignment happens BEFORE the Illyra-fumble check further down,
-      // and is excluded from re-triggering redirect a second time (this
-      // is the only redirect roll for this pass, not a fresh attack the
-      // fumble check should treat as redirectable again).
-      let wasRedirectedByMassiveFart = false;
-      if (game.massiveFartActive) {
-        const pool = Object.values(game.characters).filter((c) => c.id !== fromCharacterId && !c.isKO);
-        if (pool.length > 0) {
-          const original = newHolderCharacterId;
-          newHolderCharacterId = pool[Math.floor(Math.random() * pool.length)].id;
-          if (newHolderCharacterId !== original) {
-            wasRedirectedByMassiveFart = true;
-            log.push({ type: 'massive-fart-redirect', sourceCharacterId: fromCharacterId, originalTargetId: original, redirectedTargetId: newHolderCharacterId, hearts: heartsSnapshot(game) });
-          }
-        }
-      }
       game.jesterBall.passCount += 1;
       // Landing on Boingo (the original thrower) mid-sequence no longer
       // auto-ends the whole thing (confirmed ruling, reworked from the
@@ -222,7 +207,7 @@ export const jesterBallResolution = {
       // checkpoint-heal target and the failed-pass-to-Illyra case in the
       // same call (those are two different newHolderCharacterId values),
       // so no interaction to worry about between the two branches.
-      if (!wasRedirectedByMassiveFart && newHolderCharacterId === 'illyra' && Math.random() < 0.5) {
+      if (newHolderCharacterId === 'illyra' && Math.random() < 0.5) {
         log.push({ type: 'dodge', attackerId: fromCharacterId, targetCharacterId: 'illyra' });
         // Confirmed ruling: this must NEVER be Boingo himself - a failed
         // pass FROM Boingo TO Illyra should never explode 4 damage onto

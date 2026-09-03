@@ -19,18 +19,47 @@ import * as oraclus from '../abilities/oraclus.js';
 
 const ABILITY_MODULES = { chronox, tharox, zerathys, akyros, velorya, boingo, blade, athena, melyssa, kaelis, draxus, rowan, marin, grimtal, illyra, oraclus };
 
-// Boingo's Massive Fart total duration (Global Confusion, see project
-// memory: soulclash_mechanic_taxonomy.md #30) - flat 4-round duration
-// (raised from 2, confirmed ruling - "more fun"). Round 1 applies
-// immediately at cast time; this constant gates the remaining
-// continuation ticks in endTurn below.
-const MASSIVE_FART_TOTAL_ROUNDS = 4;
+// Boingo's Fowl Play - total move-count window (confirmed ruling: "3
+// individual moves", counted GLOBALLY across every character's action in
+// the match, not just the chickenified character's own turns and not
+// full game rounds). Ticked once per resolved action in finalizeAction
+// below, for every currently-chickenified character at once.
+export const FOWL_PLAY_TOTAL_MOVES = 3;
+// Every 2nd cumulative hit a chicken lands on Boingo actually deals
+// damage - the alternating hit deals 0 (confirmed ruling). A GLOBAL
+// counter (game.fowlPlayHitsOnBoingo), not per-attacker.
+export const FOWL_PLAY_BOINGO_HIT_INTERVAL = 2;
 
 export function getAbilityModule(characterId) {
   return ABILITY_MODULES[characterId];
 }
 
+// True while this character is chickenified by Boingo's Fowl Play - a
+// plain count>0 check on the flag createCharacter puts directly on every
+// character (see state.js), same pattern as skipNextTurn/skipHeadacheTurn.
+export function isChickenified(character) {
+  return !!character && character.chickenMovesRemaining > 0;
+}
+
+// Boingo's Fowl Play - while chickenified, EVERY one of a character's own
+// actions (Normal/Special/Neutral/Passive, whatever their hero kit
+// normally offers) is replaced by this single synthetic action. Not
+// declared in any abilities/<id>.js file (chicken status is a
+// character-agnostic override, not part of any one hero's own kit) -
+// getLegalActions below short-circuits straight to this before ever
+// consulting ABILITY_MODULES, which is also why this needs no `hidden`
+// flag of its own (it's never reached through the normal mod.actions
+// path at all).
+const CHICKEN_ATTACK_ACTION = {
+  label: 'Chicken Attack',
+  needsTarget: true,
+  isLegal: () => true,
+};
+
 export function getLegalActions(character, game) {
+  if (isChickenified(character)) {
+    return [{ actionId: 'chickenAttack', ...CHICKEN_ATTACK_ACTION }];
+  }
   const mod = ABILITY_MODULES[character.id];
   if (!mod) return [];
   const silenced = isSilenced(character, game);
@@ -45,6 +74,22 @@ export function isValidTarget(game, characterId, actionId, targetId) {
   const target = game.characters[targetId];
   if (!target || target.isKO) return false;
   const character = game.characters[characterId];
+  // Boingo's Fowl Play - Chicken Attack has its own targeting rule
+  // entirely separate from the generic enemy-only rule below: a chicken
+  // may target any OTHER living chicken (regardless of owner - there are
+  // no teams in this game anyway) or Boingo himself specifically
+  // (confirmed ruling: "chicken can only attack another chicken" + "only
+  // boingo can attack other"). Checked before the generic ownerId/
+  // untargetable checks since neither applies to this action - a chicken
+  // can and must be able to hit Boingo even though he's the one who
+  // caused this whole thing, and untargetable status is irrelevant here
+  // since no chickenified character retains any status-granting kit
+  // anyway (everything's hidden while chickenified).
+  if (actionId === 'chickenAttack') {
+    if (targetId === characterId) return false;
+    if (targetId === 'boingo') return true;
+    return isChickenified(target);
+  }
   if (target.ownerId === character.ownerId) return false;
   if (target.untargetable) return false;
   if (actionId === 'shadowExecution') return character.special.marks.has(targetId);
@@ -714,15 +759,50 @@ export function resolveOraclusPredictionIfPending(game, log, characterId, action
   });
 }
 
+// Boingo's Fowl Play - Chicken Attack's own execute, dispatched specially
+// in executeAction below since it's not a real entry in any ability
+// module's `actions` map (it's a character-agnostic override, see
+// CHICKEN_ATTACK_ACTION/getLegalActions above). Confirmed rules:
+// - Chicken vs. chicken: always flat 1 damage, ZERO defense (bypasses
+//   both Dodge and Shield entirely - ignoresDodge AND ignoresShield).
+// - Chicken vs. Boingo: uses game.fowlPlayHitsOnBoingo, a GLOBAL
+//   cumulative counter shared across every attacking chicken (not
+//   per-attacker) - every 2nd cumulative hit lands 1 damage, the
+//   alternating hit deals 0 (still bypasses defense either way, it just
+//   doesn't get to roll damage at all on the "miss" beat).
+function executeChickenAttack(character, targetId, game, log) {
+  let amount;
+  if (targetId === 'boingo') {
+    game.fowlPlayHitsOnBoingo += 1;
+    amount = (game.fowlPlayHitsOnBoingo % FOWL_PLAY_BOINGO_HIT_INTERVAL === 0) ? 1 : 0;
+  } else {
+    amount = 1;
+  }
+  const result = applyDamage(game, log, {
+    sourceCharacterId: character.id,
+    targetCharacterId: targetId,
+    amount,
+    ignoresDodge: true,
+    ignoresShield: true,
+  });
+  log.push({ type: 'attack', characterId: character.id, actionId: 'chickenAttack', targetId, ...result });
+  return result;
+}
+
 export function executeAction(game, characterId, actionId, targetId, extra) {
   const effectiveTargetId = (mirageBurstTargetsChronox(game, characterId, actionId) || earthshatterMayTargetChronox(game, characterId, actionId))
     ? 'chronox' : targetId;
   const candidateRecord = buildActionAgainstChronoxRecord(game, characterId, actionId, effectiveTargetId);
   const character = game.characters[characterId];
-  const mod = ABILITY_MODULES[characterId];
-  const actionDef = mod.actions[actionId];
   const log = [];
-  const result = actionDef.execute(character, targetId, game, log, extra);
+  let result;
+  if (actionId === 'chickenAttack') {
+    result = executeChickenAttack(character, targetId, game, log);
+  } else {
+    const mod = ABILITY_MODULES[characterId];
+    const actionDef = mod.actions[actionId];
+    result = actionDef.execute(character, targetId, game, log, extra);
+  }
   resolveOraclusPredictionIfPending(game, log, characterId, actionId, targetId, result);
   // Commit the candidate record AFTER execute has actually run, and only
   // if it's a genuinely fresh record (not 'keep-existing'/null) whose
@@ -772,8 +852,30 @@ export function finalizeAction(game, log, result, characterId, actionId, targetI
   // land it BEFORE that attack's own line instead of after.
   if (result?.mirrorReflectLogEntry) log.push(result.mirrorReflectLogEntry);
   if (result?.mirrorReflectResult?.rebirthLogEntry) log.push(result.mirrorReflectResult.rebirthLogEntry);
+  tickFowlPlayChickens(game, log);
   applyEndOfActionChecks(game);
   game.log.push(...log, { type: 'end-action', round: game.round, characterId, actionId, targetId, hearts: heartsSnapshot(game) });
+}
+
+// Boingo's Fowl Play - decrements EVERY currently-chickenified character's
+// own chickenMovesRemaining by exactly 1, once per resolved action
+// ANYWHERE in the match (confirmed ruling: "3 individual moves", counted
+// globally - not 3 of the chicken's own turns, not 3 full rounds). Called
+// from finalizeAction, the one hook that genuinely fires once per action
+// regardless of whose turn it is. A character reverting mid-loop (hitting
+// 0) doesn't affect this same pass's other characters - each is
+// independent. Reverting is silent state-wise (nothing reset, nothing
+// re-rolled - see state.js's own comment on chickenMovesRemaining); the
+// character's real kit simply becomes reachable again the next time
+// getLegalActions is called for them, exactly where it left off.
+function tickFowlPlayChickens(game, log) {
+  for (const character of Object.values(game.characters)) {
+    if (character.chickenMovesRemaining <= 0) continue;
+    character.chickenMovesRemaining -= 1;
+    if (character.chickenMovesRemaining === 0) {
+      log.push({ type: 'fowl-play-revert', characterId: character.id, hearts: heartsSnapshot(game) });
+    }
+  }
 }
 
 // Executes a puppeted action on behalf of Melyssa's Mind Control - calls
@@ -937,25 +1039,6 @@ export function endTurn(game) {
   }
   if (next <= game.activePlayerIndex) {
     game.round += 1;
-    // Boingo's Massive Fart (Global Confusion, see project memory:
-    // soulclash_mechanic_taxonomy.md #30) - flat 2-round duration, same
-    // round-counting convention as Chronox's Time Freeze/World Stops
-    // (ticked here, at the one genuine "a full new round has begun"
-    // signal, rather than tied to any single character's own turn - it's
-    // a game-level effect, not owned by Boingo's own onTurnStart the way
-    // Chronox's freezes are owned by his). Round 1 is the cast itself
-    // (massiveFartSkipsApplied set to 1 in boingo.js's own execute); this
-    // ticks the 2nd and final round, then ends.
-    if (game.massiveFartActive) {
-      if (game.massiveFartSkipsApplied < MASSIVE_FART_TOTAL_ROUNDS) {
-        game.massiveFartSkipsApplied += 1;
-        game.log.push({ type: 'massive-fart-continue', hearts: heartsSnapshot(game) });
-      } else {
-        game.massiveFartActive = false;
-        game.massiveFartSkipsApplied = 0;
-        game.log.push({ type: 'massive-fart-end', hearts: heartsSnapshot(game) });
-      }
-    }
   }
   game.activePlayerIndex = next;
 }

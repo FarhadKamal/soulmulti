@@ -32,6 +32,15 @@ const MENU_TRACKS = ['bgm-menu.mp3', 'bgm-menu-2.mp3', 'bgm-menu-3.mp3'];
 const FROZEN_TRACK = 'bgm-frozen.mp3';
 let preFrozenTrack = null; // 'menu' | 'battle' | null - remembers what to restore
 
+// Boingo's Fowl Play: same swap-and-restore pattern as World Stops' own
+// frozen track above, for as long as ANY character in the match is
+// currently chickenified (main.js checks this on every game-state
+// broadcast, since Fowl Play's window is a per-character move-count, not
+// a single global on/off flag the way World Stops' round-based freeze is -
+// see turnEngine.js's chickenMovesRemaining).
+const CHICKEN_TRACK = 'bgm-chicken.mp3';
+let preChickenTrack = null;
+
 // Browsers block audio autoplay until the user has interacted with the
 // page. Two distinct failure modes seen in practice: (1) a play() call
 // made asynchronously (e.g. from a WebSocket message handler, not
@@ -117,6 +126,24 @@ export function revertFromFrozenMusic() {
   }
 }
 
+export function startChickenMusic() {
+  if (musicTrack === 'chicken') return;
+  preChickenTrack = musicTrack;
+  startMusic('chicken', CHICKEN_TRACK, 0.28);
+}
+
+export function revertFromChickenMusic() {
+  if (musicTrack !== 'chicken') return;
+  const restoreTo = preChickenTrack;
+  preChickenTrack = null;
+  musicTrack = null;
+  if (restoreTo === 'menu') {
+    startMenuMusic();
+  } else {
+    startBattleMusic();
+  }
+}
+
 export function stopMusic() {
   if (musicAudio) {
     musicAudio.pause();
@@ -179,7 +206,8 @@ const ACTION_SOUND = {
   lunarEclipse: 'eclipse',
   chaosGamble: 'punch',
   jesterBall: 'jesterball',
-  massiveFart: 'massive_fart',
+  fowlPlay: 'chicken_cast',
+  chickenAttack: 'chicken_attack',
   bloodHunt: 'sword',
   curseStrike: 'curse',
   divineRestore: 'divinerestore',
