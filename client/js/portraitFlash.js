@@ -125,6 +125,17 @@ export function getFlashSrc(characterId) {
 // match once Rebirth has triggered.
 export function getPersistentPortrait(character) {
   if (character.isKO) return null;
+  // Boingo's Fowl Play - no hero-specific persistent portrait (Blade's
+  // post-Rebirth alive.jpg, Velorya's hided.jpg, Melyssa's mind-control
+  // selection art, Draxus's immortality.jpg) may ever override the
+  // generic chicken portrait while chickenified. Confirmed live report:
+  // "after rebirth by blade. i then casted chicken foul on blade..blade
+  // rebirth image was showing most of the time" - this function sits
+  // ABOVE the chicken-portrait check in battleScreen.js's own priority
+  // chain, so a persistent hero portrait always won regardless of chicken
+  // status, same class of gap as checkIdlePortrait's own missing guard
+  // (fixed separately).
+  if (character.isChicken) return null;
   // Held for the entire duration of a Mind Control sequence (from puppet
   // selection through the puppeted action and any nested follow-up) -
   // character.special.controlling is real, serialized character state, set
