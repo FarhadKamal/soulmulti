@@ -1,13 +1,6 @@
 import { applyDamage, applyHeal, applyShield } from '../engine/damagePipeline.js';
 import { rollChaosGamble } from '../engine/random.js';
 
-// Kept in sync manually with turnEngine.js's own FOWL_PLAY_TOTAL_MOVES -
-// duplicated here rather than imported to avoid a circular import
-// (turnEngine.js imports every abilities/*.js file, including this one,
-// so this file cannot import back from turnEngine.js - same constraint
-// that already keeps damagePipeline.js's category hooks import-free).
-const FOWL_PLAY_TOTAL_MOVES = 3;
-
 export const actions = {
   chaosGamble: {
     label: 'Chaos Gamble',
@@ -76,21 +69,23 @@ export const actions = {
   // for by Jester Ball) - confirmed ruling, replaces Massive Fart
   // entirely (retired the same session Fowl Play was designed).
   //
-  // Environmental Attack for its own cast effect (ignoresDodge: true,
-  // shield still absorbs normally - same convention as Earthshatter/Grim
-  // Barrage). Turns EVERY OTHER living character (never Boingo himself)
-  // into a chicken for FOWL_PLAY_TOTAL_MOVES individual moves, counted
-  // GLOBALLY across every character's own action from this point on (not
-  // rounds, not just the chickenified character's own turns) - ticked in
-  // turnEngine.js's finalizeAction via tickFowlPlayChickens. While
-  // chickenified: every one of that character's own actions is hidden,
-  // replaced by a single Chicken Attack (see turnEngine.js's
-  // CHICKEN_ATTACK_ACTION/isValidTarget/executeChickenAttack) that can
-  // only target another living chicken or Boingo himself. Any in-progress
-  // state (banked charge, discovery progress, active statuses) is left
-  // completely untouched - chickenMovesRemaining is a pure action-
-  // availability gate, nothing more (confirmed ruling: "anything pending
-  // such as studying will not waste... until become hero again").
+  // Turns EVERY OTHER living character (never Boingo himself) into a
+  // chicken for FOWL_PLAY_BOINGO_TURNS of Boingo's OWN turns (confirmed
+  // ruling, 2026-09-03: "wait for boingo three turn atleast" - fixed a
+  // real gap where an earlier flat global-move-count version closed the
+  // window right before Boingo's own next turn, so he never got a real
+  // chance to attack a chicken). The countdown itself ticks in
+  // turnEngine.js's beginCharacterTurn via tickFowlPlayIfBoingoTurn, only
+  // on Boingo's own turns, reverting EVERY chickenified character at once
+  // once it completes. While chickenified: every one of that character's
+  // own actions is hidden, replaced by a single Chicken Attack (see
+  // turnEngine.js's CHICKEN_ATTACK_ACTION/isValidTarget/
+  // executeChickenAttack) that can only target another living chicken or
+  // Boingo himself. Any in-progress state (banked charge, discovery
+  // progress, active statuses) is left completely untouched - isChicken
+  // is a pure action-availability gate, nothing more (confirmed ruling:
+  // "anything pending such as studying will not waste... until become
+  // hero again").
   fowlPlay: {
     label: 'Fowl Play',
     needsTarget: false,
@@ -98,9 +93,11 @@ export const actions = {
     isLegal: (character) => character.hearts <= 3 && !character.special.usedFowlPlay,
     execute(character, targetId, game, log) {
       character.special.usedFowlPlay = true;
+      game.fowlPlayActive = true;
+      game.fowlPlayBoingoTurnsElapsed = 0;
       const victims = Object.values(game.characters).filter((c) => c.id !== character.id && !c.isKO);
       for (const victim of victims) {
-        victim.chickenMovesRemaining = FOWL_PLAY_TOTAL_MOVES;
+        victim.isChicken = true;
       }
       log.push({ type: 'special', characterId: character.id, actionId: 'fowlPlay', chickenIds: victims.map((v) => v.id) });
       return {};

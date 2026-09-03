@@ -201,7 +201,7 @@ function playKoedFor(characterId, game, killerCharacterId) {
   // portrait already swaps to chicken_roast.jpg for this same case (see
   // battleScreen.js), so the audio should match that gag rather than the
   // character's own normal defeat cue.
-  if (game.characters[characterId]?.chickenMovesRemaining > 0) {
+  if (game.characters[characterId]?.isChicken) {
     playSound('chicken_koed');
   } else if (!playKoedVoice(characterId)) {
     playKO();
@@ -668,15 +668,12 @@ onMessage((msg) => {
     case 'game-state':
       state.screen = 'battle';
       state.game = msg.game;
-      // Boingo's Fowl Play - unlike World Stops (a single game-level
-      // active/inactive flag with its own dedicated log entries), the
-      // chicken window is tracked per-character (chickenMovesRemaining on
-      // each victim, each reverting independently once THEIR OWN counter
-      // hits 0). No single clean "the whole effect just ended" event
-      // exists to hook a music revert onto, so this checks fresh on every
-      // broadcast instead: chicken music plays for as long as ANYONE is
-      // still chickenified, reverts the instant nobody is.
-      if (Object.values(msg.game.characters).some((c) => c.chickenMovesRemaining > 0)) {
+      // Boingo's Fowl Play - same single game-level flag pattern as World
+      // Stops (game.fowlPlayActive), checked fresh on every broadcast
+      // rather than hooked to a dedicated start/end log entry, since a
+      // human client could join or reconnect mid-window and needs the
+      // music to reflect current state regardless of when it connected.
+      if (msg.game.fowlPlayActive) {
         startChickenMusic();
       } else {
         revertFromChickenMusic();

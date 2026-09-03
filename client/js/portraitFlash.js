@@ -439,7 +439,7 @@ export function handleLogEntryForFlash(entry, game) {
         // chickenified, so he keeps his own normal hit reaction instead -
         // this flash is only for a genuinely chickenified target.
         if (amountDealt > 0 && targetCharacterId && !isKO(targetCharacterId)
-          && game.characters[targetCharacterId]?.chickenMovesRemaining > 0) {
+          && game.characters[targetCharacterId]?.isChicken) {
           setFlash(targetCharacterId, 'assets/images/boingo/chicken_hit.jpg');
         }
       }

@@ -33,11 +33,8 @@ const FROZEN_TRACK = 'bgm-frozen.mp3';
 let preFrozenTrack = null; // 'menu' | 'battle' | null - remembers what to restore
 
 // Boingo's Fowl Play: same swap-and-restore pattern as World Stops' own
-// frozen track above, for as long as ANY character in the match is
-// currently chickenified (main.js checks this on every game-state
-// broadcast, since Fowl Play's window is a per-character move-count, not
-// a single global on/off flag the way World Stops' round-based freeze is -
-// see turnEngine.js's chickenMovesRemaining).
+// frozen track above, for as long as game.fowlPlayActive is true (main.js
+// checks this fresh on every game-state broadcast).
 const CHICKEN_TRACK = 'bgm-chicken.mp3';
 let preChickenTrack = null;
 

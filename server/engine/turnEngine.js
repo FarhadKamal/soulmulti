@@ -19,12 +19,14 @@ import * as oraclus from '../abilities/oraclus.js';
 
 const ABILITY_MODULES = { chronox, tharox, zerathys, akyros, velorya, boingo, blade, athena, melyssa, kaelis, draxus, rowan, marin, grimtal, illyra, oraclus };
 
-// Boingo's Fowl Play - total move-count window (confirmed ruling: "3
-// individual moves", counted GLOBALLY across every character's action in
-// the match, not just the chickenified character's own turns and not
-// full game rounds). Ticked once per resolved action in finalizeAction
-// below, for every currently-chickenified character at once.
-export const FOWL_PLAY_TOTAL_MOVES = 3;
+// Boingo's Fowl Play - the chicken window lasts until Boingo has had this
+// many of his OWN turns since casting (his cast turn itself doesn't
+// count) - confirmed ruling, fixed 2026-09-03 after a flat global-move-
+// count version closed the window right before Boingo's own next turn in
+// a 4-player match, so he never got a real chance to attack a chicken
+// himself. Ticked in beginCharacterTurn below, once each time Boingo's
+// own turn begins while game.fowlPlayActive is true.
+export const FOWL_PLAY_BOINGO_TURNS = 3;
 // Every 2nd cumulative hit a chicken lands on Boingo actually deals
 // damage - the alternating hit deals 0 (confirmed ruling). A GLOBAL
 // counter (game.fowlPlayHitsOnBoingo), not per-attacker.
@@ -35,10 +37,10 @@ export function getAbilityModule(characterId) {
 }
 
 // True while this character is chickenified by Boingo's Fowl Play - a
-// plain count>0 check on the flag createCharacter puts directly on every
-// character (see state.js), same pattern as skipNextTurn/skipHeadacheTurn.
+// plain boolean flag createCharacter puts directly on every character
+// (see state.js), same pattern as skipNextTurn/skipHeadacheTurn.
 export function isChickenified(character) {
-  return !!character && character.chickenMovesRemaining > 0;
+  return !!character && character.isChicken;
 }
 
 // Boingo's Fowl Play - while chickenified, EVERY one of a character's own
@@ -418,6 +420,36 @@ export function tickChronoxLockoutIfAny(character, game, log) {
   chronoxChar.special.lockedActionId = null;
 }
 
+// Boingo's Fowl Play - only fires when the character whose turn is
+// STARTING is Boingo himself (a no-op for everyone else's turns), and
+// only while game.fowlPlayActive is true. Increments
+// fowlPlayBoingoTurnsElapsed once; once it reaches FOWL_PLAY_BOINGO_TURNS
+// (3), the whole window ends - EVERY currently-chickenified character
+// reverts simultaneously (confirmed ruling, 2026-09-03: "wait for boingo
+// three turn atleast then cast will stop and everyone become hero"). The
+// turn during which Fowl Play was CAST doesn't count toward this - that
+// cast happens mid-execute, not at a beginCharacterTurn boundary, so this
+// hook is never reached for the cast turn itself, only for turns that
+// begin AFTER it.
+function tickFowlPlayIfBoingoTurn(character, game, log) {
+  if (character.id !== 'boingo' || !game.fowlPlayActive) return;
+  game.fowlPlayBoingoTurnsElapsed += 1;
+  if (game.fowlPlayBoingoTurnsElapsed >= FOWL_PLAY_BOINGO_TURNS) {
+    game.fowlPlayActive = false;
+    game.fowlPlayBoingoTurnsElapsed = 0;
+    const revertedIds = [];
+    for (const c of Object.values(game.characters)) {
+      if (c.isChicken) {
+        c.isChicken = false;
+        revertedIds.push(c.id);
+      }
+    }
+    if (revertedIds.length > 0) {
+      log.push({ type: 'fowl-play-revert', characterIds: revertedIds, hearts: heartsSnapshot(game) });
+    }
+  }
+}
+
 export function beginCharacterTurn(character, game, log) {
   // Decay due shields before anything else this turn (poison ticks
   // included) - see decayAllDueShields's own comment for why this must run
@@ -426,6 +458,7 @@ export function beginCharacterTurn(character, game, log) {
   tickPoisonIfAny(character, game, log);
   tickSilenceIfAny(character, game, log);
   resolveHeadacheIfDue(character, game, log);
+  tickFowlPlayIfBoingoTurn(character, game, log);
   const mod = ABILITY_MODULES[character.id];
   if (mod?.onTurnStart) mod.onTurnStart(character, game, log);
   // Poison's tick above deals REAL damage outside the normal executeAction/
@@ -852,30 +885,8 @@ export function finalizeAction(game, log, result, characterId, actionId, targetI
   // land it BEFORE that attack's own line instead of after.
   if (result?.mirrorReflectLogEntry) log.push(result.mirrorReflectLogEntry);
   if (result?.mirrorReflectResult?.rebirthLogEntry) log.push(result.mirrorReflectResult.rebirthLogEntry);
-  tickFowlPlayChickens(game, log);
   applyEndOfActionChecks(game);
   game.log.push(...log, { type: 'end-action', round: game.round, characterId, actionId, targetId, hearts: heartsSnapshot(game) });
-}
-
-// Boingo's Fowl Play - decrements EVERY currently-chickenified character's
-// own chickenMovesRemaining by exactly 1, once per resolved action
-// ANYWHERE in the match (confirmed ruling: "3 individual moves", counted
-// globally - not 3 of the chicken's own turns, not 3 full rounds). Called
-// from finalizeAction, the one hook that genuinely fires once per action
-// regardless of whose turn it is. A character reverting mid-loop (hitting
-// 0) doesn't affect this same pass's other characters - each is
-// independent. Reverting is silent state-wise (nothing reset, nothing
-// re-rolled - see state.js's own comment on chickenMovesRemaining); the
-// character's real kit simply becomes reachable again the next time
-// getLegalActions is called for them, exactly where it left off.
-function tickFowlPlayChickens(game, log) {
-  for (const character of Object.values(game.characters)) {
-    if (character.chickenMovesRemaining <= 0) continue;
-    character.chickenMovesRemaining -= 1;
-    if (character.chickenMovesRemaining === 0) {
-      log.push({ type: 'fowl-play-revert', characterId: character.id, hearts: heartsSnapshot(game) });
-    }
-  }
 }
 
 // Executes a puppeted action on behalf of Melyssa's Mind Control - calls

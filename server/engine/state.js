@@ -91,9 +91,9 @@ function baseSpecialFor(id) {
       // usedFowlPlay: his desperation special (hearts <= 3, confirmed
       // ruling), own dedicated one-time flag separate from usedSpecial
       // (already spoken for by Jester Ball) - same multi-special pattern
-      // as Chronox's usedWorldStops/Grimtal's usedGrimBarrage. The actual
-      // battlefield effect (which characters are currently chickenified)
-      // lives per-character on each victim's own state (chickenMovesRemaining),
+      // as Chronox's usedWorldStops/Grimtal's usedGrimBarrage. Who's
+      // currently chickenified lives per-character on each victim's own
+      // `isChicken` flag, and the shared countdown lives on `game`,
       // not here - see createCharacter's own comment and createGame's
       // fowlPlayHitsOnBoingo counter.
       return { jesterBallsUsed: 0, usedFowlPlay: false };
@@ -350,17 +350,16 @@ export function createCharacter(defId, ownerId) {
     usedSpecial: false,
     untargetable: false,
     special: baseSpecialFor(defId),
-    // Boingo's Fowl Play - 0 means not chickenified. Set to 3 on every
-    // OTHER living character the instant Fowl Play is cast (Boingo himself
-    // is never touched), decremented by exactly 1 in turnEngine.js's
-    // finalizeAction on EVERY resolved action in the whole match (not just
-    // this character's own turns, not once per round) - confirmed ruling:
-    // "3 individual moves," counted globally across all players. Reverts
-    // to normal the instant this hits 0. Lives directly on the character
-    // (not nested in `special`) for the same reason skipNextTurn/
-    // skipHeadacheTurn do - a plain, universally-applicable flag rather
-    // than a per-hero-shaped state blob.
-    chickenMovesRemaining: 0,
+    // Boingo's Fowl Play - true means currently chickenified. Set true on
+    // every OTHER living character the instant Fowl Play is cast (Boingo
+    // himself is never touched), cleared back to false on EVERY living
+    // character simultaneously once game.fowlPlayActive itself ends (see
+    // createGame's own comment - the real countdown lives there, not per-
+    // character, since everyone reverts together at the same moment).
+    // Lives directly on the character (not nested in `special`) for the
+    // same reason skipNextTurn/skipHeadacheTurn do - a plain, universally-
+    // applicable flag rather than a per-hero-shaped state blob.
+    isChicken: false,
   };
 }
 
@@ -408,6 +407,19 @@ export function createGame(mode, playerPicks) {
     // every chicken has reverted (nothing left that can even target
     // Boingo under the chicken-only-targets-chicken-or-Boingo rule).
     fowlPlayHitsOnBoingo: 0,
+    // Boingo's Fowl Play - true for the whole chicken window, cleared the
+    // instant it ends. Duration is measured in BOINGO'S OWN turns, not raw
+    // global move-count (confirmed ruling, 2026-09-03 - fixed a real gap
+    // where a flat move-count closed the window right before Boingo's own
+    // next turn in a 4-player match, so he never actually got a chance to
+    // attack a chicken himself): fowlPlayBoingoTurnsElapsed increments
+    // once each time Boingo's own turn BEGINS while this is active (see
+    // turnEngine.js's beginCharacterTurn), and the window ends - EVERY
+    // currently-chickenified character reverts simultaneously - once it
+    // reaches FOWL_PLAY_BOINGO_TURNS (his cast turn itself doesn't count
+    // as one of these, only turns that begin AFTER the cast).
+    fowlPlayActive: false,
+    fowlPlayBoingoTurnsElapsed: 0,
     winnerPlayerId: null,
     log: [],
   };

@@ -215,7 +215,7 @@ export function renderBattle(root, state) {
       isFrozenVisual: frozenIdsSet.has(character.id),
       isPuppet: character.id === puppetHighlightId || character.id === activePuppetId,
       isHypnotized: character.id === activePuppetId,
-      chickenMovesRemaining: character.chickenMovesRemaining || 0,
+      isChicken: !!character.isChicken,
     }));
   });
   scroll.appendChild(board);
@@ -499,7 +499,7 @@ function computeFrozenIdsSet(game) {
   return ids;
 }
 
-function renderCharacterTile(character, { isActing, isMine, isTargetable, onTargetClick, isHoldingBall, isCursed, isFrozenVisual, isVictorious, isPuppet, isHypnotized, grudgeCount, isPoisoned, silencedTurns, isDazed, mirageMarkCount, chickenMovesRemaining }) {
+function renderCharacterTile(character, { isActing, isMine, isTargetable, onTargetClick, isHoldingBall, isCursed, isFrozenVisual, isVictorious, isPuppet, isHypnotized, grudgeCount, isPoisoned, silencedTurns, isDazed, mirageMarkCount, isChicken }) {
   const def = CHARACTERS[character.id];
   const tile = document.createElement('div');
   tile.className = 'char-tile';
@@ -1013,16 +1013,17 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
     tile.appendChild(mirage);
   }
 
-  if (chickenMovesRemaining > 0 && !character.isKO) {
-    // Boingo's Fowl Play - a per-character badge (unlike Massive Fart's
-    // old battlefield-wide one) showing how many of the 3 total chicken
-    // moves this specific character has left. Top-center is the free
-    // badge slot (every corner already used, bottom-center taken by
-    // Illyra's mirage badge).
+  if (isChicken && !character.isKO) {
+    // Boingo's Fowl Play - every currently-chickenified character shares
+    // the SAME revert moment (once Boingo completes his own 3rd turn
+    // since casting - see turnEngine.js's tickFowlPlayIfBoingoTurn), so
+    // this is a plain on/off badge rather than a per-character countdown.
+    // Top-center is the free badge slot (every corner already used,
+    // bottom-center taken by Illyra's mirage badge).
     const chicken = document.createElement('div');
     chicken.className = 'chicken-badge';
-    chicken.textContent = `🐔${chickenMovesRemaining}`;
-    chicken.title = `Chickenified by Boingo's Fowl Play - only Chicken Attack is available for ${chickenMovesRemaining} more move${chickenMovesRemaining > 1 ? 's' : ''} (counted across everyone's moves, not just yours)`;
+    chicken.textContent = '🐔';
+    chicken.title = "Chickenified by Boingo's Fowl Play - only Chicken Attack is available until Boingo has had 3 more of his own turns";
     tile.appendChild(chicken);
   }
 
@@ -1070,17 +1071,20 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
   } else if (persistentSrc) {
     // Already wrapped with v() at its source in portraitFlash.js.
     portrait.src = persistentSrc;
-  } else if (character.isKO && character.chickenMovesRemaining > 0) {
+  } else if (character.isKO && character.isChicken) {
     // Boingo's Fowl Play - a chicken that gets KO'd shows the fried-
     // chicken gag art instead of that character's own normal koed.jpg.
     // Checked ahead of the plain isKO branch below since this is more
-    // specific. chickenMovesRemaining staying > 0 through a KO is
-    // intentional (see turnEngine.js's tickFowlPlayChickens - death
-    // doesn't clear it, there's simply no more decrementing once KO'd).
+    // specific. isChicken staying true through a KO is intentional -
+    // death doesn't clear it, only Boingo completing his own 3rd turn
+    // since the cast does (see turnEngine.js's tickFowlPlayIfBoingoTurn),
+    // so a chicken who dies mid-window keeps showing the roast art for
+    // the rest of that window even though the match may already be over
+    // for them.
     portrait.src = v('assets/images/boingo/chicken_roast.jpg');
   } else if (character.isKO) {
     portrait.src = v(`assets/koed/${character.id}.jpg`);
-  } else if (character.chickenMovesRemaining > 0) {
+  } else if (character.isChicken) {
     // Boingo's Fowl Play - shared generic chicken art overrides this
     // character's own idle/injured portrait for as long as they're
     // chickenified, same "everything hidden" reasoning that also hides
