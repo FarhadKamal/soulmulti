@@ -1,4 +1,4 @@
-import { applyDamage, applyHeal, applyShield } from '../engine/damagePipeline.js';
+import { applyDamage, applyHeal, applyShield, tryTriggerCleanSlate } from '../engine/damagePipeline.js';
 import { rollChaosGamble } from '../engine/random.js';
 import { registerOnOwnDeath } from '../engine/categories/onOwnDeath.js';
 
@@ -139,7 +139,18 @@ export const actions = {
       character.special.usedFowlPlay = true;
       game.fowlPlayActive = true;
       game.fowlPlayBoingoTurnsElapsed = 0;
-      const victims = Object.values(game.characters).filter((c) => c.id !== character.id && !c.isKO);
+      const candidates = Object.values(game.characters).filter((c) => c.id !== character.id && !c.isKO);
+      // Marin's Clean Slate - confirmed ruling: "only marin clean slate
+      // can protect her from chicken status" - the one exception in the
+      // whole roster. Checked per-candidate the same way every other
+      // status-inflicting ability already opts into tryTriggerCleanSlate
+      // (Hidden Mark, Curse Strike, Time Freeze, Skull Crack, Silence
+      // Lock) - blocks and consumes an armed Clean Slate (or is itself
+      // blocked for the rest of her post-trigger immunity window),
+      // pushing its own 'clean-slate-trigger' log entry. A blocked Marin
+      // is excluded from the chicken pool entirely - never chickenified
+      // at all this cast, not chickenified-then-immediately-reverted.
+      const victims = candidates.filter((c) => !tryTriggerCleanSlate(c, game, log));
       for (const victim of victims) {
         victim.isChicken = true;
       }
