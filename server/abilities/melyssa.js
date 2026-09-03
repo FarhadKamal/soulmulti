@@ -23,6 +23,16 @@ import { registerOnHitLanded } from '../engine/categories/onHitLanded.js';
 // about isKO now checks it itself.
 registerOnHitLanded('melyssa', (character, game, log, ctx) => {
   if (character.isKO) return;
+  // Boingo's Fowl Play - confirmed ruling: "NO SHIELD... during chicken
+  // status" extends to shield GENERATION too, not just shield blocking
+  // damage - a chickenified Melyssa must not gain any reactive shield at
+  // all (confirmed bug, 2026-09-04, live report: a match log showed
+  // "Melyssa:2+1sh" while she was still a chicken). applyDamage's own
+  // target.isChicken bypass already makes any shield she'd have pointless
+  // against a FUTURE chicken attack, but this passive fires unconditionally
+  // regardless of what hit her, so it needs its own explicit guard rather
+  // than relying on that downstream bypass alone.
+  if (character.isChicken) return;
   // Rowan's Silence Lock suppresses every shield source while active -
   // including this reactive one, so a silenced Melyssa gets 0 here instead
   // of the normal leaked-damage amount.

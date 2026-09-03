@@ -19,6 +19,14 @@ import { makeDiscoveryKit } from '../engine/categories/discoveryKit.js';
 registerOnHitLandedEarly('rowan', (character, game, log, ctx) => {
   if (!character.special.mirrorReflectActive) return;
   if (ctx.isMirror || ctx.amountDealt <= 0 || character.hearts <= 0 || ctx.sourceCharacterId === character.id) return;
+  // Boingo's Fowl Play - confirmed ruling: "no defense of any kind"
+  // extends to Counter Attack too, even though it's a retaliation rather
+  // than something that PREVENTS him taking damage - a chickenified Rowan
+  // who still has Mirror Reflect armed from before the transformation
+  // (in-progress state is preserved, not reset - see turnEngine.js) must
+  // not have it fire while he's a chicken. It stays armed and available
+  // again once he reverts, rather than being consumed/wasted here.
+  if (character.isChicken) return;
   character.special.mirrorReflectActive = false;
   const mirrorReflectResult = applyDamage(game, log, {
     sourceCharacterId: character.id,

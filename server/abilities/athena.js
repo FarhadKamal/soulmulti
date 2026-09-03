@@ -44,6 +44,13 @@ registerOnOwnDeath('athena', (character) => {
 // the caller's own push.
 registerOnHitLanded('athena', (character, game, log, ctx) => {
   if (ctx.isMirror || ctx.amountDealt <= 0) return;
+  // Boingo's Fowl Play - confirmed ruling: "no defense of any kind" -
+  // Counter Attack (curse-mirror included) is suppressed the same way
+  // Rowan's Mirror Reflect is while chickenified, same reasoning (a
+  // chickenified Athena still taking a hit shouldn't retaliate via her
+  // curse either - her curseTargetCharacterId stays intact, untouched,
+  // ready to fire normally again once she reverts).
+  if (character.isChicken) return;
   const cursedId = character.special.curseTargetCharacterId ?? ctx.preClearCursedId;
   if (!cursedId || !game.characters[cursedId] || game.characters[cursedId].isKO) return;
   const mirrorResult = applyDamage(game, log, {
