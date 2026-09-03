@@ -317,6 +317,13 @@ function tickPoisonIfAny(character, game, log) {
   if (result.rebirthLogEntry) log.push({ ...result.rebirthLogEntry, hearts: heartsSnapshot(game) });
   if (result.mirrorLogEntry) log.push({ ...result.mirrorLogEntry, hearts: heartsSnapshot(game) });
   if (result.mirrorResult?.rebirthLogEntry) log.push({ ...result.mirrorResult.rebirthLogEntry, hearts: heartsSnapshot(game) });
+  // Boingo's Fowl Play - same deferred handling: a poison tick that kills
+  // him needs to push this AFTER its own 'poison-tick' line above,
+  // otherwise the revert announcement lands before the very hit that
+  // caused it (confirmed bug, 2026-09-03: "Tharox, Rowan turn back into
+  // heroes!" appeared BEFORE "Boingo takes 1 poison damage - KO!" in a
+  // real match log).
+  if (result.fowlPlayRevertLogEntry) log.push({ ...result.fowlPlayRevertLogEntry, hearts: heartsSnapshot(game) });
 }
 
 // Rowan's Silence Lock, same victim-turn-tick shape as poison above.
@@ -885,6 +892,12 @@ export function finalizeAction(game, log, result, characterId, actionId, targetI
   // land it BEFORE that attack's own line instead of after.
   if (result?.mirrorReflectLogEntry) log.push(result.mirrorReflectLogEntry);
   if (result?.mirrorReflectResult?.rebirthLogEntry) log.push(result.mirrorReflectResult.rebirthLogEntry);
+  // Boingo's Fowl Play - deferred the same way as rebirthLogEntry above
+  // (see boingo.js's own registerOnOwnDeath comment for why this can't be
+  // pushed directly inside the callback). No hearts snapshot stamped here,
+  // same reasoning as every other entry in this block - the very next line
+  // (end-action) already carries the correct final one.
+  if (result?.fowlPlayRevertLogEntry) log.push(result.fowlPlayRevertLogEntry);
   applyEndOfActionChecks(game);
   game.log.push(...log, { type: 'end-action', round: game.round, characterId, actionId, targetId, hearts: heartsSnapshot(game) });
 }

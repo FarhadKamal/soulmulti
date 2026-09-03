@@ -1,4 +1,4 @@
-import { applyDamage, applyHeal, applyShield, heartsSnapshot } from '../engine/damagePipeline.js';
+import { applyDamage, applyHeal, applyShield } from '../engine/damagePipeline.js';
 import { rollChaosGamble } from '../engine/random.js';
 import { registerOnOwnDeath } from '../engine/categories/onOwnDeath.js';
 
@@ -16,8 +16,22 @@ import { registerOnOwnDeath } from '../engine/categories/onOwnDeath.js';
 // bug/fix as Chronox's own onOwnDeath callback ending Time Freeze/World
 // Stops immediately if HE dies mid-effect - confirmed ruling: "if boingo
 // died cast immediatly over."
-registerOnOwnDeath('boingo', (character, game, log) => {
-  if (!game.fowlPlayActive) return;
+//
+// Returns { fowlPlayRevertLogEntry } rather than pushing to `log` directly
+// - this callback runs MID-WAY through applyDamage, before the triggering
+// hit's own descriptive log line (e.g. a poison tick's own "takes 1
+// poison damage - KO!"), so a direct push here would land the revert
+// announcement BEFORE the line that actually caused it, backwards from
+// a reader's expectation (confirmed bug, 2026-09-03). damagePipeline.js
+// pulls this field out specially (NOT merged into the generic
+// hitLandedCtxExtra bag, unlike Athena's own onOwnDeath return value) and
+// defers it onto result.fowlPlayRevertLogEntry, same "defer it, don't
+// push here" pattern as Rebirth's own result.rebirthLogEntry - the actual
+// caller (finalizeAction/tickPoisonIfAny in turnEngine.js) pushes it
+// AFTER their own line, stamping a fresh heartsSnapshot at that later
+// point.
+registerOnOwnDeath('boingo', (character, game) => {
+  if (!game.fowlPlayActive) return undefined;
   game.fowlPlayActive = false;
   game.fowlPlayBoingoTurnsElapsed = 0;
   const revertedIds = [];
@@ -27,9 +41,8 @@ registerOnOwnDeath('boingo', (character, game, log) => {
       revertedIds.push(c.id);
     }
   }
-  if (revertedIds.length > 0) {
-    log.push({ type: 'fowl-play-revert', characterIds: revertedIds, hearts: heartsSnapshot(game) });
-  }
+  if (revertedIds.length === 0) return undefined;
+  return { fowlPlayRevertLogEntry: { type: 'fowl-play-revert', characterIds: revertedIds } };
 });
 
 export const actions = {

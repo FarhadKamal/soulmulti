@@ -353,7 +353,23 @@ export function applyDamage(game, log, {
     // killing blow itself landed while she was alive and should still
     // mirror, only hits AFTER her death shouldn't.
     const ownDeathExtra = runOnOwnDeath(target, game, log);
-    if (ownDeathExtra) Object.assign(hitLandedCtxExtra, ownDeathExtra);
+    if (ownDeathExtra) {
+      // Boingo's Fowl Play: a deferred log entry, NOT data for the later
+      // onHitLanded dispatch (unlike Athena's own preClearCursedId use of
+      // this same return value) - pulled out separately and NOT merged
+      // into hitLandedCtxExtra, same "defer it, don't push here" reasoning
+      // as rebirthLogEntry just above. Confirmed bug (2026-09-03): pushing
+      // this directly inside the onOwnDeath callback (as it originally
+      // did) landed the "X turn back into heroes!" line BEFORE the
+      // triggering hit's own descriptive line (e.g. a poison tick's own
+      // "takes 1 poison damage - KO!"), since this callback runs mid-way
+      // through applyDamage, before that caller's own log.push(). Deferred
+      // the same way so finalizeAction/tickPoisonIfAny push it AFTER their
+      // own line instead.
+      const { fowlPlayRevertLogEntry, ...rest } = ownDeathExtra;
+      if (fowlPlayRevertLogEntry) result.fowlPlayRevertLogEntry = fowlPlayRevertLogEntry;
+      if (Object.keys(rest).length > 0) Object.assign(hitLandedCtxExtra, rest);
+    }
     // The Jester Ball is orphaned if its current holder dies from a hit
     // that has nothing to do with the ball itself (e.g. a normal attack,
     // not them choosing to Take it) - nothing else in the codebase ever
