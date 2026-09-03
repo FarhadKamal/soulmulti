@@ -83,6 +83,14 @@ function playInjuredVoiceIfNewlyHurt(game) {
     // check has no such gate, so it would otherwise still fire his
     // "injured" voice line under the same hit. Skip it here to match.
     if (character.id === 'draxus' && character.special?.deathproofActive) continue;
+    // Boingo's Fowl Play - same reasoning as the Draxus guard above: a
+    // chickenified character's own hero voice line must never play while
+    // their whole hero identity is hidden behind the generic chicken
+    // portrait/kit. Confirmed live report: "i have heard injured voice of
+    // hero, during chicken status" - this check had no chicken guard at
+    // all, same class of gap as checkIdlePortrait's own missing guard
+    // (fixed separately, see portraitFlash.js).
+    if (character.isChicken) continue;
     const isInjuredNow = character.hearts <= character.maxHearts / 2;
     const wasInjuredBefore = prev <= character.maxHearts / 2;
     if (isInjuredNow && !wasInjuredBefore) playInjuredVoice(character.id);

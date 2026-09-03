@@ -1,5 +1,36 @@
-import { applyDamage, applyHeal, applyShield } from '../engine/damagePipeline.js';
+import { applyDamage, applyHeal, applyShield, heartsSnapshot } from '../engine/damagePipeline.js';
 import { rollChaosGamble } from '../engine/random.js';
+import { registerOnOwnDeath } from '../engine/categories/onOwnDeath.js';
+
+// KO-branch cleanup (see engine/categories/onOwnDeath.js). Fowl Play's
+// countdown only ticks on BOINGO'S OWN turn (turnEngine.js's
+// tickFowlPlayIfBoingoTurn) - but charactersActingThisTurn (turnEngine.js)
+// filters out KO'd characters entirely, so a dead Boingo's turn never
+// comes up again for the rest of the match. Left unhandled, that means
+// game.fowlPlayActive would stay true FOREVER once he dies mid-window,
+// permanently trapping every other survivor as a chicken with no way for
+// the window to ever close - confirmed live report (2026-09-03): a match
+// where Boingo died to a poison tick right after casting, and the
+// remaining 3 players stayed chickenified for the rest of the match,
+// which only ended because they fought each other to KO. Same class of
+// bug/fix as Chronox's own onOwnDeath callback ending Time Freeze/World
+// Stops immediately if HE dies mid-effect - confirmed ruling: "if boingo
+// died cast immediatly over."
+registerOnOwnDeath('boingo', (character, game, log) => {
+  if (!game.fowlPlayActive) return;
+  game.fowlPlayActive = false;
+  game.fowlPlayBoingoTurnsElapsed = 0;
+  const revertedIds = [];
+  for (const c of Object.values(game.characters)) {
+    if (c.isChicken) {
+      c.isChicken = false;
+      revertedIds.push(c.id);
+    }
+  }
+  if (revertedIds.length > 0) {
+    log.push({ type: 'fowl-play-revert', characterIds: revertedIds, hearts: heartsSnapshot(game) });
+  }
+});
 
 export const actions = {
   chaosGamble: {
