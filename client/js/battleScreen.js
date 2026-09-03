@@ -1136,7 +1136,16 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
   }
   tile.appendChild(hearts);
 
-  if (character.shield > 0) {
+  // Boingo's Fowl Play - the shield BADGE is hidden while chickenified
+  // (confirmed ruling: "if hero has shield it will vanish on chiken
+  // status. show again after curse over"), purely a display choice - the
+  // real character.shield value underneath is completely untouched (same
+  // "nothing pending is lost" rule as every other in-progress state, see
+  // executeChickenAttack's own ignoresShield: true, which already makes
+  // shield irrelevant to chicken-vs-chicken damage regardless of whether
+  // the badge shows). Reappears automatically the instant isChicken flips
+  // back to false, since this check just re-reads live state every render.
+  if (character.shield > 0 && !character.isChicken) {
     const shield = document.createElement('div');
     shield.className = 'char-shield';
     const icon = document.createElement('span');
