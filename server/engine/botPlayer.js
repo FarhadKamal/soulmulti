@@ -1570,7 +1570,17 @@ export function chooseBotMelyssaPuppetAction(puppetCharacter, game, melyssaId) {
     }
   }
 
-  const chooser = MOVE_CHOOSERS[puppetCharacter.id] || chooseFallbackMove;
+  // Boingo's Fowl Play - same interception as chooseBotMove's own (line
+  // ~1439 above) for a puppet's real turn, not just a normal one. Without
+  // this, a puppeted chickenified character fell through to its own
+  // hero-specific chooser (e.g. chooseRowanMove), which knows nothing
+  // about `usable` only ever containing chickenAttack and would pick an
+  // action that isn't even legal - recovered by the safety net a few
+  // lines below (falls back to chooseFallbackMove), but that's a random
+  // pick rather than the deliberate "target Boingo opportunistically,
+  // else lowest-hearts fellow chicken" logic chooseChickenMove already
+  // has.
+  const chooser = isChickenified(puppetCharacter) ? chooseChickenMove : (MOVE_CHOOSERS[puppetCharacter.id] || chooseFallbackMove);
   let move = chooser(puppetCharacter, game, usable);
   if (!move) move = chooseFallbackMove(puppetCharacter, game, usable);
   // Same safety net as chooseBotMove's own post-processing above.
