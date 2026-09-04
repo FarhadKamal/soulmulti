@@ -1908,7 +1908,15 @@ function describeLogEntry(entry) {
           // the 'prediction-result' entry below.
           return `${name(entry.characterId)} cast Rune Vision, predicting ${name(entry.predictedAttackerId)} will strike...`;
         }
-        return `${name(entry.characterId)} predicts ${name(entry.predictedAttackerId)} will strike ${name(entry.predictedTargetId)}`;
+        // Stage 2 (the target pick) - confirmed bug fix, 2026-09-04: the
+        // server used to also broadcast predictedTargetId in THIS entry,
+        // which this branch then rendered directly, revealing the full
+        // guess to every player live, well before it resolves. The server
+        // no longer sends predictedTargetId here at all (kept purely
+        // server-side, same as Akyros's Hidden Mark), so this line stays
+        // as vague as stage 1 - the full guess is still only ever revealed
+        // via the 'prediction-result' entry once it actually resolves.
+        return `${name(entry.characterId)} locks in their Rune Vision prediction...`;
       }
       if (entry.actionId === 'rewind') {
         // Jester Ball explosions record no caster (see server's

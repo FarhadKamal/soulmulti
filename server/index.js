@@ -266,6 +266,22 @@ function sanitizeGameForBroadcast(game) {
       // revealedMarks (post-Shadow Execution) are public and stay as-is.
       character.special.marks = [];
     }
+    // Oraclus's Rune Vision - predictedTargetId is his own pending, not-
+    // yet-resolved prediction guess. The visible log-entry leak (every
+    // player seeing "Oraclus predicts X will strike Y" the instant he
+    // cast it) was fixed at the log-push call sites (handleAction's
+    // runeVision branch and stepBotTurn's bot path) by simply not
+    // including this field there anymore - but the raw character state
+    // still carried it on every broadcast regardless, readable directly
+    // from the WebSocket payload even with the log fixed. Stripped here
+    // too, same defense-in-depth reasoning as Akyros's marks above -
+    // predictedAttackerId stays (that pick IS meant to be public,
+    // confirmed ruling: "only the attacker pick is public at this
+    // stage"), only the target guess is withheld until it actually
+    // resolves (resolveOraclusPredictionIfPending's own win/miss entry).
+    if (character.id === 'oraclus' && character.special) {
+      character.special.predictedTargetId = null;
+    }
   }
   // Sets/Maps don't survive JSON.stringify (a Map serializes to {}, silently
   // dropping every entry) - convert what's left to arrays/plain objects.
@@ -784,9 +800,22 @@ function stepBotTurn(room) {
         const predictionTarget = chooseRuneVisionTargetPick(character, room.game, move.targetId);
         if (predictionTarget) {
           character.special.predictedTargetId = predictionTarget;
+          // Confirmed bug fix, 2026-09-04: predictedTargetId used to be
+          // broadcast in this same entry, which describeLogEntry
+          // (battleScreen.js) then rendered directly into the LIVE log
+          // panel as "Oraclus predicts X will strike Y" - revealing the
+          // full guess to every player the instant he finished casting,
+          // well before it resolves. The client's own code comment already
+          // stated the intent ("the full guess is only revealed once it
+          // resolves via the 'prediction-result' entry"), but the server
+          // was never actually withholding it. predictedTargetId now stays
+          // purely server-side (character.special) until
+          // resolveOraclusPredictionIfPending's own win/miss entry reveals
+          // it for real - same "kept fully server-side until revealed"
+          // pattern Akyros's Hidden Mark already uses for its own targetId.
           room.game.log.push({
             type: 'special', characterId: 'oraclus', actionId: 'runeVision',
-            predictedAttackerId: move.targetId, predictedTargetId: predictionTarget, stage: 2,
+            predictedAttackerId: move.targetId, stage: 2,
             hearts: heartsSnapshot(room.game),
           });
         }
@@ -1682,9 +1711,14 @@ function handleRuneVisionTargetPick(room, sessionId, { characterId, targetId }) 
   if (!oraclusChar || oraclusChar.id !== 'oraclus' || !oraclusChar.special.predictedAttackerId) return;
   if (!isValidRuneVisionTargetPick(room.game, oraclusChar.special.predictedAttackerId, targetId)) return;
   oraclusChar.special.predictedTargetId = targetId;
+  // Confirmed bug fix, 2026-09-04 - see the identical fix/comment in
+  // stepBotTurn's own runeVision branch (this file) for the full
+  // reasoning: predictedTargetId must stay server-side only until the
+  // prediction actually resolves, not be broadcast in this cast-time
+  // entry where the client would render it straight into the live log.
   room.game.log.push({
     type: 'special', characterId: 'oraclus', actionId: 'runeVision',
-    predictedAttackerId: oraclusChar.special.predictedAttackerId, predictedTargetId: targetId, stage: 2,
+    predictedAttackerId: oraclusChar.special.predictedAttackerId, stage: 2,
     hearts: heartsSnapshot(room.game),
   });
   markCharacterActed(room.game, characterId);
