@@ -287,6 +287,24 @@ export function applyDamage(game, log, {
     ignoresRebirth = true;
   }
 
+  // Melyssa's Full Control (hearts<=3 special) - confirmed ruling: every
+  // puppet's forced attack during the burst is "pure damage" with no
+  // defense of any kind, exactly like Fowl Play's chicken-status rule
+  // above, EXCEPT this bypass has to apply regardless of WHICH character is
+  // the target (every puppet hits a different puppet each burst, not a
+  // fixed status on one particular character) - so it's gated on a
+  // game-level flag set for the duration of the burst
+  // (game.fullControlActive, see melyssa.js's fullControl.execute), not a
+  // per-target property the way isChicken is. Set/cleared entirely within
+  // one synchronous execute() call, never visible to any other code path.
+  if (game.fullControlActive) {
+    ignoresUntargetable = true;
+    ignoresDodge = true;
+    ignoresShield = true;
+    ignoresImmortal = true;
+    ignoresRebirth = true;
+  }
+
   // Untargetable is enforced primarily at the targeting UI layer; this is a
   // defensive re-check so a bug upstream can't sneak damage through.
   if (target.untargetable && !ignoresUntargetable) {

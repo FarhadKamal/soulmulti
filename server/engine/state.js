@@ -111,7 +111,13 @@ function baseSpecialFor(id) {
       // hypnotic-ripple tile effect client-side for that same window. Both
       // cleared by finishMelyssaTurn (server/index.js) at the exact 3
       // points a Mind Control turn is truly over.
-      return { controlling: false, puppetCharacterId: null };
+      // usedFullControl: one-time gate for her hearts<=3 special, Full
+      // Control (melyssa.js) - a SEPARATE flag from usedSpecial, since
+      // Mind Control itself is already marked special:true but is
+      // unlimited-use (same reasoning as Boingo's usedFowlPlay/
+      // jesterBallsUsed both needing their own dedicated flags rather than
+      // sharing one usedSpecial boolean).
+      return { controlling: false, puppetCharacterId: null, usedFullControl: false };
     case 'kaelis':
       // grudgeCounts: per-attacker hit counter (Map<characterId, number>),
       // incremented in damagePipeline.js's applyDamage every time that
@@ -420,6 +426,15 @@ export function createGame(mode, playerPicks) {
     // as one of these, only turns that begin AFTER the cast).
     fowlPlayActive: false,
     fowlPlayBoingoTurnsElapsed: 0,
+    // Melyssa's Full Control (hearts<=3 special) - true only for the
+    // duration of fullControl.execute()'s own synchronous burst resolution
+    // (melyssa.js), false the rest of the match. Unlike fowlPlayActive,
+    // this never persists across a broadcast/turn boundary - set true,
+    // every puppet attack in the burst resolves, set back false, all
+    // within one execute() call - so it never needs its own countdown or
+    // client-visible state. See damagePipeline.js's applyDamage, which
+    // checks it to bypass every defense the same way target.isChicken does.
+    fullControlActive: false,
     winnerPlayerId: null,
     log: [],
   };

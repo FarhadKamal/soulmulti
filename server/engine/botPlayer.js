@@ -822,6 +822,15 @@ function zerathysSoulSwapRescueTarget(game, melyssaCharacter, candidateIds) {
 }
 
 function chooseMelyssaMove(character, game, usable) {
+  // Full Control: a desperation move, only legal once hearts <= 3. No
+  // target, no real downside to casting it the instant it's available -
+  // same "cast eagerly once legal" policy as every other one-time
+  // desperation special in the roster (Fowl Play, World Stops, Earthshatter,
+  // Grim Barrage). Checked ahead of the normal Mind Control puppet-picking
+  // logic below since it's free value with zero opportunity cost.
+  if (usable.some((a) => a.actionId === 'fullControl')) {
+    return { actionId: 'fullControl', targetId: null };
+  }
   const candidates = Object.keys(game.characters).filter((tid) => isValidMindControlTarget(game, tid));
   if (candidates.length === 0) return null; // defensive; shouldn't happen if usable is nonempty
   const rescueId = zerathysSoulSwapRescueTarget(game, character, candidates);

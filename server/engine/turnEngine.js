@@ -1,5 +1,5 @@
 import { cloneGame } from './state.js';
-import { applyDamage, applyHeal, applyShield, isSilenced, isFrozenByChronox, heartsSnapshot, decayAllDueShields } from './damagePipeline.js';
+import { applyDamage, applyHeal, applyShield, isSilenced, isFrozenByChronox, heartsSnapshot, decayAllDueShields, tryTriggerCleanSlate } from './damagePipeline.js';
 import * as chronox from '../abilities/chronox.js';
 import * as tharox from '../abilities/tharox.js';
 import * as zerathys from '../abilities/zerathys.js';
@@ -865,6 +865,118 @@ function executeChickenAttack(character, targetId, game, log) {
   return result;
 }
 
+// Melyssa's Full Control (hearts<=3 special) - for each hero, the ONE
+// action id treated as "their normal attack" for this burst. Deliberately
+// NOT "the first non-special action in their file" - two heroes break that
+// assumption: Zerathys's first action is Charge Up (a no-target Neutral
+// setup move, never a real attack - his actual damage action is Thunder
+// Wrath), and Tharox's Smash can be ILLEGAL while he's mid-Titan-Toss-
+// charge (hasCharge:true), so he needs a function here rather than a fixed
+// id, picking whichever of Smash/Titan Smash is currently legal (confirmed
+// ruling: a charging Tharox uses Titan Smash for this burst instead of
+// being skipped). Two heroes' own normal action deals ZERO direct damage
+// (Illyra's Mirage Mark only plants a stack; explicitly still used here,
+// confirmed ruling - she just does 0 damage this burst) - Athena's own
+// Curse Strike has the same shape, but Divine Sacrifice (also a normal,
+// non-special action, just her SECOND one) deals real damage and was
+// explicitly chosen instead (confirmed ruling) despite its own random
+// self-cost side effect still applying normally. Every other hero has
+// exactly one unambiguous normal attack action.
+const FULL_CONTROL_ACTION_ID = {
+  chronox: 'cyclonePunch',
+  tharox: (character) => (character.special.hasCharge ? 'titanSmash' : 'smash'),
+  zerathys: 'thunderWrath',
+  akyros: 'fatalSlash',
+  velorya: 'lunarStrike',
+  boingo: 'chaosGamble',
+  blade: 'bloodHunt',
+  athena: 'divineSacrifice',
+  kaelis: 'grudgeStrike',
+  draxus: 'dyingBlow',
+  rowan: 'wandStrike',
+  marin: 'wandStrike',
+  grimtal: 'grimStrike',
+  illyra: 'mirageMark',
+  oraclus: 'runeStrike',
+};
+
+// Fisher-Yates, in place.
+function shuffleInPlace(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+// Random DERANGEMENT of ids: every id is assigned exactly one OTHER id as
+// its target, every id is targeted by exactly one other id, nobody targets
+// themselves (confirmed ruling: a "clean 1-to-1 cycle", not independent
+// random picks that could pile up on one puppet and leave another
+// untargeted). A shuffled array offset by 1 (each index attacks the next
+// index, wrapping around) always satisfies this for any array of length
+// >= 2 - simpler than repeatedly rerolling a naive random assignment until
+// it happens to avoid self-targeting and collisions.
+function randomDerangement(ids) {
+  const shuffled = shuffleInPlace([...ids]);
+  const targetFor = {};
+  for (let i = 0; i < shuffled.length; i++) {
+    targetFor[shuffled[i]] = shuffled[(i + 1) % shuffled.length];
+  }
+  return targetFor;
+}
+
+// Melyssa's Full Control (hearts<=3 special, see melyssa.js's fullControl
+// action, which just sets up and calls this) - every other living
+// character (minus a Clean-Slate-protected Marin, same exception Fowl Play
+// has) becomes a puppet simultaneously, randomly deranged into pairs (see
+// randomDerangement above), and each fires their own real normal-tier
+// attack (FULL_CONTROL_ACTION_ID above) at their assigned target - full
+// pure damage, no defense of any kind (game.fullControlActive, checked in
+// damagePipeline.js's applyDamage). Resolved in a random order; a puppet
+// already KO'd by an earlier hit in this same burst by the time their own
+// turn in the sequence comes up simply does not attack (confirmed ruling -
+// same "a dead character never acts" rule as everywhere else in the game,
+// even though every target was assigned before the burst began).
+export function resolveFullControl(game, log, casterCharacterId) {
+  const candidates = Object.values(game.characters).filter((c) => c.id !== casterCharacterId && !c.isKO);
+  const puppets = candidates.filter((c) => !tryTriggerCleanSlate(c, game, log));
+  if (puppets.length < 2) {
+    // Nobody left to pair up (0 or 1 other living, non-protected
+    // character) - the whole burst is a no-op beyond the cast itself.
+    return { puppetIds: puppets.map((p) => p.id), attackerIds: [] };
+  }
+  const puppetIds = puppets.map((p) => p.id);
+  const targetFor = randomDerangement(puppetIds);
+  const attackOrder = shuffleInPlace([...puppetIds]);
+  const attackerIds = [];
+  game.fullControlActive = true;
+  try {
+    for (const attackerId of attackOrder) {
+      const attacker = game.characters[attackerId];
+      if (!attacker || attacker.isKO) continue; // KO'd by an earlier hit this same burst
+      const targetId = targetFor[attackerId];
+      const target = game.characters[targetId];
+      if (!target || target.isKO) continue; // target already KO'd this burst - nothing to hit
+      const mod = ABILITY_MODULES[attackerId];
+      const actionIdOrFn = FULL_CONTROL_ACTION_ID[attackerId];
+      const actionId = typeof actionIdOrFn === 'function' ? actionIdOrFn(attacker) : actionIdOrFn;
+      const actionDef = mod?.actions?.[actionId];
+      if (!actionDef) continue; // defensive - should never happen, every hero has an entry above
+      const result = actionDef.execute(attacker, targetId, game, log);
+      attackerIds.push(attackerId);
+      if (result?.rebirthLogEntry) log.push(result.rebirthLogEntry);
+      if (result?.mirrorLogEntry) log.push(result.mirrorLogEntry);
+      if (result?.mirrorResult?.rebirthLogEntry) log.push(result.mirrorResult.rebirthLogEntry);
+      if (result?.mirrorReflectLogEntry) log.push(result.mirrorReflectLogEntry);
+      if (result?.mirrorReflectResult?.rebirthLogEntry) log.push(result.mirrorReflectResult.rebirthLogEntry);
+    }
+  } finally {
+    game.fullControlActive = false;
+  }
+  return { puppetIds, attackerIds };
+}
+
 export function executeAction(game, characterId, actionId, targetId, extra) {
   const effectiveTargetId = (mirageBurstTargetsChronox(game, characterId, actionId) || earthshatterMayTargetChronox(game, characterId, actionId))
     ? 'chronox' : targetId;
@@ -874,6 +986,21 @@ export function executeAction(game, characterId, actionId, targetId, extra) {
   let result;
   if (actionId === 'chickenAttack') {
     result = executeChickenAttack(character, targetId, game, log);
+  } else if (actionId === 'fullControl') {
+    // Melyssa's Full Control - melyssa.js's own actions.fullControl.execute
+    // only does the cast-time bookkeeping (usedFullControl flag, log
+    // entry); the actual multi-hero puppet-derangement burst has to live
+    // here rather than in melyssa.js itself, same "mechanism lives in the
+    // engine, the trigger/gate lives in the ability file" split Fowl Play
+    // already uses for executeChickenAttack/tickFowlPlayIfBoingoTurn -
+    // melyssa.js cannot import ABILITY_MODULES or call another hero's own
+    // actions.execute() without a circular import (ability files import
+    // FROM the engine, never the reverse).
+    const mod = ABILITY_MODULES[characterId];
+    const actionDef = mod.actions[actionId];
+    result = actionDef.execute(character, targetId, game, log, extra);
+    const burstResult = resolveFullControl(game, log, characterId);
+    result = { ...result, ...burstResult };
   } else {
     const mod = ABILITY_MODULES[characterId];
     const actionDef = mod.actions[actionId];
@@ -954,7 +1081,11 @@ export function executeActionAsPuppet(game, melyssaCharacterId, puppetCharacterI
   // 'mind-control-resist' entry is pushed instead of ever calling
   // executeAction, so the puppet's own ability never actually runs (no
   // partial effects, no side effects at all from the attempted action).
-  if (Math.random() < 0.5) {
+  // Melyssa's Full Control passive (hearts<=3, melyssa.js's
+  // hasGuaranteedMindControl) removes this roll entirely once she's this
+  // low - every puppeted action succeeds automatically from then on.
+  const melyssaChar = game.characters[melyssaCharacterId];
+  if (!melyssa.hasGuaranteedMindControl(melyssaChar) && Math.random() < 0.5) {
     // controllingMelyssaId stamped directly on the entry (not post-hoc via
     // array indexing) for consistency with how a successful puppeted
     // action gets it below - client-side flash logic keys on this field.

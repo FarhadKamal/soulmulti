@@ -426,6 +426,8 @@ export function handleLogEntryForFlash(entry, game) {
   if (isKO(characterId)) return;
 
   switch (actionId) {
+    case 'fullControl':
+      setFlash(characterId, 'assets/images/melyssa/full_control.jpg'); break;
     case 'divineRestore':
       setFlash(characterId, 'assets/images/athena/heal.jpg'); break;
     case 'divineSacrifice':

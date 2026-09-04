@@ -183,7 +183,7 @@ const ACTION_VOICE_LINES = {
   // 'mind-control-resist' log-entry handler, not through the normal
   // actionId-keyed lookup every other entry here uses (the failed action
   // could be ANY actionId the puppet was attempting, not a fixed one).
-  melyssa: { mindControl: 'mind_control', selfChoke: 'self_choke', resist: 'useless' },
+  melyssa: { mindControl: 'mind_control', selfChoke: 'self_choke', resist: 'useless', fullControl: 'all_puppets' },
   // grudgeStrike is a normal type: 'attack' entry - flows through the
   // generic bottom-of-switch playMoveVoice call automatically. callAshka's
   // "thank you, Ashka" line fires once, on the CAST itself (a normal

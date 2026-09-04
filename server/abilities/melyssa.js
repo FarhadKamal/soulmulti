@@ -1,6 +1,21 @@
 import { isSilenced } from '../engine/damagePipeline.js';
 import { registerOnHitLanded } from '../engine/categories/onHitLanded.js';
 
+// Full Control's hearts<=3 gate (also drives the guaranteed-Mind-Control
+// passive below - both use this same threshold, confirmed ruling: "when
+// her health will be <=3").
+const FULL_CONTROL_HEARTS_THRESHOLD = 3;
+
+// Passive (no button, always-on once hearts<=3): Mind Control's normal 50%
+// resist chance (turnEngine.js's executeActionAsPuppet) is removed
+// entirely - every puppeted action succeeds. Exported so
+// executeActionAsPuppet can check it without a circular import (melyssa.js
+// already sits below turnEngine.js in the dependency direction - ability
+// files import FROM the engine, never the reverse).
+export function hasGuaranteedMindControl(character) {
+  return !!character && character.hearts <= FULL_CONTROL_HEARTS_THRESHOLD;
+}
+
 // Reactive shield (see engine/categories/onHitLanded.js): whenever damage
 // actually reaches her hearts (ctx.amountDealt - already reduced by
 // absorption for a normal hit, or the full raw amount for an ignoresShield
@@ -68,6 +83,30 @@ export const actions = {
       character.special.puppetCharacterId = targetId;
       log.push({ type: 'mind-control-select', characterId: character.id, targetId });
       return { puppetCharacterId: targetId };
+    },
+  },
+  // Full Control: one-time hearts<=3 special (confirmed ruling: "when her
+  // health will be <=3"). Every other living character (minus a
+  // Clean-Slate-protected Marin) becomes a puppet simultaneously, randomly
+  // paired up, and each fires their own real normal-tier attack at their
+  // assigned puppet with full pure damage - no dodge, shield, untargetable,
+  // immortal, or Rebirth. This function only does the cast-time bookkeeping
+  // (usedFullControl flag, its own log entry) - the actual multi-hero burst
+  // (derangement, per-hero action dispatch, defense bypass) is resolved by
+  // turnEngine.js's resolveFullControl, called from executeAction right
+  // after this execute() returns (see that file's own comment for why the
+  // split is necessary - melyssa.js can't import ABILITY_MODULES without a
+  // circular import). needsTarget: false - there's no player-chosen target
+  // at all, every pairing is decided randomly server-side.
+  fullControl: {
+    label: 'Full Control',
+    needsTarget: false,
+    special: true,
+    isLegal: (character) => character.hearts <= FULL_CONTROL_HEARTS_THRESHOLD && !character.special.usedFullControl,
+    execute(character, targetId, game, log) {
+      character.special.usedFullControl = true;
+      log.push({ type: 'special', characterId: character.id, actionId: 'fullControl' });
+      return {};
     },
   },
 };

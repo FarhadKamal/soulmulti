@@ -1817,6 +1817,7 @@ const ACTION_LABELS = {
   grimStrike: 'Grim Strike', skullCrack: 'Skull Crack', claimKill: 'Claim the Kill', grimBarrage: 'Grim Barrage',
   mirageMark: 'Mirage Mark', mirageBurst: 'Mirage Burst', mirageOverload: 'Mirage Overload',
   runeStrike: 'Rune Strike', runeVision: 'Rune Vision', runeVisionTargetPick: 'Rune Vision',
+  mindControl: 'Mind Control', fullControl: 'Full Control',
 };
 
 // Rowan's and Marin's discoverable spells, shared by describeLogEntry's
@@ -1917,6 +1918,17 @@ function describeLogEntry(entry) {
           return `${name(entry.characterId)} used Rewind - undid the Jester Ball explosion!`;
         }
         return `${name(entry.characterId)} used Rewind - undid ${name(entry.rewoundCasterId)}'s ${actionLabel(entry.rewoundActionId)}!`;
+      }
+      if (entry.actionId === 'fullControl') {
+        // This entry is just the CAST itself (melyssa.js's own
+        // execute()) - the actual puppet-vs-puppet attacks that follow are
+        // separate, normal 'attack'-type entries pushed right after by
+        // turnEngine.js's resolveFullControl, each already rendering with
+        // its own puppet's real attack name/target/damage via the generic
+        // case 'attack' branch above. No victim list needed here the way
+        // Fowl Play's cast line has one - the follow-up lines already show
+        // exactly who hit whom.
+        return `${name(entry.characterId)} unleashed Full Control - everyone turns on each other!`;
       }
       if (entry.actionId === 'worldStops') {
         // No single targetId (freezes everyone at once) - list who actually
