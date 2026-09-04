@@ -983,6 +983,19 @@ export function resolveFullControl(game, log, casterCharacterId) {
       const actionId = typeof actionIdOrFn === 'function' ? actionIdOrFn(attacker) : actionIdOrFn;
       const actionDef = mod?.actions?.[actionId];
       if (!actionDef) continue; // defensive - should never happen, every hero has an entry above
+      // Stamp each puppet's own attack entry (and any deferred
+      // rebirth/mirror-reflect entry it triggers) with the hearts snapshot
+      // AT THE MOMENT IT RESOLVES, not the burst's single trailing
+      // end-action snapshot - confirmed bug, 2026-09-04: a live 4-puppet
+      // burst showed all 3 attack lines sharing the exact same (final)
+      // hearts bracket, since none of these entries carried their own
+      // `hearts` field and battleScreen.js's renderFullLogWithCopy scans
+      // FORWARD to the next hearts-bearing entry to display one - with
+      // nothing in between, every line in the burst incorrectly borrowed
+      // the one shared end-of-batch snapshot instead of its own true
+      // incremental state. Same pattern tickPoisonIfAny already uses for
+      // its own standalone mid-batch entries.
+      const before = log.length;
       const result = actionDef.execute(attacker, targetId, game, log);
       attackerIds.push(attackerId);
       if (result?.rebirthLogEntry) log.push(result.rebirthLogEntry);
@@ -990,6 +1003,10 @@ export function resolveFullControl(game, log, casterCharacterId) {
       if (result?.mirrorResult?.rebirthLogEntry) log.push(result.mirrorResult.rebirthLogEntry);
       if (result?.mirrorReflectLogEntry) log.push(result.mirrorReflectLogEntry);
       if (result?.mirrorReflectResult?.rebirthLogEntry) log.push(result.mirrorReflectResult.rebirthLogEntry);
+      const snapshot = heartsSnapshot(game);
+      for (let i = before; i < log.length; i++) {
+        if (!log[i].hearts) log[i].hearts = snapshot;
+      }
     }
   } finally {
     game.fullControlActive = false;
