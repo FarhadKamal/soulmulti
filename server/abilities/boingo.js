@@ -261,17 +261,34 @@ export const jesterBallResolution = {
       // so no interaction to worry about between the two branches.
       if (newHolderCharacterId === 'illyra' && Math.random() < 0.5) {
         log.push({ type: 'dodge', attackerId: fromCharacterId, targetCharacterId: 'illyra' });
-        // Confirmed ruling: this must NEVER be Boingo himself - a failed
-        // pass FROM Boingo TO Illyra should never explode 4 damage onto
-        // Boingo. Boingo can never actually be fromCharacterId here in
-        // practice anyway while ALSO being the one who'd take the
-        // explosion (he'd need to be holding the ball and choosing to pass
-        // it to Illyra himself) - guarded explicitly regardless, since
-        // silently exploding on him would be a real, damaging bug if this
-        // assumption is ever wrong. He just keeps holding it (as if the
-        // pass attempt itself fizzled) rather than getting healed OR
-        // exploded here.
+        // A fumbled pass to Illyra means the ball never actually reaches
+        // her - it detonates back on the passer instead, as if it fizzled
+        // in their own hands (identical resolveExplosion rules as any
+        // other explosion). On a NON-final pass this is just a normal mid-
+        // chain explosion - EXCEPT if the passer is Boingo himself
+        // (thrownByCharacterId), who must never take damage from his own
+        // ball; he simply keeps holding it instead (pass attempt fizzles
+        // with no consequence, no heal, no explosion).
+        //
+        // On the FINAL pass (isFinalPass), though, this fumble IS the
+        // match's big outcome and must resolve exactly like any other
+        // final landing - Boingo gets his full +4 reward if he's the
+        // passer, anyone else explodes for 4. Originally this branch
+        // returned early with a no-op for a Boingo-final-pass fumble,
+        // which left game.jesterBall stuck forever (isFinalPass true, so
+        // pass's own isLegal - passCount < MAX - became permanently false,
+        // and holderCharacterId was never reassigned) - confirmed live bug
+        // report: "failed to land on illyra due to illusion... staying on
+        // boingo portrait... pass is over... we missed 4 heal or 4 damage
+        // explosion". Fixed by branching on isFinalPass here too, same as
+        // the normal (non-fumble) final-pass branch below.
         if (fromCharacterId === game.jesterBall.thrownByCharacterId) {
+          if (isFinalPass) {
+            const wasKO = game.characters[fromCharacterId]?.isKO ?? false;
+            const { healed, shielded } = applyBoingoBallReward(game, fromCharacterId, 4);
+            log.push({ type: 'jester-ball-return', boingoId: fromCharacterId, healed, shielded, wasKO });
+            game.jesterBall = null;
+          }
           return;
         }
         resolveExplosion(game, log, fromCharacterId);
