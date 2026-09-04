@@ -909,45 +909,64 @@ function shuffleInPlace(arr) {
   return arr;
 }
 
-// Random DERANGEMENT of ids: every id is assigned exactly one OTHER id as
-// its target, every id is targeted by exactly one other id, nobody targets
-// themselves (confirmed ruling: a "clean 1-to-1 cycle", not independent
-// random picks that could pile up on one puppet and leave another
-// untargeted). A shuffled array offset by 1 (each index attacks the next
-// index, wrapping around) always satisfies this for any array of length
-// >= 2 - simpler than repeatedly rerolling a naive random assignment until
-// it happens to avoid self-targeting and collisions.
-function randomDerangement(ids) {
-  const shuffled = shuffleInPlace([...ids]);
+// Assigns each puppet a random target drawn from targetPool, excluding
+// themselves - independent per-puppet picks, NOT a clean 1-to-1 derangement
+// (confirmed ruling, 2026-09-04, superseding the original "clean cycle"
+// design): once a Clean-Slate-protected Marin was made a valid TARGET
+// without being a puppet herself (see resolveFullControl below), the
+// attacker pool and target pool can genuinely differ in size/membership,
+// so a strict derangement (which requires both pools to be the same set)
+// no longer applies. Multiple puppets CAN end up targeting the same
+// person, and some living characters may end up never attacked at all -
+// both are normal, expected outcomes now, not bugs.
+function assignRandomTargets(puppetIds, targetPool) {
   const targetFor = {};
-  for (let i = 0; i < shuffled.length; i++) {
-    targetFor[shuffled[i]] = shuffled[(i + 1) % shuffled.length];
+  for (const attackerId of puppetIds) {
+    const choices = targetPool.filter((tid) => tid !== attackerId);
+    if (choices.length === 0) continue; // no valid target for this puppet - shouldn't happen given resolveFullControl's own isLegal-mirroring guard, but defensive
+    targetFor[attackerId] = choices[Math.floor(Math.random() * choices.length)];
   }
   return targetFor;
 }
 
 // Melyssa's Full Control (hearts<=3 special, see melyssa.js's fullControl
-// action, which just sets up and calls this) - every other living
-// character (minus a Clean-Slate-protected Marin, same exception Fowl Play
-// has) becomes a puppet simultaneously, randomly deranged into pairs (see
-// randomDerangement above), and each fires their own real normal-tier
-// attack (FULL_CONTROL_ACTION_ID above) at their assigned target - full
-// pure damage, no defense of any kind (game.fullControlActive, checked in
-// damagePipeline.js's applyDamage). Resolved in a random order; a puppet
-// already KO'd by an earlier hit in this same burst by the time their own
-// turn in the sequence comes up simply does not attack (confirmed ruling -
-// same "a dead character never acts" rule as everywhere else in the game,
-// even though every target was assigned before the burst began).
+// action, which just sets up and calls this). Two DIFFERENT pools
+// (confirmed ruling, 2026-09-04):
+// - PUPPETS (attackers): every other living character EXCEPT a
+//   Clean-Slate-protected Marin - Clean Slate protects her from being
+//   CONTROLLED (forced to attack), same exception Fowl Play has for being
+//   turned into a chicken.
+// - TARGETS: every other living character INCLUDING a Clean-Slate-
+//   protected Marin - Clean Slate does NOT protect her from being HIT by
+//   someone else's forced attack, only from being forced to attack
+//   herself. This also resolves the "1v1 with one Clean-Slate-protected
+//   character" edge case cleanly: a lone non-Marin puppet still has a real
+//   target (the protected Marin) to attack even though she isn't a puppet
+//   herself.
+// Each puppet fires their own real normal-tier attack (FULL_CONTROL_ACTION_ID
+// above) at their independently-assigned target (assignRandomTargets above)
+// - full pure damage, no defense of any kind (game.fullControlActive,
+// checked in damagePipeline.js's applyDamage). Resolved in a random order;
+// a puppet already KO'd by an earlier hit in this same burst by the time
+// their own turn in the sequence comes up simply does not attack
+// (confirmed ruling - same "a dead character never acts" rule as
+// everywhere else in the game, even though every target was assigned
+// before the burst began).
 export function resolveFullControl(game, log, casterCharacterId) {
-  const candidates = Object.values(game.characters).filter((c) => c.id !== casterCharacterId && !c.isKO);
-  const puppets = candidates.filter((c) => !tryTriggerCleanSlate(c, game, log));
-  if (puppets.length < 2) {
-    // Nobody left to pair up (0 or 1 other living, non-protected
-    // character) - the whole burst is a no-op beyond the cast itself.
+  const others = Object.values(game.characters).filter((c) => c.id !== casterCharacterId && !c.isKO);
+  const puppets = others.filter((c) => !tryTriggerCleanSlate(c, game, log));
+  // melyssa.js's own isLegal already requires >=2 other living characters
+  // before this action is even castable, but a puppet still needs a real
+  // target pool of size >= 1 to do anything (e.g. a genuine 1v1 where the
+  // sole other character is somehow Clean-Slate-protected - not reachable
+  // via isLegal today since Clean Slate is per-cast state, not predictable
+  // there, but guarded here defensively regardless).
+  if (puppets.length === 0 || others.length < 2) {
     return { puppetIds: puppets.map((p) => p.id), attackerIds: [] };
   }
   const puppetIds = puppets.map((p) => p.id);
-  const targetFor = randomDerangement(puppetIds);
+  const targetPoolIds = others.map((c) => c.id);
+  const targetFor = assignRandomTargets(puppetIds, targetPoolIds);
   const attackOrder = shuffleInPlace([...puppetIds]);
   const attackerIds = [];
   game.fullControlActive = true;
@@ -956,6 +975,7 @@ export function resolveFullControl(game, log, casterCharacterId) {
       const attacker = game.characters[attackerId];
       if (!attacker || attacker.isKO) continue; // KO'd by an earlier hit this same burst
       const targetId = targetFor[attackerId];
+      if (!targetId) continue; // no valid target was available for this puppet
       const target = game.characters[targetId];
       if (!target || target.isKO) continue; // target already KO'd this burst - nothing to hit
       const mod = ABILITY_MODULES[attackerId];

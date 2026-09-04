@@ -87,22 +87,41 @@ export const actions = {
   },
   // Full Control: one-time hearts<=3 special (confirmed ruling: "when her
   // health will be <=3"). Every other living character (minus a
-  // Clean-Slate-protected Marin) becomes a puppet simultaneously, randomly
-  // paired up, and each fires their own real normal-tier attack at their
-  // assigned puppet with full pure damage - no dodge, shield, untargetable,
-  // immortal, or Rebirth. This function only does the cast-time bookkeeping
-  // (usedFullControl flag, its own log entry) - the actual multi-hero burst
-  // (derangement, per-hero action dispatch, defense bypass) is resolved by
-  // turnEngine.js's resolveFullControl, called from executeAction right
-  // after this execute() returns (see that file's own comment for why the
-  // split is necessary - melyssa.js can't import ABILITY_MODULES without a
+  // Clean-Slate-protected Marin, who's protected from being CONTROLLED but
+  // NOT from being a valid TARGET - confirmed ruling, 2026-09-04) becomes a
+  // puppet simultaneously, each independently assigned a random target
+  // from the full pool of other living characters, and fires their own
+  // real normal-tier attack at that target with full pure damage - no
+  // dodge, shield, untargetable, immortal, or Rebirth. This function only
+  // does the cast-time bookkeeping (usedFullControl flag, its own log
+  // entry) - the actual multi-hero burst (target assignment, per-hero
+  // action dispatch, defense bypass) is resolved by turnEngine.js's
+  // resolveFullControl, called from executeAction right after this
+  // execute() returns (see that file's own comment for why the split is
+  // necessary - melyssa.js can't import ABILITY_MODULES without a
   // circular import). needsTarget: false - there's no player-chosen target
-  // at all, every pairing is decided randomly server-side.
+  // at all, every assignment is decided randomly server-side.
   fullControl: {
     label: 'Full Control',
     needsTarget: false,
     special: true,
-    isLegal: (character) => character.hearts <= FULL_CONTROL_HEARTS_THRESHOLD && !character.special.usedFullControl,
+    // Confirmed ruling: hidden entirely in a genuine 1v1 (only one other
+    // living character besides Melyssa) - there's no second character left
+    // for even a single puppet to attack, so resolveFullControl
+    // (turnEngine.js) would resolve as a complete no-op, wasting the
+    // one-time use for zero effect at the exact moment (desperation,
+    // hearts<=3) it matters most. Requires at least 2 OTHER living
+    // characters. NOT narrowed further to account for one of those 2
+    // possibly being a Clean-Slate-protected Marin (who could still be a
+    // puppet's TARGET even though she can't be a puppet herself, per the
+    // ruling above) - Clean Slate's armed/immunity state is real per-cast
+    // side-effecting logic (tryTriggerCleanSlate), not safe to peek at
+    // from a pure isLegal check without actually consuming it.
+    isLegal: (character, game) => {
+      if (character.hearts > FULL_CONTROL_HEARTS_THRESHOLD || character.special.usedFullControl) return false;
+      const othersAlive = Object.values(game.characters).filter((c) => c.id !== character.id && !c.isKO).length;
+      return othersAlive >= 2;
+    },
     execute(character, targetId, game, log) {
       character.special.usedFullControl = true;
       log.push({ type: 'special', characterId: character.id, actionId: 'fullControl' });
