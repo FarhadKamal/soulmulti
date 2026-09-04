@@ -460,14 +460,41 @@ function tickFowlPlayIfBoingoTurn(character, game, log) {
 export function beginCharacterTurn(character, game, log) {
   // Decay due shields before anything else this turn (poison ticks
   // included) - see decayAllDueShields's own comment for why this must run
-  // first, not just before this character's own onTurnStart.
+  // first, not just before this character's own onTurnStart. Runs
+  // unconditionally regardless of chicken status - it sweeps EVERY
+  // character on the board each call (not scoped to character, the current
+  // turn's owner), and a chicken's shield is already forced irrelevant
+  // against damage (applyDamage's target.isChicken bypass), so decaying it
+  // in the background isn't "in-progress state" in the sense the freeze
+  // rule below is about.
   decayAllDueShields(game);
-  tickPoisonIfAny(character, game, log);
-  tickSilenceIfAny(character, game, log);
-  resolveHeadacheIfDue(character, game, log);
+  // Boingo's Fowl Play - confirmed ruling: "anything pending such as
+  // studying will not waste... until become hero again" - EVERY piece of
+  // this character's own turn-start processing (poison/silence/headache
+  // ticks, and every hero's onTurnStart passive - Chrono Guard's shield
+  // reset, Grim Ward's cycle clear, Arcane Study/Everbloom progress,
+  // Ashka's heal-over-time, Deathless Fury's end-timer, etc.) must sit
+  // completely frozen while chickenified, not just have its OUTPUT hidden
+  // - it resumes exactly where it left off the instant Fowl Play ends.
+  // Confirmed real bug, 2026-09-04: a live match log showed "chronox's
+  // shield resets to 1 (Chrono Guard)" firing on every one of his turns
+  // throughout the entire chicken window, even though his whole kit
+  // (including passives) is supposed to be hidden/inert - none of
+  // tickPoisonIfAny/tickSilenceIfAny/resolveHeadacheIfDue/onTurnStart had
+  // any isChicken guard at all before this fix. tickFowlPlayIfBoingoTurn
+  // is deliberately NOT gated here - it's the mechanism that ends chicken
+  // status itself (only ever fires on Boingo, who's never chickenified),
+  // not a piece of the chickenified character's own state.
+  if (!character.isChicken) {
+    tickPoisonIfAny(character, game, log);
+    tickSilenceIfAny(character, game, log);
+    resolveHeadacheIfDue(character, game, log);
+  }
   tickFowlPlayIfBoingoTurn(character, game, log);
-  const mod = ABILITY_MODULES[character.id];
-  if (mod?.onTurnStart) mod.onTurnStart(character, game, log);
+  if (!character.isChicken) {
+    const mod = ABILITY_MODULES[character.id];
+    if (mod?.onTurnStart) mod.onTurnStart(character, game, log);
+  }
   // Poison's tick above deals REAL damage outside the normal executeAction/
   // finalizeAction path (which is the only place applyEndOfActionChecks
   // normally runs) - if that tick was the killing blow on the last
