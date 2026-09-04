@@ -23,6 +23,27 @@ function isOverchargeCollapseActive(character) {
   return character.hearts <= OVERCHARGE_COLLAPSE_THRESHOLD;
 }
 
+// Shared damage logic for both a normal Thunder Wrath cast and Soul Swap's
+// free follow-up - takes actionId explicitly so each caller's own log
+// entry is tagged correctly. Confirmed bug, 2026-09-04: soulSwapWrath used
+// to just call actions.thunderWrath.execute() directly, which hardcoded
+// actionId: 'thunderWrath' into its own log.push - so the free follow-up's
+// log line was indistinguishable from a normal turn's Thunder Wrath cast,
+// and the client's ACTION_LABELS['soulSwapWrath'] = 'Thunder Wrath (free)'
+// entry was dead code, never actually reached.
+function executeThunderWrath(character, targetId, game, log, actionId) {
+  const overcharged = isOverchargeCollapseActive(character);
+  const amount = overcharged ? OVERCHARGE_COLLAPSE_DAMAGE : DAMAGE_BY_CHARGE[character.special.chargeCount];
+  character.special.chargeCount = 0;
+  const result = applyDamage(game, log, {
+    sourceCharacterId: character.id,
+    targetCharacterId: targetId,
+    amount,
+  });
+  log.push({ type: 'attack', characterId: character.id, actionId, targetId, amount, overcharged, ...result });
+  return result;
+}
+
 export const actions = {
   // Neutral Action (see engine/categories/neutralAction.js): increments a
   // bounded counter (cap enforced by isLegal), feeding thunderWrath's
@@ -45,16 +66,7 @@ export const actions = {
     needsTarget: true,
     isLegal: () => true,
     execute(character, targetId, game, log) {
-      const overcharged = isOverchargeCollapseActive(character);
-      const amount = overcharged ? OVERCHARGE_COLLAPSE_DAMAGE : DAMAGE_BY_CHARGE[character.special.chargeCount];
-      character.special.chargeCount = 0;
-      const result = applyDamage(game, log, {
-        sourceCharacterId: character.id,
-        targetCharacterId: targetId,
-        amount,
-      });
-      log.push({ type: 'attack', characterId: character.id, actionId: 'thunderWrath', targetId, amount, overcharged, ...result });
-      return result;
+      return executeThunderWrath(character, targetId, game, log, 'thunderWrath');
     },
   },
   soulSwap: {
@@ -81,7 +93,7 @@ export const actions = {
     hidden: true,
     isLegal: () => true,
     execute(character, targetId, game, log) {
-      return actions.thunderWrath.execute(character, targetId, game, log);
+      return executeThunderWrath(character, targetId, game, log, 'soulSwapWrath');
     },
   },
 };
