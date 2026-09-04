@@ -5,6 +5,7 @@
 // main game), same 1600ms flash duration, same idle/untouched-since-last-
 // turn pattern for the 8 "idle portrait" characters.
 import { v } from './assetVersion.js';
+import { CHARACTER_IDS } from './characters.js';
 
 const FLASH_DURATION_MS = 1600;
 
@@ -86,10 +87,22 @@ export function registerFlashRerender(fn) {
 // reflects a stale/indirect trigger (an idle check, a delayed queued
 // flash, a leftover Jester Ball sequence started before they turned into
 // a chicken, etc.) - silently dropped rather than shown.
+// Per-hero chicken art (2026-09-04) - every character except Boingo (who
+// can never be chickenified) has its own chicken/chicken_attack/
+// chicken_hit/chicken_roast set under assets/images/<id>/, replacing the
+// original shared assets/images/boingo/chicken*.jpg set. chickenImagePath
+// below is the single helper every call site uses to build the right path
+// for whichever character is currently involved.
+function chickenImagePath(characterId, suffix) {
+  return `assets/images/${characterId}/chicken${suffix}`;
+}
+
 const CHICKEN_FLASH_PATHS = new Set([
-  'assets/images/boingo/chicken.jpg',
-  'assets/images/boingo/chicken_attack.jpg',
-  'assets/images/boingo/chicken_hit.jpg',
+  ...CHARACTER_IDS.filter((id) => id !== 'boingo').flatMap((id) => [
+    chickenImagePath(id, '.jpg'),
+    chickenImagePath(id, '_attack.jpg'),
+    chickenImagePath(id, '_hit.jpg'),
+  ]),
   'assets/images/boingo/foul_play.jpg',
 ]);
 
@@ -494,7 +507,10 @@ export function handleLogEntryForFlash(entry, game) {
       setFlash(characterId, 'assets/images/boingo/foul_play.jpg', FOWL_PLAY_FLASH_DURATION_MS); break;
     case 'chickenAttack':
       if (!dodged) {
-        setFlash(characterId, 'assets/images/boingo/chicken_attack.jpg');
+        // Per-hero chicken art (2026-09-04) - the attacker here is always
+        // a chickenified character (Chicken Attack is their only legal
+        // action), so its own hero-specific chicken_attack.jpg applies.
+        setFlash(characterId, chickenImagePath(characterId, '_attack.jpg'));
         // Distinct victim-side reaction flash (with its own egg-drop gag),
         // separate from the attacker's own chicken_attack.jpg above -
         // confirmed ruling: fires on ANY chicken taking damage, a brief
@@ -503,10 +519,11 @@ export function handleLogEntryForFlash(entry, game) {
         // dodged/0-damage hit shows no reaction). Boingo himself CAN be the
         // target here (chickens are allowed to attack him) but he's never
         // chickenified, so he keeps his own normal hit reaction instead -
-        // this flash is only for a genuinely chickenified target.
+        // this flash is only for a genuinely chickenified target, using
+        // THAT target's own hero-specific chicken_hit.jpg.
         if (amountDealt > 0 && targetCharacterId && !isKO(targetCharacterId)
           && game.characters[targetCharacterId]?.isChicken) {
-          setFlash(targetCharacterId, 'assets/images/boingo/chicken_hit.jpg');
+          setFlash(targetCharacterId, chickenImagePath(targetCharacterId, '_hit.jpg'));
         }
       }
       break;

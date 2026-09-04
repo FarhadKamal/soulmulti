@@ -1057,26 +1057,31 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
     // Already wrapped with v() at its source in portraitFlash.js.
     portrait.src = persistentSrc;
   } else if (character.isKO && character.isChicken) {
-    // Boingo's Fowl Play - a chicken that gets KO'd shows the fried-
-    // chicken gag art instead of that character's own normal koed.jpg.
-    // Checked ahead of the plain isKO branch below since this is more
-    // specific. isChicken staying true through a KO is intentional -
-    // death doesn't clear it, only Boingo completing his own 3rd turn
-    // since the cast does (see turnEngine.js's tickFowlPlayIfBoingoTurn),
-    // so a chicken who dies mid-window keeps showing the roast art for
-    // the rest of that window even though the match may already be over
-    // for them.
-    portrait.src = v('assets/images/boingo/chicken_roast.jpg');
+    // Boingo's Fowl Play - a chicken that gets KO'd shows THIS character's
+    // own fried-chicken gag art instead of their normal koed.jpg. Checked
+    // ahead of the plain isKO branch below since this is more specific.
+    // isChicken staying true through a KO is intentional - death doesn't
+    // clear it, only Boingo completing his own 3rd turn since the cast
+    // does (see turnEngine.js's tickFowlPlayIfBoingoTurn), so a chicken who
+    // dies mid-window keeps showing the roast art for the rest of that
+    // window even though the match may already be over for them. Per-hero
+    // chicken art (2026-09-04) - every character has its own
+    // chicken_roast.jpg under assets/images/<id>/, replacing the original
+    // shared assets/images/boingo/chicken_roast.jpg.
+    portrait.src = v(`assets/images/${character.id}/chicken_roast.jpg`);
   } else if (character.isKO) {
     portrait.src = v(`assets/koed/${character.id}.jpg`);
   } else if (character.isChicken) {
-    // Boingo's Fowl Play - shared generic chicken art overrides this
-    // character's own idle/injured portrait for as long as they're
+    // Boingo's Fowl Play - THIS character's own hero-specific chicken art
+    // overrides their own idle/injured portrait for as long as they're
     // chickenified, same "everything hidden" reasoning that also hides
     // their real action list (confirmed ruling: "chicken can only attack
     // ... other things will hide"). Checked ahead of the Draxus/injured
-    // branches below since chicken status overrides both.
-    portrait.src = v('assets/images/boingo/chicken.jpg');
+    // branches below since chicken status overrides both. Per-hero chicken
+    // art (2026-09-04) - replaces the original shared
+    // assets/images/boingo/chicken.jpg with each character's own
+    // assets/images/<id>/chicken.jpg.
+    portrait.src = v(`assets/images/${character.id}/chicken.jpg`);
   } else if (character.id === 'draxus' && character.special?.deathproofActive) {
     // Belt-and-braces: persistentSrc above already covers this, but a
     // reported-live case still showed injured.jpg during his death-proof

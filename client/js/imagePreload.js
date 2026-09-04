@@ -33,10 +33,6 @@ const FLASH_IMAGES = [
   'assets/images/boingo/miss.jpg',
   'assets/images/boingo/normalpunch.jpg',
   'assets/images/boingo/throwing.jpg',
-  'assets/images/boingo/chicken.jpg',
-  'assets/images/boingo/chicken_attack.jpg',
-  'assets/images/boingo/chicken_hit.jpg',
-  'assets/images/boingo/chicken_roast.jpg',
   'assets/images/boingo/foul_play.jpg',
   'assets/images/chronox/cyclone.jpg',
   'assets/images/chronox/space.jpg',
@@ -105,6 +101,21 @@ const FLASH_IMAGES = [
   'assets/images/oraclus/loss_prediction.jpg',
 ];
 
+// Boingo's Fowl Play - per-hero chicken art (2026-09-04): every character
+// except Boingo (who can never be chickenified) has its own chicken.jpg /
+// chicken_attack.jpg / chicken_hit.jpg / chicken_roast.jpg under
+// assets/images/<id>/, replacing the original shared
+// assets/images/boingo/chicken*.jpg set (now removed - no longer needed
+// once every hero has its own). Generated from CHARACTER_IDS rather than
+// listed by hand like FLASH_IMAGES above, so a future new hero's set is
+// preloaded automatically without a matching edit here.
+const CHICKEN_IMAGES = CHARACTER_IDS.filter((id) => id !== 'boingo').flatMap((id) => [
+  `assets/images/${id}/chicken.jpg`,
+  `assets/images/${id}/chicken_attack.jpg`,
+  `assets/images/${id}/chicken_hit.jpg`,
+  `assets/images/${id}/chicken_roast.jpg`,
+]);
+
 let started = false;
 // Resolves once every preloaded image has either loaded or failed - used by
 // main.js to gate the battle screen behind a brief "preparing battle" wait
@@ -118,7 +129,7 @@ let readyPromise = null;
 export function preloadBattleImages() {
   if (started) return readyPromise;
   started = true;
-  const paths = [...FLASH_IMAGES];
+  const paths = [...FLASH_IMAGES, ...CHICKEN_IMAGES];
   for (const folder of PER_CHARACTER_FOLDERS) {
     for (const id of CHARACTER_IDS) paths.push(`${folder}/${id}.jpg`);
   }
