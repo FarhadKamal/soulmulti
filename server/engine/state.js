@@ -100,7 +100,21 @@ function baseSpecialFor(id) {
     case 'blade':
       return { streakTargetId: null, streakCount: 0, rebirthUsed: false };
     case 'athena':
-      return { curseTargetCharacterId: null };
+      // divineJudgmentTargetId: her hearts<=3 one-time special's marked
+      // victim - completely independent of curseTargetCharacterId above
+      // (can be the same character or a different one, confirmed ruling).
+      // Does nothing on its own; only checked once, in her own
+      // registerOnOwnDeath callback (athena.js), the instant SHE is KO'd.
+      // Deliberately NOT part of hasNegativeStatus/clearNegativeStatuses
+      // (damagePipeline.js) - unlike her curse, this can never be cleansed
+      // by Purify or Clean Slate, confirmed ruling ("only rewind time can
+      // remove it") - the one exception falls out naturally from Chronox's
+      // Rewind restoring his own whole character object wholesale, not
+      // from any code here needing to know about Death Pacts specifically.
+      // usedDivineJudgment: separate one-time-use flag from usedSpecial,
+      // since Divine Restore already occupies that slot - same reasoning
+      // as every other multi-special character in the roster.
+      return { curseTargetCharacterId: null, divineJudgmentTargetId: null, usedDivineJudgment: false };
     case 'melyssa':
       // controlling: true for the entire duration of a Mind Control
       // sequence (from puppet selection through the puppeted action, and

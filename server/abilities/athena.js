@@ -2,6 +2,9 @@ import { applyDamage, applyHeal, applyShield, tryTriggerCleanSlate, tryIllyraDod
 import { registerOnOtherRevived } from '../engine/categories/onOtherRevived.js';
 import { registerOnOwnDeath } from '../engine/categories/onOwnDeath.js';
 import { registerOnHitLanded } from '../engine/categories/onHitLanded.js';
+import { registerOnAnyDeath } from '../engine/categories/onAnyDeath.js';
+
+const DIVINE_JUDGMENT_HEARTS_THRESHOLD = 3;
 
 // Revival cleanup (see engine/categories/onOtherRevived.js) - her curse
 // doesn't survive the cursed character's own revival (e.g. Blade's
@@ -31,6 +34,59 @@ registerOnOwnDeath('athena', (character) => {
   const preClearCursedId = character.special.curseTargetCharacterId;
   character.special.curseTargetCharacterId = null;
   return { preClearCursedId };
+});
+
+// Divine Judgment (Death Pact category #31, see taxonomy) - the instant
+// SHE dies, her marked victim dies too, real source damage not just a
+// flag flip. Uses onAnyDeath (not onOwnDeath above) deliberately: this
+// needs to call applyDamage AGAIN on a completely different character
+// (the victim) after her own death is already fully resolved (isKO/hearts
+// already settled), which onOwnDeath's mid-applyDamage callback timing
+// isn't the right shape for - onAnyDeath fires once the triggering KO
+// branch has already finished, matching Grimtal's own kill-credit
+// bookkeeping's identical "call applyDamage-adjacent logic after a death
+// resolves" pattern. Confirmed ruling: no exception for the victim
+// delivering the killing blow themselves - it still fires. If the marked
+// victim is already dead by the time she dies, this just no-ops (isKO
+// guard below) - confirmed ruling, a harmless fizzle, not an error.
+registerOnAnyDeath((diedCharacterId, sourceCharacterId, isMirror, game, log) => {
+  if (diedCharacterId !== 'athena') return;
+  const athena = game.characters.athena;
+  const victimId = athena?.special?.divineJudgmentTargetId;
+  if (!victimId) return;
+  athena.special.divineJudgmentTargetId = null;
+  const victim = game.characters[victimId];
+  if (!victim || victim.isKO) return;
+  // Flat lethal damage rather than a raw isKO flip - routes through the
+  // normal applyDamage pipeline so every other system that expects a real
+  // kill to go through there (onOwnDeath/onAnyDeath cascades for the
+  // victim's OWN death, KO log/hearts snapshot, elimination/game-over
+  // detection via applyEndOfActionChecks back in turnEngine.js) all still
+  // fire correctly, rather than silently setting isKO=true and leaving
+  // everything downstream of a normal death unaware anything happened.
+  // ignoresShield/ignoresDodge/ignoresUntargetable/ignoresImmortal/
+  // ignoresRebirth: true - a pact death is not a normal attack the victim
+  // could have defended against in the moment (the mark itself was
+  // unblockable when cast - confirmed ruling), so its actual trigger
+  // shouldn't suddenly become defensible either. Deliberately amount:
+  // 999 rather than a computed "exactly enough" value - simplest way to
+  // guarantee a real KO regardless of the victim's current hearts/shield,
+  // matching Draxus's own deathproof floor logic's spirit of "a big flat
+  // number is fine when the intent is just 'this must KO regardless'."
+  const result = applyDamage(game, log, {
+    sourceCharacterId: 'athena',
+    targetCharacterId: victimId,
+    amount: 999,
+    ignoresShield: true,
+    ignoresDodge: true,
+    ignoresUntargetable: true,
+    ignoresImmortal: true,
+    ignoresRebirth: true,
+  });
+  log.push({
+    type: 'divine-judgment-trigger', fromCharacterId: 'athena', toCharacterId: victimId,
+    koTriggered: result.koTriggered,
+  });
 });
 
 // Curse mirror (see engine/categories/onHitLanded.js): triggered by damage
@@ -159,6 +215,37 @@ export const actions = {
         ...result,
       });
       return result;
+    },
+  },
+  // Divine Judgment: her hearts<=3 one-time desperation special (Death
+  // Pact category #31, see taxonomy memory) - confirmed ruling: "put
+  // something on victim... if athena koed. that victim will also koed."
+  // Places a permanent, visible mark on one chosen living target
+  // (independent of curseTargetCharacterId - can be the same character or
+  // a different one, confirmed ruling). Does nothing on its own; the KO
+  // trigger itself lives in this file's own registerOnAnyDeath callback
+  // above, fired the instant SHE dies. Deliberately unblockable at cast
+  // time too (confirmed ruling) - no tryTriggerCleanSlate/
+  // tryIllyraDodgeStatus calls here, unlike every other status-application
+  // in the game (Curse Strike just above, Time Freeze, Hidden Mark,
+  // Silence Lock, Skull Crack all route through one or both). Also
+  // deliberately NOT added to hasNegativeStatus/clearNegativeStatuses
+  // (damagePipeline.js) so Rowan's Purify/Marin's Clean Slate can never
+  // cleanse an already-placed mark either - "only rewind time can remove
+  // it" (confirmed ruling), which falls out naturally from Chronox's
+  // Rewind restoring his own whole character object wholesale if HE
+  // happens to be the marked target, with no special-casing needed here
+  // at all.
+  divineJudgment: {
+    label: 'Divine Judgment',
+    needsTarget: true,
+    special: true,
+    isLegal: (character) => character.hearts <= DIVINE_JUDGMENT_HEARTS_THRESHOLD && !character.special.usedDivineJudgment,
+    execute(character, targetId, game, log) {
+      character.special.usedDivineJudgment = true;
+      character.special.divineJudgmentTargetId = targetId;
+      log.push({ type: 'special', characterId: character.id, actionId: 'divineJudgment', targetId });
+      return {};
     },
   },
 };

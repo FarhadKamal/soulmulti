@@ -468,6 +468,31 @@ input {
   50% { opacity: 1; }
 }
 
+/* Athena's Divine Judgment mark - visible to everyone for as long as it's
+   live (confirmed ruling), same "border glow + corner icon" shape as
+   .cursed-mark above but a deliberately distinct crimson/gold palette
+   (rather than reusing her curse's violet) since this is a different,
+   more severe mechanic - a death pact, not a recurring damage mirror. Can
+   coexist with .cursed-mark on the same tile (independent targets). */
+.char-tile.divine-judgment-mark {
+  border-color: #d4af37 !important;
+  box-shadow: 0 0 16px rgba(212, 175, 55, 0.5), inset 0 0 26px rgba(139, 0, 0, 0.25);
+}
+.char-tile.divine-judgment-mark::before {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background: linear-gradient(200deg, rgba(139, 0, 0, 0.22), rgba(139, 0, 0, 0) 60%);
+  animation: tile-divine-judgment-pulse 2.2s ease-in-out infinite;
+}
+.char-tile.divine-judgment-mark::after {
+  content: '⚖'; position: absolute; top: 6px; left: 8px; font-size: 16px;
+  color: #f0d878; text-shadow: 0 0 10px rgba(212, 175, 55, 0.9);
+  animation: tile-divine-judgment-pulse 2.2s ease-in-out infinite;
+}
+@keyframes tile-divine-judgment-pulse {
+  0%, 100% { opacity: 0.65; }
+  50% { opacity: 1; }
+}
+
 .jesterball-holding-icon {
   position: absolute; top: 6px; left: 8px; font-size: 32px;
   filter: drop-shadow(0 0 6px rgba(255, 100, 30, 0.9));

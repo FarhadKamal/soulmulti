@@ -665,6 +665,27 @@ const ATHENA_SACRIFICE_SAFE_HEARTS = 6;
 
 function chooseAthenaMove(character, game, usable) {
   const byId = Object.fromEntries(usable.map((a) => [a.actionId, a]));
+  // Divine Judgment: a desperation move, only legal once hearts <= 3. No
+  // real downside to casting it the instant it's available - same "cast
+  // eagerly once legal" policy as every other one-time desperation special
+  // in the roster (Fowl Play, World Stops, Earthshatter, Grim Barrage,
+  // Full Control). Checked ahead of Divine Restore/Sacrifice since it's
+  // free value with zero opportunity cost - marking a target costs nothing
+  // and doesn't compete with her turn the way casting Divine Restore would
+  // (this IS her turn's action, but there's no reason to ever delay it
+  // once hearts<=3, unlike Restore which she saves for exactly the right
+  // moment). Targets her biggest threat, same "at least take my likely
+  // killer down with me" philosophy as the curse danger-override further
+  // below - Divine Judgment is actually a MORE reliable version of that
+  // same idea (a guaranteed KO on death, not a damage mirror that depends
+  // on landing enough hits), so it gets first priority.
+  if (byId.divineJudgment) {
+    const targets = validTargetsFor(game, character, 'divineJudgment');
+    if (targets.length > 0) {
+      const targetId = biggestThreatTarget(game, character, targets) || lowestHeartsTarget(game, targets) || pickRandom(targets);
+      return { actionId: 'divineJudgment', targetId };
+    }
+  }
   if (byId.divineRestore && character.hearts <= LOW_HEARTS_THRESHOLD) {
     return { actionId: 'divineRestore', targetId: null };
   }

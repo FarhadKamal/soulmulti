@@ -131,6 +131,14 @@ export function renderBattle(root, state) {
   // freezeActive check just below, which is inherently already false once
   // he's KO'd (his freeze cleanup runs in that same server-side block).
   const cursedId = athena && !athena.isKO ? athena.special.curseTargetCharacterId : null;
+  // Divine Judgment's mark - visible to everyone for as long as it's live
+  // (confirmed ruling), independent of cursedId above (can be a different
+  // character or the same one). !athena.isKO guard for the same reason
+  // cursedId has one - the mark is already gone (either fired via
+  // divineJudgmentTargetId being nulled in the trigger, or genuinely still
+  // there but Athena herself just died, in which case it fires THIS SAME
+  // broadcast and nulls itself anyway).
+  const divineJudgmentTargetId = athena && !athena.isKO ? athena.special.divineJudgmentTargetId : null;
   const frozenIdsSet = computeFrozenIdsSet(game);
   const puppetHighlightId = state.awaitingMindControlAction ? state.mindControlPuppetId : null;
   // Broader than puppetHighlightId (which only covers the selection-click
@@ -212,6 +220,7 @@ export function renderBattle(root, state) {
       isDazed: isDazedFor(character.id),
       mirageMarkCount: mirageMarksFor(character.id),
       isCursed: character.id === cursedId,
+      isDivineJudgmentMarked: character.id === divineJudgmentTargetId,
       isFrozenVisual: frozenIdsSet.has(character.id),
       isPuppet: character.id === puppetHighlightId || character.id === activePuppetId,
       isHypnotized: character.id === activePuppetId,
@@ -498,7 +507,7 @@ function computeFrozenIdsSet(game) {
   return ids;
 }
 
-function renderCharacterTile(character, { isActing, isMine, isTargetable, onTargetClick, isHoldingBall, isCursed, isFrozenVisual, isVictorious, isPuppet, isHypnotized, grudgeCount, isPoisoned, silencedTurns, isDazed, mirageMarkCount }) {
+function renderCharacterTile(character, { isActing, isMine, isTargetable, onTargetClick, isHoldingBall, isCursed, isDivineJudgmentMarked, isFrozenVisual, isVictorious, isPuppet, isHypnotized, grudgeCount, isPoisoned, silencedTurns, isDazed, mirageMarkCount }) {
   const def = CHARACTERS[character.id];
   const tile = document.createElement('div');
   tile.className = 'char-tile';
@@ -518,6 +527,11 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
   if (isMine) tile.classList.add('char-tile--mine');
   if (character.isKO) tile.classList.add('char-tile--ko');
   if (isCursed && !character.isKO) tile.classList.add('cursed-mark');
+  // Divine Judgment's mark - visible to everyone for as long as it's live
+  // (confirmed ruling), independent of the curse above (can be a
+  // different character or the same one - both classes can apply
+  // together).
+  if (isDivineJudgmentMarked && !character.isKO) tile.classList.add('divine-judgment-mark');
   if (isFrozenVisual && !character.isKO) tile.classList.add('ice-frozen');
   // Grimtal's Skull Crack headache: persistent (server-state-driven, not a
   // timed flash) swirl overlay for as long as the roll is pending - same
@@ -1831,7 +1845,7 @@ const ACTION_LABELS = {
   hiddenMark: 'Hidden Mark', fatalSlash: 'Fatal Slash', shadowExecution: 'Shadow Execution',
   lunarStrike: 'Lunar Strike', moonstep: 'Moonstep', lunarEclipse: 'Lunar Eclipse',
   chaosGamble: 'Chaos Gamble', jesterBall: 'Jester Ball', fowlPlay: 'Fowl Play', chickenAttack: 'Chicken Attack', bloodHunt: 'Blood Hunt',
-  curseStrike: 'Curse Strike', divineRestore: 'Divine Restore', divineSacrifice: 'Divine Sacrifice',
+  curseStrike: 'Curse Strike', divineRestore: 'Divine Restore', divineSacrifice: 'Divine Sacrifice', divineJudgment: 'Divine Judgment',
   selfChoke: 'Self Choke',
   grudgeStrike: 'Grudge Strike', callAshka: 'Call Ashka',
   dyingBlow: 'Dying Blow', deathlessFury: 'Deathless Fury',
@@ -1964,6 +1978,14 @@ function describeLogEntry(entry) {
         // exactly who hit whom.
         return `${name(entry.characterId)} unleashed Full Control - everyone turns on each other!`;
       }
+      if (entry.actionId === 'divineJudgment') {
+        // Deliberately vague about the CONSEQUENCE here (same "reveal the
+        // setup, not the payoff" pattern as Oraclus's Rune Vision stage 1
+        // and Akyros's Hidden Mark) - the actual "X dies too" outcome only
+        // shows later, via the separate divine-judgment-trigger entry
+        // above, whenever it actually fires.
+        return `${name(entry.characterId)} unleashed Divine Judgment upon ${name(entry.targetId)}...`;
+      }
       if (entry.actionId === 'worldStops') {
         // No single targetId (freezes everyone at once) - list who actually
         // got frozen, and separately call out anyone Clean Slate blocked
@@ -1993,6 +2015,8 @@ function describeLogEntry(entry) {
       return `${name(entry.characterId)} cast Curse Strike on ${name(entry.targetId)}${blockedByText(entry.blockedBy)}`;
     case 'curse-mirror':
       return `Curse mirrors ${entry.amount} damage to ${name(entry.toCharacterId)}${entry.koTriggered ? ' - KO!' : ''}`;
+    case 'divine-judgment-trigger':
+      return `Divine Judgment falls upon ${name(entry.toCharacterId)}${entry.koTriggered ? ' - KO!' : ''}`;
     case 'ashka-heal':
       return `${name(entry.characterId)}'s Ashka heals +${entry.healed}`;
     case 'prediction-result':
