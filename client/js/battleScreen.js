@@ -2,7 +2,7 @@ import { CHARACTERS } from './characters.js';
 import { send } from './net.js';
 import { renderChatPanel } from './chatPanel.js';
 import { playUiClick } from './sound.js';
-import { getFlashSrc, getPersistentPortrait } from './portraitFlash.js';
+import { getFlashSrc, getPersistentPortrait, isMindControlOverlayActive } from './portraitFlash.js';
 import { getActiveEffects, getClawCount, getCrackCount, getPowSize, getVortexSize, getAxechopTier, getLightningTier, getWildLightningTier, getDarkslashVariant } from './actionEffects.js';
 import { renderFullscreenButton } from './fullscreen.js';
 import { v, hardRefresh } from './assetVersion.js';
@@ -1103,6 +1103,21 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
     portrait.classList.add('portrait-invert-flash');
   }
   tile.appendChild(portrait);
+
+  // Melyssa's Full Control: her own face, faded in via CSS opacity (the
+  // source image is a normal opaque JPG - Gemini couldn't reliably produce
+  // a real transparent-alpha PNG, so the fade is done here instead of via
+  // image transparency), layered on top of the puppet's own portrait for
+  // the whole burst's shared duration. Never shown on Melyssa herself (she
+  // is never a puppet of her own special) or on a KO'd character (matches
+  // every other timed effect's own isKO guard in this file).
+  if (isMindControlOverlayActive(character.id) && !character.isKO) {
+    const mindControlOverlay = document.createElement('img');
+    mindControlOverlay.className = 'char-portrait char-portrait--mind-control-overlay';
+    mindControlOverlay.src = v('assets/images/melyssa/mind_control_overlay.jpg');
+    mindControlOverlay.alt = '';
+    tile.appendChild(mindControlOverlay);
+  }
 
   const name = document.createElement('div');
   name.className = 'char-name';

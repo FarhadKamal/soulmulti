@@ -53,6 +53,24 @@ const GRIMTAL_POWER_DELAY_MS = FLASH_DURATION_MS;
 // an earlier one, matching the main game's priority chain naturally
 // collapsing to "whichever fired most recently").
 const activeFlash = new Map(); // characterId -> { src, timer }
+
+// Melyssa's Full Control: a transparent "mind control" overlay (her own
+// glowing eyes, ghosted) layered ON TOP of every puppet's own portrait for
+// the duration of the burst - a SEPARATE mechanism from activeFlash above,
+// since that map only ever holds ONE image per character (a portrait
+// swap), while this needs to render alongside whatever the puppet's own
+// portrait/flash is already showing, on MULTIPLE characters at once for
+// the same shared duration. Populated by handleLogEntryForFlash's own
+// 'special'/actionId:'fullControl' case below with every puppet id at
+// once, cleared by a single shared timer (not one per character, since
+// they all start and end together as part of the same burst).
+const mindControlOverlayIds = new Set();
+let mindControlOverlayTimer = null;
+const MIND_CONTROL_OVERLAY_DURATION_MS = 5000;
+
+export function isMindControlOverlayActive(characterId) {
+  return mindControlOverlayIds.has(characterId);
+}
 // Tracks each idle-portrait character's hearts as of their last turn start,
 // to detect "untouched since last turn" - same reasoning as
 // athenaHeartsAtLastTurnStart etc. in the main game.
@@ -324,6 +342,24 @@ export function handleLogEntryForFlash(entry, game) {
     setFlash(entry.controllingMelyssaId, 'assets/images/melyssa/mind_control_action.jpg');
   }
 
+  if (entry.type === 'special' && entry.actionId === 'fullControl') {
+    // Melyssa's Full Control: layers her own face (mind_control_overlay.jpg,
+    // an opaque image - CSS opacity in battleScreen.js does the actual
+    // fading, not image alpha) on top of every puppet's own portrait for
+    // the duration of the burst, sharing one timer since they all start and
+    // end together. Cleared/restarted on every fresh cast (clearTimeout
+    // first) so a second cast later in the same match can't leave an old
+    // timer racing a new one.
+    if (mindControlOverlayTimer) clearTimeout(mindControlOverlayTimer);
+    mindControlOverlayIds.clear();
+    for (const id of entry.puppetIds || []) mindControlOverlayIds.add(id);
+    mindControlOverlayTimer = setTimeout(() => {
+      mindControlOverlayTimer = null;
+      mindControlOverlayIds.clear();
+      onFlashExpired();
+    }, MIND_CONTROL_OVERLAY_DURATION_MS);
+    return;
+  }
   if (entry.type === 'special' && entry.actionId === 'jesterBall') {
     lastJesterBallThrowerId = entry.characterId;
     if (!isKO(entry.characterId)) setFlash(entry.characterId, 'assets/images/boingo/throwing.jpg');

@@ -1035,9 +1035,16 @@ export function executeAction(game, characterId, actionId, targetId, extra) {
     // FROM the engine, never the reverse).
     const mod = ABILITY_MODULES[characterId];
     const actionDef = mod.actions[actionId];
+    const castEntryIndex = log.length; // melyssa.js's own execute() pushes exactly one entry, right here
     result = actionDef.execute(character, targetId, game, log, extra);
     const burstResult = resolveFullControl(game, log, characterId);
     result = { ...result, ...burstResult };
+    // Stamp the puppet list onto the CAST entry itself (not a separate
+    // entry) so the client can drive the mind-control face overlay - see
+    // portraitFlash.js's isMindControlOverlayActive - off this one 'special'
+    // entry alone, without needing to scan the whole burst's individual
+    // attack lines to reconstruct who was a puppet.
+    if (log[castEntryIndex]) log[castEntryIndex].puppetIds = burstResult.puppetIds;
   } else {
     const mod = ABILITY_MODULES[characterId];
     const actionDef = mod.actions[actionId];
