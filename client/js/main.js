@@ -318,11 +318,18 @@ function playLogEntrySound(entry, game) {
     return;
   }
   if (entry.type === 'divine-judgment-trigger') {
-    // Same "just the KO'd sound, no dedicated sting of its own" pattern as
-    // curse-mirror/mirror-reflect above - the dedicated visual moment
-    // (judgment_struck.jpg flash) is handled separately in
+    // Unlike curse-mirror/mirror-reflect above, this DOES get its own
+    // dedicated sting (confirmed ruling, 2026-09-05) - plays immediately,
+    // layered with the victim's own normal KO'd sound/voice a moment
+    // later (same 200ms stagger every other KO-adjacent effect in this
+    // file already uses, so the two don't talk over each other at the
+    // exact same instant). The visual moment itself
+    // (judgement_strike.jpg flash) is handled separately in
     // portraitFlash.js. fromCharacterId is always 'athena' here.
-    if (entry.koTriggered) setTimeout(() => playKoedFor(entry.toCharacterId, game, entry.fromCharacterId), 200);
+    if (entry.koTriggered) {
+      playSound('divine_judgment_strike');
+      setTimeout(() => playKoedFor(entry.toCharacterId, game, entry.fromCharacterId), 200);
+    }
     return;
   }
   // Chronox's World Stops fully ending (both rounds of the freeze complete
