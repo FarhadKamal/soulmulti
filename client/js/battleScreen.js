@@ -503,9 +503,6 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
   const tile = document.createElement('div');
   tile.className = 'char-tile';
   if (isActing) tile.classList.add('char-tile--acting');
-  // Melyssa's current Mind Control puppet - highlighted alongside her own
-  // acting tile so both halves of the mechanic are visible at once.
-  if (isPuppet && !character.isKO) tile.classList.add('char-tile--puppet');
   // Looping hypnotic-ripple pulse for the whole control window (unlike the
   // one-shot claw/crack effects), driven off real server state
   // (melyssa.special.controlling + puppetCharacterId), not just the
@@ -1104,14 +1101,28 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
   }
   tile.appendChild(portrait);
 
-  // Melyssa's Full Control: her own face, faded in via CSS opacity (the
-  // source image is a normal opaque JPG - Gemini couldn't reliably produce
-  // a real transparent-alpha PNG, so the fade is done here instead of via
-  // image transparency), layered on top of the puppet's own portrait for
-  // the whole burst's shared duration. Never shown on Melyssa herself (she
-  // is never a puppet of her own special) or on a KO'd character (matches
-  // every other timed effect's own isKO guard in this file).
-  if (isMindControlOverlayActive(character.id) && !character.isKO) {
+  // Melyssa's own face, faded in via CSS opacity (the source image is a
+  // normal opaque JPG - Gemini couldn't reliably produce a real
+  // transparent-alpha PNG, so the fade is done here instead of via image
+  // transparency), layered on top of a puppet's own portrait. Shared by
+  // BOTH Mind Control mechanics (confirmed ruling, 2026-09-05: "we can do
+  // mindcontrol ability animation also using same image"):
+  // - Full Control's multi-puppet burst (isMindControlOverlayActive, a
+  //   client-side timed Set in portraitFlash.js - see its own comment for
+  //   why this needs a timer rather than reading live server state, since
+  //   the whole burst resolves within one synchronous cast).
+  // - Normal single-puppet Mind Control (isPuppet, real server state -
+  //   character.special.controlling/puppetCharacterId - spanning the
+  //   whole control window exactly like the hypnotic-ripple pulse below).
+  //   This REPLACES char-tile--puppet's old glow-ring + "PUPPET" text
+  //   badge entirely (confirmed ruling: a full-face overlay reads as
+  //   "under her control" more clearly than a small badge, and the two
+  //   together looked cluttered) - the ripple pulse itself is UNCHANGED,
+  //   both layer together for the whole window.
+  // Never shown on Melyssa herself (she is never a puppet of either
+  // mechanic) or on a KO'd character (matches every other timed effect's
+  // own isKO guard in this file).
+  if ((isMindControlOverlayActive(character.id) || isPuppet) && !character.isKO) {
     const mindControlOverlay = document.createElement('img');
     mindControlOverlay.className = 'char-portrait char-portrait--mind-control-overlay';
     mindControlOverlay.src = v('assets/images/melyssa/mind_control_overlay.jpg');

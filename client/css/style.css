@@ -188,18 +188,17 @@ input {
   background: #ffd75e; color: #1a1a12; font-size: 0.65em; font-weight: 700;
   padding: 2px 6px; border-radius: 4px; letter-spacing: 0.5px;
 }
-/* Melyssa's current Mind Control puppet - a distinct violet glow (matching
-   her own portrait theme) so both halves of the mechanic (her own acting
-   tile in gold, her puppet in violet) are clearly visible at once, never
-   confusable with the acting glow itself. */
-.char-tile--puppet { box-shadow: 0 0 0 4px #a855f7, 0 0 16px 2px #a855f788; }
-.char-tile--puppet::before {
-  content: 'PUPPET'; position: absolute; top: -10px; left: 8px;
-  background: #a855f7; color: #fff; font-size: 0.65em; font-weight: 700;
-  padding: 2px 6px; border-radius: 4px; letter-spacing: 0.5px;
-}
+/* Melyssa's current Mind Control puppet used to get a distinct violet glow
+   ring + "PUPPET" text badge here (char-tile--puppet) - removed entirely
+   2026-09-05, replaced by the mind-control face overlay
+   (.char-portrait--mind-control-overlay, shared with Full Control) - a
+   full-face image reads as "under her control" more immediately than a
+   small badge, and the two together looked cluttered. The overlay is
+   added directly in renderCharacterTile alongside the hypnotic-ripple
+   pulse below, which is UNCHANGED - both effects still layer together for
+   the whole control window.
 
-/* Hypnotic ripple: looping concentric rings pulsing outward from the
+   Hypnotic ripple: looping concentric rings pulsing outward from the
    puppet's portrait center, for the ENTIRE control window (unlike the
    one-shot hit-reaction effects like claw/crack) - same violet as
    char-tile--puppet's glow, reading as "still under her control" through
