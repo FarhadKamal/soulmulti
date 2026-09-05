@@ -16,8 +16,36 @@ function livingEnemies(game, character) {
   );
 }
 
+// Confirmed ruling, 2026-09-05: "ai bot should not attack athena. if she
+// cast judgement strike to them.. only if no option available or 1 vs 1
+// situation." A bot who is CURRENTLY MARKED by Athena's Divine Judgment
+// avoids targeting her specifically - if their own hit happens to be the
+// one that kills her, the pact fires and kills them too, so a bot with any
+// other legal target should always prefer it. NOT a blanket "no one
+// attacks Athena" rule - only the specific marked victim avoids her, and
+// even they still attack her if she's genuinely the only option left
+// (every other living enemy already dead/untargetable, or a true 1v1
+// where she's the sole remaining opponent) - self-preservation shouldn't
+// mean throwing away a turn entirely when there's truly nothing else to
+// do. Deliberately checked generically here (in the one shared
+// target-pool function every hero's chooser already calls), not
+// per-character, so it applies uniformly across the whole roster without
+// needing a bespoke override in each chooser the way Zerathys/Blade's own
+// puppeted-decision overrides do.
+function isAvoidingDivineJudgmentVictim(game, character, targetId) {
+  if (targetId !== 'athena') return false;
+  const athena = game.characters.athena;
+  return !!athena && !athena.isKO && athena.special?.divineJudgmentTargetId === character.id;
+}
+
 function validTargetsFor(game, character, actionId) {
-  return Object.keys(game.characters).filter((tid) => isValidTarget(game, character.id, actionId, tid));
+  const all = Object.keys(game.characters).filter((tid) => isValidTarget(game, character.id, actionId, tid));
+  if (!isAvoidingDivineJudgmentVictim(game, character, 'athena')) return all;
+  const withoutAthena = all.filter((tid) => tid !== 'athena');
+  // Only fall back to including Athena if she's truly the sole legal
+  // target left (no option available / a genuine 1v1) - otherwise the
+  // marked victim always has at least one safer alternative to prefer.
+  return withoutAthena.length > 0 ? withoutAthena : all;
 }
 
 // Picks a uniformly random element - used to break ties between equally
