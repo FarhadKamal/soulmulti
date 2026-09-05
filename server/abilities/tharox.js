@@ -150,6 +150,13 @@ export const actions = {
       let mirrorTargetId = null;
       let mirrorKoTriggered = false;
       let mirrorRevived = false;
+      // Athena's Divine Judgment trigger - same "first occurrence wins" as
+      // rebirthLogEntry/mirrorReflectLogEntry above (self-clears the
+      // instant it fires, so only the first point that triggers it can
+      // ever matter). Added 2026-09-05, alongside the identical fix to
+      // Mirage Burst (illyra.js) and Grim Barrage (grimtal.js) after the
+      // same gap was confirmed live on Mirage Burst.
+      let divineJudgmentTriggerLogEntry = null;
       for (let i = 0; i < EARTHSHATTER_TOTAL_DAMAGE; i++) {
         if (others.length === 0) break;
         const target = others[Math.floor(Math.random() * others.length)];
@@ -191,6 +198,7 @@ export const actions = {
         if (result.mirrorResult?.rebirthLogEntry && !rebirthLogEntry) rebirthLogEntry = result.mirrorResult.rebirthLogEntry;
         if (result.mirrorReflectLogEntry && !mirrorReflectLogEntry) mirrorReflectLogEntry = result.mirrorReflectLogEntry;
         if (result.mirrorReflectResult?.rebirthLogEntry && !rebirthLogEntry) rebirthLogEntry = result.mirrorReflectResult.rebirthLogEntry;
+        if (result.divineJudgmentTriggerLogEntry && !divineJudgmentTriggerLogEntry) divineJudgmentTriggerLogEntry = result.divineJudgmentTriggerLogEntry;
         if (result.koTriggered) {
           koTriggeredByTarget[target.id] = true;
           others = others.filter((c) => c.id !== target.id);
@@ -212,7 +220,7 @@ export const actions = {
           amount: mirrorTotal, koTriggered: mirrorKoTriggered, revived: mirrorRevived,
         }
         : null;
-      return { hits, rebirthLogEntry, mirrorLogEntry, mirrorReflectLogEntry };
+      return { hits, rebirthLogEntry, mirrorLogEntry, mirrorReflectLogEntry, divineJudgmentTriggerLogEntry };
     },
   },
 };

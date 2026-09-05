@@ -73,6 +73,34 @@ export const actions = {
     execute(character, targetId, game, log) {
       const marks = character.special.mirageMarks;
       const bursts = [];
+      // Deferred fields any one of the per-target applyDamage calls below
+      // might set on its own hit result - confirmed real, pre-existing gap
+      // (2026-09-05, same class of bug already fixed for Earthshatter's
+      // identical multi-target loop, see tharox.js's own earthshatter for
+      // the full reasoning): the old code only ever returned `{ bursts }`,
+      // silently discarding rebirthLogEntry/mirrorLogEntry/
+      // mirrorReflectLogEntry/divineJudgmentTriggerLogEntry from any
+      // individual burst - confirmed live report: Athena's Divine Judgment
+      // trigger never appeared in the log when Mirage Burst was the hit
+      // that killed her, even though the marked victim genuinely still
+      // died. "First occurrence wins" for each - matches Earthshatter's own
+      // reasoning: Rebirth/Mirror Reflect/Divine Judgment are each
+      // effectively one-shot per relevant character within a single cast
+      // (Rebirth and Divine Judgment self-clear the instant they fire,
+      // Mirror Reflect self-deactivates), so only the first hit that
+      // triggers one can ever matter. Athena's curse-mirror, unlike those,
+      // has no self-deactivating flag and could fire on EVERY burst target
+      // independently if Illyra detonates a mark on her cursed target
+      // more than once in extremely contrived setups (not currently
+      // reachable in practice since mirageMarks is per-target and Burst
+      // clears each mark it detonates) - left as first-occurrence too for
+      // now rather than importing Earthshatter's fuller mirror-aggregation
+      // logic, since a single mark per target makes the aggregation case
+      // unreachable here.
+      let rebirthLogEntry = null;
+      let mirrorLogEntry = null;
+      let mirrorReflectLogEntry = null;
+      let divineJudgmentTriggerLogEntry = null;
       // Snapshot the target list BEFORE clearing anything - iterating and
       // mutating the same Map in one pass is fine here since .set() never
       // adds new keys mid-loop (only zeroes existing ones), but snapshotting
@@ -100,9 +128,15 @@ export const actions = {
           ignoresUntargetable: true,
         });
         bursts.push({ targetId: tid, stackCount, ...result });
+        if (result.rebirthLogEntry && !rebirthLogEntry) rebirthLogEntry = result.rebirthLogEntry;
+        if (result.mirrorLogEntry && !mirrorLogEntry) mirrorLogEntry = result.mirrorLogEntry;
+        if (result.mirrorResult?.rebirthLogEntry && !rebirthLogEntry) rebirthLogEntry = result.mirrorResult.rebirthLogEntry;
+        if (result.mirrorReflectLogEntry && !mirrorReflectLogEntry) mirrorReflectLogEntry = result.mirrorReflectLogEntry;
+        if (result.mirrorReflectResult?.rebirthLogEntry && !rebirthLogEntry) rebirthLogEntry = result.mirrorReflectResult.rebirthLogEntry;
+        if (result.divineJudgmentTriggerLogEntry && !divineJudgmentTriggerLogEntry) divineJudgmentTriggerLogEntry = result.divineJudgmentTriggerLogEntry;
       }
       log.push({ type: 'special', characterId: character.id, actionId: 'mirageBurst', bursts });
-      return { bursts };
+      return { bursts, rebirthLogEntry, mirrorLogEntry, mirrorReflectLogEntry, divineJudgmentTriggerLogEntry };
     },
   },
   // Mirage Overload: her desperate last-stand special. No-target, one-time
