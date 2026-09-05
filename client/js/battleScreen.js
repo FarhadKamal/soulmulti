@@ -1431,7 +1431,22 @@ function renderActionPanel(characterId, usableActions, armedAction, state) {
   const btnRow = document.createElement('div');
   btnRow.className = 'action-btn-row';
   const lockableButtons = [];
-  usableActions.forEach((action) => {
+  // Confirmed ruling, 2026-09-05: special buttons should always render on
+  // the RIGHT side - the raw usableActions order is just each hero's own
+  // actions object declaration order server-side (getLegalActions
+  // preserves Object.entries order untouched), which varies per hero and
+  // is NOT guaranteed to put special actions last (e.g. Athena's own
+  // curseStrike, divineRestore, divineSacrifice, divineJudgment
+  // declaration order put her special - divineRestore/divineJudgment -
+  // in the middle, not the right, whenever several of her normal actions
+  // were also legal at once). A stable sort (every JS engine's
+  // Array.prototype.sort has been spec-guaranteed stable since ES2019)
+  // moves every special-flagged action to the end while preserving each
+  // group's own relative order - so if a hero ever has 2 specials legal
+  // at once, they still appear in their original declared order relative
+  // to each other, just both after every normal action.
+  const orderedActions = [...usableActions].sort((a, b) => (a.special ? 1 : 0) - (b.special ? 1 : 0));
+  orderedActions.forEach((action) => {
     const btn = document.createElement('button');
     btn.textContent = action.label;
     // Distinct styling for each character's one signature special ability
@@ -1562,7 +1577,11 @@ function renderMindControlActionPanel(game, melyssaId, state) {
   const btnRow = document.createElement('div');
   btnRow.className = 'action-btn-row';
   const lockableButtons = [];
-  state.usableActions.forEach((action) => {
+  // Same right-side special-button ordering as renderActionPanel's own
+  // fix - a puppeted character's options should look consistent with
+  // their own normal turn's button layout.
+  const orderedActions = [...state.usableActions].sort((a, b) => (a.special ? 1 : 0) - (b.special ? 1 : 0));
+  orderedActions.forEach((action) => {
     const btn = document.createElement('button');
     btn.textContent = action.label;
     if (action.special) btn.classList.add('special-action-btn');
