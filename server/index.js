@@ -1550,6 +1550,19 @@ function handleAction(room, sessionId, { characterId, actionId, targetId }) {
   if (!seat || seat.playerId !== sessionId) return; // not your character
   const acting = settleToNextDecision(room.game);
   if (acting !== characterId) return; // not this character's decision right now
+  // Confirmed bug fix, 2026-09-05: getUsableActions has no ball-holder
+  // awareness at all - without this check, ANY character currently
+  // holding the Jester Ball could submit a normal action instead of
+  // resolving it (Pass/Take), silently orphaning the ball forever
+  // (game.jesterBall never touched again for the rest of the match).
+  // Client-side battleScreen.js now only shows the normal action panel
+  // alongside Pass/Take for Boingo specifically (the one holder whose
+  // Take genuinely doesn't consume his turn) - this is the server-side
+  // backstop for that same rule, rejecting the request outright for
+  // every other holder regardless of what the client renders.
+  if (room.game.jesterBall && room.game.jesterBall.holderCharacterId === characterId && characterId !== 'boingo') {
+    return;
+  }
   const usable = getUsableActions(room.game.characters[characterId], room.game);
   const actionDef = usable.find((a) => a.actionId === actionId);
   if (!actionDef) return;

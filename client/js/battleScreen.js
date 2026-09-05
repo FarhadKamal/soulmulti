@@ -232,7 +232,7 @@ export function renderBattle(root, state) {
   const jb = game.jesterBall;
   const isMyBallDecision = isMyTurn && jb && jb.holderCharacterId === actingCharacterId;
 
-  if (isMyBallDecision) {
+  if (isMyBallDecision && actingCharacterId === 'boingo') {
     // Keep/Take (unlike Pass) deliberately do NOT consume the holder's
     // turn (see finishJesterBall, server/index.js/gameFlow.js) - Boingo
     // still owes his own normal action afterward, every time. Without
@@ -244,19 +244,39 @@ export function renderBattle(root, state) {
     // independently re-validates whose decision it actually still is via
     // settleToNextDecision before accepting anything.
     //
-    // Always shown together, every time isMyBallDecision is true - an
-    // earlier attempt hid this panel for "the rest of the turn" after a
-    // Keep click (keyed on jesterBallKeptThisTurnFor === actingCharacterId)
-    // but that flag couldn't tell "still this exact turn" apart from "a
-    // LATER turn, same character acting again" - confirmed live report
-    // ("after keep it prev round. how will i pass again"): once he'd
-    // clicked Keep once, the panel silently never came back on ANY future
-    // turn, permanently blocking Pass for the rest of the match. Reverted
+    // Always shown together, every time isMyBallDecision is true FOR
+    // BOINGO SPECIFICALLY - an earlier attempt hid this panel for "the
+    // rest of the turn" after a Keep click (keyed on
+    // jesterBallKeptThisTurnFor === actingCharacterId) but that flag
+    // couldn't tell "still this exact turn" apart from "a LATER turn,
+    // same character acting again" - confirmed live report ("after keep
+    // it prev round. how will i pass again"): once he'd clicked Keep
+    // once, the panel silently never came back on ANY future turn,
+    // permanently blocking Pass for the rest of the match. Reverted
     // rather than patched with a turn-instance key - the cosmetic
     // "buttons disappear right after Keep" polish isn't worth the risk of
     // this bug class recurring.
+    //
+    // Restricted to Boingo only (confirmed bug fix, 2026-09-05): every
+    // OTHER ball holder was ALSO getting both panels, since this branch
+    // originally fired for isMyBallDecision alone with no character
+    // check - letting them click a normal action (e.g. Athena's Divine
+    // Restore) instead of Pass/Take, silently orphaning the ball forever
+    // (game.jesterBall never resolved again for the rest of the match,
+    // vanishing from the log entirely - confirmed live report + direct
+    // code audit: getUsableActions/handleAction have no ball-holder
+    // legality check at all, so nothing server-side ever rejected this).
+    // Only Boingo's own Take/Pass genuinely doesn't consume his turn -
+    // every other holder must resolve the ball FIRST, exactly like the
+    // original design intended, before their own normal action panel
+    // ever appears.
     scroll.appendChild(renderJesterBallPrompt(game, actingCharacterId, armedAction, state));
     scroll.appendChild(renderActionPanel(actingCharacterId, usableActions, armedAction, state));
+  } else if (isMyBallDecision) {
+    // Every ball holder OTHER than Boingo: Pass/Take ONLY, no normal
+    // action panel until the ball is actually resolved - see the comment
+    // above for why this split exists.
+    scroll.appendChild(renderJesterBallPrompt(game, actingCharacterId, armedAction, state));
   } else if (isMyTurn && state.awaitingMindControlAction) {
     scroll.appendChild(renderMindControlActionPanel(game, actingCharacterId, state));
   } else if (isMyTurn) {
