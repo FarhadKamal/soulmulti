@@ -128,6 +128,16 @@ const BOT_SHOW_GAME_OVER_VICTORY_MS = 6000;
 // seen wining image coming too first"). Matches the longer of its two
 // durations so the freeze genuinely outlasts everything it triggered.
 const EARTHSHATTER_GAME_OVER_FREEZE_MS = 5200;
+// Athena's Divine Judgment trigger (the marked victim's own death when she
+// dies) runs its own 4.5s flash (portraitFlash.js's
+// DIVINE_JUDGMENT_TRIGGER_FLASH_DURATION_MS) plus a dedicated sound sting -
+// same "don't let the freeze cut away before this finishes" problem
+// Earthshatter already had, confirmed live report: "we need to wait for
+// more second for each part animation finish, before go to winning
+// screen." A little over the flash duration, matching how
+// EARTHSHATTER_GAME_OVER_FREEZE_MS is set a bit past its own longest
+// component rather than exactly equal to it.
+const DIVINE_JUDGMENT_GAME_OVER_FREEZE_MS = 5000;
 function startGameOverSequence(game) {
   if (gameOverSequenceStarted) return;
   gameOverSequenceStarted = true;
@@ -138,9 +148,28 @@ function startGameOverSequence(game) {
   // freeze stage long enough for its own effects to fully play out before
   // cutting to victory art.
   const wasEarthshatter = game.log[game.log.length - 1]?.actionId === 'earthshatter';
+  // Divine Judgment's trigger is NOT the last log entry the way Earthshatter
+  // itself is - it's a separate 'divine-judgment-trigger' entry pushed
+  // partway through whatever action actually delivered the killing blow to
+  // Athena (runOnAnyDeath fires mid-applyDamage, before that action's own
+  // trailing end-action marker), so a simple "is the LAST entry this
+  // actionId" check like Earthshatter's own doesn't work here. Scan the
+  // final action's own batch instead - everything from the last
+  // 'end-action' backwards to the previous one (or the start of the log) -
+  // for a triggered Divine Judgment. This can be a DRAW specifically
+  // (Athena's own death simultaneously KOs her marked victim, potentially
+  // eliminating the last two players at once), which is exactly the
+  // scenario flagged live.
+  const lastEndActionIndex = game.log.length - 1;
+  let batchStart = lastEndActionIndex;
+  while (batchStart > 0 && game.log[batchStart - 1]?.type !== 'end-action') batchStart--;
+  const wasDivineJudgment = game.log.slice(batchStart, lastEndActionIndex + 1)
+    .some((e) => e.type === 'divine-judgment-trigger' && e.koTriggered);
   const freezeMs = wasEarthshatter
     ? EARTHSHATTER_GAME_OVER_FREEZE_MS
-    : (isBotShow ? BOT_SHOW_GAME_OVER_FREEZE_MS : GAME_OVER_FREEZE_MS);
+    : wasDivineJudgment
+      ? DIVINE_JUDGMENT_GAME_OVER_FREEZE_MS
+      : (isBotShow ? BOT_SHOW_GAME_OVER_FREEZE_MS : GAME_OVER_FREEZE_MS);
   const victoryMs = isBotShow ? BOT_SHOW_GAME_OVER_VICTORY_MS : GAME_OVER_VICTORY_MS;
   state.gameOverStage = 'freeze';
   setTimeout(() => {
