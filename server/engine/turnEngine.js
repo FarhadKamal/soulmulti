@@ -811,6 +811,19 @@ export function resolveOraclusPredictionIfPending(game, log, characterId, action
   // simply irrelevant noise, not a miss - the guess is specifically about
   // that one character's NEXT action, wherever it falls in turn order.
   if (characterId !== oraclusChar.special.predictedAttackerId) return;
+  // Boingo's Fowl Play - confirmed bug, 2026-09-05: a forced Chicken
+  // Attack while the predicted attacker is chickenified used to still
+  // resolve the prediction (as a guaranteed miss, since Chicken Attack's
+  // targeting rule means it can never match a pre-chicken-status
+  // predicted target) - but a chickenified character's whole hero
+  // identity is supposed to be hidden/inert, this isn't really "the
+  // predicted character acting" in any meaningful sense. Confirmed live:
+  // "Rune Vision failed" fired off Athena's own Chicken Attack. The
+  // pending prediction now stays fully preserved (same "nothing pending
+  // is lost while chickenified" rule every other in-progress state
+  // follows - Arcane Study, banked charges, active statuses) and resolves
+  // normally against her first REAL action once she reverts.
+  if (game.characters[characterId]?.isChicken) return;
   if (!result || typeof result.amountDealt !== 'number') return;
   const isMatch = targetId === oraclusChar.special.predictedTargetId;
   oraclusChar.special.predictedAttackerId = null;
