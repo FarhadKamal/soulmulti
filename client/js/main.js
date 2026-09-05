@@ -317,6 +317,14 @@ function playLogEntrySound(entry, game) {
     if (entry.koTriggered) setTimeout(() => playKoedFor(entry.toCharacterId, game, entry.fromCharacterId), 200);
     return;
   }
+  if (entry.type === 'divine-judgment-trigger') {
+    // Same "just the KO'd sound, no dedicated sting of its own" pattern as
+    // curse-mirror/mirror-reflect above - the dedicated visual moment
+    // (judgment_struck.jpg flash) is handled separately in
+    // portraitFlash.js. fromCharacterId is always 'athena' here.
+    if (entry.koTriggered) setTimeout(() => playKoedFor(entry.toCharacterId, game, entry.fromCharacterId), 200);
+    return;
+  }
   // Chronox's World Stops fully ending (both rounds of the freeze complete
   // for the whole group) - reverts the frozen-world ambient track back to
   // whichever music was actually playing before the freeze started (see

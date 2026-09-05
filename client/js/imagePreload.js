@@ -24,6 +24,7 @@ const FLASH_IMAGES = [
   'assets/images/athena/curse.jpg',
   'assets/images/athena/heal.jpg',
   'assets/images/athena/sacrifice.jpg',
+  'assets/images/athena/judgment.jpg',
   'assets/images/blade/alive.jpg',
   'assets/images/blade/guitar.jpg',
   'assets/images/blade/strike.jpg',
@@ -118,6 +119,18 @@ const CHICKEN_IMAGES = CHARACTER_IDS.filter((id) => id !== 'boingo').flatMap((id
   `assets/images/${id}/chicken_roast.jpg`,
 ]);
 
+// Athena's Divine Judgment TRIGGER moment - per-victim-hero art
+// (confirmed ruling, 2026-09-05: "no asset limitation... we will create
+// for each hero"), one judgement_strike.jpg (this exact spelling/wording
+// is the real filename used across all 15 - not "judgment_struck", a
+// mismatch between the constant's own name and the actual asset path)
+// per possible victim (everyone except Athena herself, who can never be
+// her own marked target). Same CHARACTER_IDS-derived generation as
+// CHICKEN_IMAGES above.
+const DIVINE_JUDGMENT_STRUCK_IMAGES = CHARACTER_IDS.filter((id) => id !== 'athena').map(
+  (id) => `assets/images/${id}/judgement_strike.jpg`
+);
+
 let started = false;
 // Resolves once every preloaded image has either loaded or failed - used by
 // main.js to gate the battle screen behind a brief "preparing battle" wait
@@ -131,7 +144,7 @@ let readyPromise = null;
 export function preloadBattleImages() {
   if (started) return readyPromise;
   started = true;
-  const paths = [...FLASH_IMAGES, ...CHICKEN_IMAGES];
+  const paths = [...FLASH_IMAGES, ...CHICKEN_IMAGES, ...DIVINE_JUDGMENT_STRUCK_IMAGES];
   for (const folder of PER_CHARACTER_FOLDERS) {
     for (const id of CHARACTER_IDS) paths.push(`${folder}/${id}.jpg`);
   }

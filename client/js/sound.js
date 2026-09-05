@@ -277,6 +277,7 @@ const ACTION_SOUND = {
   // Reuses Grimtal's spear-thrust impact sound - fitting for her own
   // spear-lunge sacrifice attack, per explicit request.
   divineSacrifice: 'sword_thud',
+  divineJudgment: 'divine_judgment',
   mirageMark: 'mirage_mark',
   mirageBurst: 'mirage_burst',
   mirageOverload: 'mirage_overload',

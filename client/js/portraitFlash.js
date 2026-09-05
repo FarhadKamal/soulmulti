@@ -39,6 +39,12 @@ const WORLD_STOPS_FLASH_DURATION_MS = 4500;
 // other multi-round special uses (Earthshatter/Grim Barrage/World Stops).
 const FOWL_PLAY_FLASH_DURATION_MS = 4500;
 
+// Athena's Divine Judgment TRIGGER moment (the marked victim's own death,
+// not the cast) - same 4.5s scale as every other dramatic multi-beat
+// special above, so the shared struck-down art has time to actually read
+// before the victim's normal koed.jpg portrait would otherwise take over.
+const DIVINE_JUDGMENT_TRIGGER_FLASH_DURATION_MS = 4500;
+
 // Grimtal's power.jpg follow-up: fires AFTER his own strike flash has fully
 // finished playing (not simultaneously), same "let the first beat read
 // before the second starts" sequencing Rowan's mirror-shard effect uses
@@ -395,6 +401,23 @@ export function handleLogEntryForFlash(entry, game) {
     if (!isKO(entry.characterId)) setFlash(entry.characterId, 'assets/images/athena/curse.jpg');
     return;
   }
+  if (entry.type === 'divine-judgment-trigger') {
+    // The TRIGGER moment (Athena's own death killing her marked victim) -
+    // deliberately NOT gated on !isKO(entry.toCharacterId) like every
+    // other flash in this file, since the victim IS KO'd by the time this
+    // entry is even pushed (applyDamage already ran) - that's exactly the
+    // moment this flash needs to show, overriding the plain koed.jpg for
+    // DIVINE_JUDGMENT_TRIGGER_FLASH_DURATION_MS so the death reads as "the
+    // pact," not a normal KO. Per-victim-hero art (confirmed ruling,
+    // 2026-09-05: "no asset limitation... we will create for each hero") -
+    // assets/images/<victimId>/judgement_strike.jpg (this exact spelling
+    // is the real filename used, not "judgment_struck"), one per hero (all
+    // 15 possible victims, everyone except Athena herself).
+    if (entry.koTriggered) {
+      setFlash(entry.toCharacterId, `assets/images/${entry.toCharacterId}/judgement_strike.jpg`, DIVINE_JUDGMENT_TRIGGER_FLASH_DURATION_MS);
+    }
+    return;
+  }
   if (entry.type === 'prediction-result') {
     // Oraclus's Rune Vision resolving - its own dedicated log entry type
     // (server's resolveOraclusPredictionIfPending), same reasoning as
@@ -469,6 +492,8 @@ export function handleLogEntryForFlash(entry, game) {
     case 'divineSacrifice':
       if (!dodged && amountDealt > 0) setFlash(characterId, 'assets/images/athena/sacrifice.jpg');
       break;
+    case 'divineJudgment':
+      setFlash(characterId, 'assets/images/athena/judgment.jpg'); break;
     case 'glorySmash':
       setFlash(characterId, 'assets/images/tharox/glory.jpg'); break;
     case 'earthshatter':
