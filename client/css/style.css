@@ -256,7 +256,7 @@ input {
 .char-portrait--mind-control-overlay {
   position: absolute; top: 8px; left: 8px; right: 8px;
   width: calc(100% - 16px); margin-bottom: 0;
-  opacity: 0.45; pointer-events: none; z-index: 2;
+  opacity: 0.4; pointer-events: none; z-index: 2;
 }
 .char-name { font-weight: 700; }
 .char-hearts { font-size: 0.9em; display: flex; flex-wrap: wrap; gap: 2px; }
