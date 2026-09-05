@@ -21,8 +21,28 @@ export function registerOnAnyDeath(callback) {
 // `diedCharacterId`: who just died. `sourceCharacterId`/`isMirror`: who/what
 // dealt the killing blow, so a callback can attribute credit correctly
 // (e.g. "was this MY OWN direct kill, or someone/something else's").
+//
+// Return values ARE collected and merged (confirmed necessary 2026-09-05,
+// added for Athena's Divine Judgment - see athena.js's own registration):
+// a callback that itself calls applyDamage (a second, real kill triggered
+// by this death) needs its own deferred log entry threaded back through
+// applyDamage's `result`, same "defer it, don't push here" pattern as
+// Athena's curse-mirror/Blade's Rebirth/Rowan's Mirror Reflect all already
+// use - pushing directly to `log` from inside this callback lands it
+// BEFORE the triggering action's own log line, since this fires mid-way
+// through applyDamage, before the caller's own log.push() for that action.
+// Confirmed live bug: "Divine Judgment falls upon Tharox - KO!" appeared
+// BEFORE "Blade used Blood Hunt on Athena - 1 damage - KO!" in a real
+// match log - the trigger entry was being pushed directly inside the
+// callback instead of returned and deferred. Every registered callback
+// returning a plain object gets merged onto one shared result (later
+// callbacks' keys win on collision, though in practice no two callbacks
+// are expected to return the same key).
 export function runOnAnyDeath(diedCharacterId, sourceCharacterId, isMirror, game, log) {
+  let merged;
   for (const callback of callbacks) {
-    callback(diedCharacterId, sourceCharacterId, isMirror, game, log);
+    const extra = callback(diedCharacterId, sourceCharacterId, isMirror, game, log);
+    if (extra) merged = { ...merged, ...extra };
   }
+  return merged;
 }

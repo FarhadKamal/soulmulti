@@ -324,6 +324,11 @@ function tickPoisonIfAny(character, game, log) {
   // heroes!" appeared BEFORE "Boingo takes 1 poison damage - KO!" in a
   // real match log).
   if (result.fowlPlayRevertLogEntry) log.push({ ...result.fowlPlayRevertLogEntry, hearts: heartsSnapshot(game) });
+  // Athena's Divine Judgment trigger - same deferred handling as
+  // fowlPlayRevertLogEntry directly above: a poison tick that happens to
+  // kill a marked Athena needs this path to push the trigger entry too,
+  // same reasoning as every other deferred entry on this call path.
+  if (result.divineJudgmentTriggerLogEntry) log.push({ ...result.divineJudgmentTriggerLogEntry, hearts: heartsSnapshot(game) });
 }
 
 // Rowan's Silence Lock, same victim-turn-tick shape as poison above.
@@ -1003,6 +1008,11 @@ export function resolveFullControl(game, log, casterCharacterId) {
       if (result?.mirrorResult?.rebirthLogEntry) log.push(result.mirrorResult.rebirthLogEntry);
       if (result?.mirrorReflectLogEntry) log.push(result.mirrorReflectLogEntry);
       if (result?.mirrorReflectResult?.rebirthLogEntry) log.push(result.mirrorReflectResult.rebirthLogEntry);
+      // Athena's Divine Judgment trigger - if she's one of the puppets and
+      // dies mid-burst while a mark is still armed, this needs the same
+      // deferred handling as every other call site on this list, or it's
+      // silently dropped entirely (nothing else reads this field here).
+      if (result?.divineJudgmentTriggerLogEntry) log.push(result.divineJudgmentTriggerLogEntry);
       const snapshot = heartsSnapshot(game);
       for (let i = before; i < log.length; i++) {
         if (!log[i].hearts) log[i].hearts = snapshot;
@@ -1105,6 +1115,12 @@ export function finalizeAction(game, log, result, characterId, actionId, targetI
   // same reasoning as every other entry in this block - the very next line
   // (end-action) already carries the correct final one.
   if (result?.fowlPlayRevertLogEntry) log.push(result.fowlPlayRevertLogEntry);
+  // Athena's Divine Judgment trigger - same deferred reasoning as
+  // fowlPlayRevertLogEntry directly above (see damagePipeline.js's own
+  // comment where this field is set). Confirmed live bug, 2026-09-05:
+  // "Divine Judgment falls upon Tharox - KO!" appeared BEFORE the
+  // triggering attack's own descriptive line in a real match log.
+  if (result?.divineJudgmentTriggerLogEntry) log.push(result.divineJudgmentTriggerLogEntry);
   applyEndOfActionChecks(game);
   game.log.push(...log, { type: 'end-action', round: game.round, characterId, actionId, targetId, hearts: heartsSnapshot(game) });
 }
@@ -1211,6 +1227,11 @@ export function resolveJesterBall(game, holderCharacterId, choice, extra) {
   // own deferred pushes above (this log array is local, followed by this
   // same call's own end-action a few lines down).
   if (result?.rebirthLogEntry) log.push(result.rebirthLogEntry);
+  // Athena's Divine Judgment trigger - a Jester Ball explosion can KO her
+  // too (she can hold/be forced to Take it like anyone else), same
+  // deferred handling as every other call site that resolves applyDamage
+  // outside the normal executeAction/finalizeAction path.
+  if (result?.divineJudgmentTriggerLogEntry) log.push(result.divineJudgmentTriggerLogEntry);
   applyEndOfActionChecks(game);
   game.log.push(...log, { type: 'end-action', round: game.round, characterId: holderCharacterId, actionId: `jesterBall:${choice}`, hearts: heartsSnapshot(game) });
   return result;

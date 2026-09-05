@@ -448,7 +448,15 @@ export function applyDamage(game, log, {
     // Grim Strike own-kill/unclaimed-kill bookkeeping now lives in his own
     // ability file's registered callback, replacing the inline
     // `if (target.id !== 'grimtal') { ... }` block that used to be here.
-    runOnAnyDeath(target.id, sourceCharacterId, isMirror, game, log);
+    // Athena's Divine Judgment trigger also hangs off this same dispatch -
+    // its own deferred log entry is pulled out and merged onto `result`
+    // here, same "defer it, don't push inside the callback" pattern as
+    // fowlPlayRevertLogEntry above, so finalizeAction can push it AFTER
+    // this action's own triggering log line instead of before it.
+    const anyDeathExtra = runOnAnyDeath(target.id, sourceCharacterId, isMirror, game, log);
+    if (anyDeathExtra?.divineJudgmentTriggerLogEntry) {
+      result.divineJudgmentTriggerLogEntry = anyDeathExtra.divineJudgmentTriggerLogEntry;
+    }
   }
 
   // onHitLanded dispatch (see engine/categories/onHitLanded.js): Melyssa's

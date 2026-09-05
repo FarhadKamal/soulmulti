@@ -83,10 +83,20 @@ registerOnAnyDeath((diedCharacterId, sourceCharacterId, isMirror, game, log) => 
     ignoresImmortal: true,
     ignoresRebirth: true,
   });
-  log.push({
-    type: 'divine-judgment-trigger', fromCharacterId: 'athena', toCharacterId: victimId,
-    koTriggered: result.koTriggered,
-  });
+  // Deferred (returned, not pushed to `log` here) - see onAnyDeath.js's own
+  // comment for why: this callback runs mid-way through the OUTER
+  // applyDamage call (whatever action actually delivered Athena's own
+  // killing blow), before that caller's own log.push() for its attack
+  // line, so pushing directly here would land this entry BEFORE the
+  // triggering attack's own line instead of after it. Confirmed live bug,
+  // 2026-09-05: "Divine Judgment falls upon Tharox - KO!" appeared before
+  // "Blade used Blood Hunt on Athena - 1 damage - KO!" in a real match.
+  return {
+    divineJudgmentTriggerLogEntry: {
+      type: 'divine-judgment-trigger', fromCharacterId: 'athena', toCharacterId: victimId,
+      koTriggered: result.koTriggered,
+    },
+  };
 });
 
 // Curse mirror (see engine/categories/onHitLanded.js): triggered by damage
