@@ -43,11 +43,22 @@ registerOnAnyDeath((diedCharacterId, sourceCharacterId, isMirror, game) => {
   if (diedCharacterId === 'grimtal') return;
   const grimtal = game.characters.grimtal;
   if (!grimtal || grimtal.isKO) return;
-  // lastKillCreditSourceFor: remembers, PER VICTIM, which counter this most
-  // recent KO credit went into - needed so a Resurrection Gamble revival
-  // (Draxus's Cheat Death, taxonomy #32) can roll back the EXACT counter
-  // that was actually incremented, not guess. Only ever consulted/cleared
-  // for 'draxus' today (see the onOtherRevived rollback above), but keyed
+  // lastKillCreditSourceFor: remembers, PER VICTIM, WHICH POOL this most
+  // recent KO credit is CURRENTLY sitting in - needed so a Resurrection
+  // Gamble revival (Draxus's Cheat Death, taxonomy #32) can roll back the
+  // exact counter it's actually in RIGHT NOW, not just where it started.
+  // Confirmed bug, 2026-09-06 (found via a live match log): unclaimedKillCount
+  // and claimedKillCount are anonymous/fungible pools, NOT tracked per-kill -
+  // if Claim the Kill (actions.claimKill below) moves a unit from unclaimed
+  // to claimed BEFORE Draxus revives, a rollback that only ever checks the
+  // ORIGINAL 'unclaimed' tag would decrement the wrong (already-vacated)
+  // pool, leaving the phantom credit sitting uncorrected in claimedKillCount
+  // forever. Fixed by having claimKill's own mutate() update this map too,
+  // flipping 'unclaimed' -> 'claimed' for whichever victim's credit it's
+  // claiming (see claimKill below for how that victim is chosen from
+  // multiple candidates) - so this map always reflects current location,
+  // not just original source. Only ever consulted/cleared for 'draxus'
+  // today (see the onOtherRevived rollback further below), but keyed
   // generically per-victim rather than hardcoded to him, in case a future
   // character gains a similar undo-my-own-death mechanic.
   if (sourceCharacterId === 'grimtal' && !isMirror) {
@@ -88,10 +99,20 @@ registerOnOtherRevived((revivedCharacterId, game) => {
   // for it in the first place; this callback only needs to fire for a
   // GENUINE prior KO being undone after the fact.
   if (grimtal && !grimtal.isKO && revivedCharacterId === 'draxus') {
-    if (grimtal.special.lastKillCreditSourceFor?.draxus === 'own') {
+    const source = grimtal.special.lastKillCreditSourceFor?.draxus;
+    if (source === 'own') {
       grimtal.special.ownKillCount = Math.max(0, grimtal.special.ownKillCount - 1);
-    } else if (grimtal.special.lastKillCreditSourceFor?.draxus === 'unclaimed') {
+    } else if (source === 'unclaimed') {
       grimtal.special.unclaimedKillCount = Math.max(0, grimtal.special.unclaimedKillCount - 1);
+    } else if (source === 'claimed') {
+      // Fixed 2026-09-06 (found via a live match log showing Claim the Kill
+      // fire between his death and revival): the credit had already moved
+      // out of unclaimedKillCount into claimedKillCount by the time this
+      // fires - roll back THAT pool instead, since that's where it's
+      // actually sitting right now (see claimKill's own mutate() above,
+      // which keeps this map in sync with the credit's CURRENT location,
+      // not just its original source).
+      grimtal.special.claimedKillCount = Math.max(0, grimtal.special.claimedKillCount - 1);
     }
     if (grimtal.special.lastKillCreditSourceFor) delete grimtal.special.lastKillCreditSourceFor.draxus;
   }
@@ -179,6 +200,22 @@ export const actions = {
     mutate(character) {
       character.special.unclaimedKillCount -= 1;
       character.special.claimedKillCount += 1;
+      // Resurrection Gamble rollback tracking (taxonomy #32, fixed
+      // 2026-09-06) - the unclaimed/claimed pools are anonymous/fungible
+      // (no per-kill identity), so this can't know FOR CERTAIN which
+      // specific banked victim's credit it just moved. Flips the oldest
+      // still-'unclaimed'-tagged entry in lastKillCreditSourceFor to
+      // 'claimed' as the best available approximation - correct whenever
+      // only one kill is actually banked (the overwhelmingly common case,
+      // since Claim the Kill's own isLegal already requires
+      // unclaimedKillCount > 0 and most casts happen close to the kill
+      // itself), and no worse than the pre-fix behavior (which didn't
+      // track this at all) even in the rarer multi-banked-kill case.
+      const src = character.special.lastKillCreditSourceFor;
+      if (src) {
+        const oldestUnclaimedId = Object.keys(src).find((id) => src[id] === 'unclaimed');
+        if (oldestUnclaimedId) src[oldestUnclaimedId] = 'claimed';
+      }
     },
   }),
   skullCrack: {
