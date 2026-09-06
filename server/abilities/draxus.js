@@ -14,12 +14,10 @@ function dyingBlowAmount(hearts) {
 }
 
 // Resurrection Gamble (taxonomy #32, design-locked 2026-09-06, see project
-// memory soulclash_draxus_new_ability_design.md - NOT implemented until
-// this exact pass): the odds of a successful Cheat Death roll.
-// TEMP TEST OVERRIDE (2026-09-06): bumped 0.25 -> 1 at the user's explicit
-// request to make the mechanic trivially observable in live testing -
-// revert to 0.25 before this is considered done/shipped.
-export const CHEAT_DEATH_REVIVE_CHANCE = 1;
+// memory soulclash_draxus_new_ability_design.md): the odds of a successful
+// Cheat Death roll. Confirmed final value, 2026-09-06 (was bumped to 1 for
+// live testing, now reverted back to the originally-locked design value).
+export const CHEAT_DEATH_REVIVE_CHANCE = 0.25;
 export const CHEAT_DEATH_REVIVE_HEARTS = 1;
 
 // True whenever there are at least 2 OTHER living characters besides
