@@ -258,6 +258,17 @@ input {
   width: calc(100% - 16px); margin-bottom: 0;
   opacity: 0.4; pointer-events: none; z-index: 2;
 }
+/* Tharox's Earthshatter: a generic falling-stone image layered on top of
+   EVERY victim's own portrait for the duration of the flash (same shape as
+   Melyssa's mind-control overlay above - an opaque JPG faded via CSS
+   opacity, since Gemini can't reliably produce genuine alpha transparency).
+   Same positioning/sizing as the mind-control overlay so it exactly covers
+   the base .char-portrait underneath. */
+.char-portrait--earthshatter-overlay {
+  position: absolute; top: 8px; left: 8px; right: 8px;
+  width: calc(100% - 16px); margin-bottom: 0;
+  opacity: 0.4; pointer-events: none; z-index: 2;
+}
 .char-name { font-weight: 700; }
 .char-hearts { font-size: 0.9em; display: flex; flex-wrap: wrap; gap: 2px; }
 .heart-icon { font-size: 1.1em; line-height: 1; }

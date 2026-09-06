@@ -2,7 +2,7 @@ import { CHARACTERS } from './characters.js';
 import { send } from './net.js';
 import { renderChatPanel } from './chatPanel.js';
 import { playUiClick } from './sound.js';
-import { getFlashSrc, getPersistentPortrait, isMindControlOverlayActive } from './portraitFlash.js';
+import { getFlashSrc, getPersistentPortrait, isMindControlOverlayActive, isEarthshatterOverlayActive } from './portraitFlash.js';
 import { getActiveEffects, getClawCount, getCrackCount, getPowSize, getVortexSize, getAxechopTier, getLightningTier, getWildLightningTier, getDarkslashVariant } from './actionEffects.js';
 import { renderFullscreenButton } from './fullscreen.js';
 import { v, hardRefresh } from './assetVersion.js';
@@ -1168,6 +1168,19 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
     mindControlOverlay.src = v('assets/images/melyssa/mind_control_overlay.jpg');
     mindControlOverlay.alt = '';
     tile.appendChild(mindControlOverlay);
+  }
+
+  // Tharox's Earthshatter: a generic falling-stone image layered on top of
+  // every VICTIM's own portrait for the duration of the burst - same
+  // opaque-JPG-faded-via-CSS-opacity pattern as Melyssa's mind-control
+  // overlay just above, tracked the same way (a timed Set in
+  // portraitFlash.js, populated from the log entry's own per-target hits).
+  if (isEarthshatterOverlayActive(character.id) && !character.isKO) {
+    const earthshatterOverlay = document.createElement('img');
+    earthshatterOverlay.className = 'char-portrait char-portrait--earthshatter-overlay';
+    earthshatterOverlay.src = v('assets/images/tharox/earthshatter_overlay.jpg');
+    earthshatterOverlay.alt = '';
+    tile.appendChild(earthshatterOverlay);
   }
 
   const name = document.createElement('div');

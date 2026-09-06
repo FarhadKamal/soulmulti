@@ -42,6 +42,7 @@ const FLASH_IMAGES = [
   'assets/images/chronox/world_stop.jpg',
   'assets/images/tharox/glory.jpg',
   'assets/images/tharox/final.jpg',
+  'assets/images/tharox/earthshatter_overlay.jpg',
   'assets/images/tharox/roar.jpg',
   'assets/images/tharox/smash.jpg',
   'assets/images/tharox/toss.jpg',

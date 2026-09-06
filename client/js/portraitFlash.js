@@ -84,6 +84,19 @@ const MIND_CONTROL_OVERLAY_DURATION_MS = 5000;
 export function isMindControlOverlayActive(characterId) {
   return mindControlOverlayIds.has(characterId);
 }
+
+// Tharox's Earthshatter: same timed-Set-of-ids shape as the mind-control
+// overlay above, but populated with every VICTIM who actually took damage
+// this cast (read from the log entry's own `hits` array), not a fixed list
+// handed in directly - see handleLogEntryForFlash's own 'earthshatter' case
+// below. Shares the same duration as his own EARTHSHATTER_FLASH_DURATION_MS
+// cast flash so both effects start and end together.
+const earthshatterOverlayIds = new Set();
+let earthshatterOverlayTimer = null;
+
+export function isEarthshatterOverlayActive(characterId) {
+  return earthshatterOverlayIds.has(characterId);
+}
 // Tracks each idle-portrait character's hearts as of their last turn start,
 // to detect "untouched since last turn" - same reasoning as
 // athenaHeartsAtLastTurnStart etc. in the main game.
@@ -513,6 +526,38 @@ export function handleLogEntryForFlash(entry, game) {
   if (entry.type === 'clean-slate-trigger') {
     if (!isKO(entry.characterId)) setFlash(entry.characterId, 'assets/images/marin/clean_slate.jpg');
     return;
+  }
+
+  if (entry.type === 'special' && entry.actionId === 'earthshatter') {
+    // Tharox's own cast flash still fires via the generic switch below (his
+    // characterId is 'attack'/'special'-shaped like any other action) -
+    // this block ONLY handles the separate victim-overlay layer, read from
+    // entry.hits (per-target results, see tharox.js's own execute() - the
+    // real shape is { targetId, amountDealt, koTriggered }, NOT
+    // targetCharacterId/dodged - Earthshatter always sets ignoresDodge:
+    // true on every point, so there's no dodge concept to check here at
+    // all). Every victim who actually took real damage (amountDealt > 0)
+    // gets the falling-stone overlay for the same duration as his own cast
+    // flash - one shared timer, since the whole AoE resolves as a single
+    // instant burst, same reasoning as Full Control's own shared overlay
+    // timer above.
+    if (earthshatterOverlayTimer) clearTimeout(earthshatterOverlayTimer);
+    earthshatterOverlayIds.clear();
+    for (const hit of entry.hits || []) {
+      if (hit.amountDealt > 0 && !isKO(hit.targetId)) {
+        earthshatterOverlayIds.add(hit.targetId);
+      }
+    }
+    if (earthshatterOverlayIds.size > 0) {
+      earthshatterOverlayTimer = setTimeout(() => {
+        earthshatterOverlayTimer = null;
+        earthshatterOverlayIds.clear();
+        onFlashExpired();
+      }, EARTHSHATTER_FLASH_DURATION_MS);
+    }
+    // Deliberately NOT returning here - falls through to the generic
+    // switch below so Tharox's own 'assets/images/tharox/final.jpg' cast
+    // flash (case 'earthshatter') still fires exactly as before.
   }
 
   if (entry.type !== 'attack' && entry.type !== 'special' && entry.type !== 'setup') return;
