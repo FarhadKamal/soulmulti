@@ -45,6 +45,13 @@ const FOWL_PLAY_FLASH_DURATION_MS = 4500;
 // before the victim's normal koed.jpg portrait would otherwise take over.
 const DIVINE_JUDGMENT_TRIGGER_FLASH_DURATION_MS = 4500;
 
+// Resurrection Gamble (Draxus's Cheat Death, taxonomy #32) - a successful
+// revival reuses the SAME sound effect as Deathless Fury's own cast
+// (assets/sounds/deathless_fury.mp3, confirmed ruling 2026-09-06: "same
+// mp3 deathless_fury"), so the flash duration is sized to match that same
+// cast's own scale rather than a longer dramatic multi-beat special.
+const CHEAT_DEATH_REVIVE_FLASH_DURATION_MS = FLASH_DURATION_MS;
+
 // Grimtal's power.jpg follow-up: fires AFTER his own strike flash has fully
 // finished playing (not simultaneously), same "let the first beat read
 // before the second starts" sequencing Rowan's mirror-shard effect uses
@@ -187,6 +194,20 @@ export function getPersistentPortrait(character) {
   // "real serialized state, not a client timer" pattern as Melyssa's own
   // held portrait above.
   if (character.id === 'draxus' && character.special?.deathproofActive) return v('assets/images/draxus/immortality.jpg');
+  // Resurrection Gamble (Cheat Death, taxonomy #32) - same "sticky, for the
+  // rest of the match" shape as Blade's own post-Rebirth alive.jpg just
+  // above, confirmed ruling: "after he alive. that alive image will show
+  // rest of the match until he koed again" - hasRevivedOnce never clears
+  // itself (unlike deathproofActive), so this checked BEFORE the
+  // deathproofActive branch would be wrong priority if he somehow also had
+  // it active; in practice the two never overlap (Deathless Fury requires
+  // being alive to cast, Cheat Death only fires while dead), so order
+  // between them doesn't matter here. Also covers his injured display -
+  // confirmed ruling: "his potrait/injured image after alive is alive.jpg"
+  // - battleScreen.js's own injured-threshold branch never runs for him
+  // once this persistent override wins first, same priority position every
+  // other persistent portrait here already relies on.
+  if (character.id === 'draxus' && character.special?.hasRevivedOnce) return v('assets/images/draxus/alive.jpg');
   return null;
 }
 
@@ -401,6 +422,20 @@ export function handleLogEntryForFlash(entry, game) {
     if (!isKO(entry.characterId)) setFlash(entry.characterId, 'assets/images/athena/curse.jpg');
     return;
   }
+  if (entry.type === 'cheat-death') {
+    // Resurrection Gamble (Draxus's Cheat Death, taxonomy #32) - a failed
+    // roll (success: false) shows nothing at all, he's still just sitting
+    // there KO'd (koed.jpg keeps showing via the normal isKO branch). A
+    // successful roll flashes the revival burst - by the time this entry
+    // is pushed, isKO has already flipped back to false (draxus.js's
+    // executeCheatDeath sets it before pushing this entry), so the normal
+    // isKO guard already reads correctly here without needing the
+    // divine-judgment-trigger entry's own special-cased inversion above.
+    if (entry.success && !isKO(entry.characterId)) {
+      setFlash(entry.characterId, 'assets/images/draxus/alive.jpg', CHEAT_DEATH_REVIVE_FLASH_DURATION_MS);
+    }
+    return;
+  }
   if (entry.type === 'divine-judgment-trigger') {
     // The TRIGGER moment (Athena's own death killing her marked victim) -
     // deliberately NOT gated on !isKO(entry.toCharacterId) like every
@@ -546,8 +581,17 @@ export function handleLogEntryForFlash(entry, game) {
       // this one actionId/execute(), so the distinction has to come from
       // the log entry's own isBonusStrike flag (draxus.js), not the
       // action id itself.
+      //
+      // Resurrection Gamble (Cheat Death, taxonomy #32) - EVERY strike for
+      // the rest of the match after a successful revival also flashes
+      // immortal_strike.jpg, not just genuine Deathless Fury bonus strikes
+      // (confirmed ruling: "for every strike immortal strike image will
+      // play" - "he was koed. and alived again"). hasRevivedOnce is sticky
+      // (never clears), matching alive.jpg's own persistent-portrait
+      // lifetime above.
       if (!dodged && amountDealt > 0) {
-        setFlash(characterId, entry.isBonusStrike ? 'assets/images/draxus/immortal_strike.jpg' : 'assets/images/draxus/normal_strike.jpg');
+        const usesImmortalStrike = entry.isBonusStrike || game.characters.draxus?.special?.hasRevivedOnce;
+        setFlash(characterId, usesImmortalStrike ? 'assets/images/draxus/immortal_strike.jpg' : 'assets/images/draxus/normal_strike.jpg');
       }
       break;
     case 'deathlessFury':

@@ -67,6 +67,7 @@ const FLASH_IMAGES = [
   'assets/images/draxus/normal_strike.jpg',
   'assets/images/draxus/immortal_strike.jpg',
   'assets/images/draxus/immortality.jpg',
+  'assets/images/draxus/alive.jpg',
   'assets/images/rowan/idle.jpg',
   'assets/images/rowan/wand_strike.jpg',
   'assets/images/rowan/arcane_study.jpg',

@@ -43,10 +43,19 @@ registerOnAnyDeath((diedCharacterId, sourceCharacterId, isMirror, game) => {
   if (diedCharacterId === 'grimtal') return;
   const grimtal = game.characters.grimtal;
   if (!grimtal || grimtal.isKO) return;
+  // lastKillCreditSourceFor: remembers, PER VICTIM, which counter this most
+  // recent KO credit went into - needed so a Resurrection Gamble revival
+  // (Draxus's Cheat Death, taxonomy #32) can roll back the EXACT counter
+  // that was actually incremented, not guess. Only ever consulted/cleared
+  // for 'draxus' today (see the onOtherRevived rollback above), but keyed
+  // generically per-victim rather than hardcoded to him, in case a future
+  // character gains a similar undo-my-own-death mechanic.
   if (sourceCharacterId === 'grimtal' && !isMirror) {
     grimtal.special.ownKillCount += 1;
+    grimtal.special.lastKillCreditSourceFor = { ...grimtal.special.lastKillCreditSourceFor, [diedCharacterId]: 'own' };
   } else {
     grimtal.special.unclaimedKillCount += 1;
+    grimtal.special.lastKillCreditSourceFor = { ...grimtal.special.lastKillCreditSourceFor, [diedCharacterId]: 'unclaimed' };
   }
 });
 
@@ -65,6 +74,26 @@ registerOnOtherRevived((revivedCharacterId, game) => {
   if (grimtal && grimtal.special.headacheVictimId === revivedCharacterId) {
     grimtal.special.headacheVictimId = null;
     grimtal.special.headacheRollPending = false;
+  }
+  // Resurrection Gamble rollback (Draxus's Cheat Death, taxonomy #32,
+  // confirmed ruling 2026-09-06: "becareful grimtal have to give up his
+  // death count for each alive count") - a KO Grimtal already banked
+  // credit for (either ownKillCount, if HE landed it, or unclaimedKillCount,
+  // if someone/something else did) must be given back the instant that
+  // exact KO turns out not to have stuck after all. Only relevant for
+  // Draxus specifically (the one character whose own death can currently
+  // be undone this way) - every other onOtherRevived case in the game
+  // today is Blade's Rebirth, which intercepts the killing blow BEFORE
+  // isKO ever flips true, so runOnAnyDeath (and this credit) never fired
+  // for it in the first place; this callback only needs to fire for a
+  // GENUINE prior KO being undone after the fact.
+  if (grimtal && !grimtal.isKO && revivedCharacterId === 'draxus') {
+    if (grimtal.special.lastKillCreditSourceFor?.draxus === 'own') {
+      grimtal.special.ownKillCount = Math.max(0, grimtal.special.ownKillCount - 1);
+    } else if (grimtal.special.lastKillCreditSourceFor?.draxus === 'unclaimed') {
+      grimtal.special.unclaimedKillCount = Math.max(0, grimtal.special.unclaimedKillCount - 1);
+    }
+    if (grimtal.special.lastKillCreditSourceFor) delete grimtal.special.lastKillCreditSourceFor.draxus;
   }
 });
 

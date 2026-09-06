@@ -58,7 +58,22 @@ const CHICKEN_ATTACK_ACTION = {
   isLegal: () => true,
 };
 
+// Resurrection Gamble (Draxus's Cheat Death, taxonomy #32) - same
+// synthetic, character-agnostic-shaped override as CHICKEN_ATTACK_ACTION
+// above, not declared in draxus.js's own actions map since it only ever
+// applies while he's actually KO'd (every real actions-map entry there
+// implicitly assumes a living character). No target - the roll is against
+// fate, not another character.
+const CHEAT_DEATH_ACTION = {
+  label: 'Cheat Death',
+  needsTarget: false,
+  isLegal: () => true,
+};
+
 export function getLegalActions(character, game) {
+  if (character.id === 'draxus' && character.isKO && character.special.cheatDeathEligible) {
+    return [{ actionId: 'cheatDeath', ...CHEAT_DEATH_ACTION }];
+  }
   if (isChickenified(character)) {
     return [{ actionId: 'chickenAttack', ...CHICKEN_ATTACK_ACTION }];
   }
@@ -1046,6 +1061,12 @@ export function executeAction(game, characterId, actionId, targetId, extra) {
   let result;
   if (actionId === 'chickenAttack') {
     result = executeChickenAttack(character, targetId, game, log);
+  } else if (actionId === 'cheatDeath') {
+    // Resurrection Gamble (Draxus's Cheat Death, taxonomy #32) - same
+    // "mechanism lives in the engine, trigger lives in the ability file"
+    // split as chickenAttack above; draxus.js's own executeCheatDeath does
+    // the actual roll/revive/fresh-copy-reset logic.
+    result = draxus.executeCheatDeath(character, game, log);
   } else if (actionId === 'fullControl') {
     // Melyssa's Full Control - melyssa.js's own actions.fullControl.execute
     // only does the cast-time bookkeeping (usedFullControl flag, log
@@ -1258,7 +1279,20 @@ export function resolveJesterBall(game, holderCharacterId, choice, extra) {
 
 function applyEndOfActionChecks(game) {
   for (const player of game.players) {
-    player.isEliminated = player.characterIds.every((id) => game.characters[id].isKO);
+    // Resurrection Gamble (Draxus's Cheat Death, taxonomy #32): a KO'd
+    // Draxus does NOT count as eliminated while cheatDeathEligible is still
+    // true - he's still due a Cheat Death turn/roll before his player can
+    // genuinely be considered out. cheatDeathEligible itself is only ever
+    // set true on his own KO when the stop condition (>=2 other living
+    // characters) is met (see draxus.js's onOwnDeath registration) - a 1v1
+    // KO never sets it in the first place, so this has no effect there and
+    // the match ends immediately exactly as before (confirmed ruling: "in
+    // 1 v 1 situation... if draxus koed. its over").
+    player.isEliminated = player.characterIds.every((id) => {
+      const c = game.characters[id];
+      if (id === 'draxus' && c.isKO && c.special.cheatDeathEligible) return false;
+      return c.isKO;
+    });
   }
   const remaining = game.players.filter((p) => !p.isEliminated);
   if (remaining.length === 1) {
@@ -1281,7 +1315,15 @@ export function charactersActingThisTurn(game) {
   const player = currentPlayer(game);
   return player.characterIds
     .map((id) => game.characters[id])
-    .filter((c) => !c.isKO);
+    // Resurrection Gamble (taxonomy #32, Draxus's Cheat Death, design-
+    // locked 2026-09-06): a KO'd character normally never appears in this
+    // walk at all (every other dead character is fully skipped, forever).
+    // Draxus is the one deliberate exception - while cheatDeathEligible is
+    // true (set on his own KO, cleared on a successful revival or once the
+    // match's stop condition removes him from rolling), he still gets a
+    // turn slot so getActingCharacterId can offer him the Cheat Death
+    // button instead of a normal action set.
+    .filter((c) => !c.isKO || c.special?.cheatDeathEligible);
 }
 
 export function hasCharacterActedThisTurn(game, characterId) {

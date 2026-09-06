@@ -199,7 +199,13 @@ const ACTION_VOICE_LINES = {
   // wired separately via playDraxusStrikeVoice below, called directly from
   // main.js's dedicated isBonusStrike branch instead of the generic
   // playMoveVoice dispatch every other actionId uses.
-  draxus: { deathlessFury: 'immortality' },
+  // cheatDeath: Resurrection Gamble's own revival voice line (taxonomy
+  // #32) - only ever played on a SUCCESSFUL roll (main.js's own
+  // 'cheat-death' dispatch branch gates this on entry.success itself,
+  // mirroring how it also gates the reused deathless_fury sound effect); a
+  // failed roll is silent, same as any other unsuccessful gamble in the
+  // game.
+  draxus: { deathlessFury: 'immortality', cheatDeath: 'alive' },
   rowan: {
     wandStrike: 'wand_strike',
     arcaneStudy: 'arcane_study',

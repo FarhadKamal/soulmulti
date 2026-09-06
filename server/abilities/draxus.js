@@ -1,4 +1,6 @@
-import { applyDamage, heartsSnapshot } from '../engine/damagePipeline.js';
+import { applyDamage, heartsSnapshot, clearNegativeStatuses } from '../engine/damagePipeline.js';
+import { registerOnOwnDeath } from '../engine/categories/onOwnDeath.js';
+import { runOnOtherRevived } from '../engine/categories/onOtherRevived.js';
 
 const DYING_BLOW_TIERS = [
   { min: 6, amount: 1 },
@@ -11,18 +13,109 @@ function dyingBlowAmount(hearts) {
   return tier ? tier.amount : 1;
 }
 
+// Resurrection Gamble (taxonomy #32, design-locked 2026-09-06, see project
+// memory soulclash_draxus_new_ability_design.md - NOT implemented until
+// this exact pass): the odds of a successful Cheat Death roll.
+// TEMP TEST OVERRIDE (2026-09-06): bumped 0.25 -> 1 at the user's explicit
+// request to make the mechanic trivially observable in live testing -
+// revert to 0.25 before this is considered done/shipped.
+export const CHEAT_DEATH_REVIVE_CHANCE = 1;
+export const CHEAT_DEATH_REVIVE_HEARTS = 1;
+
+// True whenever there are at least 2 OTHER living characters besides
+// Draxus himself - the stop condition (confirmed ruling: rolling continues
+// "until 2 different char alive" [besides him]). Below this, offering him
+// another Cheat Death turn would either be pointless (a genuine 1v1 - "in
+// 1 v 1 situation... if draxus koed. its over", so this never even arms in
+// the first place) or would indefinitely stall a match that's otherwise
+// already decided (only 1 other living character left, everyone else
+// already KO'd including him).
+function hasEnoughSurvivorsForCheatDeath(game) {
+  const others = Object.values(game.characters).filter((c) => c.id !== 'draxus' && !c.isKO);
+  return others.length >= 2;
+}
+
+// KO-branch cleanup (see engine/categories/onOwnDeath.js) - fires exactly
+// once, the instant Draxus's own hearts first reach 0 and isKO flips true
+// inside applyDamage's KO branch. Arms (or leaves un-armed) his Cheat Death
+// eligibility for this new "dead but rolling" cycle - re-armed on every one
+// of his deaths this match, not just the first (confirmed ruling: "this
+// 25% chance continue. he can get koed multiple time").
+registerOnOwnDeath('draxus', (character, game) => {
+  character.special.cheatDeathEligible = hasEnoughSurvivorsForCheatDeath(game);
+});
+
 // Fires exactly once at the start of his own turn (gated by
 // game.turnStartFiredFor in gameFlow.js's getActingCharacterId, so this
 // never re-fires mid-way through his own 3-strike bonus turn). This is
 // where the death-proof window ends and, if it was active, the bonus turn
 // is granted. If Deathless Fury was never cast (or already consumed), this
 // is a no-op every other turn.
+//
+// Also where reviveImmortalActive's own one-turn-delayed clear happens
+// (confirmed ruling: "immortal will stay untill his second turn come") -
+// same shape as deathproofActive just above, a SEPARATE flag since the two
+// windows are conceptually distinct (a proactive cast vs. an automatic
+// post-revival state) even though they can never be active at once in
+// practice. Fires on this SAME call as the eligibility re-check below,
+// since both are "things that resolve at the start of his own next turn."
 export function onTurnStart(character, game, log) {
   if (character.special.deathproofActive) {
     character.special.deathproofActive = false;
     character.special.bonusActionsRemaining = 3;
     log.push({ type: 'deathless-fury-end', characterId: character.id, hearts: heartsSnapshot(game) });
   }
+  if (character.special.reviveImmortalActive) {
+    character.special.reviveImmortalActive = false;
+  }
+  // While he's still KO'd and eligible, his own "turn" is the Cheat Death
+  // roll itself (see gameFlow.js's getActingCharacterId, which returns him
+  // here instead of skipping) - re-check the stop condition fresh every
+  // time this turn comes up, since other players may have died in the
+  // meantime and dropped the survivor count below 2 since he last rolled.
+  if (character.isKO && character.special.cheatDeathEligible && !hasEnoughSurvivorsForCheatDeath(game)) {
+    character.special.cheatDeathEligible = false;
+  }
+}
+
+// Cheat Death: the single button offered on a KO'd, still-eligible
+// Draxus's own turn (see turnEngine.js's getLegalActions/executeAction,
+// which dispatch here the same way Fowl Play's chickenAttack is handled -
+// not declared in the `actions` map below since it only ever applies while
+// he's actually dead, unlike every real entry there which implicitly
+// assumes a living character).
+export function executeCheatDeath(character, game, log) {
+  const success = Math.random() < CHEAT_DEATH_REVIVE_CHANCE;
+  if (!success) {
+    log.push({ type: 'cheat-death', characterId: character.id, success: false, hearts: heartsSnapshot(game) });
+    return {};
+  }
+  character.isKO = false;
+  character.hearts = CHEAT_DEATH_REVIVE_HEARTS;
+  character.special.cheatDeathEligible = false;
+  character.special.reviveImmortalActive = true;
+  character.special.hasRevivedOnce = true;
+  // "Fresh copy" reset, same pattern as Rebirth's own revival (see
+  // registerRebirth('blade', ...) in blade.js) - confirmed ruling:
+  // "remember after alive fresh copy like we did example for rebirth", then
+  // "fresh means negative status will remove". Clears every negative
+  // status CURRENTLY on him (curse, freeze/world-stops, marks, silence,
+  // headache, poison, grudge counts against him - clearNegativeStatuses
+  // covers curse/freeze/world-stops/marks/silence/headache; poison/grudge/
+  // mirage-stack cleanup for the OTHER caster's own side lives in each of
+  // THEIR ability modules' own registerOnOtherRevived callbacks, invoked
+  // below) plus his own transient self-state.
+  clearNegativeStatuses(character, game, log);
+  character.skipNextTurn = false;
+  character.skipHeadacheTurn = false;
+  // Every OTHER character's stale reference to him (a pending headache
+  // roll aimed at him, a banked grudge count, poison tracking, a stale
+  // Rewind snapshot, Grimtal's own kill-credit bookkeeping) is handled
+  // generically here - see each affected character's own onOtherRevived
+  // registration, same dispatch Blade's Rebirth already triggers.
+  runOnOtherRevived(character.id, game, log);
+  log.push({ type: 'cheat-death', characterId: character.id, success: true, hearts: heartsSnapshot(game) });
+  return { revived: true };
 }
 
 export const actions = {

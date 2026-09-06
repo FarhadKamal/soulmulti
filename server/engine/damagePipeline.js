@@ -383,7 +383,8 @@ export function applyDamage(game, log, {
     // runs mid-way through the ability's execute(), before its own
     // log.push() for the attack/special line itself.
     result.rebirthLogEntry = { type: 'rebirth', targetCharacterId };
-  } else if (target.id === 'draxus' && target.hearts === 0 && target.special.deathproofActive && !ignoresImmortal) {
+  } else if (target.id === 'draxus' && target.hearts === 0
+    && (target.special.deathproofActive || target.special.reviveImmortalActive) && !ignoresImmortal) {
     // Floors at 1 instead of KO - NOT a revival event (isKO is never set,
     // no "comes back fresh" cleanup like Rebirth's above, since he never
     // actually died: his hearts never truly reach/stay at 0). Deliberately
@@ -392,6 +393,13 @@ export function applyDamage(game, log, {
     // source: direct attacks, curse mirrors, Jester Ball explosions, all
     // of which route through this same applyDamage) until his own
     // onTurnStart clears it (draxus.js), at the start of his own next turn.
+    //
+    // reviveImmortalActive (Resurrection Gamble, taxonomy #32) shares this
+    // exact same floor mechanism - confirmed ruling: "immortal will stay
+    // untill his second turn come", the same one-turn-delayed-clear shape
+    // as deathproofActive, just a separate flag (see draxus.js's own
+    // onTurnStart) since the two windows are conceptually distinct even
+    // though they never overlap in practice.
     target.hearts = 1;
     result.deathproofSave = true;
   } else if (target.hearts === 0) {

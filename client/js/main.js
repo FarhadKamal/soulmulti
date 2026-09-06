@@ -513,6 +513,19 @@ function playLogEntrySound(entry, game) {
     playMoveVoice('marin', 'cleanSlate');
     return;
   }
+  if (entry.type === 'cheat-death') {
+    // Resurrection Gamble (Draxus's Cheat Death, taxonomy #32) - own
+    // dedicated log entry type (not 'attack'/'special'/'setup'), same
+    // reasoning as curse/hidden-mark/etc. above. A failed roll (success:
+    // false) is silent - no sound, no voice, he's just still lying there
+    // KO'd. A successful roll plays the reused deathless_fury sound plus
+    // his own revival voice line.
+    if (entry.success) {
+      playActionSound('cheatDeath');
+      playMoveVoice('draxus', 'cheatDeath');
+    }
+    return;
+  }
   if (entry.type !== 'attack' && entry.type !== 'special' && entry.type !== 'setup') return;
 
   // A dodged hit already got its own 'dodge' log entry (and playDodge()

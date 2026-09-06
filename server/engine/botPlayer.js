@@ -945,6 +945,13 @@ function chooseKaelisMove(character, game, usable) {
 
 function chooseDraxusMove(character, game, usable) {
   const byId = Object.fromEntries(usable.map((a) => [a.actionId, a]));
+  // Resurrection Gamble (Cheat Death, taxonomy #32) - while he's KO'd and
+  // still eligible, this is his ONLY usable action (getLegalActions
+  // short-circuits to just this one entry, same as chickenAttack while
+  // chickenified) - no real decision to make, always take the roll.
+  if (byId.cheatDeath) {
+    return { actionId: 'cheatDeath', targetId: null };
+  }
   // Cast Deathless Fury when meaningfully hurt but BEFORE he's already on
   // the verge of dying - unlike Call Ashka/Divine Restore's critical-only
   // gating, the payoff here (become unkillable, then land 3 strikes) is

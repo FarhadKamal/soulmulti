@@ -71,6 +71,17 @@ export function getActingCharacterId(game) {
     // stuck on "Waiting for Athena's turn" because her own poison tick (or
     // the curse-mirror it triggered) killed her inside this exact call.
     if (character.isKO) {
+      // Resurrection Gamble (Draxus's Cheat Death, taxonomy #32): a KO'd
+      // Draxus with cheatDeathEligible still true is the one deliberate
+      // exception to "a dead character never gets a real decision" -
+      // return him here instead of auto-skipping, so the client can offer
+      // the single Cheat Death button. Every other KO'd character (and a
+      // no-longer-eligible Draxus, post-revival-fail's stop condition or
+      // after a successful revival already cleared the flag) still hits
+      // the skip below exactly as before.
+      if (character.id === 'draxus' && character.special.cheatDeathEligible) {
+        return character.id;
+      }
       clearStalledBonusTurn(character);
       markCharacterActed(game, character.id);
       continue;

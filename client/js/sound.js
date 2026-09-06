@@ -255,6 +255,13 @@ const ACTION_SOUND = {
   callAshka: 'bird_heal',
   dyingBlow: 'axe_strike',
   deathlessFury: 'deathless_fury',
+  // Resurrection Gamble (Draxus's Cheat Death, taxonomy #32) - a
+  // SUCCESSFUL revival reuses the exact same sound effect as Deathless
+  // Fury's own cast (confirmed ruling 2026-09-06: "same mp3 deathless_
+  // fury"), not a new file. Only ever played on success - main.js's own
+  // 'cheat-death' dispatch branch gates this on entry.success itself,
+  // since a failed roll makes no sound at all.
+  cheatDeath: 'deathless_fury',
   wandStrike: 'wand_strike',
   arcaneStudy: 'study',
   poisonCloud: 'cloud',

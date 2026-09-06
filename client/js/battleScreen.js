@@ -1119,6 +1119,12 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
     // window, so guard the injured branch directly rather than relying
     // solely on priority ordering.
     portrait.src = v('assets/images/draxus/immortality.jpg');
+  } else if (character.id === 'draxus' && character.special?.hasRevivedOnce) {
+    // Same belt-and-braces reasoning as the deathproofActive guard just
+    // above, for the same class of injured.jpg-leak risk - Resurrection
+    // Gamble (Cheat Death, taxonomy #32), confirmed ruling: "his potrait/
+    // injured image after alive is alive.jpg".
+    portrait.src = v('assets/images/draxus/alive.jpg');
   } else if (character.hearts <= character.maxHearts / 2) {
     portrait.src = v(`assets/injured/${character.id}.jpg`);
   } else {
@@ -1307,6 +1313,16 @@ function statusBadges(character) {
       }
       if (character.special.bonusActionsRemaining > 0) {
         badges.push({ text: `Bonus strikes: ${character.special.bonusActionsRemaining}`, cls: 'warn' });
+      }
+      // Resurrection Gamble (Cheat Death, taxonomy #32) - visible even
+      // while he's KO'd (this function has no isKO guard on its own
+      // caller), a deliberate signal to both players that he isn't truly
+      // out yet, matching the colorful (non-desaturated) koed.jpg art.
+      if (character.isKO && character.special.cheatDeathEligible) {
+        badges.push({ text: 'Cheat Death eligible', cls: 'warn' });
+      }
+      if (character.special.reviveImmortalActive) {
+        badges.push({ text: 'Immortal (revived)', cls: 'warn' });
       }
       break;
     case 'rowan':
@@ -1887,7 +1903,7 @@ const ACTION_LABELS = {
   curseStrike: 'Curse Strike', divineRestore: 'Divine Restore', divineSacrifice: 'Divine Sacrifice', divineJudgment: 'Divine Judgment',
   selfChoke: 'Self Choke',
   grudgeStrike: 'Grudge Strike', callAshka: 'Call Ashka',
-  dyingBlow: 'Dying Blow', deathlessFury: 'Deathless Fury',
+  dyingBlow: 'Dying Blow', deathlessFury: 'Deathless Fury', cheatDeath: 'Cheat Death',
   wandStrike: 'Wand Strike', arcaneStudy: 'Arcane Study',
   poisonCloud: 'Poison Cloud', purify: 'Purify', wildLightning: 'Wild Lightning',
   mirrorReflect: 'Mirror Reflect', silenceLock: 'Silence Lock',
@@ -2064,6 +2080,10 @@ function describeLogEntry(entry) {
         : `Rune Vision failed - the vision did not come to pass`;
     case 'deathless-fury-end':
       return `${name(entry.characterId)}'s Deathless Fury ends - 3 strikes granted!`;
+    case 'cheat-death':
+      return entry.success
+        ? `${name(entry.characterId)} CHEATS DEATH - revived with 1 heart!`
+        : `${name(entry.characterId)} tries to cheat death... and fails.`;
     case 'rebirth':
       return `${name(entry.targetCharacterId)} used REBIRTH - revived with 2 hearts!`;
     case 'dodge':

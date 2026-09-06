@@ -153,7 +153,28 @@ function baseSpecialFor(id) {
       // bonusActionsRemaining: set to 3 by his own onTurnStart when the
       // window above just ended - decremented in index.js's handleAction/
       // stepBotTurn instead of calling markCharacterActed, until it hits 0.
-      return { deathproofActive: false, bonusActionsRemaining: 0 };
+      // Resurrection Gamble (taxonomy #32, design-locked 2026-09-06, see
+      // project memory soulclash_draxus_new_ability_design.md):
+      // cheatDeathEligible: true from the moment he's KO'd until either a
+      // successful revival or the match's stop condition removes him from
+      // rolling - gates whether getActingCharacterId still gives him a
+      // turn at all while isKO. Re-set true on every subsequent KO, not
+      // just the first (re-arms every death, confirmed ruling).
+      // reviveImmortalActive: true from a successful revival roll until his
+      // own NEXT onTurnStart clears it - same one-turn-delayed-clear shape
+      // as deathproofActive, but a SEPARATE flag since the two windows are
+      // conceptually distinct (Deathless Fury is a proactive cast; this is
+      // an automatic post-revival state) and can never overlap in practice
+      // but are kept independent for clarity/future-proofing.
+      // hasRevivedOnce: sticky, never cleared once true - flips permanently
+      // on the FIRST successful revival and gates the "revived" art/strike
+      // mapping (alive.jpg at rest, immortal_strike.jpg on every strike)
+      // for the rest of the match, confirmed to persist across further
+      // deaths/revivals, not just the immediate post-revival stretch.
+      return {
+        deathproofActive: false, bonusActionsRemaining: 0,
+        cheatDeathEligible: false, reviveImmortalActive: false, hasRevivedOnce: false,
+      };
     case 'rowan':
       // discoveredSpells: which of the 5 spells Arcane Study has revealed so
       // far this match (never re-drawn once discovered) - see rowan.js.
@@ -284,6 +305,12 @@ function baseSpecialFor(id) {
       // Environmental Attack (bypasses dodge, shield still absorbs) and
       // each rolling its own headache-roll attempt on whoever it lands on
       // - see grimtal.js's grimBarrage action.
+      // lastKillCreditSourceFor: { [victimCharacterId]: 'own' | 'unclaimed' }
+      // - which counter each victim's most recent KO credit landed in,
+      // needed so a Resurrection Gamble revival (Draxus's Cheat Death,
+      // taxonomy #32) can roll back the exact counter that was actually
+      // incremented rather than guessing. See grimtal.js's registerOnAnyDeath/
+      // registerOnOtherRevived pair.
       return {
         ownKillCount: 0,
         claimedKillCount: 0,
@@ -293,6 +320,7 @@ function baseSpecialFor(id) {
         headacheVictimId: null,
         headacheRollPending: true,
         usedGrimBarrage: false,
+        lastKillCreditSourceFor: {},
       };
     case 'illyra':
       // mirageMarks: Map<targetCharacterId, stackCount> - how many
