@@ -474,6 +474,12 @@ function tickFowlPlayIfBoingoTurn(character, game, log) {
     if (revertedIds.length > 0) {
       log.push({ type: 'fowl-play-revert', characterIds: revertedIds, hearts: heartsSnapshot(game) });
     }
+    // Resurrection Gamble (Draxus's Cheat Death, taxonomy #32) - a KO'd
+    // Draxus who died WHILE chickenified never armed his eligibility (see
+    // draxus.js's own registerOnOwnDeath guard) - now that Fowl Play has
+    // ended and his real koed.jpg is showing again, arm it here if it
+    // hasn't already been armed some other way.
+    draxus.armCheatDeathIfNewlyRevealed(game);
   }
 }
 

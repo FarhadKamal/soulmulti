@@ -41,6 +41,20 @@ registerOnOwnDeath('boingo', (character, game) => {
       revertedIds.push(c.id);
     }
   }
+  // Resurrection Gamble (Draxus's Cheat Death, taxonomy #32) - a KO'd
+  // Draxus who died WHILE chickenified never armed his eligibility (see
+  // draxus.js's own registerOnOwnDeath guard: "so only normal koed image
+  // we will give chance"). Now that Fowl Play has ended (Boingo's own
+  // death is the SECOND of the two ways this can happen - see turnEngine.js's
+  // tickFowlPlayIfBoingoTurn for the natural 3-turn-timer version) and his
+  // real koed.jpg is showing again, arm it here. Inlined rather than
+  // importing draxus.js directly - ability files never import each other,
+  // only ever import FROM the engine, to avoid a circular-import risk.
+  const draxusChar = game.characters.draxus;
+  if (draxusChar && draxusChar.isKO && !draxusChar.isChicken && !draxusChar.special.cheatDeathEligible) {
+    const others = Object.values(game.characters).filter((c) => c.id !== 'draxus' && !c.isKO);
+    draxusChar.special.cheatDeathEligible = others.length >= 2;
+  }
   if (revertedIds.length === 0) return undefined;
   return { fowlPlayRevertLogEntry: { type: 'fowl-play-revert', characterIds: revertedIds } };
 });

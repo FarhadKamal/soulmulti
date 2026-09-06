@@ -39,9 +39,33 @@ function hasEnoughSurvivorsForCheatDeath(game) {
 // eligibility for this new "dead but rolling" cycle - re-armed on every one
 // of his deaths this match, not just the first (confirmed ruling: "this
 // 25% chance continue. he can get koed multiple time").
+//
+// Confirmed ruling, 2026-09-06: a Draxus who dies WHILE chickenified
+// (Boingo's Fowl Play, isChicken true) shows chicken_roast.jpg, not his own
+// normal koed.jpg - "so only normal koed image we will give chance". He
+// must NOT become eligible to roll while still a fried chicken - only once
+// Fowl Play ends and he's showing his real koed.jpg does the chance apply.
 registerOnOwnDeath('draxus', (character, game) => {
+  if (character.isChicken) return;
   character.special.cheatDeathEligible = hasEnoughSurvivorsForCheatDeath(game);
 });
+
+// Called from BOTH places Fowl Play can end (turnEngine.js's own 3-turn
+// timer, and boingo.js's registerOnOwnDeath if Boingo himself dies
+// mid-window) - the moment a KO'd Draxus stops being chickenified, his real
+// koed.jpg is showing again, so this is when Cheat Death eligibility should
+// actually arm for the first time if he died while still a chicken
+// (skipped entirely by the onOwnDeath callback above in that case).
+// Confirmed ruling: "boingo have to die. when he die koed image normal
+// back to our current. that is already their. so only normal koed image we
+// will give chance" - same reasoning covers the natural 3-turn timer end,
+// not just Boingo's own death specifically.
+export function armCheatDeathIfNewlyRevealed(game) {
+  const character = game.characters.draxus;
+  if (!character || !character.isKO || character.isChicken) return;
+  if (character.special.cheatDeathEligible) return; // already armed, nothing to do
+  character.special.cheatDeathEligible = hasEnoughSurvivorsForCheatDeath(game);
+}
 
 // Fires exactly once at the start of his own turn (gated by
 // game.turnStartFiredFor in gameFlow.js's getActingCharacterId, so this
