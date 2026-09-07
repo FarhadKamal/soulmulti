@@ -171,9 +171,18 @@ function baseSpecialFor(id) {
       // mapping (alive.jpg at rest, immortal_strike.jpg on every strike)
       // for the rest of the match, confirmed to persist across further
       // deaths/revivals, not just the immediate post-revival stretch.
+      // cheatDeathAttemptCount: how many Cheat Death rolls have FAILED so
+      // far in the CURRENT death-cycle (confirmed ruling, 2026-09-07: "i
+      // want to increase cheat death percentage by 5%... first turn try
+      // 25% next turn 30%... after alive if he koed again then next turn
+      // again 25%"). Escalates the odds +5% per failed attempt, uncapped
+      // (confirmed: "no cap"), reset to 0 both on a fresh KO (a new
+      // death-cycle starts) and on a successful revival - see draxus.js's
+      // own onOwnDeath registration and executeCheatDeath.
       return {
         deathproofActive: false, bonusActionsRemaining: 0,
         cheatDeathEligible: false, reviveImmortalActive: false, hasRevivedOnce: false,
+        cheatDeathAttemptCount: 0,
       };
     case 'rowan':
       // discoveredSpells: which of the 5 spells Arcane Study has revealed so

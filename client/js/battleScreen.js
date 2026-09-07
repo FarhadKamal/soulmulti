@@ -1332,7 +1332,12 @@ function statusBadges(character) {
       // caller), a deliberate signal to both players that he isn't truly
       // out yet, matching the colorful (non-desaturated) koed.jpg art.
       if (character.isKO && character.special.cheatDeathEligible) {
-        badges.push({ text: 'Cheat Death eligible', cls: 'warn' });
+        // Escalating odds (confirmed ruling, 2026-09-07): +5% per failed
+        // attempt this death-cycle, uncapped, resetting to 25% on his next
+        // actual death - shown here so both players can see the current
+        // roll, not just that he's still eligible.
+        const nextChance = Math.round((25 + character.special.cheatDeathAttemptCount * 5));
+        badges.push({ text: `Cheat Death eligible (${nextChance}%)`, cls: 'warn' });
       }
       if (character.special.reviveImmortalActive) {
         badges.push({ text: 'Immortal (revived)', cls: 'warn' });
@@ -2093,10 +2098,13 @@ function describeLogEntry(entry) {
         : `Rune Vision failed - the vision did not come to pass`;
     case 'deathless-fury-end':
       return `${name(entry.characterId)}'s Deathless Fury ends - 3 strikes granted!`;
-    case 'cheat-death':
+    case 'cheat-death': {
+      const pct = entry.chance != null ? Math.round(entry.chance * 100) : null;
+      const oddsText = pct != null ? ` (${pct}%)` : '';
       return entry.success
-        ? `${name(entry.characterId)} CHEATS DEATH - revived with 1 heart!`
-        : `${name(entry.characterId)} tries to cheat death... and fails.`;
+        ? `${name(entry.characterId)} CHEATS DEATH${oddsText} - revived with 1 heart!`
+        : `${name(entry.characterId)} tries to cheat death${oddsText}... and fails.`;
+    }
     case 'rebirth':
       return `${name(entry.targetCharacterId)} used REBIRTH - revived with 2 hearts!`;
     case 'dodge':

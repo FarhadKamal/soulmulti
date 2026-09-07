@@ -15,10 +15,20 @@ function dyingBlowAmount(hearts) {
 
 // Resurrection Gamble (taxonomy #32, design-locked 2026-09-06, see project
 // memory soulclash_draxus_new_ability_design.md): the odds of a successful
-// Cheat Death roll. Confirmed final value, 2026-09-06 (was bumped to 1 for
-// live testing, now reverted back to the originally-locked design value).
+// Cheat Death roll. Confirmed final base value, 2026-09-06 (was bumped to 1
+// for live testing, then reverted back to this).
+//
+// Escalating odds, confirmed ruling 2026-09-07: the chance climbs +5% per
+// FAILED attempt within the same death-cycle (25% -> 30% -> 35% -> ...),
+// uncapped ("no cap"), resetting back to the base 25% both on a fresh KO
+// and on a successful revival - see cheatDeathAttemptCount in state.js.
 export const CHEAT_DEATH_REVIVE_CHANCE = 0.25;
+export const CHEAT_DEATH_REVIVE_CHANCE_STEP = 0.05;
 export const CHEAT_DEATH_REVIVE_HEARTS = 1;
+
+function currentCheatDeathChance(character) {
+  return CHEAT_DEATH_REVIVE_CHANCE + character.special.cheatDeathAttemptCount * CHEAT_DEATH_REVIVE_CHANCE_STEP;
+}
 
 // True whenever there are at least 2 OTHER living characters besides
 // Draxus himself - the stop condition (confirmed ruling: rolling continues
@@ -46,6 +56,9 @@ function hasEnoughSurvivorsForCheatDeath(game) {
 // must NOT become eligible to roll while still a fried chicken - only once
 // Fowl Play ends and he's showing his real koed.jpg does the chance apply.
 registerOnOwnDeath('draxus', (character, game) => {
+  // New death-cycle - escalation resets to the base chance (confirmed
+  // ruling: "if he die again it will start from 25%").
+  character.special.cheatDeathAttemptCount = 0;
   if (character.isChicken) return;
   character.special.cheatDeathEligible = hasEnoughSurvivorsForCheatDeath(game);
 });
@@ -107,14 +120,21 @@ export function onTurnStart(character, game, log) {
 // he's actually dead, unlike every real entry there which implicitly
 // assumes a living character).
 export function executeCheatDeath(character, game, log) {
-  const success = Math.random() < CHEAT_DEATH_REVIVE_CHANCE;
+  const chance = currentCheatDeathChance(character);
+  const success = Math.random() < chance;
   if (!success) {
-    log.push({ type: 'cheat-death', characterId: character.id, success: false, hearts: heartsSnapshot(game) });
+    // Escalates the NEXT attempt's odds - confirmed ruling: "first turn
+    // try 25% next turn 30% next turn 35%..." (uncapped within this same
+    // death-cycle; resets to 0 on his next actual death via
+    // registerOnOwnDeath above, or on a success just below).
+    character.special.cheatDeathAttemptCount += 1;
+    log.push({ type: 'cheat-death', characterId: character.id, success: false, chance, hearts: heartsSnapshot(game) });
     return {};
   }
   character.isKO = false;
   character.hearts = CHEAT_DEATH_REVIVE_HEARTS;
   character.special.cheatDeathEligible = false;
+  character.special.cheatDeathAttemptCount = 0;
   character.special.reviveImmortalActive = true;
   character.special.hasRevivedOnce = true;
   // "Fresh copy" reset, same pattern as Rebirth's own revival (see
@@ -136,7 +156,7 @@ export function executeCheatDeath(character, game, log) {
   // generically here - see each affected character's own onOtherRevived
   // registration, same dispatch Blade's Rebirth already triggers.
   runOnOtherRevived(character.id, game, log);
-  log.push({ type: 'cheat-death', characterId: character.id, success: true, hearts: heartsSnapshot(game) });
+  log.push({ type: 'cheat-death', characterId: character.id, success: true, chance, hearts: heartsSnapshot(game) });
   return { revived: true };
 }
 
