@@ -2098,6 +2098,10 @@ function describeLogEntry(entry) {
     }
     case 'ashka-heal':
       return `${name(entry.characterId)}'s Ashka heals +${entry.healed}`;
+    case 'ashkas-vengeance-activate':
+      return `${name(entry.characterId)}'s Ashka awakens - vengeance stirs!`;
+    case 'ashkas-vengeance-strike':
+      return `Ashka strikes ${name(entry.targetId)} - ${entry.amountDealt} damage${entry.koTriggered ? ' - KO!' : ''}`;
     case 'prediction-result':
       return entry.matched
         ? `Rune Vision confirmed! ${name(entry.predictedAttackerId)} struck ${name(entry.predictedTargetId)} exactly as foreseen - +3 hearts, +3 shield, +1 damage (${entry.predictionWins}/2 wins)`

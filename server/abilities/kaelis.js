@@ -31,6 +31,9 @@ registerOnOtherRevived((revivedCharacterId, game) => {
   if (kaelis) kaelis.special.grudgeCounts.delete(revivedCharacterId);
 });
 
+const ASHKAS_VENGEANCE_HEARTS_THRESHOLD = 3;
+const ASHKAS_VENGEANCE_DAMAGE = 1;
+
 // Bird heal ticks fire on Kaelis's own onTurnStart, unconditionally - this
 // runs BEFORE any freeze/skip check (turnEngine.js's beginCharacterTurn
 // calls onTurnStart before consumeSkipIfFrozen), so the heal still lands
@@ -43,6 +46,60 @@ export function onTurnStart(character, game, log) {
     const healed = applyHeal(game, character.id, 2);
     character.special.ashkaHealsRemaining -= 1;
     log.push({ type: 'ashka-heal', characterId: character.id, healed, hearts: heartsSnapshot(game) });
+  }
+  // Ashka's Vengeance (hearts<=3 passive, see project memory
+  // soulclash_kaelis_ashkas_vengeance.md) - a fully automatic bonus effect,
+  // no button/cast, no target choice. Activates permanently the instant her
+  // hearts first drop to <=3 (confirmed ruling: "this will continue until
+  // her death" / "stays active permanently once triggered" - does NOT
+  // clear if she later heals back above 3). Fires every one of her own
+  // turns from that point on, layered ON TOP of her normal action that
+  // turn (confirmed ruling: "she don't have to hit anything. she will do
+  // just her normal attack" - the bonus strike is pure addition, no
+  // opportunity cost). Deliberately fires here in onTurnStart - runs even
+  // on a turn she ends up frozen/skipped, same reasoning as the bird-heal
+  // tick above (both are true passives, unaffected by her own turn being
+  // interrupted).
+  const wasAlreadyActive = character.special.ashkasVengeanceActive;
+  if (!wasAlreadyActive && character.hearts <= ASHKAS_VENGEANCE_HEARTS_THRESHOLD) {
+    character.special.ashkasVengeanceActive = true;
+    log.push({ type: 'ashkas-vengeance-activate', characterId: character.id, hearts: heartsSnapshot(game) });
+  }
+  if (character.special.ashkasVengeanceActive) {
+    const others = Object.values(game.characters).filter((c) => c.id !== 'kaelis' && !c.isKO);
+    if (others.length > 0) {
+      const target = others[Math.floor(Math.random() * others.length)];
+      // True Pure Attack (confirmed ruling: "bypasses shield too") -
+      // ignoresShield/ignoresDodge/ignoresUntargetable all true, same
+      // damage-type rules as Akyros's Shadow Execution. Random selection
+      // itself already ignores untargetable (Object.values above doesn't
+      // filter on it), matching the confirmed ruling that untargetable
+      // status shouldn't stop this at all.
+      const result = applyDamage(game, log, {
+        sourceCharacterId: 'kaelis',
+        targetCharacterId: target.id,
+        amount: ASHKAS_VENGEANCE_DAMAGE,
+        ignoresShield: true,
+        ignoresDodge: true,
+        ignoresUntargetable: true,
+      });
+      log.push({
+        type: 'ashkas-vengeance-strike', characterId: character.id, targetId: target.id,
+        amountDealt: result.amountDealt, koTriggered: result.koTriggered, hearts: heartsSnapshot(game),
+      });
+      // If this 1-damage bonus strike happens to be the killing blow on
+      // someone with their OWN Death-Pact-style trigger armed (Athena's
+      // Divine Judgment, Oraclus's Prophecy of Doom), those deferred
+      // fields need pushing here too - same reasoning as every other
+      // standalone (non-executeAction) applyDamage call site in the
+      // codebase (tickPoisonIfAny, resolveJesterBall, etc.). `log` here is
+      // already game.log directly (this whole function runs inside
+      // beginCharacterTurn's own real log, not a local batch), so pushing
+      // immediately - not deferring - is correct and matches
+      // tickPoisonIfAny's own identical handling.
+      if (result.divineJudgmentTriggerLogEntry) log.push({ ...result.divineJudgmentTriggerLogEntry, hearts: heartsSnapshot(game) });
+      if (result.prophecyOfDoomTriggerLogEntry) log.push({ ...result.prophecyOfDoomTriggerLogEntry, hearts: heartsSnapshot(game) });
+    }
   }
 }
 

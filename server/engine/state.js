@@ -144,7 +144,14 @@ function baseSpecialFor(id) {
       // ashkaHealsRemaining: counts her own remaining FOLLOW-UP heal ticks
       // from Call Ashka (not counting the cast turn's own immediate heal) -
       // ticked down in kaelis.js's onTurnStart.
-      return { grudgeCounts: new Map(), ashkaHealsRemaining: 0 };
+      // ashkasVengeanceActive: her hearts<=3 passive (see project memory
+      // soulclash_kaelis_ashkas_vengeance.md) - flips true the instant her
+      // hearts first drop to <=3 and stays true permanently for the rest of
+      // the match (does NOT clear if she heals back above 3). Once true,
+      // every one of her own onTurnStart calls fires a bonus 1 pure damage
+      // Ashka strike on a random living enemy, on top of her own normal
+      // action that turn - see kaelis.js's own onTurnStart.
+      return { grudgeCounts: new Map(), ashkaHealsRemaining: 0, ashkasVengeanceActive: false };
     case 'draxus':
       // deathproofActive: true from the moment Deathless Fury is cast
       // until his own next onTurnStart clears it (see draxus.js) -

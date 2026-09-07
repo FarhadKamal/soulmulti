@@ -64,6 +64,7 @@ const FLASH_IMAGES = [
   'assets/images/kaelis/idle.jpg',
   'assets/images/kaelis/grudge.jpg',
   'assets/images/kaelis/bird.jpg',
+  'assets/images/kaelis/surprise.jpg',
   'assets/images/draxus/idle.jpg',
   'assets/images/draxus/normal_strike.jpg',
   'assets/images/draxus/immortal_strike.jpg',
@@ -142,6 +143,14 @@ const PROPHECY_OF_DOOM_STRIKE_IMAGES = CHARACTER_IDS.filter((id) => id !== 'orac
   (id) => `assets/images/${id}/doom_strike.jpg`
 );
 
+// Kaelis's Ashka's Vengeance bonus strike - same per-victim-hero art
+// pattern as Divine Judgment/Prophecy of Doom above, one ashka_strike.jpg
+// per possible victim (everyone except Kaelis herself, who is never her
+// own random target).
+const ASHKAS_VENGEANCE_STRIKE_IMAGES = CHARACTER_IDS.filter((id) => id !== 'kaelis').map(
+  (id) => `assets/images/${id}/ashka_strike.jpg`
+);
+
 let started = false;
 // Resolves once every preloaded image has either loaded or failed - used by
 // main.js to gate the battle screen behind a brief "preparing battle" wait
@@ -155,7 +164,7 @@ let readyPromise = null;
 export function preloadBattleImages() {
   if (started) return readyPromise;
   started = true;
-  const paths = [...FLASH_IMAGES, ...CHICKEN_IMAGES, ...DIVINE_JUDGMENT_STRUCK_IMAGES, ...PROPHECY_OF_DOOM_STRIKE_IMAGES];
+  const paths = [...FLASH_IMAGES, ...CHICKEN_IMAGES, ...DIVINE_JUDGMENT_STRUCK_IMAGES, ...PROPHECY_OF_DOOM_STRIKE_IMAGES, ...ASHKAS_VENGEANCE_STRIKE_IMAGES];
   for (const folder of PER_CHARACTER_FOLDERS) {
     for (const id of CHARACTER_IDS) paths.push(`${folder}/${id}.jpg`);
   }

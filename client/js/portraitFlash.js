@@ -513,6 +513,27 @@ export function handleLogEntryForFlash(entry, game) {
     if (!isKO(entry.characterId)) setFlash(entry.characterId, 'assets/images/kaelis/bird.jpg');
     return;
   }
+  if (entry.type === 'ashkas-vengeance-strike') {
+    // Ashka's Vengeance (Kaelis's hearts<=3 passive, taxonomy: Pure Attack
+    // #1 + Passive Action #23) - a fully automatic bonus strike, own
+    // dedicated log type. Kaelis's OWN tile shows a phoenix-LESS reaction
+    // shot (confirmed ruling: "she will also surprise at that time" -
+    // Ashka has physically flown off, so her usual phoenix-beside-her art
+    // would look wrong here) - assets/images/kaelis/surprise.jpg. The
+    // VICTIM's own tile shows their own per-hero trigger image (confirmed
+    // ruling: "we will create ashka is attaking for each hero"), same
+    // per-victim-art pattern as Divine Judgment/Prophecy of Doom -
+    // assets/images/<victimId>/ashka_strike.jpg. Uses the default
+    // FLASH_DURATION_MS (not gated on amountDealt>0 the way most attack
+    // flashes are, since this is always exactly 1 flat pure damage with no
+    // dodge to fail against - it always lands unless the target already
+    // died before this fires, guarded by isKO below).
+    if (!isKO(entry.characterId)) setFlash(entry.characterId, 'assets/images/kaelis/surprise.jpg');
+    if (!isKO(entry.targetId) || entry.koTriggered) {
+      setFlash(entry.targetId, `assets/images/${entry.targetId}/ashka_strike.jpg`);
+    }
+    return;
+  }
   if (entry.type === 'spell-discovered') {
     // Marin's 5 spells auto-activate the instant they're revealed - unlike
     // Rowan (whose discoveries stay flash-silent, since HIS spells are cast

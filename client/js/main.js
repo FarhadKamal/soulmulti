@@ -507,6 +507,14 @@ function playLogEntrySound(entry, game) {
     playMoveVoice('kaelis', 'callAshka');
     return;
   }
+  if (entry.type === 'ashkas-vengeance-strike') {
+    // Ashka's Vengeance bonus strike - own dedicated sfx (confirmed
+    // ruling: no voice line needed for this, "no need"). Plays every time
+    // regardless of amountDealt, same as its own flash - this is always
+    // flat 1 pure damage with nothing to dodge/block against.
+    playSound('bird_hit');
+    return;
+  }
   if (entry.type === 'spell-discovered') {
     // Rowan's own discoveries stay voice-silent (his spells are cast
     // separately later - the CAST is where his flash/voice/sound lives, not
