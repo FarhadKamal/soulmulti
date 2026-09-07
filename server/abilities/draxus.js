@@ -1,4 +1,4 @@
-import { applyDamage, heartsSnapshot, clearNegativeStatuses } from '../engine/damagePipeline.js';
+import { applyDamage, heartsSnapshot, clearNegativeStatuses, isFrozenByChronox } from '../engine/damagePipeline.js';
 import { registerOnOwnDeath } from '../engine/categories/onOwnDeath.js';
 import { runOnOtherRevived } from '../engine/categories/onOtherRevived.js';
 
@@ -100,7 +100,17 @@ export function onTurnStart(character, game, log) {
     character.special.bonusActionsRemaining = 3;
     log.push({ type: 'deathless-fury-end', characterId: character.id, hearts: heartsSnapshot(game) });
   }
-  if (character.special.reviveImmortalActive) {
+  // Fixed 2026-09-07 (found via a live match log): onTurnStart fires the
+  // instant getActingCharacterId reaches him, EVEN on a turn that's about
+  // to be skipped for being frozen (gameFlow.js runs beginCharacterTurn
+  // before its own freeze-skip check, deliberately, for other mechanics
+  // like Mirror Reflect/poison ticks that need to fire regardless). A
+  // frozen turn isn't a REAL turn he got to act on, so it must NOT count
+  // toward "his own next turn" for reviveImmortalActive's clear - confirmed
+  // bug: a Draxus revived then immediately frozen by World Stops had his
+  // immortality clear on the very next (frozen, skipped) turn, then died
+  // for real to a hit that landed before he ever got a genuine turn back.
+  if (character.special.reviveImmortalActive && !isFrozenByChronox(character, game)) {
     character.special.reviveImmortalActive = false;
   }
   // While he's still KO'd and eligible, his own "turn" is the Cheat Death
