@@ -110,6 +110,11 @@ registerOnAnyDeath((diedCharacterId, sourceCharacterId, isMirror, game, log) => 
 // the caller's own push.
 registerOnHitLanded('athena', (character, game, log, ctx) => {
   if (ctx.isMirror || ctx.amountDealt <= 0) return;
+  // Kaelis's Ashka's Vengeance - confirmed ruling, 2026-09-07: "kaleis
+  // will not suffer what ashka did" - same reasoning as Rowan's own Mirror
+  // Reflect exclusion. Ashka's independent bonus strike hitting a cursed
+  // Athena must not mirror damage back onto Kaelis.
+  if (ctx.isAshkaStrike) return;
   // Boingo's Fowl Play - confirmed ruling: "no defense of any kind" -
   // Counter Attack (curse-mirror included) is suppressed the same way
   // Rowan's Mirror Reflect is while chickenified, same reasoning (a

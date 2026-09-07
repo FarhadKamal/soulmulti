@@ -82,21 +82,50 @@ export function onTurnStart(character, game, log) {
         ignoresShield: true,
         ignoresDodge: true,
         ignoresUntargetable: true,
+        // Confirmed ruling, 2026-09-07: "kaleis will not suffer what ashka
+        // did" - found via a live match log where Ashka's strike on a
+        // Mirror-Reflect-armed Rowan bounced 3 damage back onto Kaelis
+        // (5->2 hearts) with no log entry announcing it at all (a second,
+        // separate bug - see the deferred-field handling added below).
+        // This flag stops Mirror Reflect/curse-mirror from ever triggering
+        // off this specific attack in the first place, so there's nothing
+        // left to defer for those two mechanics - Ashka acts independently
+        // of Kaelis, and nothing that happens to her companion's strike
+        // should be attributed back to her.
+        isAshkaStrike: true,
       });
       log.push({
         type: 'ashkas-vengeance-strike', characterId: character.id, targetId: target.id,
         amountDealt: result.amountDealt, koTriggered: result.koTriggered, hearts: heartsSnapshot(game),
       });
+      // Full deferred-field handling, matching tickPoisonIfAny's own
+      // identical standalone-applyDamage-call-site pattern exactly (`log`
+      // here is already game.log directly - this whole function runs
+      // inside beginCharacterTurn's own real log, not a local batch - so
+      // pushing immediately, not deferring further, is correct).
+      // rebirthLogEntry: if this 1-damage strike happens to be the killing
+      // blow on Blade (at exactly 1 heart) and he hasn't used Rebirth yet,
+      // his revival triggers silently without this - confirmed real gap,
+      // found via the same audit that caught the Mirror-Reflect issue
+      // above.
+      if (result.rebirthLogEntry) log.push({ ...result.rebirthLogEntry, hearts: heartsSnapshot(game) });
+      // mirrorLogEntry/mirrorReflectLogEntry: should never actually be set
+      // now that isAshkaStrike: true stops both Athena's curse-mirror and
+      // Rowan's Mirror Reflect from triggering off this attack at all (see
+      // above) - kept here defensively anyway, matching every other
+      // standalone call site's full field list, in case a future Counter
+      // Attack-shaped mechanic is added without remembering this
+      // exclusion.
+      if (result.mirrorLogEntry) log.push({ ...result.mirrorLogEntry, hearts: heartsSnapshot(game) });
+      if (result.mirrorResult?.rebirthLogEntry) log.push({ ...result.mirrorResult.rebirthLogEntry, hearts: heartsSnapshot(game) });
+      if (result.mirrorReflectLogEntry) log.push({ ...result.mirrorReflectLogEntry, hearts: heartsSnapshot(game) });
+      if (result.mirrorReflectResult?.rebirthLogEntry) log.push({ ...result.mirrorReflectResult.rebirthLogEntry, hearts: heartsSnapshot(game) });
+      // Boingo's Fowl Play - if this strike happens to KO him mid-window.
+      if (result.fowlPlayRevertLogEntry) log.push({ ...result.fowlPlayRevertLogEntry, hearts: heartsSnapshot(game) });
       // If this 1-damage bonus strike happens to be the killing blow on
       // someone with their OWN Death-Pact-style trigger armed (Athena's
       // Divine Judgment, Oraclus's Prophecy of Doom), those deferred
-      // fields need pushing here too - same reasoning as every other
-      // standalone (non-executeAction) applyDamage call site in the
-      // codebase (tickPoisonIfAny, resolveJesterBall, etc.). `log` here is
-      // already game.log directly (this whole function runs inside
-      // beginCharacterTurn's own real log, not a local batch), so pushing
-      // immediately - not deferring - is correct and matches
-      // tickPoisonIfAny's own identical handling.
+      // fields need pushing here too.
       if (result.divineJudgmentTriggerLogEntry) log.push({ ...result.divineJudgmentTriggerLogEntry, hearts: heartsSnapshot(game) });
       if (result.prophecyOfDoomTriggerLogEntry) log.push({ ...result.prophecyOfDoomTriggerLogEntry, hearts: heartsSnapshot(game) });
     }

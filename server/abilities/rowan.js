@@ -19,6 +19,11 @@ import { makeDiscoveryKit } from '../engine/categories/discoveryKit.js';
 registerOnHitLandedEarly('rowan', (character, game, log, ctx) => {
   if (!character.special.mirrorReflectActive) return;
   if (ctx.isMirror || ctx.amountDealt <= 0 || character.hearts <= 0 || ctx.sourceCharacterId === character.id) return;
+  // Kaelis's Ashka's Vengeance - confirmed ruling, 2026-09-07: "kaleis
+  // will not suffer what ashka did" - her phoenix's own independent bonus
+  // strike must never trigger a reflect back onto her, since she didn't
+  // personally make this attack.
+  if (ctx.isAshkaStrike) return;
   // Boingo's Fowl Play - confirmed ruling: "no defense of any kind"
   // extends to Counter Attack too, even though it's a retaliation rather
   // than something that PREVENTS him taking damage - a chickenified Rowan

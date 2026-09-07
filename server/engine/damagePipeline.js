@@ -226,6 +226,16 @@ export function applyDamage(game, log, {
   ignoresUntargetable = false,
   isMirror = false,
   isPoisonTick = false,
+  // Kaelis's Ashka's Vengeance (hearts<=3 passive) - confirmed ruling,
+  // 2026-09-07: "kaleis will not suffer what ashka did" - a Counter Attack
+  // reaction (Rowan's Mirror Reflect, Athena's curse-mirror) triggered by
+  // Ashka's own independent bonus strike must NOT bounce back onto Kaelis
+  // herself, since the strike is her phoenix companion acting on its own,
+  // not a direct attack she personally made. Threaded through to both
+  // onHitLandedEarly/onHitLanded's own ctx the same way isPoisonTick is,
+  // and checked by each Counter-Attack-shaped callback exactly like their
+  // own existing isMirror/isChicken exclusions.
+  isAshkaStrike = false,
   // Illyra's Mirage Burst is the first (and so far only) source that needs
   // to bypass EVERY dodge mechanic in the game uniformly - not just one
   // character's, all of them (Akyros, Marin, Grimtal, and Illyra's own
@@ -357,7 +367,7 @@ export function applyDamage(game, log, {
   // above. See rowan.js's own registerOnHitLandedEarly call for the actual
   // Mirror Reflect logic.
   const earlyExtra = runOnHitLandedEarly(target, game, log, {
-    amountDealt: result.amountDealt, isMirror, isPoisonTick, sourceCharacterId, heartsBefore,
+    amountDealt: result.amountDealt, isMirror, isPoisonTick, isAshkaStrike, sourceCharacterId, heartsBefore,
   });
   if (earlyExtra) Object.assign(result, earlyExtra);
 
@@ -493,7 +503,7 @@ export function applyDamage(game, log, {
   // them specifically). hitLandedCtxExtra carries anything an earlier
   // onOwnDeath callback handed forward this same call (see above).
   const hitLandedExtra = runOnHitLanded(target, game, log, {
-    amountDealt: result.amountDealt, isMirror, isPoisonTick, sourceCharacterId, ...hitLandedCtxExtra,
+    amountDealt: result.amountDealt, isMirror, isPoisonTick, isAshkaStrike, sourceCharacterId, ...hitLandedCtxExtra,
   });
   if (hitLandedExtra) Object.assign(result, hitLandedExtra);
 
