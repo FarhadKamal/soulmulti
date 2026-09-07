@@ -289,6 +289,11 @@ const ACTION_VOICE_LINES = {
     // determined amountDealt >= 3, same reasoning as the sound-effect
     // override just above it.
     runeStrikeStrong: 'rune_strike_strong',
+    // Prophecy of Doom's own cast line - reached automatically via the
+    // generic playMoveVoice(entry.characterId, entry.actionId) dispatch
+    // for any 'special'-type entry, same as every other real actionId in
+    // this table.
+    prophecyOfDoom: 'prophecy',
   },
 };
 
