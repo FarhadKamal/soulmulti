@@ -372,11 +372,31 @@ function baseSpecialFor(id) {
       // runeStrikeBonusDamage: +1 permanent, non-decaying, per correct
       // prediction (so max +2 once both wins are banked) - added on top of
       // Rune Strike's own base damage.
+      // prophecyOfDoomArmed/usedProphecyOfDoom: his hearts<=3 desperation
+      // special (Death Pact #31 + Environmental Attack #2, see project
+      // memory soulclash_oraclus_prophecy_of_doom.md) - cast does nothing
+      // immediately, just arms the flag; the instant he's KO'd (any
+      // source), a meteor strike deals 3 to every OTHER living character
+      // (shield still absorbs, but dodge/untargetable are bypassed - same
+      // "Environmental Attack" shape as Earthshatter/Mirage Burst/Grim
+      // Barrage). usedProphecyOfDoom is the one-time-use gate (separate
+      // from usedSpecial, already spoken for by nothing here since Rune
+      // Vision doesn't set it - but kept as its own dedicated flag for
+      // clarity/consistency with every other multi-special hero's pattern).
+      // prophecyOfDoomPendingAfterChicken: true if he died WHILE
+      // chickenified (Boingo's Fowl Play) - the meteor strike is parked
+      // here instead of firing immediately (confirmed ruling: "if chicken
+      // status, oraclus fried and koed. doom start after boingo death"),
+      // fired later by oraclus.js's own firePendingProphecyOfDoomIfAny once
+      // Fowl Play actually ends.
       return {
         predictedAttackerId: null,
         predictedTargetId: null,
         predictionWins: 0,
         runeStrikeBonusDamage: 0,
+        prophecyOfDoomArmed: false,
+        usedProphecyOfDoom: false,
+        prophecyOfDoomPendingAfterChicken: false,
       };
     default:
       return {};

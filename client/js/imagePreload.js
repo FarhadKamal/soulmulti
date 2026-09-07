@@ -104,6 +104,7 @@ const FLASH_IMAGES = [
   'assets/images/oraclus/rune_prediction.jpg',
   'assets/images/oraclus/win_prediction.jpg',
   'assets/images/oraclus/loss_prediction.jpg',
+  'assets/images/oraclus/prophecy.jpg',
 ];
 
 // Boingo's Fowl Play - per-hero chicken art (2026-09-04): every character
@@ -133,6 +134,14 @@ const DIVINE_JUDGMENT_STRUCK_IMAGES = CHARACTER_IDS.filter((id) => id !== 'athen
   (id) => `assets/images/${id}/judgement_strike.jpg`
 );
 
+// Oraclus's Prophecy of Doom TRIGGER moment - same per-victim-hero art
+// pattern as Divine Judgment's own DIVINE_JUDGMENT_STRUCK_IMAGES above,
+// one doom_strike.jpg per possible victim (everyone except Oraclus
+// himself, who can never be his own meteor-strike target).
+const PROPHECY_OF_DOOM_STRIKE_IMAGES = CHARACTER_IDS.filter((id) => id !== 'oraclus').map(
+  (id) => `assets/images/${id}/doom_strike.jpg`
+);
+
 let started = false;
 // Resolves once every preloaded image has either loaded or failed - used by
 // main.js to gate the battle screen behind a brief "preparing battle" wait
@@ -146,7 +155,7 @@ let readyPromise = null;
 export function preloadBattleImages() {
   if (started) return readyPromise;
   started = true;
-  const paths = [...FLASH_IMAGES, ...CHICKEN_IMAGES, ...DIVINE_JUDGMENT_STRUCK_IMAGES];
+  const paths = [...FLASH_IMAGES, ...CHICKEN_IMAGES, ...DIVINE_JUDGMENT_STRUCK_IMAGES, ...PROPHECY_OF_DOOM_STRIKE_IMAGES];
   for (const folder of PER_CHARACTER_FOLDERS) {
     for (const id of CHARACTER_IDS) paths.push(`${folder}/${id}.jpg`);
   }

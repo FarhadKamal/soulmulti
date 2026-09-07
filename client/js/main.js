@@ -138,6 +138,12 @@ const EARTHSHATTER_GAME_OVER_FREEZE_MS = 5200;
 // EARTHSHATTER_GAME_OVER_FREEZE_MS is set a bit past its own longest
 // component rather than exactly equal to it.
 const DIVINE_JUDGMENT_GAME_OVER_FREEZE_MS = 5000;
+// Oraclus's Prophecy of Doom trigger (the meteor strike hitting everyone
+// when he dies) - same "don't let the freeze cut away before this
+// finishes" reasoning as Divine Judgment's own freeze above, matching its
+// duration since the trigger reuses the same board-wide dramatic-moment
+// scale.
+const PROPHECY_OF_DOOM_GAME_OVER_FREEZE_MS = 5000;
 function startGameOverSequence(game) {
   if (gameOverSequenceStarted) return;
   gameOverSequenceStarted = true;
@@ -165,11 +171,22 @@ function startGameOverSequence(game) {
   while (batchStart > 0 && game.log[batchStart - 1]?.type !== 'end-action') batchStart--;
   const wasDivineJudgment = game.log.slice(batchStart, lastEndActionIndex + 1)
     .some((e) => e.type === 'divine-judgment-trigger' && e.koTriggered);
+  // Same batch-scan reasoning as Divine Judgment directly above - the
+  // meteor strike is its own 'prophecy-of-doom-trigger' entry pushed
+  // partway through whatever action delivered Oraclus's own killing blow,
+  // not the log's own last entry. Any hit in its own `hits` array KO'ing
+  // someone is enough to trigger the longer freeze (a strike hitting
+  // everyone for 3 could easily end the match, same "can cause a draw"
+  // reasoning Divine Judgment's own comment flags).
+  const wasProphecyOfDoom = game.log.slice(batchStart, lastEndActionIndex + 1)
+    .some((e) => e.type === 'prophecy-of-doom-trigger' && e.hits?.some((h) => h.koTriggered));
   const freezeMs = wasEarthshatter
     ? EARTHSHATTER_GAME_OVER_FREEZE_MS
     : wasDivineJudgment
       ? DIVINE_JUDGMENT_GAME_OVER_FREEZE_MS
-      : (isBotShow ? BOT_SHOW_GAME_OVER_FREEZE_MS : GAME_OVER_FREEZE_MS);
+      : wasProphecyOfDoom
+        ? PROPHECY_OF_DOOM_GAME_OVER_FREEZE_MS
+        : (isBotShow ? BOT_SHOW_GAME_OVER_FREEZE_MS : GAME_OVER_FREEZE_MS);
   const victoryMs = isBotShow ? BOT_SHOW_GAME_OVER_VICTORY_MS : GAME_OVER_VICTORY_MS;
   state.gameOverStage = 'freeze';
   setTimeout(() => {
@@ -358,6 +375,26 @@ function playLogEntrySound(entry, game) {
     if (entry.koTriggered) {
       playSound('divine_judgment_strike');
       setTimeout(() => playKoedFor(entry.toCharacterId, game, entry.fromCharacterId), 200);
+    }
+    return;
+  }
+  if (entry.type === 'prophecy-of-doom-trigger') {
+    // Same dedicated-sting reasoning as Divine Judgment's own trigger just
+    // above, played once regardless of how many victims were hit (one
+    // meteor strike, not one sound per victim). Every KO'd victim's own
+    // normal koed sound/voice then plays a moment later, staggered
+    // slightly PER VICTIM (not all at the identical 200ms mark) so
+    // multiple simultaneous KOs don't talk over each other.
+    const hits = entry.hits || [];
+    if (hits.some((h) => h.amountDealt > 0)) {
+      playSound('doom_strike');
+    }
+    let staggerIndex = 0;
+    for (const hit of hits) {
+      if (!hit.koTriggered) continue;
+      const delay = 200 + staggerIndex * 150;
+      staggerIndex += 1;
+      setTimeout(() => playKoedFor(hit.targetId, game, entry.fromCharacterId), delay);
     }
     return;
   }

@@ -291,6 +291,10 @@ const ACTION_SOUND = {
   rewind: 'rewind',
   runeStrike: 'rune_strike',
   runeVision: 'predict',
+  // Prophecy of Doom's cast reuses the same sound as Rune Vision's own
+  // cast (confirmed ruling: "yes because both are prediciton") - no new
+  // cast sound effect needed.
+  prophecyOfDoom: 'predict',
 };
 
 export function playActionSound(actionId) {

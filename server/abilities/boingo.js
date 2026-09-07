@@ -30,7 +30,7 @@ import { registerOnOwnDeath } from '../engine/categories/onOwnDeath.js';
 // caller (finalizeAction/tickPoisonIfAny in turnEngine.js) pushes it
 // AFTER their own line, stamping a fresh heartsSnapshot at that later
 // point.
-registerOnOwnDeath('boingo', (character, game) => {
+registerOnOwnDeath('boingo', (character, game, log) => {
   if (!game.fowlPlayActive) return undefined;
   game.fowlPlayActive = false;
   game.fowlPlayBoingoTurnsElapsed = 0;
@@ -55,8 +55,44 @@ registerOnOwnDeath('boingo', (character, game) => {
     const others = Object.values(game.characters).filter((c) => c.id !== 'draxus' && !c.isKO);
     draxusChar.special.cheatDeathEligible = others.length >= 2;
   }
-  if (revertedIds.length === 0) return undefined;
-  return { fowlPlayRevertLogEntry: { type: 'fowl-play-revert', characterIds: revertedIds } };
+  // Prophecy of Doom (Oraclus, Death Pact #31 + Environmental Attack #2) -
+  // same "fire the pending trigger now that Fowl Play has ended" reasoning
+  // as the Draxus block above (confirmed ruling, 2026-09-07: "doom start
+  // after boingo death"). Inlined for the same circular-import reason -
+  // resolves the meteor strike directly (applyDamage is already imported
+  // at the top of this file) rather than calling into oraclus.js.
+  let prophecyOfDoomTriggerLogEntry;
+  const oraclusChar = game.characters.oraclus;
+  if (oraclusChar?.special?.prophecyOfDoomPendingAfterChicken) {
+    oraclusChar.special.prophecyOfDoomPendingAfterChicken = false;
+    const hits = [];
+    // Local `log` array (the mid-applyDamage batch this whole callback
+    // runs inside) is fine to pass through here - applyDamage's own
+    // pushes onto it are themselves deferred/reordered correctly by the
+    // SAME mechanism this trigger's own entry needs (see below), same
+    // "collect real hit entries into the shared local batch, defer only
+    // the summary/trigger entry itself" pattern Divine Judgment/this
+    // trigger's own immediate-path counterpart in oraclus.js already use.
+    for (const target of Object.values(game.characters)) {
+      if (target.id === 'oraclus' || target.isKO) continue;
+      const result = applyDamage(game, log, {
+        sourceCharacterId: 'oraclus',
+        targetCharacterId: target.id,
+        amount: 3,
+        ignoresDodge: true,
+        ignoresUntargetable: true,
+      });
+      hits.push({ targetId: target.id, amountDealt: result.amountDealt, koTriggered: result.koTriggered });
+    }
+    if (hits.length > 0) {
+      prophecyOfDoomTriggerLogEntry = { type: 'prophecy-of-doom-trigger', fromCharacterId: 'oraclus', hits };
+    }
+  }
+  if (revertedIds.length === 0 && !prophecyOfDoomTriggerLogEntry) return undefined;
+  return {
+    ...(revertedIds.length > 0 ? { fowlPlayRevertLogEntry: { type: 'fowl-play-revert', characterIds: revertedIds } } : {}),
+    ...(prophecyOfDoomTriggerLogEntry ? { prophecyOfDoomTriggerLogEntry } : {}),
+  };
 });
 
 export const actions = {

@@ -344,6 +344,9 @@ function tickPoisonIfAny(character, game, log) {
   // kill a marked Athena needs this path to push the trigger entry too,
   // same reasoning as every other deferred entry on this call path.
   if (result.divineJudgmentTriggerLogEntry) log.push({ ...result.divineJudgmentTriggerLogEntry, hearts: heartsSnapshot(game) });
+  // Oraclus's Prophecy of Doom trigger - same deferred handling as
+  // divineJudgmentTriggerLogEntry directly above.
+  if (result.prophecyOfDoomTriggerLogEntry) log.push({ ...result.prophecyOfDoomTriggerLogEntry, hearts: heartsSnapshot(game) });
 }
 
 // Rowan's Silence Lock, same victim-turn-tick shape as poison above.
@@ -480,6 +483,12 @@ function tickFowlPlayIfBoingoTurn(character, game, log) {
     // ended and his real koed.jpg is showing again, arm it here if it
     // hasn't already been armed some other way.
     draxus.armCheatDeathIfNewlyRevealed(game);
+    // Prophecy of Doom (Oraclus, Death Pact #31 + Environmental Attack #2)
+    // - same reasoning as Draxus's own chicken-death gate above (confirmed
+    // ruling, 2026-09-07): if he died WHILE chickenified, the meteor strike
+    // was parked rather than firing immediately - fire it now that Fowl
+    // Play has ended and his real koed.jpg is showing again.
+    oraclus.firePendingProphecyOfDoomIfAny(game, log);
   }
 }
 
@@ -1047,6 +1056,10 @@ export function resolveFullControl(game, log, casterCharacterId) {
       // deferred handling as every other call site on this list, or it's
       // silently dropped entirely (nothing else reads this field here).
       if (result?.divineJudgmentTriggerLogEntry) log.push(result.divineJudgmentTriggerLogEntry);
+      // Oraclus's Prophecy of Doom trigger - same reasoning as
+      // divineJudgmentTriggerLogEntry directly above (if he's one of the
+      // puppets and dies mid-burst with a still-armed prophecy).
+      if (result?.prophecyOfDoomTriggerLogEntry) log.push(result.prophecyOfDoomTriggerLogEntry);
       const snapshot = heartsSnapshot(game);
       for (let i = before; i < log.length; i++) {
         if (!log[i].hearts) log[i].hearts = snapshot;
@@ -1161,6 +1174,9 @@ export function finalizeAction(game, log, result, characterId, actionId, targetI
   // "Divine Judgment falls upon Tharox - KO!" appeared BEFORE the
   // triggering attack's own descriptive line in a real match log.
   if (result?.divineJudgmentTriggerLogEntry) log.push(result.divineJudgmentTriggerLogEntry);
+  // Oraclus's Prophecy of Doom trigger - same deferred reasoning as
+  // divineJudgmentTriggerLogEntry directly above.
+  if (result?.prophecyOfDoomTriggerLogEntry) log.push(result.prophecyOfDoomTriggerLogEntry);
   applyEndOfActionChecks(game);
   game.log.push(...log, { type: 'end-action', round: game.round, characterId, actionId, targetId, hearts: heartsSnapshot(game) });
 }
@@ -1272,6 +1288,9 @@ export function resolveJesterBall(game, holderCharacterId, choice, extra) {
   // deferred handling as every other call site that resolves applyDamage
   // outside the normal executeAction/finalizeAction path.
   if (result?.divineJudgmentTriggerLogEntry) log.push(result.divineJudgmentTriggerLogEntry);
+  // Oraclus's Prophecy of Doom trigger - same deferred handling as
+  // divineJudgmentTriggerLogEntry directly above.
+  if (result?.prophecyOfDoomTriggerLogEntry) log.push(result.prophecyOfDoomTriggerLogEntry);
   applyEndOfActionChecks(game);
   game.log.push(...log, { type: 'end-action', round: game.round, characterId: holderCharacterId, actionId: `jesterBall:${choice}`, hearts: heartsSnapshot(game) });
   return result;

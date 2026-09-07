@@ -356,6 +356,9 @@ export const actions = {
       // matter). Added 2026-09-05, alongside the identical fix to Mirage
       // Burst (illyra.js) after the same gap was confirmed live there.
       let divineJudgmentTriggerLogEntry = null;
+      // Oraclus's Prophecy of Doom trigger - same "first occurrence wins"
+      // reasoning as divineJudgmentTriggerLogEntry directly above.
+      let prophecyOfDoomTriggerLogEntry = null;
       for (let i = 0; i < GRIM_BARRAGE_TOTAL_HITS; i++) {
         if (others.length === 0) break;
         const target = others[Math.floor(Math.random() * others.length)];
@@ -402,6 +405,7 @@ export const actions = {
         if (result.mirrorReflectLogEntry && !mirrorReflectLogEntry) mirrorReflectLogEntry = result.mirrorReflectLogEntry;
         if (result.mirrorReflectResult?.rebirthLogEntry && !rebirthLogEntry) rebirthLogEntry = result.mirrorReflectResult.rebirthLogEntry;
         if (result.divineJudgmentTriggerLogEntry && !divineJudgmentTriggerLogEntry) divineJudgmentTriggerLogEntry = result.divineJudgmentTriggerLogEntry;
+        if (result.prophecyOfDoomTriggerLogEntry && !prophecyOfDoomTriggerLogEntry) prophecyOfDoomTriggerLogEntry = result.prophecyOfDoomTriggerLogEntry;
         hits.push({ targetId: target.id, blockedBy, ...result });
         // A hit that KO's its target removes them from the pool for any
         // REMAINING hits this same cast - confirmed ruling (2026-08-31,
@@ -421,7 +425,7 @@ export const actions = {
           amount: mirrorTotal, koTriggered: mirrorKoTriggered, revived: mirrorRevived,
         }
         : null;
-      return { hits, rebirthLogEntry, mirrorLogEntry, mirrorReflectLogEntry, divineJudgmentTriggerLogEntry };
+      return { hits, rebirthLogEntry, mirrorLogEntry, mirrorReflectLogEntry, divineJudgmentTriggerLogEntry, prophecyOfDoomTriggerLogEntry };
     },
   },
 };

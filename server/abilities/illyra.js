@@ -101,6 +101,10 @@ export const actions = {
       let mirrorLogEntry = null;
       let mirrorReflectLogEntry = null;
       let divineJudgmentTriggerLogEntry = null;
+      // Oraclus's Prophecy of Doom trigger - same "first occurrence wins"
+      // reasoning as divineJudgmentTriggerLogEntry directly above (self-
+      // clears the instant it fires).
+      let prophecyOfDoomTriggerLogEntry = null;
       // Snapshot the target list BEFORE clearing anything - iterating and
       // mutating the same Map in one pass is fine here since .set() never
       // adds new keys mid-loop (only zeroes existing ones), but snapshotting
@@ -134,9 +138,10 @@ export const actions = {
         if (result.mirrorReflectLogEntry && !mirrorReflectLogEntry) mirrorReflectLogEntry = result.mirrorReflectLogEntry;
         if (result.mirrorReflectResult?.rebirthLogEntry && !rebirthLogEntry) rebirthLogEntry = result.mirrorReflectResult.rebirthLogEntry;
         if (result.divineJudgmentTriggerLogEntry && !divineJudgmentTriggerLogEntry) divineJudgmentTriggerLogEntry = result.divineJudgmentTriggerLogEntry;
+        if (result.prophecyOfDoomTriggerLogEntry && !prophecyOfDoomTriggerLogEntry) prophecyOfDoomTriggerLogEntry = result.prophecyOfDoomTriggerLogEntry;
       }
       log.push({ type: 'special', characterId: character.id, actionId: 'mirageBurst', bursts });
-      return { bursts, rebirthLogEntry, mirrorLogEntry, mirrorReflectLogEntry, divineJudgmentTriggerLogEntry };
+      return { bursts, rebirthLogEntry, mirrorLogEntry, mirrorReflectLogEntry, divineJudgmentTriggerLogEntry, prophecyOfDoomTriggerLogEntry };
     },
   },
   // Mirage Overload: her desperate last-stand special. No-target, one-time

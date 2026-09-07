@@ -1437,6 +1437,14 @@ export function chooseRuneVisionTargetPick(character, game, predictedAttackerId)
 
 function chooseOraclusMove(character, game, usable) {
   const byId = Object.fromEntries(usable.map((a) => [a.actionId, a]));
+  // Prophecy of Doom: a desperation special, only legal once hearts <= 3 -
+  // same "cast eagerly once legal" policy as every other one-time
+  // desperation special in the roster (Divine Judgment, Fowl Play, World
+  // Stops, Earthshatter, Grim Barrage, Full Control). No target to pick and
+  // no immediate cost, so there's no reason to ever delay it once eligible.
+  if (byId.prophecyOfDoom) {
+    return { actionId: 'prophecyOfDoom', targetId: null };
+  }
   if (byId.runeVision) {
     const attackerId = chooseRuneVisionAttackerPick(character, game);
     if (attackerId) return { actionId: 'runeVision', targetId: attackerId };

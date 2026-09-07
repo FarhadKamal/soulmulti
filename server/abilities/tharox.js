@@ -157,6 +157,9 @@ export const actions = {
       // Mirage Burst (illyra.js) and Grim Barrage (grimtal.js) after the
       // same gap was confirmed live on Mirage Burst.
       let divineJudgmentTriggerLogEntry = null;
+      // Oraclus's Prophecy of Doom trigger - same "first occurrence wins"
+      // reasoning as divineJudgmentTriggerLogEntry directly above.
+      let prophecyOfDoomTriggerLogEntry = null;
       for (let i = 0; i < EARTHSHATTER_TOTAL_DAMAGE; i++) {
         if (others.length === 0) break;
         const target = others[Math.floor(Math.random() * others.length)];
@@ -199,6 +202,7 @@ export const actions = {
         if (result.mirrorReflectLogEntry && !mirrorReflectLogEntry) mirrorReflectLogEntry = result.mirrorReflectLogEntry;
         if (result.mirrorReflectResult?.rebirthLogEntry && !rebirthLogEntry) rebirthLogEntry = result.mirrorReflectResult.rebirthLogEntry;
         if (result.divineJudgmentTriggerLogEntry && !divineJudgmentTriggerLogEntry) divineJudgmentTriggerLogEntry = result.divineJudgmentTriggerLogEntry;
+        if (result.prophecyOfDoomTriggerLogEntry && !prophecyOfDoomTriggerLogEntry) prophecyOfDoomTriggerLogEntry = result.prophecyOfDoomTriggerLogEntry;
         if (result.koTriggered) {
           koTriggeredByTarget[target.id] = true;
           others = others.filter((c) => c.id !== target.id);
@@ -220,7 +224,7 @@ export const actions = {
           amount: mirrorTotal, koTriggered: mirrorKoTriggered, revived: mirrorRevived,
         }
         : null;
-      return { hits, rebirthLogEntry, mirrorLogEntry, mirrorReflectLogEntry, divineJudgmentTriggerLogEntry };
+      return { hits, rebirthLogEntry, mirrorLogEntry, mirrorReflectLogEntry, divineJudgmentTriggerLogEntry, prophecyOfDoomTriggerLogEntry };
     },
   },
 };

@@ -431,8 +431,15 @@ export function applyDamage(game, log, {
       // through applyDamage, before that caller's own log.push(). Deferred
       // the same way so finalizeAction/tickPoisonIfAny push it AFTER their
       // own line instead.
-      const { fowlPlayRevertLogEntry, ...rest } = ownDeathExtra;
+      // Oraclus's Prophecy of Doom, fired via boingo.js's own onOwnDeath
+      // callback (Boingo dying mid-Fowl-Play-window is one of the two ways
+      // a PENDING (chicken-death-delayed) meteor strike can finally fire) -
+      // same deferred-log-entry reasoning as fowlPlayRevertLogEntry right
+      // above, pulled out the same special way rather than merged into
+      // hitLandedCtxExtra.
+      const { fowlPlayRevertLogEntry, prophecyOfDoomTriggerLogEntry: pendingProphecyEntry, ...rest } = ownDeathExtra;
       if (fowlPlayRevertLogEntry) result.fowlPlayRevertLogEntry = fowlPlayRevertLogEntry;
+      if (pendingProphecyEntry) result.prophecyOfDoomTriggerLogEntry = pendingProphecyEntry;
       if (Object.keys(rest).length > 0) Object.assign(hitLandedCtxExtra, rest);
     }
     // The Jester Ball is orphaned if its current holder dies from a hit
@@ -464,6 +471,13 @@ export function applyDamage(game, log, {
     const anyDeathExtra = runOnAnyDeath(target.id, sourceCharacterId, isMirror, game, log);
     if (anyDeathExtra?.divineJudgmentTriggerLogEntry) {
       result.divineJudgmentTriggerLogEntry = anyDeathExtra.divineJudgmentTriggerLogEntry;
+    }
+    // Oraclus's Prophecy of Doom (Death Pact #31 + Environmental Attack #2)
+    // - same deferred pattern as divineJudgmentTriggerLogEntry just above,
+    // fired from this same onAnyDeath dispatch (see oraclus.js's own
+    // registration).
+    if (anyDeathExtra?.prophecyOfDoomTriggerLogEntry) {
+      result.prophecyOfDoomTriggerLogEntry = anyDeathExtra.prophecyOfDoomTriggerLogEntry;
     }
   }
 

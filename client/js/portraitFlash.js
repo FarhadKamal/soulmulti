@@ -45,6 +45,11 @@ const FOWL_PLAY_FLASH_DURATION_MS = 4500;
 // before the victim's normal koed.jpg portrait would otherwise take over.
 const DIVINE_JUDGMENT_TRIGGER_FLASH_DURATION_MS = 4500;
 
+// Oraclus's Prophecy of Doom TRIGGER moment (the meteor strike hitting
+// everyone when he dies) - same 4.5s dramatic-multi-beat scale as Divine
+// Judgment's own trigger above.
+const PROPHECY_OF_DOOM_TRIGGER_FLASH_DURATION_MS = 4500;
+
 // Resurrection Gamble (Draxus's Cheat Death, taxonomy #32) - a successful
 // revival reuses the SAME sound effect as Deathless Fury's own cast
 // (assets/sounds/deathless_fury.mp3, confirmed ruling 2026-09-06: "same
@@ -466,6 +471,29 @@ export function handleLogEntryForFlash(entry, game) {
     }
     return;
   }
+  if (entry.type === 'prophecy-of-doom-trigger') {
+    // The TRIGGER moment (Oraclus's own death raining a meteor strike on
+    // EVERY other living character) - structurally different from Divine
+    // Judgment's own single-victim trigger just above: loops entry.hits
+    // and flashes EVERY victim, not gated on koTriggered per-victim (a
+    // survivor who only took damage still shows the meteor impact art, not
+    // just the ones it kills) - only requires amountDealt > 0 (a shield
+    // that fully absorbed the hit shows nothing, matching every other
+    // "did this actually land" flash gate in this file). Per-victim-hero
+    // art, same asset-naming pattern as judgement_strike.jpg -
+    // assets/images/<victimId>/doom_strike.jpg, one per hero (all 15
+    // possible victims, everyone except Oraclus himself). Deliberately NOT
+    // gated on !isKO(hit.targetId) for a hit that DID KO them - same
+    // reasoning as Divine Judgment's own trigger, the victim IS KO'd by
+    // the time this entry is pushed, and that's exactly the moment this
+    // flash needs to override the plain koed.jpg for.
+    for (const hit of entry.hits || []) {
+      if (hit.amountDealt > 0) {
+        setFlash(hit.targetId, `assets/images/${hit.targetId}/doom_strike.jpg`, PROPHECY_OF_DOOM_TRIGGER_FLASH_DURATION_MS);
+      }
+    }
+    return;
+  }
   if (entry.type === 'prediction-result') {
     // Oraclus's Rune Vision resolving - its own dedicated log entry type
     // (server's resolveOraclusPredictionIfPending), same reasoning as
@@ -736,6 +764,8 @@ export function handleLogEntryForFlash(entry, game) {
       // same cast, not a second visible moment worth re-flashing.
       if (entry.stage === 1) setFlash(characterId, 'assets/images/oraclus/rune_prediction.jpg');
       break;
+    case 'prophecyOfDoom':
+      setFlash(characterId, 'assets/images/oraclus/prophecy.jpg'); break;
     default:
       break;
   }

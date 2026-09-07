@@ -1929,7 +1929,7 @@ const ACTION_LABELS = {
   piercingWand: 'Piercing Wand', wandMastery: 'Wand Mastery',
   grimStrike: 'Grim Strike', skullCrack: 'Skull Crack', claimKill: 'Claim the Kill', grimBarrage: 'Grim Barrage',
   mirageMark: 'Mirage Mark', mirageBurst: 'Mirage Burst', mirageOverload: 'Mirage Overload',
-  runeStrike: 'Rune Strike', runeVision: 'Rune Vision', runeVisionTargetPick: 'Rune Vision',
+  runeStrike: 'Rune Strike', runeVision: 'Rune Vision', runeVisionTargetPick: 'Rune Vision', prophecyOfDoom: 'Prophecy of Doom',
   mindControl: 'Mind Control', fullControl: 'Full Control',
 };
 
@@ -2090,6 +2090,12 @@ function describeLogEntry(entry) {
       return `Curse mirrors ${entry.amount} damage to ${name(entry.toCharacterId)}${entry.koTriggered ? ' - KO!' : ''}`;
     case 'divine-judgment-trigger':
       return `Divine Judgment falls upon ${name(entry.toCharacterId)}${entry.koTriggered ? ' - KO!' : ''}`;
+    case 'prophecy-of-doom-trigger': {
+      const hitsText = (entry.hits || [])
+        .map((h) => `${name(h.targetId)} (${h.amountDealt} dmg${h.koTriggered ? ' - KO!' : ''})`)
+        .join(', ');
+      return `Prophecy of Doom rains down - ${hitsText}`;
+    }
     case 'ashka-heal':
       return `${name(entry.characterId)}'s Ashka heals +${entry.healed}`;
     case 'prediction-result':
