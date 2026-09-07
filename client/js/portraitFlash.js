@@ -619,7 +619,7 @@ export function handleLogEntryForFlash(entry, game) {
     case 'divineRestore':
       setFlash(characterId, 'assets/images/athena/heal.jpg'); break;
     case 'divineSacrifice':
-      if (!dodged && amountDealt > 0) setFlash(characterId, 'assets/images/athena/sacrifice.jpg');
+      if (!dodged) setFlash(characterId, 'assets/images/athena/sacrifice.jpg');
       break;
     case 'divineJudgment':
       setFlash(characterId, 'assets/images/athena/judgment.jpg'); break;
@@ -630,7 +630,7 @@ export function handleLogEntryForFlash(entry, game) {
     case 'titanToss':
       setFlash(characterId, 'assets/images/tharox/toss.jpg'); break;
     case 'smash': case 'titanSmash':
-      if (!dodged && amountDealt > 0) setFlash(characterId, 'assets/images/tharox/smash.jpg');
+      if (!dodged) setFlash(characterId, 'assets/images/tharox/smash.jpg');
       break;
     case 'soulSwap':
       setFlash(characterId, 'assets/images/zerathys/soul.jpg'); break;
@@ -649,10 +649,10 @@ export function handleLogEntryForFlash(entry, game) {
       if (!dodged) setFlash(characterId, 'assets/images/chronox/cyclone.jpg');
       break;
     case 'shadowExecution':
-      if (!dodged && amountDealt > 0) setFlash(characterId, 'assets/images/akyros/shadow.jpg');
+      if (!dodged) setFlash(characterId, 'assets/images/akyros/shadow.jpg');
       break;
     case 'fatalSlash':
-      if (!dodged && amountDealt > 0) setFlash(characterId, 'assets/images/akyros/fatal.jpg');
+      if (!dodged) setFlash(characterId, 'assets/images/akyros/fatal.jpg');
       break;
     case 'lunarEclipse':
       setFlash(characterId, 'assets/images/velorya/casting.jpg'); break;
@@ -660,10 +660,10 @@ export function handleLogEntryForFlash(entry, game) {
       if (!dodged) setFlash(characterId, 'assets/images/velorya/strike.jpg');
       break;
     case 'bloodHunt':
-      if (!dodged && amountDealt > 0) setFlash(characterId, 'assets/images/blade/strike.jpg');
+      if (!dodged) setFlash(characterId, 'assets/images/blade/strike.jpg');
       break;
     case 'grudgeStrike':
-      if (!dodged && amountDealt > 0) setFlash(characterId, 'assets/images/kaelis/grudge.jpg');
+      if (!dodged) setFlash(characterId, 'assets/images/kaelis/grudge.jpg');
       break;
     case 'callAshka':
       setFlash(characterId, 'assets/images/kaelis/bird.jpg'); break;
@@ -683,7 +683,7 @@ export function handleLogEntryForFlash(entry, game) {
       // play" - "he was koed. and alived again"). hasRevivedOnce is sticky
       // (never clears), matching alive.jpg's own persistent-portrait
       // lifetime above.
-      if (!dodged && amountDealt > 0) {
+      if (!dodged) {
         const usesImmortalStrike = entry.isBonusStrike || game.characters.draxus?.special?.hasRevivedOnce;
         setFlash(characterId, usesImmortalStrike ? 'assets/images/draxus/immortal_strike.jpg' : 'assets/images/draxus/normal_strike.jpg');
       }
@@ -732,7 +732,7 @@ export function handleLogEntryForFlash(entry, game) {
       // Shared action id (Rowan and Marin both have a Wand Strike) - the
       // image folder differs per character, everything else about the
       // trigger condition is identical.
-      if (!dodged && amountDealt > 0) {
+      if (!dodged) {
         setFlash(characterId, characterId === 'marin' ? 'assets/images/marin/wand_strike.jpg' : 'assets/images/rowan/wand_strike.jpg');
       }
       break;
@@ -745,17 +745,17 @@ export function handleLogEntryForFlash(entry, game) {
     case 'purify':
       setFlash(characterId, 'assets/images/rowan/purify.jpg'); break;
     case 'wildLightning':
-      if (!dodged && amountDealt > 0) setFlash(characterId, 'assets/images/rowan/wild_lightning.jpg');
+      if (!dodged) setFlash(characterId, 'assets/images/rowan/wild_lightning.jpg');
       break;
     case 'mirrorReflect':
       setFlash(characterId, 'assets/images/rowan/mirror_reflect.jpg'); break;
     case 'silenceLock':
       setFlash(characterId, 'assets/images/rowan/silence_lock.jpg'); break;
     case 'grimStrike':
-      if (!dodged && amountDealt > 0) setFlash(characterId, 'assets/images/grimtal/normal_attack.jpg');
+      if (!dodged) setFlash(characterId, 'assets/images/grimtal/normal_attack.jpg');
       break;
     case 'skullCrack':
-      if (!dodged && amountDealt > 0) setFlash(characterId, 'assets/images/grimtal/skull_crack.jpg');
+      if (!dodged) setFlash(characterId, 'assets/images/grimtal/skull_crack.jpg');
       break;
     case 'claimKill':
       setFlash(characterId, 'assets/images/grimtal/claim_kill.jpg'); break;
@@ -775,7 +775,7 @@ export function handleLogEntryForFlash(entry, game) {
       // Empowered (3 damage, both prediction wins banked) gets its own
       // more intense flash image, same amountDealt-gated swap the sound/
       // voice already do (see main.js).
-      if (!dodged && amountDealt > 0) {
+      if (!dodged) {
         setFlash(characterId, amountDealt >= 3 ? 'assets/images/oraclus/rune_strong_strike.jpg' : 'assets/images/oraclus/rune_strike.jpg');
       }
       break;
