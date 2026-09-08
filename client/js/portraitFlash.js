@@ -50,6 +50,11 @@ const DIVINE_JUDGMENT_TRIGGER_FLASH_DURATION_MS = 4500;
 // Judgment's own trigger above.
 const PROPHECY_OF_DOOM_TRIGGER_FLASH_DURATION_MS = 4500;
 
+// Ashka's Vengeance (Kaelis's hearts<=3 passive) - the VICTIM's own
+// ashka_strike.jpg flash, bumped to 3s per direct request (2026-09-08) so
+// the bird-strike image has more time to read on the victim's tile.
+const ASHKAS_VENGEANCE_STRIKE_FLASH_DURATION_MS = 3000;
+
 // Resurrection Gamble (Draxus's Cheat Death, taxonomy #32) - a successful
 // revival reuses the SAME sound effect as Deathless Fury's own cast
 // (assets/sounds/deathless_fury.mp3, confirmed ruling 2026-09-06: "same
@@ -523,14 +528,14 @@ export function handleLogEntryForFlash(entry, game) {
     // VICTIM's own tile shows their own per-hero trigger image (confirmed
     // ruling: "we will create ashka is attaking for each hero"), same
     // per-victim-art pattern as Divine Judgment/Prophecy of Doom -
-    // assets/images/<victimId>/ashka_strike.jpg. Uses the default
-    // FLASH_DURATION_MS (not gated on amountDealt>0 the way most attack
-    // flashes are, since this is always exactly 1 flat pure damage with no
-    // dodge to fail against - it always lands unless the target already
-    // died before this fires, guarded by isKO below).
+    // assets/images/<victimId>/ashka_strike.jpg, held for
+    // ASHKAS_VENGEANCE_STRIKE_FLASH_DURATION_MS (not gated on amountDealt>0
+    // the way most attack flashes are, since this is always exactly 1 flat
+    // pure damage with no dodge to fail against - it always lands unless
+    // the target already died before this fires, guarded by isKO below).
     if (!isKO(entry.characterId)) setFlash(entry.characterId, 'assets/images/kaelis/surprise.jpg');
     if (!isKO(entry.targetId) || entry.koTriggered) {
-      setFlash(entry.targetId, `assets/images/${entry.targetId}/ashka_strike.jpg`);
+      setFlash(entry.targetId, `assets/images/${entry.targetId}/ashka_strike.jpg`, ASHKAS_VENGEANCE_STRIKE_FLASH_DURATION_MS);
     }
     return;
   }
