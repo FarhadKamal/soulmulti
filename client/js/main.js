@@ -668,6 +668,16 @@ function playLogEntrySound(entry, game) {
       }
     }
   }
+  // Akyros's Shadow Army: same multi-victim shape as Mirage Burst above -
+  // no single koTriggered/targetCharacterId at the top level, see
+  // entry.hits instead (akyros.js's own shadowArmy execute()).
+  if (entry.actionId === 'shadowArmy') {
+    for (const hit of entry.hits || []) {
+      if (hit.koTriggered) {
+        setTimeout(() => playKoedFor(hit.targetId, game, entry.characterId), 200);
+      }
+    }
+  }
   // Athena's Divine Sacrifice can KO HERSELF via its own separate self-cost
   // roll (entry.selfResult.koTriggered) - a distinct outcome from the enemy
   // target's own koTriggered above (both could even fire from the same

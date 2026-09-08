@@ -42,6 +42,7 @@ const SOUND_EFFECT_FILES = [
   'rune_strike.mp3', 'rune_strike_strong.mp3', 'predict.mp3', 'correct.mp3', 'wrong.mp3',
   'earthshatter.mp3', 'world_stop.mp3', 'grim_barrage.mp3', 'divine_judgment.mp3', 'divine_judgment_strike.mp3',
   'chicken_cast.mp3', 'chicken_attack.mp3', 'chicken_hit.mp3', 'chicken_koed.mp3',
+  'stabbing.mp3',
 ];
 
 let started = false;

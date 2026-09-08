@@ -55,6 +55,12 @@ const PROPHECY_OF_DOOM_TRIGGER_FLASH_DURATION_MS = 4500;
 // the bird-strike image has more time to read on the victim's tile.
 const ASHKAS_VENGEANCE_STRIKE_FLASH_DURATION_MS = 3000;
 
+// Akyros's Shadow Army (Absolute Attack #33, hearts<=3 repeatable special) -
+// both the cast (call_army.jpg) and every struck victim's own shadow_strike.jpg
+// use the same 4.5s multi-beat scale as Earthshatter/Grim Barrage above,
+// since it's the same shape (one cast, multiple simultaneous victim hits).
+const SHADOW_ARMY_FLASH_DURATION_MS = 4500;
+
 // Resurrection Gamble (Draxus's Cheat Death, taxonomy #32) - a successful
 // revival reuses the SAME sound effect as Deathless Fury's own cast
 // (assets/sounds/deathless_fury.mp3, confirmed ruling 2026-09-06: "same
@@ -614,6 +620,31 @@ export function handleLogEntryForFlash(entry, game) {
     // flash (case 'earthshatter') still fires exactly as before.
   }
 
+  if (entry.type === 'special' && entry.actionId === 'shadowArmy') {
+    // Akyros's own cast flash still fires via the generic switch below
+    // (call_army.jpg) - this block handles the per-victim strike art, read
+    // from entry.hits (see akyros.js's own shadowArmy execute() - shape is
+    // { targetId, amountDealt, koTriggered }, no dodged field since this
+    // always sets ignoresDodge: true). Every struck living-at-cast-time
+    // marked enemy gets their own shadow_strike.jpg, same per-victim-hero
+    // art pattern as judgement_strike.jpg/doom_strike.jpg/ashka_strike.jpg.
+    // Deliberately NOT gated on !isKO(hit.targetId) - a hit that KO'd its
+    // target should still show the strike art overriding the plain
+    // koed.jpg for SHADOW_ARMY_FLASH_DURATION_MS, same reasoning as Divine
+    // Judgment/Prophecy of Doom's own trigger flashes. Gated on
+    // amountDealt > 0 (a shield that somehow fully absorbed the hit would
+    // be a contradiction here since this ignores shield entirely, but kept
+    // for consistency with every other "did this actually land" gate).
+    for (const hit of entry.hits || []) {
+      if (hit.amountDealt > 0) {
+        setFlash(hit.targetId, `assets/images/${hit.targetId}/shadow_strike.jpg`, SHADOW_ARMY_FLASH_DURATION_MS);
+      }
+    }
+    // Deliberately NOT returning here - falls through to the generic
+    // switch below so Akyros's own 'assets/images/akyros/call_army.jpg'
+    // cast flash (case 'shadowArmy') still fires exactly as before.
+  }
+
   if (entry.type !== 'attack' && entry.type !== 'special' && entry.type !== 'setup') return;
   const { characterId, actionId, dodged, amountDealt, targetCharacterId } = entry;
   if (isKO(characterId)) return;
@@ -659,6 +690,8 @@ export function handleLogEntryForFlash(entry, game) {
     case 'fatalSlash':
       if (!dodged) setFlash(characterId, 'assets/images/akyros/fatal.jpg');
       break;
+    case 'shadowArmy':
+      setFlash(characterId, 'assets/images/akyros/call_army.jpg', SHADOW_ARMY_FLASH_DURATION_MS); break;
     case 'lunarEclipse':
       setFlash(characterId, 'assets/images/velorya/casting.jpg'); break;
     case 'lunarStrike': case 'moonstep':

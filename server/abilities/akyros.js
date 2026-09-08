@@ -10,6 +10,21 @@ function anyEnemyIsMarked(game, akyrosId) {
   );
 }
 
+function livingMarkedEnemies(game, akyros) {
+  return Object.values(game.characters).filter(
+    (c) => c.ownerId !== akyros.ownerId && !c.isKO && akyros.special.marks.has(c.id)
+  );
+}
+
+// Absolute Attack (taxonomy #33, design-locked 2026-09-08, see project
+// memory soulclash_mechanic_taxonomy.md): Shadow Army's own hearts<=3
+// threshold - once crossed, the button stays available every one of his
+// own turns for the rest of the match (no usedSpecial gate, unlike Shadow
+// Execution - confirmed ruling: "this special button will remain until his
+// koed").
+const SHADOW_ARMY_HEARTS_THRESHOLD = 3;
+const SHADOW_ARMY_DAMAGE = 2;
+
 // Dodge Defense category registration (see
 // engine/categories/dodgeDefense.js) - additive, not yet consumed by
 // applyDamage's own inline dodge block. Per-attacker, one-time: dodges each
@@ -121,6 +136,63 @@ export const actions = {
       });
       log.push({ type: 'special', characterId: character.id, actionId: 'shadowExecution', targetId, ...result });
       return result;
+    },
+  },
+  // Absolute Attack (taxonomy #33, design-locked 2026-09-08): hearts<=3
+  // repeatable special - deliberately NOT gated by usedSpecial (confirmed
+  // ruling: "this special button will remain until his koed"), so it stays
+  // available every one of his own turns for the rest of the match
+  // alongside (not instead of) Shadow Execution's own separate one-time
+  // usedSpecial gate. Requires at least one currently-living marked enemy
+  // to be legal, same anyEnemyIsMarked gate Shadow Execution already uses.
+  shadowArmy: {
+    label: 'Shadow Army',
+    needsTarget: false,
+    special: true,
+    isLegal: (character, game) => character.hearts <= SHADOW_ARMY_HEARTS_THRESHOLD && anyEnemyIsMarked(game, character.id),
+    execute(character, targetId, game, log) {
+      const targets = livingMarkedEnemies(game, character);
+      const hits = [];
+      // Multi-target loop - same "first occurrence wins" deferred-field
+      // capture as Earthshatter/Grim Barrage/Mirage Burst (see those files'
+      // own comments for the full reasoning), since finalizeAction only
+      // ever reads these fields off the top-level return value, not off
+      // each individual hit buried inside `hits`.
+      let rebirthLogEntry = null;
+      let mirrorLogEntry = null;
+      let mirrorReflectLogEntry = null;
+      let fowlPlayRevertLogEntry = null;
+      let divineJudgmentTriggerLogEntry = null;
+      let prophecyOfDoomTriggerLogEntry = null;
+      for (const target of targets) {
+        // Absolute Attack (#33): ignores shield, dodge, AND untargetable
+        // all at once (confirmed ruling: "nothing can defend it. dodge or
+        // even untargetable") - a strictly stronger bypass than any single
+        // existing attack-delivery type. Reveals every mark it hits, same
+        // as Fatal Slash/Shadow Execution's own reveal behavior - marks
+        // themselves are NOT consumed, so a living marked survivor can be
+        // struck again by a later cast.
+        character.special.revealedMarks.add(target.id);
+        const result = applyDamage(game, log, {
+          sourceCharacterId: character.id,
+          targetCharacterId: target.id,
+          amount: SHADOW_ARMY_DAMAGE,
+          ignoresShield: true,
+          ignoresDodge: true,
+          ignoresUntargetable: true,
+        });
+        hits.push({ targetId: target.id, amountDealt: result.amountDealt, koTriggered: result.koTriggered });
+        if (result.rebirthLogEntry && !rebirthLogEntry) rebirthLogEntry = result.rebirthLogEntry;
+        if (result.mirrorLogEntry && !mirrorLogEntry) mirrorLogEntry = result.mirrorLogEntry;
+        if (result.mirrorResult?.rebirthLogEntry && !rebirthLogEntry) rebirthLogEntry = result.mirrorResult.rebirthLogEntry;
+        if (result.mirrorReflectLogEntry && !mirrorReflectLogEntry) mirrorReflectLogEntry = result.mirrorReflectLogEntry;
+        if (result.mirrorReflectResult?.rebirthLogEntry && !rebirthLogEntry) rebirthLogEntry = result.mirrorReflectResult.rebirthLogEntry;
+        if (result.fowlPlayRevertLogEntry && !fowlPlayRevertLogEntry) fowlPlayRevertLogEntry = result.fowlPlayRevertLogEntry;
+        if (result.divineJudgmentTriggerLogEntry && !divineJudgmentTriggerLogEntry) divineJudgmentTriggerLogEntry = result.divineJudgmentTriggerLogEntry;
+        if (result.prophecyOfDoomTriggerLogEntry && !prophecyOfDoomTriggerLogEntry) prophecyOfDoomTriggerLogEntry = result.prophecyOfDoomTriggerLogEntry;
+      }
+      log.push({ type: 'special', characterId: character.id, actionId: 'shadowArmy', hits });
+      return { hits, rebirthLogEntry, mirrorLogEntry, mirrorReflectLogEntry, fowlPlayRevertLogEntry, divineJudgmentTriggerLogEntry, prophecyOfDoomTriggerLogEntry };
     },
   },
 };

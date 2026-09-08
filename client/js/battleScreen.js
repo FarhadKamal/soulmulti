@@ -1915,7 +1915,7 @@ const ACTION_LABELS = {
   cyclonePunch: 'Cyclone Punch', timeFreeze: 'Time Freeze', rewind: 'Rewind', worldStops: 'World Stops',
   smash: 'Smash', titanToss: 'Titan Toss', titanSmash: 'Titan Smash', glorySmash: 'Glory Smash', earthshatter: 'Earthshatter',
   chargeUp: 'Charge Up', thunderWrath: 'Thunder Wrath', soulSwap: 'Soul Swap', soulSwapWrath: 'Thunder Wrath (free)',
-  hiddenMark: 'Hidden Mark', fatalSlash: 'Fatal Slash', shadowExecution: 'Shadow Execution',
+  hiddenMark: 'Hidden Mark', fatalSlash: 'Fatal Slash', shadowExecution: 'Shadow Execution', shadowArmy: 'Shadow Army',
   lunarStrike: 'Lunar Strike', moonstep: 'Moonstep', lunarEclipse: 'Lunar Eclipse',
   chaosGamble: 'Chaos Gamble', jesterBall: 'Jester Ball', fowlPlay: 'Fowl Play', chickenAttack: 'Chicken Attack', bloodHunt: 'Blood Hunt',
   curseStrike: 'Curse Strike', divineRestore: 'Divine Restore', divineSacrifice: 'Divine Sacrifice', divineJudgment: 'Divine Judgment',
@@ -2011,6 +2011,21 @@ function describeLogEntry(entry) {
           `${name(h.targetId)} (${h.amountDealt != null ? `${h.amountDealt} dmg` : '0 dmg'}${h.koTriggered ? ' - KO!' : ''}${h.blockedBy ? `, headache blocked by ${h.blockedBy === 'cleanSlate' ? 'Clean Slate' : 'Illusion'}` : ''})`
         );
         return `${name(entry.characterId)} unleashed Grim Barrage - ${parts.join(', ')}`;
+      }
+      if (entry.actionId === 'shadowArmy') {
+        // No single target - strikes every currently-living marked enemy
+        // at once (entry.hits is empty only if every marked enemy died
+        // between isLegal's own check and this cast actually resolving,
+        // e.g. to a poison tick earlier the same round - shouldn't be
+        // reachable in real play, same edge-case note as Earthshatter's
+        // own empty-hits branch above).
+        if (!entry.hits || entry.hits.length === 0) {
+          return `${name(entry.characterId)} summoned their Shadow Army, but no marked enemy remained!`;
+        }
+        const parts = entry.hits.map((h) =>
+          `${name(h.targetId)} (${h.amountDealt != null ? `${h.amountDealt} dmg` : '0 dmg'}${h.koTriggered ? ' - KO!' : ''})`
+        );
+        return `${name(entry.characterId)} summoned their Shadow Army - ${parts.join(', ')}`;
       }
       if (entry.actionId === 'runeVision') {
         if (entry.stage === 1) {

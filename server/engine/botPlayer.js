@@ -470,6 +470,16 @@ function chooseChronoxMove(character, game, usable) {
 
 function chooseAkyrosMove(character, game, usable) {
   const byId = Object.fromEntries(usable.map((a) => [a.actionId, a]));
+  // Shadow Army (hearts<=3, Absolute Attack #33): unlike every other action
+  // here, it's untargeted and hits EVERY currently-living marked enemy at
+  // once for unblockable damage (bypasses shield/dodge/untargetable
+  // entirely) - no per-target risk to weigh (no Mirror Reflect/curse-mirror
+  // avoidance needed the way markedTargets/fatalTargets require below,
+  // since he isn't choosing who to hit). Always take it once legal - it's
+  // strictly the highest-value move available whenever it's on the table.
+  if (byId.shadowArmy) {
+    return { actionId: 'shadowArmy', targetId: null };
+  }
   let markedTargets = validTargetsFor(game, character, 'shadowExecution');
   let fatalTargets = validTargetsFor(game, character, 'fatalSlash');
   // Mirror Reflect avoidance: unlike Athena's curse (handled below via

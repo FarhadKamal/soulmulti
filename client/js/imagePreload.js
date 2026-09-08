@@ -15,6 +15,7 @@ const PER_CHARACTER_FOLDERS = ['assets/portraits', 'assets/koed', 'assets/victor
 // sync with every literal 'assets/images/...jpg' path referenced in
 // portraitFlash.js.
 const FLASH_IMAGES = [
+  'assets/images/akyros/call_army.jpg',
   'assets/images/akyros/dodge.jpg',
   'assets/images/akyros/fatal.jpg',
   'assets/images/akyros/hidden.jpg',
@@ -151,6 +152,13 @@ const ASHKAS_VENGEANCE_STRIKE_IMAGES = CHARACTER_IDS.filter((id) => id !== 'kael
   (id) => `assets/images/${id}/ashka_strike.jpg`
 );
 
+// Akyros's Shadow Army (Absolute Attack #33) - same per-victim-hero art
+// pattern as the three above, one shadow_strike.jpg per possible victim
+// (everyone except Akyros himself, who is never his own marked target).
+const SHADOW_ARMY_STRIKE_IMAGES = CHARACTER_IDS.filter((id) => id !== 'akyros').map(
+  (id) => `assets/images/${id}/shadow_strike.jpg`
+);
+
 let started = false;
 // Resolves once every preloaded image has either loaded or failed - used by
 // main.js to gate the battle screen behind a brief "preparing battle" wait
@@ -164,7 +172,7 @@ let readyPromise = null;
 export function preloadBattleImages() {
   if (started) return readyPromise;
   started = true;
-  const paths = [...FLASH_IMAGES, ...CHICKEN_IMAGES, ...DIVINE_JUDGMENT_STRUCK_IMAGES, ...PROPHECY_OF_DOOM_STRIKE_IMAGES, ...ASHKAS_VENGEANCE_STRIKE_IMAGES];
+  const paths = [...FLASH_IMAGES, ...CHICKEN_IMAGES, ...DIVINE_JUDGMENT_STRUCK_IMAGES, ...PROPHECY_OF_DOOM_STRIKE_IMAGES, ...ASHKAS_VENGEANCE_STRIKE_IMAGES, ...SHADOW_ARMY_STRIKE_IMAGES];
   for (const folder of PER_CHARACTER_FOLDERS) {
     for (const id of CHARACTER_IDS) paths.push(`${folder}/${id}.jpg`);
   }

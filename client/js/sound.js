@@ -240,6 +240,7 @@ const ACTION_SOUND = {
   hiddenMark: 'hiddenmark',
   fatalSlash: 'sword',
   shadowExecution: 'shadowexecution',
+  shadowArmy: 'stabbing',
   lunarStrike: 'sword',
   moonstep: 'moonstep',
   lunarEclipse: 'eclipse',
