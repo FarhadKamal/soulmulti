@@ -1,4 +1,4 @@
-import { applyDamage, applyHeal, applyShield, tryTriggerCleanSlate, tryIllyraDodgeStatus } from '../engine/damagePipeline.js';
+import { applyDamage, applyHeal, applyShield, tryTriggerCleanSlate, tryIllyraDodgeStatus, heartsSnapshot } from '../engine/damagePipeline.js';
 import { registerOnOtherRevived } from '../engine/categories/onOtherRevived.js';
 import { registerOnOwnDeath } from '../engine/categories/onOwnDeath.js';
 import { registerOnHitLanded } from '../engine/categories/onHitLanded.js';
@@ -229,6 +229,24 @@ export const actions = {
         selfResult,
         ...result,
       });
+      // Deferred-log-entry handling for the SELF-hit, same reference
+      // pattern as tickPoisonIfAny in turnEngine.js. finalizeAction already
+      // surfaces `result`'s own deferred fields (it's the returned value
+      // below), but selfResult is a separate applyDamage call whose own
+      // mirror/rebirth/etc. entries would otherwise be silently dropped -
+      // confirmed real bug: her self-inflicted sacrifice damage is a hit
+      // ON HERSELF, which is exactly the kind of hit her own curse-mirror
+      // (registerOnHitLanded('athena', ...) above) reacts to. A cursed
+      // Kaelis took the mirrored self-cost damage with no log line
+      // explaining it at all.
+      if (selfResult.rebirthLogEntry) log.push({ ...selfResult.rebirthLogEntry, hearts: heartsSnapshot(game) });
+      if (selfResult.mirrorLogEntry) log.push({ ...selfResult.mirrorLogEntry, hearts: heartsSnapshot(game) });
+      if (selfResult.mirrorResult?.rebirthLogEntry) log.push({ ...selfResult.mirrorResult.rebirthLogEntry, hearts: heartsSnapshot(game) });
+      if (selfResult.mirrorReflectLogEntry) log.push({ ...selfResult.mirrorReflectLogEntry, hearts: heartsSnapshot(game) });
+      if (selfResult.mirrorReflectResult?.rebirthLogEntry) log.push({ ...selfResult.mirrorReflectResult.rebirthLogEntry, hearts: heartsSnapshot(game) });
+      if (selfResult.fowlPlayRevertLogEntry) log.push({ ...selfResult.fowlPlayRevertLogEntry, hearts: heartsSnapshot(game) });
+      if (selfResult.divineJudgmentTriggerLogEntry) log.push({ ...selfResult.divineJudgmentTriggerLogEntry, hearts: heartsSnapshot(game) });
+      if (selfResult.prophecyOfDoomTriggerLogEntry) log.push({ ...selfResult.prophecyOfDoomTriggerLogEntry, hearts: heartsSnapshot(game) });
       return result;
     },
   },
