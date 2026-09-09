@@ -1088,16 +1088,21 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
   const persistentSrc = getPersistentPortrait(character);
   // Rowan's Petrify - while active, every OTHER character shows ONLY
   // stone.jpg, overriding literally everything below (flash, persistent
-  // portrait, idle, KO) - confirmed ruling: "during stone image of other ..
-  // no other hero image will play animation. only stone image for them."
+  // portrait, idle) - confirmed ruling: "during stone image of other .. no
+  // other hero image will play animation. only stone image for them."
   // Checked right after isVictorious (an ended match still always wins),
   // but before every other branch. Rowan himself is exempt (isPetrifiedOther
   // is already computed as false for him by the caller) - he still shows
   // his own normal flash/portrait throughout, since only OTHER characters
-  // are described as turning to stone.
+  // are described as turning to stone. Confirmed live bug, 2026-09-10: an
+  // already-KO'd character showed stone.jpg instead of their real koed
+  // portrait during Petrify - a dead character was never being "petrified,"
+  // there's nothing to turn to stone, so this is now excluded via
+  // !character.isKO, letting the normal isKO branch further below win for
+  // them instead.
   if (isVictorious) {
     portrait.src = v(`assets/victory/${character.id}.jpg`);
-  } else if (isPetrifiedOther) {
+  } else if (isPetrifiedOther && !character.isKO) {
     portrait.src = v(`assets/images/${character.id}/stone.jpg`);
   } else if (flashSrc) {
     // Already wrapped with v() at its source in portraitFlash.js.
