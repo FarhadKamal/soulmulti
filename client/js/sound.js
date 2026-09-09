@@ -270,6 +270,10 @@ const ACTION_SOUND = {
   wildLightning: 'lightning',
   mirrorReflect: 'mirror',
   silenceLock: 'lock',
+  // Petrify (hearts<=3 one-time bonus action) - reuses the shared magic.mp3
+  // sound effect, confirmed ruling: "use common sound magic.mp3", no
+  // dedicated sound needed.
+  petrify: 'magic',
   // Marin: all 5 fire once, at the moment each is discovered (see
   // main.js's 'spell-discovered' handler) - none of them are cast
   // separately later, unlike Rowan's kit. Piercing Wand and Wand Mastery

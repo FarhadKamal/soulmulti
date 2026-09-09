@@ -214,6 +214,7 @@ const ACTION_VOICE_LINES = {
     wildLightning: 'lightning',
     mirrorReflect: 'mirror',
     silenceLock: 'silence_lock',
+    petrify: 'petrify',
   },
   marin: {
     wandStrike: 'wand_strike',

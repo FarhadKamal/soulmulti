@@ -9,6 +9,26 @@ import { CHARACTER_IDS } from './characters.js';
 
 const FLASH_DURATION_MS = 1600;
 
+// Rowan's Petrify (hearts<=3 one-time bonus action) - unlike every other
+// visual in this file, its "everyone turns to stone" effect has no fixed
+// duration at all: it lasts until Rowan's own REAL follow-up action
+// resolves, which could be seconds (a bot) or much longer (a human still
+// deciding) - a timer-based setFlash() would be wrong here, so this is
+// genuine persistent state instead, set the instant a 'petrify' log entry
+// is seen and cleared the instant any LATER log entry with
+// characterId === 'rowan' is processed (see handleLogEntryForFlash's own
+// 'petrify' case and its own clearing check below). Confirmed ruling:
+// "during stone image of other .. no other hero image will play animation.
+// only stone image for them" - checked at the TOP of battleScreen.js's own
+// portrait priority chain (above flash/persistent/idle), same conceptual
+// position as isVictorious, so it overrides literally everything for every
+// OTHER character while active.
+let petrifyActive = false;
+
+export function isPetrifyActive() {
+  return petrifyActive;
+}
+
 // Confirmed ruling (2026-09-03): idle animations (checkIdlePortrait below)
 // only ever play through this round of the match - round 4 onward, no
 // character flashes to their idle pose again for the rest of that match,
@@ -369,6 +389,23 @@ export function queueGrimtalPowerFlash(characterId, game) {
 // and fires whatever flash(es) it implies. Call in log-append order.
 export function handleLogEntryForFlash(entry, game) {
   const isKO = (id) => game.characters[id]?.isKO;
+
+  // Rowan's Petrify - checked FIRST, before anything else in this function,
+  // since it needs to react to characterId === 'rowan' on ANY entry type
+  // (not just the 'petrify' cast entry itself, but also his own real
+  // follow-up action's entry, which is what actually clears the effect).
+  // Deliberately does NOT `return` early - the petrify cast entry itself
+  // still needs to fall through to the generic switch below so Rowan's own
+  // petrify.jpg cast flash fires normally, and a genuine follow-up action
+  // entry still needs its own normal flash to fire too (e.g. he casts
+  // Petrify then immediately Wild Lightning someone - both his cast flash
+  // AND the strike's own flash should show, same turn).
+  if (entry.type === 'special' && entry.actionId === 'petrify') {
+    petrifyActive = true;
+  } else if (petrifyActive && entry.characterId === 'rowan') {
+    petrifyActive = false;
+    onFlashExpired();
+  }
 
   // Self Choke gets its own dedicated flash on Melyssa herself - checked
   // first and returns, since its entry's characterId is already 'melyssa'
@@ -789,6 +826,12 @@ export function handleLogEntryForFlash(entry, game) {
       setFlash(characterId, 'assets/images/rowan/mirror_reflect.jpg'); break;
     case 'silenceLock':
       setFlash(characterId, 'assets/images/rowan/silence_lock.jpg'); break;
+    case 'petrify':
+      // The "everyone else turns to stone" effect itself is handled by
+      // petrifyActive above (persistent state, not a timed flash) - this
+      // case only fires Rowan's own cast flash on his own tile, same
+      // FLASH_DURATION_MS as any normal cast.
+      setFlash(characterId, 'assets/images/rowan/petrify.jpg'); break;
     case 'grimStrike':
       if (!dodged) setFlash(characterId, 'assets/images/grimtal/normal_attack.jpg');
       break;

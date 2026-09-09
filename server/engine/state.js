@@ -213,6 +213,11 @@ function baseSpecialFor(id) {
       // shape), just tracked per-spell instead of a single shared boolean
       // since he can have several discovered spells at once but each is
       // independently spent the moment it's first cast.
+      // usedPetrify: hearts<=3 one-time bonus action (see rowan.js) -
+      // instantly discovers every remaining spell in one shot. One-time
+      // use, same shape as usedSpecial elsewhere, tracked separately since
+      // this isn't gated by the shared usedSpecial flag (he has no other
+      // action using that flag to begin with).
       return {
         discoveredSpells: new Set(),
         arcaneStudyPending: false,
@@ -221,6 +226,7 @@ function baseSpecialFor(id) {
         poisonTargets: new Set(),
         silenceTargets: new Map(),
         usedSpells: new Set(),
+        usedPetrify: false,
       };
     case 'marin':
       // discoveredSpells/arcaneStudyPending/arcaneStudyOnCooldown: identical

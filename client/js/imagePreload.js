@@ -79,6 +79,7 @@ const FLASH_IMAGES = [
   'assets/images/rowan/wild_lightning.jpg',
   'assets/images/rowan/mirror_reflect.jpg',
   'assets/images/rowan/silence_lock.jpg',
+  'assets/images/rowan/petrify.jpg',
   'assets/images/marin/idle.jpg',
   'assets/images/marin/wand_strike.jpg',
   'assets/images/marin/arcane_study.jpg',
@@ -159,6 +160,13 @@ const SHADOW_ARMY_STRIKE_IMAGES = CHARACTER_IDS.filter((id) => id !== 'akyros').
   (id) => `assets/images/${id}/shadow_strike.jpg`
 );
 
+// Rowan's Petrify (Neutral Action #25 + Bonus) - same per-victim-hero art
+// pattern as the sets above, one stone.jpg per possible victim (everyone
+// except Rowan himself, who is never described as turning to stone).
+const PETRIFY_STONE_IMAGES = CHARACTER_IDS.filter((id) => id !== 'rowan').map(
+  (id) => `assets/images/${id}/stone.jpg`
+);
+
 let started = false;
 // Resolves once every preloaded image has either loaded or failed - used by
 // main.js to gate the battle screen behind a brief "preparing battle" wait
@@ -172,7 +180,7 @@ let readyPromise = null;
 export function preloadBattleImages() {
   if (started) return readyPromise;
   started = true;
-  const paths = [...FLASH_IMAGES, ...CHICKEN_IMAGES, ...DIVINE_JUDGMENT_STRUCK_IMAGES, ...PROPHECY_OF_DOOM_STRIKE_IMAGES, ...ASHKAS_VENGEANCE_STRIKE_IMAGES, ...SHADOW_ARMY_STRIKE_IMAGES];
+  const paths = [...FLASH_IMAGES, ...CHICKEN_IMAGES, ...DIVINE_JUDGMENT_STRUCK_IMAGES, ...PROPHECY_OF_DOOM_STRIKE_IMAGES, ...ASHKAS_VENGEANCE_STRIKE_IMAGES, ...SHADOW_ARMY_STRIKE_IMAGES, ...PETRIFY_STONE_IMAGES];
   for (const folder of PER_CHARACTER_FOLDERS) {
     for (const id of CHARACTER_IDS) paths.push(`${folder}/${id}.jpg`);
   }

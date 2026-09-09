@@ -1116,6 +1116,15 @@ function rowanFacingHealthyKaelis(game, character) {
 
 function chooseRowanMove(character, game, usable) {
   const byId = Object.fromEntries(usable.map((a) => [a.actionId, a]));
+  // Petrify (hearts<=3 one-time bonus action): a free bonus - doesn't cost
+  // his turn (see index.js's own handling, mirroring Draxus's Deathless
+  // Fury bonus strikes), and instantly unlocks every remaining spell with
+  // zero downside. Always take it the instant it's legal, before any other
+  // decision here - he still gets to act normally right after in the same
+  // turn, so there's no tradeoff to weigh.
+  if (byId.petrify) {
+    return { actionId: 'petrify', targetId: null };
+  }
   const reserveForChronox = shouldReserveForChronox(game, character);
   const reserveForMarin = shouldReserveForMarin(game, character);
   // Purify: cast immediately if he's carrying anything ACTIVELY harmful

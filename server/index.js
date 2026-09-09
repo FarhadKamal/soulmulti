@@ -852,8 +852,19 @@ function stepBotTurn(room) {
     if (character.id === 'draxus' && character.special.bonusActionsRemaining > 0) {
       character.special.bonusActionsRemaining -= 1;
     }
-    if (!(character.id === 'draxus' && character.special.bonusActionsRemaining > 0)) {
+    // Rowan's Petrify bonus action (see the human-path handling above for
+    // full reasoning) - a bot Rowan who just cast it should immediately act
+    // again this same tick rather than having his turn marked over. Since
+    // usedPetrify is one-time-use, chooseBotMove's very next call this same
+    // stepBotTurn tick will never pick petrify again, so no infinite loop
+    // risk here.
+    const justCastPetrify = move && move.actionId === 'petrify';
+    if (!(character.id === 'draxus' && character.special.bonusActionsRemaining > 0) && !justCastPetrify) {
       markCharacterActed(room.game, acting);
+    }
+    if (justCastPetrify) {
+      setTimeout(() => stepBotTurn(room), BOT_ACTION_DELAY_MS);
+      return;
     }
   }
 
@@ -1685,6 +1696,19 @@ function handleAction(room, sessionId, { characterId, actionId, targetId }) {
     }
     // Bonus sequence genuinely over (3rd strike just resolved) - fall
     // through below to end his turn for real.
+  }
+  // Rowan's Petrify (hearts<=3 one-time bonus action, see rowan.js and
+  // project memory soulclash_rowan_petrify.md): a genuine Bonus action,
+  // doesn't consume his turn - same "skip markCharacterActed, re-broadcast"
+  // shape as Draxus's Deathless Fury bonus strikes above, just a single
+  // follow-up instead of a decrementing counter (usedPetrify is already
+  // one-time-use, so there's no risk of this branch re-triggering on his
+  // very next real action this same turn).
+  if (actionId === 'petrify') {
+    armTurnTimer(room, characterId);
+    broadcastGameState(room);
+    runBotTurnsIfAny(room);
+    return;
   }
   markCharacterActed(room.game, characterId);
   // Broadcast the human's own move on its own FIRST, before any bot turns

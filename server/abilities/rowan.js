@@ -101,6 +101,18 @@ export function onTurnStart(character, game, log) {
   discoveryKit.resolveOnTurnStart(character, game, log);
 }
 
+// Petrify (hearts<=3 one-time bonus action, working name, design-locked
+// 2026-09-09 - see project memory soulclash_rowan_petrify.md): combines
+// existing Neutral Action (#25) - same discovery mechanism Arcane Study
+// itself already uses, just an instant batch reveal instead of the normal
+// one-turn-delayed single pick - with the Bonus action-type label
+// (confirmed ruling: "that was bonus turn for him.. after that he can use
+// any action he want" - does NOT consume his turn, unlike a normal Arcane
+// Study cast). Legal only while at least one of his 5 spells is still
+// undiscovered - if he already knows all 5 by the time he crosses the
+// threshold, this is simply never offered.
+const PETRIFY_HEARTS_THRESHOLD = 3;
+
 export const actions = {
   wandStrike: {
     label: 'Wand Strike',
@@ -251,6 +263,44 @@ export const actions = {
       if (target) target.shield = 0;
       log.push({ type: 'special', characterId: character.id, actionId: 'silenceLock', targetId });
       return {};
+    },
+  },
+  petrify: {
+    label: 'Petrify',
+    needsTarget: false,
+    special: true,
+    isLegal: (character) => character.hearts <= PETRIFY_HEARTS_THRESHOLD
+      && !character.special.usedPetrify
+      && character.special.discoveredSpells.size < ALL_SPELL_IDS.length,
+    execute(character, targetId, game, log) {
+      character.special.usedPetrify = true;
+      // Instantly discovers every remaining spell in one shot - bypasses
+      // discoveryKit's own one-turn-delayed arcaneStudyPending mechanism
+      // entirely (that's Arcane Study's normal pace, this is the "finish
+      // it all right now" desperation version). Each newly-discovered
+      // spell gets its own log entry, same shape/type as Arcane Study's
+      // normal single reveal, so the client's existing 'spell-discovered'
+      // handling (log text, sound, voice) needs no special-casing for
+      // multiple entries landing in the same batch.
+      const newlyDiscovered = [];
+      for (const spellId of ALL_SPELL_IDS) {
+        if (!character.special.discoveredSpells.has(spellId)) {
+          character.special.discoveredSpells.add(spellId);
+          newlyDiscovered.push(spellId);
+        }
+      }
+      for (const spellId of newlyDiscovered) {
+        log.push({ type: 'spell-discovered', characterId: character.id, spellId });
+      }
+      log.push({ type: 'special', characterId: character.id, actionId: 'petrify', discoveredSpellIds: newlyDiscovered });
+      // Genuine Bonus action (see index.js's own handling, mirroring
+      // Draxus's Deathless Fury bonus-strike pattern) - does NOT consume
+      // his turn. The caller checks actionId === 'petrify' and skips
+      // markCharacterActed, so he still gets to choose a real action
+      // immediately afterward in this same turn, fully unrestricted
+      // (confirmed ruling: "he can use any action he want... not
+      // restricted purify or mirror").
+      return { isBonusAction: true };
     },
   },
 };

@@ -2,7 +2,7 @@ import { CHARACTERS } from './characters.js';
 import { send } from './net.js';
 import { renderChatPanel } from './chatPanel.js';
 import { playUiClick } from './sound.js';
-import { getFlashSrc, getPersistentPortrait, isMindControlOverlayActive, isEarthshatterOverlayActive } from './portraitFlash.js';
+import { getFlashSrc, getPersistentPortrait, isMindControlOverlayActive, isEarthshatterOverlayActive, isPetrifyActive } from './portraitFlash.js';
 import { getActiveEffects, getClawCount, getCrackCount, getPowSize, getVortexSize, getAxechopTier, getLightningTier, getWildLightningTier, getDarkslashVariant } from './actionEffects.js';
 import { renderFullscreenButton } from './fullscreen.js';
 import { v, hardRefresh } from './assetVersion.js';
@@ -1079,8 +1079,19 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
   // mid-animation from the winning hit.
   const flashSrc = getFlashSrc(character.id);
   const persistentSrc = getPersistentPortrait(character);
+  // Rowan's Petrify - while active, every OTHER character shows ONLY
+  // stone.jpg, overriding literally everything below (flash, persistent
+  // portrait, idle, KO) - confirmed ruling: "during stone image of other ..
+  // no other hero image will play animation. only stone image for them."
+  // Checked right after isVictorious (an ended match still always wins),
+  // but before every other branch. Rowan himself is exempt - he still
+  // shows his own normal flash/portrait throughout, since only OTHER
+  // characters are described as turning to stone.
+  const isPetrifiedOther = isPetrifyActive() && character.id !== 'rowan';
   if (isVictorious) {
     portrait.src = v(`assets/victory/${character.id}.jpg`);
+  } else if (isPetrifiedOther) {
+    portrait.src = v(`assets/images/${character.id}/stone.jpg`);
   } else if (flashSrc) {
     // Already wrapped with v() at its source in portraitFlash.js.
     portrait.src = flashSrc;
@@ -1924,7 +1935,7 @@ const ACTION_LABELS = {
   dyingBlow: 'Dying Blow', deathlessFury: 'Deathless Fury', cheatDeath: 'Cheat Death',
   wandStrike: 'Wand Strike', arcaneStudy: 'Arcane Study',
   poisonCloud: 'Poison Cloud', purify: 'Purify', wildLightning: 'Wild Lightning',
-  mirrorReflect: 'Mirror Reflect', silenceLock: 'Silence Lock',
+  mirrorReflect: 'Mirror Reflect', silenceLock: 'Silence Lock', petrify: 'Petrify',
   everbloom: 'Everbloom', threefoldVeil: 'Threefold Veil', cleanSlate: 'Clean Slate',
   piercingWand: 'Piercing Wand', wandMastery: 'Wand Mastery',
   grimStrike: 'Grim Strike', skullCrack: 'Skull Crack', claimKill: 'Claim the Kill', grimBarrage: 'Grim Barrage',
@@ -2026,6 +2037,14 @@ function describeLogEntry(entry) {
           `${name(h.targetId)} (${h.amountDealt != null ? `${h.amountDealt} dmg` : '0 dmg'}${h.koTriggered ? ' - KO!' : ''})`
         );
         return `${name(entry.characterId)} summoned their Shadow Army - ${parts.join(', ')}`;
+      }
+      if (entry.actionId === 'petrify') {
+        // Petrify (Rowan's hearts<=3 one-time bonus action) - its own
+        // 'spell-discovered' entries (pushed separately, one per newly
+        // revealed spell, same shape as a normal Arcane Study reveal)
+        // already show individually right before this line, so this just
+        // announces the cast itself rather than re-listing every spell.
+        return `${name(entry.characterId)} unleashed Petrify - everyone froze to stone!`;
       }
       if (entry.actionId === 'runeVision') {
         if (entry.stage === 1) {
