@@ -62,6 +62,11 @@ registerOnOwnDeath('rowan', (character) => {
   character.special.poisonTargets.clear();
   character.special.silenceTargets.clear();
   character.special.mirrorReflectActive = false;
+  // Safety net: if he somehow dies before his own Petrify follow-up action
+  // ever resolves (e.g. a poison tick or Prophecy of Doom fires between the
+  // cast and his next turn), the stone visual shouldn't get stuck forever
+  // with no one left to clear it.
+  character.special.petrifyPending = false;
 });
 
 // Revival cleanup (see engine/categories/onOtherRevived.js) - his Poison
@@ -274,6 +279,21 @@ export const actions = {
       && character.special.discoveredSpells.size < ALL_SPELL_IDS.length,
     execute(character, targetId, game, log) {
       character.special.usedPetrify = true;
+      // Real serialized state (not a client-inferred flag) - true from the
+      // instant this cast resolves until his own real follow-up action
+      // clears it (index.js's own action handlers do this explicitly, same
+      // "held until it's genuinely over" pattern as deathproofActive/
+      // controlling). The client's "everyone else shows stone.jpg" check
+      // reads THIS field directly off the broadcast game state, the same
+      // way Fowl Play's isChicken/Melyssa's controlling/Draxus's
+      // deathproofActive already work - confirmed live bug, 2026-09-10: an
+      // earlier version tracked this as purely client-local module state
+      // (set/cleared by watching log-entry sequence), which had no source
+      // of truth to fall back on and silently never displayed correctly
+      // for at least one real player, root cause never fully isolated.
+      // Real broadcast state can't drift from what the server actually
+      // knows the way inferred client state can.
+      character.special.petrifyPending = true;
       // Instantly discovers every remaining spell in one shot - bypasses
       // discoveryKit's own one-turn-delayed arcaneStudyPending mechanism
       // entirely (that's Arcane Study's normal pace, this is the "finish

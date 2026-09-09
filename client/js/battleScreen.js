@@ -207,6 +207,12 @@ export function renderBattle(root, state) {
     if (!illyra || illyra.isKO || illyra.id === characterId) return 0;
     return illyra.special?.mirageMarks?.[characterId] || 0;
   };
+  // Rowan's Petrify - real serialized state (rowan.js/index.js), not a
+  // client-inferred flag (see portraitFlash.js's isPetrifyActive for why -
+  // reading directly off broadcast game state avoids drift). Computed once
+  // here (game is in scope) and passed down like every other per-tile flag,
+  // since renderCharacterTile itself has no access to the full game object.
+  const isPetrified = isPetrifyActive(game);
   Object.values(game.characters).forEach((character) => {
     board.appendChild(renderCharacterTile(character, {
       isActing: character.id === actingCharacterId,
@@ -224,6 +230,7 @@ export function renderBattle(root, state) {
       isFrozenVisual: frozenIdsSet.has(character.id),
       isPuppet: character.id === puppetHighlightId || character.id === activePuppetId,
       isHypnotized: character.id === activePuppetId,
+      isPetrifiedOther: isPetrified && character.id !== 'rowan',
     }));
   });
   scroll.appendChild(board);
@@ -527,7 +534,7 @@ function computeFrozenIdsSet(game) {
   return ids;
 }
 
-function renderCharacterTile(character, { isActing, isMine, isTargetable, onTargetClick, isHoldingBall, isCursed, isDivineJudgmentMarked, isFrozenVisual, isVictorious, isPuppet, isHypnotized, grudgeCount, isPoisoned, silencedTurns, isDazed, mirageMarkCount }) {
+function renderCharacterTile(character, { isActing, isMine, isTargetable, onTargetClick, isHoldingBall, isCursed, isDivineJudgmentMarked, isFrozenVisual, isVictorious, isPuppet, isHypnotized, grudgeCount, isPoisoned, silencedTurns, isDazed, mirageMarkCount, isPetrifiedOther = false }) {
   const def = CHARACTERS[character.id];
   const tile = document.createElement('div');
   tile.className = 'char-tile';
@@ -1084,10 +1091,10 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
   // portrait, idle, KO) - confirmed ruling: "during stone image of other ..
   // no other hero image will play animation. only stone image for them."
   // Checked right after isVictorious (an ended match still always wins),
-  // but before every other branch. Rowan himself is exempt - he still
-  // shows his own normal flash/portrait throughout, since only OTHER
-  // characters are described as turning to stone.
-  const isPetrifiedOther = isPetrifyActive() && character.id !== 'rowan';
+  // but before every other branch. Rowan himself is exempt (isPetrifiedOther
+  // is already computed as false for him by the caller) - he still shows
+  // his own normal flash/portrait throughout, since only OTHER characters
+  // are described as turning to stone.
   if (isVictorious) {
     portrait.src = v(`assets/victory/${character.id}.jpg`);
   } else if (isPetrifiedOther) {

@@ -218,6 +218,11 @@ function baseSpecialFor(id) {
       // use, same shape as usedSpecial elsewhere, tracked separately since
       // this isn't gated by the shared usedSpecial flag (he has no other
       // action using that flag to begin with).
+      // petrifyPending: true from the instant Petrify resolves until his
+      // own real follow-up action clears it (index.js) - real serialized
+      // state so the client's "everyone else shows stone.jpg" visual reads
+      // directly off broadcast game state, same pattern as isChicken/
+      // deathproofActive/controlling, not a client-inferred flag.
       return {
         discoveredSpells: new Set(),
         arcaneStudyPending: false,
@@ -227,6 +232,7 @@ function baseSpecialFor(id) {
         silenceTargets: new Map(),
         usedSpells: new Set(),
         usedPetrify: false,
+        petrifyPending: false,
       };
     case 'marin':
       // discoveredSpells/arcaneStudyPending/arcaneStudyOnCooldown: identical

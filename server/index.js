@@ -860,6 +860,12 @@ function stepBotTurn(room) {
     // risk here.
     const justCastPetrify = move && move.actionId === 'petrify';
     if (!(character.id === 'draxus' && character.special.bonusActionsRemaining > 0) && !justCastPetrify) {
+      // Real follow-up action (not the petrify cast itself, which returns
+      // early below before ever reaching here) - clear the real broadcast
+      // flag now that the desperate moment is genuinely over.
+      if (character.id === 'rowan' && character.special.petrifyPending) {
+        character.special.petrifyPending = false;
+      }
       markCharacterActed(room.game, acting);
     }
     if (justCastPetrify) {
@@ -1722,6 +1728,12 @@ function handleAction(room, sessionId, { characterId, actionId, targetId }) {
     broadcastGameState(room);
     runBotTurnsIfAny(room);
     return;
+  }
+  // Real follow-up action (not the petrify cast itself, which already
+  // returned above) - clear the real broadcast flag now that the desperate
+  // moment is genuinely over. Same clearing point as the bot path above.
+  if (actedCharacter.id === 'rowan' && actedCharacter.special.petrifyPending) {
+    actedCharacter.special.petrifyPending = false;
   }
   markCharacterActed(room.game, characterId);
   // Broadcast the human's own move on its own FIRST, before any bot turns
