@@ -863,6 +863,19 @@ function stepBotTurn(room) {
       markCharacterActed(room.game, acting);
     }
     if (justCastPetrify) {
+      // Confirmed live bug, 2026-09-09: without an explicit broadcast HERE,
+      // the cast and its real follow-up action both resolved inside two
+      // SEPARATE stepBotTurn ticks as expected, but the client only ever
+      // received ONE combined game-state broadcast (the follow-up tick's
+      // own broadcastGameState call further below) - petrifyActive got set
+      // true then immediately false again processing that single batch,
+      // all before the one rerender() at the end, so the stone visual was
+      // set and cleared within the same synchronous frame and never
+      // actually painted. Same class of gap as the hitDraxusMidWindow
+      // broadcast above (Deathless Fury's own floor-catch moment) - the
+      // cast needs to be visible ON ITS OWN for the full BOT_ACTION_DELAY_MS
+      // before the follow-up resolves.
+      broadcastGameState(room);
       setTimeout(() => stepBotTurn(room), BOT_ACTION_DELAY_MS);
       return;
     }
