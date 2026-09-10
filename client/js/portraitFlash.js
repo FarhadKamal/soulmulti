@@ -393,8 +393,23 @@ export function handleLogEntryForFlash(entry, game) {
   // first and returns, since its entry's characterId is already 'melyssa'
   // directly (she's the true actor, per server/index.js's executeSelfChoke)
   // and must not ALSO trigger the generic controllingMelyssaId flash below.
+  // The REAL damage lands on entry.targetId (the puppet forced into this),
+  // not on Melyssa - confirmed live gap, 2026-09-10: the puppet who
+  // actually takes 2 real unshielded damage had zero portrait reaction of
+  // its own (only the CSS choke-ring/ghost-hand overlay, no per-hero
+  // image), while Melyssa's own tile flashed as if she were the one hurt.
+  // Per-victim art added the same way Divine Judgment/Prophecy of Doom/
+  // Shadow Army/Petrify already do - assets/images/<victimId>/choke.jpg,
+  // one per hero (all 15 possible puppets, everyone except Melyssa
+  // herself, who can never be forced into her own Self Choke). Layered
+  // ALONGSIDE the existing CSS skeleton-hand/choke-ring effect for now
+  // (not replacing it) - confirmed ruling: "we will remove that css
+  // animation.. but not now."
   if (entry.actionId === 'selfChoke' && entry.characterId === 'melyssa') {
     if (!isKO('melyssa')) setFlash('melyssa', 'assets/images/melyssa/self_choke.jpg');
+    if (entry.targetId && !isKO(entry.targetId)) {
+      setFlash(entry.targetId, `assets/images/${entry.targetId}/choke.jpg`);
+    }
     return;
   }
   // The 50% chance her puppeted action simply fails - her own frustrated

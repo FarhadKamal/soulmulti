@@ -167,6 +167,13 @@ const PETRIFY_STONE_IMAGES = CHARACTER_IDS.filter((id) => id !== 'rowan').map(
   (id) => `assets/images/${id}/stone.jpg`
 );
 
+// Melyssa's Self Choke victim reaction - same per-victim-hero art pattern
+// as the sets above, one choke.jpg per possible puppet (everyone except
+// Melyssa herself, who can never be forced into her own Self Choke).
+const SELF_CHOKE_VICTIM_IMAGES = CHARACTER_IDS.filter((id) => id !== 'melyssa').map(
+  (id) => `assets/images/${id}/choke.jpg`
+);
+
 let started = false;
 // Resolves once every preloaded image has either loaded or failed - used by
 // main.js to gate the battle screen behind a brief "preparing battle" wait
@@ -180,7 +187,7 @@ let readyPromise = null;
 export function preloadBattleImages() {
   if (started) return readyPromise;
   started = true;
-  const paths = [...FLASH_IMAGES, ...CHICKEN_IMAGES, ...DIVINE_JUDGMENT_STRUCK_IMAGES, ...PROPHECY_OF_DOOM_STRIKE_IMAGES, ...ASHKAS_VENGEANCE_STRIKE_IMAGES, ...SHADOW_ARMY_STRIKE_IMAGES, ...PETRIFY_STONE_IMAGES];
+  const paths = [...FLASH_IMAGES, ...CHICKEN_IMAGES, ...DIVINE_JUDGMENT_STRUCK_IMAGES, ...PROPHECY_OF_DOOM_STRIKE_IMAGES, ...ASHKAS_VENGEANCE_STRIKE_IMAGES, ...SHADOW_ARMY_STRIKE_IMAGES, ...PETRIFY_STONE_IMAGES, ...SELF_CHOKE_VICTIM_IMAGES];
   for (const folder of PER_CHARACTER_FOLDERS) {
     for (const id of CHARACTER_IDS) paths.push(`${folder}/${id}.jpg`);
   }
