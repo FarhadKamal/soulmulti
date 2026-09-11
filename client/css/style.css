@@ -276,13 +276,22 @@ input {
 .heart-icon--empty { color: #3a3a48; }
 .char-flag { font-size: 0.8em; opacity: 0.8; }
 .char-shield {
-  display: inline-flex; align-items: center; gap: 4px; margin-top: 4px;
-  padding: 2px 8px; border-radius: 999px;
-  background: #1a2a3a; border: 1px solid #4a9eff88;
-  box-shadow: 0 0 8px rgba(74, 158, 255, 0.35);
+  display: inline-flex; align-items: center; gap: 5px; margin-top: 4px;
+  padding: 3px 10px; border-radius: 999px;
+  background: #1a2a3a; border: 1.5px solid #4a9effcc;
+  box-shadow: 0 0 10px rgba(74, 158, 255, 0.5);
 }
-.char-shield-icon { font-size: 1.15em; filter: drop-shadow(0 0 3px rgba(120, 190, 255, 0.9)); }
-.char-shield-count { font-weight: 700; font-size: 0.9em; color: #bfe0ff; }
+.char-shield-icon { font-size: 1.3em; filter: drop-shadow(0 0 4px rgba(120, 190, 255, 0.95)); }
+.char-shield-count { font-weight: 800; font-size: 1.05em; color: #d5ecff; }
+/* Brief pulse the moment shield is (re)rendered with a nonzero value, so a
+   fresh grant (Glory Smash, Divine Restore, etc.) visually announces itself
+   instead of silently appearing as a static badge someone can miss next to
+   Tharox's own persistent "Glory Smash: N/2" status badge underneath it. */
+.char-shield--pulse { animation: char-shield-pulse 0.9s ease-out; }
+@keyframes char-shield-pulse {
+  0% { transform: scale(1.35); box-shadow: 0 0 18px rgba(74, 158, 255, 0.9); }
+  100% { transform: scale(1); box-shadow: 0 0 10px rgba(74, 158, 255, 0.5); }
+}
 
 /* Persistent per-character status badges (Zerathys's charge count, Tharox's
    Charge ready, Blade's streak, Special used) - ported from the main

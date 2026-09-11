@@ -1239,7 +1239,7 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
   // back to false, since this check just re-reads live state every render.
   if (character.shield > 0 && !character.isChicken) {
     const shield = document.createElement('div');
-    shield.className = 'char-shield';
+    shield.className = 'char-shield' + (effects.has('shieldgain') ? ' char-shield--pulse' : '');
     const icon = document.createElement('span');
     icon.className = 'char-shield-icon';
     icon.textContent = '🛡';

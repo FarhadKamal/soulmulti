@@ -40,6 +40,7 @@ const EFFECT_DURATION_MS = {
   predictionwin: 1100,
   predictionloss: 700,
   mirageshatter: 600,
+  shieldgain: 900,
 };
 
 // How long the mirror-shard counter-hit effect waits before it even starts,
@@ -416,6 +417,18 @@ export function handleLogEntryForEffects(entry, game) {
   // as "something good just happened to you."
   if ((actionId === 'divineRestore' || actionId === 'glorySmash' || actionId === 'purify') && !isKO(characterId)) {
     addEffect(characterId, 'divine', EFFECT_DURATION_MS.divine);
+  }
+
+  // Shield badge pulse: Divine Restore and Glory Smash both grant the
+  // caster shield alongside the heal above - confirmed live report that the
+  // shield count was easy to miss sitting quietly next to Tharox's own
+  // persistent "Glory Smash: N/2" status badge. This fires a one-shot pulse
+  // on the shield badge itself (see .char-shield--pulse in style.css) so a
+  // fresh grant visually announces itself instead of just appearing as a
+  // static number. Purify grants no shield, so it's excluded here even
+  // though it shares the golden self-buff glow above.
+  if ((actionId === 'divineRestore' || actionId === 'glorySmash') && !isKO(characterId)) {
+    addEffect(characterId, 'shieldgain', EFFECT_DURATION_MS.shieldgain);
   }
 
   // Rowan's Poison Cloud, CAST moment: deals no direct damage itself
