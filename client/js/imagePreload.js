@@ -183,13 +183,18 @@ const SELF_CHOKE_VICTIM_IMAGES = CHARACTER_IDS.filter((id) => id !== 'melyssa').
 const LIFEBOND_REACTION_IMAGES = CHARACTER_IDS.map((id) => `assets/images/${id}/lifebond.jpg`);
 
 // Velorya's Moonlit Theft (Siphon #35) - unlike every other per-victim set,
-// this only covers the 5 heroes whose kits can actually generate shield at
+// this only covers the heroes whose kits can actually generate shield at
 // all (confirmed ruling: "I think for hijack we only have to create image
-// those hero can have shield") - Athena, Boingo, Tharox, Chronox, Melyssa.
-// Listed explicitly rather than derived from CHARACTER_IDS since there's no
-// clean filter predicate available client-side for "can this hero ever have
-// shield" - if a future hero gains a shield source, add their id here too.
-const MOONLIT_THEFT_REACTION_IMAGES = ['athena', 'boingo', 'tharox', 'chronox', 'melyssa'].map(
+// those hero can have shield") - Athena, Boingo, Tharox, Chronox, Melyssa
+// (their own signature shield sources), plus Oraclus (confirmed live gap,
+// 2026-09-11: his Rune Vision prediction-win reward also grants +3 shield,
+// missed in the original scoping pass since it's a bonus effect rather than
+// a dedicated shield-granting action). Listed explicitly rather than
+// derived from CHARACTER_IDS since there's no clean filter predicate
+// available client-side for "can this hero ever have shield" - if a future
+// hero gains a shield source (direct or as a side effect of another
+// mechanic), add their id here too.
+const MOONLIT_THEFT_REACTION_IMAGES = ['athena', 'boingo', 'tharox', 'chronox', 'melyssa', 'oraclus'].map(
   (id) => `assets/images/${id}/shield_stolen.jpg`
 );
 
