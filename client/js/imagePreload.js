@@ -51,6 +51,7 @@ const FLASH_IMAGES = [
   'assets/images/velorya/dance.jpg',
   'assets/images/velorya/hided.jpg',
   'assets/images/velorya/strike.jpg',
+  'assets/images/velorya/moonlit_theft.jpg',
   'assets/images/zerathys/charge.jpg',
   'assets/images/zerathys/glass.jpg',
   'assets/images/zerathys/soul.jpg',
@@ -181,6 +182,17 @@ const SELF_CHOKE_VICTIM_IMAGES = CHARACTER_IDS.filter((id) => id !== 'melyssa').
 // exempts Rowan) - so this covers all 16 heroes, no filter.
 const LIFEBOND_REACTION_IMAGES = CHARACTER_IDS.map((id) => `assets/images/${id}/lifebond.jpg`);
 
+// Velorya's Moonlit Theft (Siphon #35) - unlike every other per-victim set,
+// this only covers the 5 heroes whose kits can actually generate shield at
+// all (confirmed ruling: "I think for hijack we only have to create image
+// those hero can have shield") - Athena, Boingo, Tharox, Chronox, Melyssa.
+// Listed explicitly rather than derived from CHARACTER_IDS since there's no
+// clean filter predicate available client-side for "can this hero ever have
+// shield" - if a future hero gains a shield source, add their id here too.
+const MOONLIT_THEFT_REACTION_IMAGES = ['athena', 'boingo', 'tharox', 'chronox', 'melyssa'].map(
+  (id) => `assets/images/${id}/shield_stolen.jpg`
+);
+
 let started = false;
 // Resolves once every preloaded image has either loaded or failed - used by
 // main.js to gate the battle screen behind a brief "preparing battle" wait
@@ -194,7 +206,7 @@ let readyPromise = null;
 export function preloadBattleImages() {
   if (started) return readyPromise;
   started = true;
-  const paths = [...FLASH_IMAGES, ...CHICKEN_IMAGES, ...DIVINE_JUDGMENT_STRUCK_IMAGES, ...PROPHECY_OF_DOOM_STRIKE_IMAGES, ...ASHKAS_VENGEANCE_STRIKE_IMAGES, ...SHADOW_ARMY_STRIKE_IMAGES, ...PETRIFY_STONE_IMAGES, ...SELF_CHOKE_VICTIM_IMAGES, ...LIFEBOND_REACTION_IMAGES];
+  const paths = [...FLASH_IMAGES, ...CHICKEN_IMAGES, ...DIVINE_JUDGMENT_STRUCK_IMAGES, ...PROPHECY_OF_DOOM_STRIKE_IMAGES, ...ASHKAS_VENGEANCE_STRIKE_IMAGES, ...SHADOW_ARMY_STRIKE_IMAGES, ...PETRIFY_STONE_IMAGES, ...SELF_CHOKE_VICTIM_IMAGES, ...LIFEBOND_REACTION_IMAGES, ...MOONLIT_THEFT_REACTION_IMAGES];
   for (const folder of PER_CHARACTER_FOLDERS) {
     for (const id of CHARACTER_IDS) paths.push(`${folder}/${id}.jpg`);
   }

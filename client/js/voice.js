@@ -166,7 +166,7 @@ const VOICE_LINES = {
 // existing titanSmash/glorySmash lines), Akyros has two.
 const ACTION_VOICE_LINES = {
   chronox: { timeFreeze: 'time_freeze', rewind: 'rewind', worldStops: 'world_stop' },
-  velorya: { lunarEclipse: 'eclipse' },
+  velorya: { lunarEclipse: 'eclipse', moonlitTheft: 'moonlit_theft' },
   boingo: { jesterBall: 'jerster', fowlPlay: 'fowl_play' },
   athena: { divineRestore: 'devine', divineSacrifice: 'sacrifice', divineJudgment: 'divine_judgment' },
   zerathys: { chargeUp: 'charge', thunderWrath: 'release', soulSwap: 'soul_swap' },

@@ -86,6 +86,11 @@ const SHADOW_ARMY_FLASH_DURATION_MS = 4500;
 // simultaneous reactions across the board).
 const LIFEBOND_FLASH_DURATION_MS = 4500;
 
+// Velorya's Moonlit Theft (Siphon #35) - same 4.5s multi-beat scale as
+// Lifebond/Shadow Army above (one cast, multiple simultaneous victim
+// reactions, though here only ever the shield-capable subset of heroes).
+const MOONLIT_THEFT_FLASH_DURATION_MS = 4500;
+
 // Resurrection Gamble (Draxus's Cheat Death, taxonomy #32) - a successful
 // revival reuses the SAME sound effect as Deathless Fury's own cast
 // (assets/sounds/deathless_fury.mp3, confirmed ruling 2026-09-06: "same
@@ -645,6 +650,23 @@ export function handleLogEntryForFlash(entry, game) {
     }
     return;
   }
+  if (entry.type === 'special' && entry.actionId === 'moonlitTheft') {
+    // Velorya's Moonlit Theft (taxonomy #35 Siphon) - flashes shield_stolen.jpg
+    // on every character entry.changes actually drained shield from (server's
+    // velorya.js only includes characters who genuinely had shield > 0 at
+    // cast time, which naturally means this only ever fires for the 5 heroes
+    // who can have shield at all - Athena/Boingo/Tharox/Chronox/Melyssa -
+    // confirmed ruling: "I think for hijack we only have to create image
+    // those hero can have shield", so no art exists for anyone else and none
+    // is needed, since they can never appear in this array to begin with.
+    // Velorya's own cast flash still fires via the generic switch below.
+    for (const change of entry.changes || []) {
+      if (!isKO(change.characterId)) {
+        setFlash(change.characterId, `assets/images/${change.characterId}/shield_stolen.jpg`, MOONLIT_THEFT_FLASH_DURATION_MS);
+      }
+    }
+    return;
+  }
 
   if (entry.type === 'special' && entry.actionId === 'earthshatter') {
     // Tharox's own cast flash still fires via the generic switch below (his
@@ -752,6 +774,8 @@ export function handleLogEntryForFlash(entry, game) {
       setFlash(characterId, 'assets/images/akyros/call_army.jpg', SHADOW_ARMY_FLASH_DURATION_MS); break;
     case 'lunarEclipse':
       setFlash(characterId, 'assets/images/velorya/casting.jpg'); break;
+    case 'moonlitTheft':
+      setFlash(characterId, 'assets/images/velorya/moonlit_theft.jpg', MOONLIT_THEFT_FLASH_DURATION_MS); break;
     case 'lunarStrike': case 'moonstep':
       if (!dodged) setFlash(characterId, 'assets/images/velorya/strike.jpg');
       break;

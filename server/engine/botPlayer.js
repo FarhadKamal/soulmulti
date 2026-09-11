@@ -599,8 +599,31 @@ function chooseAkyrosMove(character, game, usable) {
   return { actionId: 'fatalSlash', targetId: pickDefaultTarget(game, character, 'fatalSlash') };
 }
 
+// Minimum combined enemy shield worth burning the one-time Moonlit Theft
+// cast on - unlike Petrify/Shadow Army (free bonus actions, always take
+// when legal), this genuinely consumes her turn for a payoff that scales
+// with how much shield is actually out there. A near-empty board (0-1
+// total) isn't worth spending the only cast on; 2+ combined starts being a
+// real swing (a full shield off at least one meaningful source).
+const MOONLIT_THEFT_MIN_WORTHWHILE_SHIELD = 2;
+
 function chooseVeloryaMove(character, game, usable) {
   const byId = Object.fromEntries(usable.map((a) => [a.actionId, a]));
+  // Moonlit Theft (hearts<=3 one-time special): only cast when there's
+  // meaningful shield to actually steal right now - casting into a
+  // shieldless board wastes the one-time use for zero benefit. The
+  // opportunity re-evaluates fresh every turn this stays legal (shield
+  // totals shift turn to turn as Chrono Guard resets, Divine Restore
+  // fires, Jester Ball rewards land, etc.), so holding it isn't wasted -
+  // she'll take it the moment the board is actually worth raiding.
+  if (byId.moonlitTheft) {
+    const totalEnemyShield = Object.values(game.characters)
+      .filter((c) => c.id !== character.id && !c.isKO)
+      .reduce((sum, c) => sum + c.shield, 0);
+    if (totalEnemyShield >= MOONLIT_THEFT_MIN_WORTHWHILE_SHIELD) {
+      return { actionId: 'moonlitTheft', targetId: null };
+    }
+  }
   // Eclipse is a defensive panic button - use it when low on hearts to buy
   // 3 safe attacks, rather than burning it early/randomly.
   if (byId.lunarEclipse && character.hearts <= LOW_HEARTS_THRESHOLD) {

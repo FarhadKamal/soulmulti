@@ -244,6 +244,10 @@ const ACTION_SOUND = {
   lunarStrike: 'sword',
   moonstep: 'moonstep',
   lunarEclipse: 'eclipse',
+  // Moonlit Theft (hearts<=3 one-time special) - reuses the shared
+  // magic.mp3 sound effect, confirmed ruling: "for sound effect magic.mp3",
+  // no dedicated sound needed (same reuse pattern as Petrify/Lifebond).
+  moonlitTheft: 'magic',
   chaosGamble: 'punch',
   jesterBall: 'jesterball',
   fowlPlay: 'chicken_cast',

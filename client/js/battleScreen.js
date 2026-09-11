@@ -1939,7 +1939,7 @@ const ACTION_LABELS = {
   smash: 'Smash', titanToss: 'Titan Toss', titanSmash: 'Titan Smash', glorySmash: 'Glory Smash', earthshatter: 'Earthshatter',
   chargeUp: 'Charge Up', thunderWrath: 'Thunder Wrath', soulSwap: 'Soul Swap', soulSwapWrath: 'Thunder Wrath (free)',
   hiddenMark: 'Hidden Mark', fatalSlash: 'Fatal Slash', shadowExecution: 'Shadow Execution', shadowArmy: 'Shadow Army',
-  lunarStrike: 'Lunar Strike', moonstep: 'Moonstep', lunarEclipse: 'Lunar Eclipse',
+  lunarStrike: 'Lunar Strike', moonstep: 'Moonstep', lunarEclipse: 'Lunar Eclipse', moonlitTheft: 'Moonlit Theft',
   chaosGamble: 'Chaos Gamble', jesterBall: 'Jester Ball', fowlPlay: 'Fowl Play', chickenAttack: 'Chicken Attack', bloodHunt: 'Blood Hunt',
   curseStrike: 'Curse Strike', divineRestore: 'Divine Restore', divineSacrifice: 'Divine Sacrifice', divineJudgment: 'Divine Judgment',
   selfChoke: 'Self Choke',
@@ -2072,6 +2072,18 @@ function describeLogEntry(entry) {
         const shared = entry.changes[0].after;
         const parts = entry.changes.map((c) => `${name(c.characterId)} (${c.before}→${c.after})`);
         return `${name(entry.characterId)} unleashed Lifebond - everyone's hearts became ${shared}! ${parts.join(', ')}`;
+      }
+      if (entry.actionId === 'moonlitTheft') {
+        // Moonlit Theft (Velorya's hearts<=3 one-time special, taxonomy #35
+        // Siphon) - entry.changes (server's velorya.js) carries one
+        // { characterId, before, after } per character who actually HAD
+        // shield to lose (always after: 0 - a real drain, not a split like
+        // Lifebond). entry.stolenTotal/shieldAfter describe her own gain.
+        if (!entry.changes || entry.changes.length === 0) {
+          return `${name(entry.characterId)} unleashed Moonlit Theft, but no one had any shield to steal!`;
+        }
+        const parts = entry.changes.map((c) => `${name(c.characterId)} (-${c.before}sh)`);
+        return `${name(entry.characterId)} unleashed Moonlit Theft - stole ${entry.stolenTotal} shield! ${parts.join(', ')} → ${name(entry.characterId)} now has ${entry.shieldAfter} shield`;
       }
       if (entry.actionId === 'runeVision') {
         if (entry.stage === 1) {

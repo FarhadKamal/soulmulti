@@ -78,7 +78,11 @@ function baseSpecialFor(id) {
     case 'akyros':
       return { marks: new Set(), revealedMarks: new Set(), everMarkedIds: new Set(), dodgedAttackerIds: new Set() };
     case 'velorya':
-      return { lastTargetId: null, hasActedOnce: false, eclipseAttacksSinceCast: 0 };
+      // usedMoonlitTheft: hearts<=3 one-time special (see velorya.js) -
+      // drains every other living character's shield to 0 and takes it
+      // all for herself. One-time use, same shape as usedSpecial elsewhere,
+      // tracked separately since Lunar Eclipse already owns usedSpecial.
+      return { lastTargetId: null, hasActedOnce: false, eclipseAttacksSinceCast: 0, usedMoonlitTheft: false };
     case 'boingo':
       // jesterBallsUsed: gates Jester Ball's own isLegal (boingo.js) - back
       // to 1 throw per match (an earlier 2-throw buff was reverted
