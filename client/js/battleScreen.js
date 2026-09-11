@@ -2145,6 +2145,16 @@ function describeLogEntry(entry) {
           : '';
         return `${name(entry.characterId)} unleashed World Stops - ${frozenText}${blockedText}`;
       }
+      if (entry.actionId === 'glorySmash') {
+        // Confirmed gap: the generic SPECIAL fallback below only ever shows
+        // "used their SPECIAL: Glory Smash on X" - it never mentions the
+        // damage dealt or Tharox's own self-heal/self-shield, even though
+        // both are genuinely applied (server always grants +2 hearts, +2
+        // decaying shield). The hearts-snapshot suffix rendered the shield
+        // correctly, but nothing in the line text itself explained WHY it
+        // changed - reported live as "that was not showing in screen."
+        return `${name(entry.characterId)} used their SPECIAL: Glory Smash on ${name(actualAttackTargetId(entry))}${entry.amountDealt != null ? ` - ${entry.amountDealt} damage` : ''}${entry.koTriggered ? ' - KO!' : ''} (+2 hearts, +2 shield)`;
+      }
       return `${name(entry.characterId)} used their SPECIAL: ${actionLabel(entry.actionId)}${entry.targetId ? ` on ${name(actualAttackTargetId(entry))}` : ''}${blockedByText(entry.blockedBy)}`;
     case 'setup':
       if (entry.actionId === 'mirageMark') {
