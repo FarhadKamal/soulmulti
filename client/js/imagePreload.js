@@ -56,6 +56,7 @@ const FLASH_IMAGES = [
   'assets/images/zerathys/glass.jpg',
   'assets/images/zerathys/soul.jpg',
   'assets/images/zerathys/strike.jpg',
+  'assets/images/zerathys/overcharge_strike.jpg',
   'assets/images/melyssa/chess.jpg',
   'assets/images/melyssa/mind_control_selection.jpg',
   'assets/images/melyssa/mind_control_action.jpg',
@@ -193,8 +194,10 @@ const LIFEBOND_REACTION_IMAGES = CHARACTER_IDS.map((id) => `assets/images/${id}/
 // derived from CHARACTER_IDS since there's no clean filter predicate
 // available client-side for "can this hero ever have shield" - if a future
 // hero gains a shield source (direct or as a side effect of another
-// mechanic), add their id here too.
-const MOONLIT_THEFT_REACTION_IMAGES = ['athena', 'boingo', 'tharox', 'chronox', 'melyssa', 'oraclus'].map(
+// mechanic), add their id here too. Zerathys added 2026-09-11 alongside
+// his own new Overcharge Collapse shield stake (+1 shield per Thunder
+// Wrath cast while overcharged, hearts<=3).
+const MOONLIT_THEFT_REACTION_IMAGES = ['athena', 'boingo', 'tharox', 'chronox', 'melyssa', 'oraclus', 'zerathys'].map(
   (id) => `assets/images/${id}/shield_stolen.jpg`
 );
 

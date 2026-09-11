@@ -1,4 +1,4 @@
-import { applyDamage } from '../engine/damagePipeline.js';
+import { applyDamage, applyShield } from '../engine/damagePipeline.js';
 import { makeSetupAction } from '../engine/categories/neutralAction.js';
 
 const DAMAGE_BY_CHARGE = [1, 2, 3];
@@ -40,6 +40,20 @@ function executeThunderWrath(character, targetId, game, log, actionId) {
     targetCharacterId: targetId,
     amount,
   });
+  // Overcharge Collapse's own shield stake (confirmed ruling, 2026-09-11):
+  // every Thunder Wrath cast while overcharged - the normal action AND
+  // Soul Swap's free follow-up, both routing through this shared function -
+  // grants him +1 shield, regardless of whether the hit actually dealt
+  // damage ("every cast while overcharged, regardless of whether it
+  // actually dealt damage"). No cap, stacks with every qualifying cast
+  // ("say he hit total 2 hit .. then shield will be 2"). Not decaying -
+  // behaves exactly like any other normal shield once granted, sticking
+  // around until a real hit consumes it, completely independent of whether
+  // Overcharge Collapse is still active by the time that happens (confirmed
+  // ruling: healing back above the threshold does NOT strip it away).
+  if (overcharged) {
+    applyShield(game, character.id, 1);
+  }
   log.push({ type: 'attack', characterId: character.id, actionId, targetId, amount, overcharged, ...result });
   return result;
 }

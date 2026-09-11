@@ -766,7 +766,18 @@ export function handleLogEntryForFlash(entry, game) {
     case 'chargeUp':
       setFlash(characterId, 'assets/images/zerathys/charge.jpg'); break;
     case 'thunderWrath': case 'soulSwapWrath':
-      if (!dodged) setFlash(characterId, 'assets/images/zerathys/strike.jpg');
+      // Overcharge Collapse (hearts<=3): a distinct, more intense strike
+      // image for the moment he's both dealing the guaranteed 3 damage AND
+      // gaining his own shield stake from it at once (confirmed ruling,
+      // 2026-09-11: "he is damaging 3 . and also gaining shield.. in one
+      // image. during overcharge state") - entry.overcharged is stamped by
+      // this same executeThunderWrath call (zerathys.js) that grants the
+      // shield, so the two are always in sync by construction.
+      if (!dodged) {
+        setFlash(characterId, entry.overcharged
+          ? 'assets/images/zerathys/overcharge_strike.jpg'
+          : 'assets/images/zerathys/strike.jpg');
+      }
       break;
     case 'timeFreeze':
       setFlash(characterId, 'assets/images/chronox/time.jpg'); break;
