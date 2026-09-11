@@ -108,6 +108,8 @@ export function onTurnStart(character, game, log) {
   }
 }
 
+const LIFEBOND_HEARTS_THRESHOLD = 3;
+
 export const actions = {
   wandStrike: {
     label: 'Wand Strike',
@@ -127,4 +129,39 @@ export const actions = {
     },
   },
   arcaneStudy: discoveryKit.arcaneStudy,
+  // Lifebond (taxonomy #34 Pool & Redistribute + #12 No Threat, design-
+  // locked 2026-09-11): hearts<=3 one-time special. Sums every currently
+  // LIVING character's hearts (Marin included, KO'd characters excluded
+  // from both the sum and the divisor - this cannot revive anyone), floor-
+  // divides by the count, and sets every living character's hearts to that
+  // one shared value. Deliberately does NOT route through applyDamage/
+  // applyHeal - this is neither a hit nor a heal (no attacker/defender
+  // relationship, no shield interaction, bypasses every defense mechanic
+  // entirely) - directly mutating character.hearts is the correct
+  // primitive here, matching the No Threat (#12) tag's own "not treated as
+  // a fresh attack" reasoning (same category Illyra's Mirage Mark uses to
+  // skip dodge/shield checks). Can never push anyone above maxHearts (a
+  // flat 7 for every character) since an average of values each <=7 can
+  // itself never exceed 7 - confirmed by the user this edge case is
+  // structurally impossible, so no explicit clamp is needed. Can also
+  // never round down to exactly 0 heart (which would need special KO
+  // handling) - every living character has hearts >= 1 by definition (a
+  // character at 0 hearts is already KO'd, excluded from the sum/divisor
+  // entirely), so the average of values each >= 1 is itself always >= 1.
+  lifebond: {
+    label: 'Lifebond',
+    needsTarget: false,
+    special: true,
+    isLegal: (character) => character.hearts <= LIFEBOND_HEARTS_THRESHOLD && !character.special.usedLifebond,
+    execute(character, targetId, game, log) {
+      character.special.usedLifebond = true;
+      const living = Object.values(game.characters).filter((c) => !c.isKO);
+      const total = living.reduce((sum, c) => sum + c.hearts, 0);
+      const shared = Math.floor(total / living.length);
+      const changes = living.map((c) => ({ characterId: c.id, before: c.hearts, after: shared }));
+      for (const c of living) c.hearts = shared;
+      log.push({ type: 'special', characterId: character.id, actionId: 'lifebond', changes, hearts: heartsSnapshot(game) });
+      return {};
+    },
+  },
 };

@@ -1257,6 +1257,24 @@ function chooseRowanMove(character, game, usable) {
 // Study fallback), and who Wand Strike hits otherwise.
 function chooseMarinMove(character, game, usable) {
   const byId = Object.fromEntries(usable.map((a) => [a.actionId, a]));
+  // Lifebond (hearts<=3 one-time special): unlike Rowan's Petrify/Akyros's
+  // Shadow Army, this is NOT a free unconditional take - it can genuinely
+  // hurt her if she'd end up worse off than her current hearts (e.g. she's
+  // the healthiest of a low-average group). Only cast when it's actually
+  // favorable: the shared average would leave her at or above her current
+  // hearts (a real heal or at worst neutral for her), same "don't take a
+  // move that makes your own situation worse" reasoning used elsewhere in
+  // this file. A bot Marin who'd come out worse simply holds it and plays
+  // normally instead, waiting for a more favorable moment (the average
+  // recalculates fresh every time this is checked).
+  if (byId.lifebond) {
+    const living = Object.values(game.characters).filter((c) => !c.isKO);
+    const total = living.reduce((sum, c) => sum + c.hearts, 0);
+    const shared = Math.floor(total / living.length);
+    if (shared >= character.hearts) {
+      return { actionId: 'lifebond', targetId: null };
+    }
+  }
   // Secure an outright kill before studying - same fix/reasoning as
   // chooseRowanMove's own identical check above (confirmed bug via a real
   // match log: the bot kept re-discovering spells turn after turn against

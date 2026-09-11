@@ -325,6 +325,24 @@ export function handleLogEntryForEffects(entry, game) {
     }
     return;
   }
+  if (entry.type === 'special' && entry.actionId === 'lifebond') {
+    // Marin's Lifebond (taxonomy #34 Pool & Redistribute + #12 No Threat) -
+    // reuses Rewind's own "!" shock-mark pop (confirmed ruling: "animation
+    // every victim will '!' , we used in rewind cast animation"), but fires
+    // on EVERY currently-living character's own tile at once instead of a
+    // single target - the first time this shared effect has ever been
+    // applied to more than one character simultaneously. entry.changes
+    // (server's marin.js) carries one { characterId, before, after } per
+    // living character - loop it rather than re-deriving "who's living"
+    // from game.characters here, since changes IS exactly the set of
+    // characters this cast actually touched.
+    for (const change of entry.changes || []) {
+      if (!isKO(change.characterId)) {
+        addEffect(change.characterId, 'shockmark', EFFECT_DURATION_MS.shockmark);
+      }
+    }
+    return;
+  }
 
   if (entry.type === 'special' && entry.actionId === 'mirageBurst') {
     for (const burst of entry.bursts || []) {

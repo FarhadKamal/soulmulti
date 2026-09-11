@@ -174,6 +174,13 @@ const SELF_CHOKE_VICTIM_IMAGES = CHARACTER_IDS.filter((id) => id !== 'melyssa').
   (id) => `assets/images/${id}/choke.jpg`
 );
 
+// Marin's Lifebond (Pool & Redistribute #34 + No Threat #12) - unlike every
+// other per-victim-hero set above, this does NOT exclude the caster: Marin
+// herself is a genuine "living character" this cast affects too (she's just
+// another entry in entry.changes, not exempt the way Petrify's stone.jpg
+// exempts Rowan) - so this covers all 16 heroes, no filter.
+const LIFEBOND_REACTION_IMAGES = CHARACTER_IDS.map((id) => `assets/images/${id}/lifebond.jpg`);
+
 let started = false;
 // Resolves once every preloaded image has either loaded or failed - used by
 // main.js to gate the battle screen behind a brief "preparing battle" wait
@@ -187,7 +194,7 @@ let readyPromise = null;
 export function preloadBattleImages() {
   if (started) return readyPromise;
   started = true;
-  const paths = [...FLASH_IMAGES, ...CHICKEN_IMAGES, ...DIVINE_JUDGMENT_STRUCK_IMAGES, ...PROPHECY_OF_DOOM_STRIKE_IMAGES, ...ASHKAS_VENGEANCE_STRIKE_IMAGES, ...SHADOW_ARMY_STRIKE_IMAGES, ...PETRIFY_STONE_IMAGES, ...SELF_CHOKE_VICTIM_IMAGES];
+  const paths = [...FLASH_IMAGES, ...CHICKEN_IMAGES, ...DIVINE_JUDGMENT_STRUCK_IMAGES, ...PROPHECY_OF_DOOM_STRIKE_IMAGES, ...ASHKAS_VENGEANCE_STRIKE_IMAGES, ...SHADOW_ARMY_STRIKE_IMAGES, ...PETRIFY_STONE_IMAGES, ...SELF_CHOKE_VICTIM_IMAGES, ...LIFEBOND_REACTION_IMAGES];
   for (const folder of PER_CHARACTER_FOLDERS) {
     for (const id of CHARACTER_IDS) paths.push(`${folder}/${id}.jpg`);
   }

@@ -283,6 +283,10 @@ const ACTION_SOUND = {
   threefoldVeil: 'magic_dodge.wav',
   cleanSlate: 'cleanSlate',
   wandDiscover: 'wand_discover',
+  // Lifebond (hearts<=3 one-time special) - reuses the shared magic.mp3
+  // sound effect, confirmed ruling: "sound effect same. magic.mp3", no
+  // dedicated sound needed (same reuse pattern as Rowan's Petrify above).
+  lifebond: 'magic',
   grimStrike: 'sword_thud',
   skullCrack: 'bullet_hit',
   grimBarrage: 'grim_barrage',

@@ -275,6 +275,9 @@ function baseSpecialFor(id) {
       // Everbloom is active (whether or not that turn heals) - odd counts
       // heal, even counts skip, so it heals every OTHER turn forever
       // rather than every single turn (balance tune - see marin.js).
+      // usedLifebond: hearts<=3 one-time special (see marin.js) - pools and
+      // redistributes every living character's hearts to their shared
+      // average. One-time use, same shape as usedSpecial elsewhere.
       return {
         discoveredSpells: new Set(),
         arcaneStudyPending: false,
@@ -287,6 +290,7 @@ function baseSpecialFor(id) {
         cleanSlateImmuneTurnsRemaining: 0,
         piercingWandActive: false,
         wandMasteryActive: false,
+        usedLifebond: false,
       };
     case 'grimtal':
       // Grim Strike's damage is 1 + ownKillCount + claimedKillCount:

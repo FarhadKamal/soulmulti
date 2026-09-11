@@ -1949,7 +1949,7 @@ const ACTION_LABELS = {
   poisonCloud: 'Poison Cloud', purify: 'Purify', wildLightning: 'Wild Lightning',
   mirrorReflect: 'Mirror Reflect', silenceLock: 'Silence Lock', petrify: 'Petrify',
   everbloom: 'Everbloom', threefoldVeil: 'Threefold Veil', cleanSlate: 'Clean Slate',
-  piercingWand: 'Piercing Wand', wandMastery: 'Wand Mastery',
+  piercingWand: 'Piercing Wand', wandMastery: 'Wand Mastery', lifebond: 'Lifebond',
   grimStrike: 'Grim Strike', skullCrack: 'Skull Crack', claimKill: 'Claim the Kill', grimBarrage: 'Grim Barrage',
   mirageMark: 'Mirage Mark', mirageBurst: 'Mirage Burst', mirageOverload: 'Mirage Overload',
   runeStrike: 'Rune Strike', runeVision: 'Rune Vision', runeVisionTargetPick: 'Rune Vision', prophecyOfDoom: 'Prophecy of Doom',
@@ -2057,6 +2057,21 @@ function describeLogEntry(entry) {
         // already show individually right before this line, so this just
         // announces the cast itself rather than re-listing every spell.
         return `${name(entry.characterId)} unleashed Petrify - everyone froze to stone!`;
+      }
+      if (entry.actionId === 'lifebond') {
+        // Lifebond (Marin's hearts<=3 one-time special, taxonomy #34 Pool &
+        // Redistribute + #12 No Threat) - entry.changes (server's marin.js)
+        // carries one { characterId, before, after } per living character
+        // this cast touched (Marin included). Every character ends up at
+        // the SAME shared value, so just show that once alongside a quick
+        // before-list rather than repeating the same "after" number per
+        // person.
+        if (!entry.changes || entry.changes.length === 0) {
+          return `${name(entry.characterId)} unleashed Lifebond!`;
+        }
+        const shared = entry.changes[0].after;
+        const parts = entry.changes.map((c) => `${name(c.characterId)} (${c.before}→${c.after})`);
+        return `${name(entry.characterId)} unleashed Lifebond - everyone's hearts became ${shared}! ${parts.join(', ')}`;
       }
       if (entry.actionId === 'runeVision') {
         if (entry.stage === 1) {

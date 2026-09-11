@@ -232,6 +232,7 @@ const ACTION_VOICE_LINES = {
     cleanSlate: 'clean_slate',
     piercingWand: 'piercing',
     wandMastery: 'mastery',
+    lifebond: 'lifebond',
   },
   // grimWard is played directly from main.js's 'dodge' log-entry handler
   // (same pattern as marin's threefoldDodge above), not through the

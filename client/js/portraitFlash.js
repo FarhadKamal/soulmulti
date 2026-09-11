@@ -80,6 +80,12 @@ const ASHKAS_VENGEANCE_STRIKE_FLASH_DURATION_MS = 3000;
 // since it's the same shape (one cast, multiple simultaneous victim hits).
 const SHADOW_ARMY_FLASH_DURATION_MS = 4500;
 
+// Marin's Lifebond (Pool & Redistribute #34 + No Threat #12) - every living
+// character's own lifebond.jpg flashes at once, same 4.5s multi-beat scale
+// as Shadow Army/Earthshatter/Grim Barrage above (one cast, multiple
+// simultaneous reactions across the board).
+const LIFEBOND_FLASH_DURATION_MS = 4500;
+
 // Resurrection Gamble (Draxus's Cheat Death, taxonomy #32) - a successful
 // revival reuses the SAME sound effect as Deathless Fury's own cast
 // (assets/sounds/deathless_fury.mp3, confirmed ruling 2026-09-06: "same
@@ -619,6 +625,24 @@ export function handleLogEntryForFlash(entry, game) {
   }
   if (entry.type === 'clean-slate-trigger') {
     if (!isKO(entry.characterId)) setFlash(entry.characterId, 'assets/images/marin/clean_slate.jpg');
+    return;
+  }
+  if (entry.type === 'special' && entry.actionId === 'lifebond') {
+    // Marin's Lifebond (taxonomy #34 Pool & Redistribute + #12 No Threat) -
+    // flashes EVERY currently-living character's own lifebond.jpg at once,
+    // Marin included (unlike Petrify's stone.jpg, which deliberately
+    // excludes the caster - Lifebond genuinely affects Marin herself too,
+    // she's just another "living character" in entry.changes, not exempt).
+    // entry.changes (server's marin.js) is exactly the set of characters
+    // this cast touched, one { characterId, before, after } per living
+    // character - no separate isKO re-check needed for who to include, but
+    // still guarded here in case a character somehow died in the same
+    // broadcast batch between this cast and the flash actually rendering.
+    for (const change of entry.changes || []) {
+      if (!isKO(change.characterId)) {
+        setFlash(change.characterId, `assets/images/${change.characterId}/lifebond.jpg`, LIFEBOND_FLASH_DURATION_MS);
+      }
+    }
     return;
   }
 
