@@ -22,10 +22,12 @@ export function hasGuaranteedMindControl(character) {
 // hit since those skip absorption entirely), she gains new shield EXACTLY
 // equal to that leaked-through amount, REPLACING whatever shield she had
 // left (not additive). Reuses the same decaying:true persistence Tharox/
-// Athena already have (clears via decayAllDueShields, run at the very start
-// of beginCharacterTurn - BEFORE this turn's own poison tick, so a shield
-// granted by a poison tick landing on her own turn survives instead of
-// being wiped moments later). Fires even when amountDealt
+// Athena already have (clears via decayShieldIfDue, run at the very start
+// of HER OWN beginCharacterTurn - BEFORE this turn's own poison tick, so a
+// shield granted by a poison tick landing on her own turn survives instead of
+// being wiped moments later). Confirmed bug fix, 2026-09-11: this decay used
+// to run for EVERY character on every beginCharacterTurn call, not just the
+// shield-holder's own turn - see turnEngine.js's beginCharacterTurn. Fires even when amountDealt
 // is 0 (a fully-absorbed hit) - REPLACE semantics mean a stale leftover
 // shield must be explicitly zeroed that turn too, not just left alone.
 // No isMirror/isPoisonTick exclusion (unlike Kaelis's grudge) - matches the

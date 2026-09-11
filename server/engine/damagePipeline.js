@@ -540,17 +540,3 @@ export function decayShieldIfDue(character) {
   }
 }
 
-// Runs decayShieldIfDue for every character, BEFORE poison/silence/headache
-// ticks fire this turn (see beginCharacterTurn in turnEngine.js). Without
-// this, a decaying shield that expires on a character's own turn can be
-// re-granted by that same turn's poison tick (Melyssa's reactive shield off
-// Rowan's Poison Cloud) and then immediately wiped moments later by that
-// character's own onTurnStart decay call, in the same beginCharacterTurn
-// pass - the shield never provides any benefit. Running decay first means
-// only a shield that was already stale from a PRIOR turn gets cleared here;
-// anything granted during this turn's own tick sequence survives.
-export function decayAllDueShields(game) {
-  for (const character of Object.values(game.characters)) {
-    decayShieldIfDue(character);
-  }
-}

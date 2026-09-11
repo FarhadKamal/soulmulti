@@ -1,5 +1,5 @@
 import { cloneGame } from './state.js';
-import { applyDamage, applyHeal, applyShield, isSilenced, isFrozenByChronox, heartsSnapshot, decayAllDueShields, tryTriggerCleanSlate } from './damagePipeline.js';
+import { applyDamage, applyHeal, applyShield, isSilenced, isFrozenByChronox, heartsSnapshot, decayShieldIfDue, tryTriggerCleanSlate } from './damagePipeline.js';
 import * as chronox from '../abilities/chronox.js';
 import * as tharox from '../abilities/tharox.js';
 import * as zerathys from '../abilities/zerathys.js';
@@ -493,16 +493,19 @@ function tickFowlPlayIfBoingoTurn(character, game, log) {
 }
 
 export function beginCharacterTurn(character, game, log) {
-  // Decay due shields before anything else this turn (poison ticks
-  // included) - see decayAllDueShields's own comment for why this must run
-  // first, not just before this character's own onTurnStart. Runs
-  // unconditionally regardless of chicken status - it sweeps EVERY
-  // character on the board each call (not scoped to character, the current
-  // turn's owner), and a chicken's shield is already forced irrelevant
-  // against damage (applyDamage's target.isChicken bypass), so decaying it
-  // in the background isn't "in-progress state" in the sense the freeze
-  // rule below is about.
-  decayAllDueShields(game);
+  // Decay THIS character's own due shield before anything else this turn -
+  // confirmed real bug, 2026-09-11: this used to call decayAllDueShields(game),
+  // sweeping EVERY character on the board on EVERY beginCharacterTurn call,
+  // not just the one whose turn is actually starting. decayShieldIfDue's own
+  // doc comment always said a decaying shield "expires once THAT
+  // character's next turn begins" - but the sweep-everyone call meant it
+  // actually expired the instant ANY character's turn began next, whoever's
+  // turn that was. In a 4-player match this meant Tharox's Glory Smash
+  // shield (or Athena's Divine Restore shield) was wiped before any other
+  // player even got a turn to hit him with it up - "flash once and vanish,
+  // never got a chance to use." Scoped to just this character now, matching
+  // the doc comment's actual intent.
+  decayShieldIfDue(character);
   // Boingo's Fowl Play - confirmed ruling: "anything pending such as
   // studying will not waste... until become hero again" - EVERY piece of
   // this character's own turn-start processing (poison/silence/headache
