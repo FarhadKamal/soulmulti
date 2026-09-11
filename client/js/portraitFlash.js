@@ -659,13 +659,26 @@ export function handleLogEntryForFlash(entry, game) {
     // confirmed ruling: "I think for hijack we only have to create image
     // those hero can have shield", so no art exists for anyone else and none
     // is needed, since they can never appear in this array to begin with.
-    // Velorya's own cast flash still fires via the generic switch below.
+    // Confirmed live bug, 2026-09-11: this block used to `return` here, same
+    // as Lifebond's own handler above - but Lifebond's caster (Marin) IS
+    // included in her own entry.changes (Lifebond affects her too), so her
+    // flash fires from that same loop with no need for the generic switch
+    // below. Velorya is NOT included in her own entry.changes here (she's
+    // the thief, not a drained victim), so an early return here skipped the
+    // generic switch entirely and her own moonlit_theft.jpg cast flash never
+    // fired at all. Fixed by NOT returning - same fall-through pattern
+    // Earthshatter/Shadow Army's own multi-victim blocks already use, since
+    // those two are in the identical situation (a caster who needs their own
+    // separate cast-flash case further down, not included in their own
+    // per-victim loop).
     for (const change of entry.changes || []) {
       if (!isKO(change.characterId)) {
         setFlash(change.characterId, `assets/images/${change.characterId}/shield_stolen.jpg`, MOONLIT_THEFT_FLASH_DURATION_MS);
       }
     }
-    return;
+    // Deliberately NOT returning here - falls through to the generic switch
+    // below so Velorya's own 'assets/images/velorya/moonlit_theft.jpg' cast
+    // flash (case 'moonlitTheft') still fires.
   }
 
   if (entry.type === 'special' && entry.actionId === 'earthshatter') {
