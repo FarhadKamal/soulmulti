@@ -342,6 +342,19 @@ export function applyDamage(game, log, {
   // the per-character rules this now dispatches to generically.
   if (resolveDodgeDefense(game, log, target, sourceCharacterId, { isMirror, ignoresDodge, isFrozen, isPoisonTick })) {
     result.dodged = true;
+    // Confirmed real bug, 2026-09-12: the 'dodge' entry dodgeDefense.js
+    // pushes never carried its own hearts snapshot, so a dodge occurring
+    // MID a multi-hit burst (Blade's Blood Frenzy, Grimtal's Grim Barrage -
+    // any special whose loop routes each hit through this same applyDamage,
+    // sharing one `log` array across several strikes) had its display
+    // snapshot forward-scanned to the batch's single trailing end-action
+    // marker instead of its own true state at the moment it happened -
+    // showing a LATER strike's outcome (even a KO from a strike several
+    // iterations later in the same burst) on the dodge line. Stamped here
+    // rather than inside dodgeDefense.js itself, since that file can't
+    // import heartsSnapshot without a circular import (damagePipeline.js
+    // already imports resolveDodgeDefense FROM it).
+    log[log.length - 1].hearts = heartsSnapshot(game);
     return result;
   }
 
