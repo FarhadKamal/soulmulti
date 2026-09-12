@@ -30,19 +30,6 @@ function get(characterId, line) {
 // playing).
 let currentClip = null;
 
-// Grimtal's Beast Form cast line is two SEPARATE files played one after
-// another (confirmed ruling: "there will be two voice. one after another.
-// first one is beast_form then roar_raw") - his own spoken line, followed
-// by a roar clip chained onto the first file's real 'ended' event rather
-// than a guessed fixed delay, so it works regardless of how long the
-// spoken line actually runs. Declared as a lookup keyed by
-// `${characterId}/${line}` (matching get()'s own cache key shape) so this
-// stays a plain data table if a future character needs the same two-part
-// pattern, rather than a bespoke if-check for just this one case.
-const CHAINED_FOLLOWUP = {
-  'grimtal/beast_form': 'roar_raw',
-};
-
 function playRawVoiceFile(characterId, line) {
   try {
     if (currentClip) {
@@ -52,25 +39,7 @@ function playRawVoiceFile(characterId, line) {
     const base = get(characterId, line);
     const node = base.cloneNode();
     node.volume = 0.85;
-    const followupLine = CHAINED_FOLLOWUP[`${characterId}/${line}`];
-    node.addEventListener('ended', () => {
-      if (currentClip !== node) return;
-      currentClip = null;
-      if (!followupLine) return;
-      // Chains straight into the follow-up clip, still occupying the same
-      // currentClip slot (a later, genuinely new voice call can still cut
-      // this off mid-roar, same as any other single clip would be).
-      try {
-        const followupBase = get(characterId, followupLine);
-        const followupNode = followupBase.cloneNode();
-        followupNode.volume = 0.85;
-        followupNode.addEventListener('ended', () => { if (currentClip === followupNode) currentClip = null; });
-        currentClip = followupNode;
-        followupNode.play().catch(() => {});
-      } catch {
-        // ignore - same silent-fallback policy as the outer try/catch
-      }
-    });
+    node.addEventListener('ended', () => { if (currentClip === node) currentClip = null; });
     // Set currentClip BEFORE play() resolves, not inside a .then() - a
     // second call arriving synchronously right after this one (which is
     // exactly the scenario this whole cutoff mechanism exists for) would
@@ -288,11 +257,11 @@ const ACTION_VOICE_LINES = {
     // Beast Form (Death-Triggered Reversion #36, replaces Grim Barrage):
     // dispatched through the generic playMoveVoice bottom-of-switch path,
     // same as claimKill above - a normal type: 'special' entry with
-    // actionId 'beastForm', no special-casing needed for the DISPATCH
-    // itself. The file it plays (beast_form.mp3) auto-chains into
-    // roar_raw.mp3 afterward via CHAINED_FOLLOWUP near the top of this
-    // file - see that table's own comment for the full two-part reasoning.
-    beastForm: 'beast_form',
+    // actionId 'beastForm', no special-casing needed. beast_cast.wav is a
+    // single merged file (his spoken cast line followed by a roar, both
+    // combined into one clip during recording) - no chained-playback logic
+    // needed on the code side.
+    beastForm: 'beast_cast',
   },
   illyra: {
     mirageMark: 'mark',
@@ -433,15 +402,5 @@ export function allVoiceFilePaths() {
   // DRAXUS_STRIKE_LINES needs to be folded in explicitly here or these 3
   // files would never be preloaded at all, only fetched live on first use.
   for (const filename of Object.values(DRAXUS_STRIKE_LINES)) paths.push(`assets/voice/draxus/${filename}.mp3`);
-  // Chained follow-up clips (Grimtal's Beast Form roar) - same reasoning as
-  // DRAXUS_STRIKE_LINES above, a file only ever referenced from
-  // CHAINED_FOLLOWUP's own table, never appearing as a line in
-  // VOICE_LINES/ACTION_VOICE_LINES itself, so it needs to be folded in
-  // explicitly here or it would never be preloaded, only fetched live the
-  // first time the cast line actually finishes playing.
-  for (const [key, followupLine] of Object.entries(CHAINED_FOLLOWUP)) {
-    const [characterId] = key.split('/');
-    paths.push(`assets/voice/${characterId}/${followupLine}.mp3`);
-  }
   return paths;
 }
