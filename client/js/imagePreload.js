@@ -197,8 +197,11 @@ const LIFEBOND_REACTION_IMAGES = CHARACTER_IDS.map((id) => `assets/images/${id}/
 // hero gains a shield source (direct or as a side effect of another
 // mechanic), add their id here too. Zerathys added 2026-09-11 alongside
 // his own new Overcharge Collapse shield stake (+1 shield per Thunder
-// Wrath cast while overcharged, hearts<=3).
-const MOONLIT_THEFT_REACTION_IMAGES = ['athena', 'boingo', 'tharox', 'chronox', 'melyssa', 'oraclus', 'zerathys'].map(
+// Wrath cast while overcharged, hearts<=3). Grimtal added 2026-09-12 -
+// his Grim Ward dodge-reward passive converts overflow (already at max
+// hearts) into shield, a bonus-effect source same category as Oraclus's
+// Rune Vision reward.
+const MOONLIT_THEFT_REACTION_IMAGES = ['athena', 'boingo', 'tharox', 'chronox', 'melyssa', 'oraclus', 'zerathys', 'grimtal'].map(
   (id) => `assets/images/${id}/shield_stolen.jpg`
 );
 
