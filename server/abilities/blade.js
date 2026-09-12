@@ -120,7 +120,22 @@ export const actions = {
           targetCharacterId: target.id,
           amount,
         });
-        hits.push({ targetId: target.id, streak: character.special.streakCount, amountDealt: result.amountDealt, dodged: result.dodged, koTriggered: result.koTriggered });
+        // Confirmed real bug, 2026-09-12: this used to re-read
+        // character.special.streakCount HERE (after applyDamage already
+        // returned) instead of using the `amount` already captured above -
+        // normally identical, but a nested reflect/mirror counter-hit
+        // triggered BY this very strike (e.g. Rowan's Mirror Reflect
+        // bouncing 3 damage back onto Blade himself, hard enough to KO him
+        // and trigger his own Rebirth, which resets streakCount to 0 as
+        // part of its revival reset) can mutate streakCount to something
+        // else WHILE this applyDamage call is still in progress, before
+        // control even returns here - showing a mismatched "streak 0, 3
+        // dmg" line where amountDealt (correct) and streak (stale-read,
+        // wrong) silently disagreed. Using the locally-captured `amount`
+        // guarantees this entry reflects the value this specific strike
+        // actually used, regardless of what happens to the live counter as
+        // a side effect of the hit landing.
+        hits.push({ targetId: target.id, streak: amount, amountDealt: result.amountDealt, dodged: result.dodged, koTriggered: result.koTriggered });
         if (result.rebirthLogEntry && !rebirthLogEntry) rebirthLogEntry = result.rebirthLogEntry;
         if (result.mirrorLogEntry && !mirrorLogEntry) mirrorLogEntry = result.mirrorLogEntry;
         if (result.mirrorResult?.rebirthLogEntry && !rebirthLogEntry) rebirthLogEntry = result.mirrorResult.rebirthLogEntry;
