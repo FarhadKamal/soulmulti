@@ -294,12 +294,9 @@ const ACTION_SOUND = {
   lifebond: 'magic',
   grimStrike: 'sword_thud',
   skullCrack: 'bullet_hit',
-  // Death-Triggered Reversion #36 - beastForm's own cast moment is carried
-  // by its real voice line (beast_form.mp3 + chained roar_raw.mp3, see
-  // voice.js) rather than a dedicated sound effect, so it still reuses the
-  // old Grim Barrage sound here as a light layer underneath. Beast Attack
-  // has its own real dedicated sound effect now.
-  beastForm: 'grim_barrage',
+  // Death-Triggered Reversion #36 - both the transformation cast and the
+  // Beast Attack strike have their own real dedicated sound effects.
+  beastForm: 'beast_form',
   beastAttack: 'beast_attack',
   // Reuses Grimtal's spear-thrust impact sound - fitting for her own
   // spear-lunge sacrifice attack, per explicit request.
