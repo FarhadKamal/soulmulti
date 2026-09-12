@@ -184,11 +184,22 @@ export const actions = {
     label: 'Fowl Play',
     needsTarget: false,
     special: true,
-    isLegal: (character) => character.hearts <= 3 && !character.special.usedFowlPlay,
+    // Confirmed ruling, 2026-09-12: hidden entirely once no other living
+    // character exists at all (mirrors Melyssa's own Full Control
+    // isLegal), so the one-time special is never offered as a guaranteed
+    // no-op when everyone else is already KO'd. Deliberately NOT narrowed
+    // further to exclude a Clean-Slate-armed Marin - same reasoning as
+    // Melyssa's own comment on this exact boundary: Clean Slate's armed/
+    // immunity state is real per-cast side-effecting logic
+    // (tryTriggerCleanSlate), not safe to peek at from a pure isLegal
+    // check without actually consuming it. A cast that ends up blocking
+    // its only candidate that way still correctly skips arming
+    // fowlPlayActive (see execute() below), it just isn't preventable at
+    // the button-legality level the way an empty-board case is.
+    isLegal: (character, game) => character.hearts <= 3 && !character.special.usedFowlPlay
+      && Object.values(game.characters).some((c) => c.id !== character.id && !c.isKO),
     execute(character, targetId, game, log) {
       character.special.usedFowlPlay = true;
-      game.fowlPlayActive = true;
-      game.fowlPlayBoingoTurnsElapsed = 0;
       const candidates = Object.values(game.characters).filter((c) => c.id !== character.id && !c.isKO);
       // Marin's Clean Slate - confirmed ruling: "only marin clean slate
       // can protect her from chicken status" - the one exception in the
@@ -203,6 +214,19 @@ export const actions = {
       const victims = candidates.filter((c) => !tryTriggerCleanSlate(c, game, log));
       for (const victim of victims) {
         victim.isChicken = true;
+      }
+      // Confirmed real bug, 2026-09-12: game.fowlPlayActive used to be set
+      // true unconditionally, BEFORE the Clean Slate check even ran - so a
+      // cast that ends up chickenifying literally no one (every candidate
+      // Clean-Slate-blocked, or simply no other living character left)
+      // still flipped the shared flag on, starting the chicken background
+      // music and ticking down the full 3-turn window for zero visible
+      // effect (live report: "but chicken music was continue" with an empty
+      // "turned into chickens!" line). Only arm the window when at least
+      // one real victim exists.
+      if (victims.length > 0) {
+        game.fowlPlayActive = true;
+        game.fowlPlayBoingoTurnsElapsed = 0;
       }
       log.push({ type: 'special', characterId: character.id, actionId: 'fowlPlay', chickenIds: victims.map((v) => v.id) });
       return {};
