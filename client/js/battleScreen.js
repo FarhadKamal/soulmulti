@@ -2059,6 +2059,19 @@ function describeLogEntry(entry) {
         );
         return `${name(entry.characterId)} summoned their Shadow Army - ${parts.join(', ')}`;
       }
+      if (entry.actionId === 'skullCrack') {
+        // Confirmed real bug, 2026-09-12: the generic SPECIAL fallback
+        // below never mentioned damage/KO at all, even though Skull Crack
+        // genuinely deals 2 pierce damage (ignoresShield: true) and can
+        // outright KO - a live match log showed "Grimtal used their
+        // SPECIAL: Skull Crack on Blade" with no damage shown, followed
+        // immediately by "Blade used REBIRTH" with no visible cause in
+        // between, even though this exact hit was what actually KO'd him
+        // (Rebirth intercepted it). blockedBy names which mechanic (Clean
+        // Slate/Illusion) blocked the headache side effect specifically -
+        // the pierce damage itself still lands regardless of that.
+        return `${name(entry.characterId)} used their SPECIAL: Skull Crack on ${name(actualAttackTargetId(entry))}${entry.amountDealt != null ? ` - ${entry.amountDealt} damage` : ''}${entry.koTriggered ? ' - KO!' : ''}${entry.blockedBy ? `, headache blocked by ${entry.blockedBy === 'cleanSlate' ? 'Clean Slate' : 'Illusion'}` : ''}`;
+      }
       if (entry.actionId === 'bloodFrenzy') {
         // Blade's Blood Frenzy (hearts<=3 one-time special) - 2-5 random-
         // target strikes, each a full normal Blood Hunt hit (shield/dodge
