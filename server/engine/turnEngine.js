@@ -36,6 +36,16 @@ export function getAbilityModule(characterId) {
   return ABILITY_MODULES[characterId];
 }
 
+// How many characters are currently KO'd - used by Grimtal's Beast Form
+// reversion check (see finalizeAction/resolveJesterBall/tickPoisonIfAny) to
+// tell "a death happened during THIS action" apart from "no death
+// happened, he's just still transformed from earlier" via a simple before/
+// after comparison, without needing to thread a dedicated flag through
+// every possible death-causing call path in the codebase.
+export function countKO(game) {
+  return Object.values(game.characters).filter((c) => c.isKO).length;
+}
+
 // True while this character is chickenified by Boingo's Fowl Play - a
 // plain boolean flag createCharacter puts directly on every character
 // (see state.js), same pattern as skipNextTurn/skipHeadacheTurn.
@@ -321,6 +331,11 @@ function tickPoisonIfAny(character, game, log) {
     (c) => c.special?.poisonTargets?.has(character.id)
   );
   if (!caster) return;
+  // Snapshot for Grimtal's Beast Form reversion check below - same
+  // before/after comparison finalizeAction uses, needed here too since a
+  // poison tick can itself cascade (curse-mirror, Divine Judgment, Prophecy
+  // of Doom) into a death that isn't this tick's own direct target.
+  const koCountBefore = countKO(game);
   // ignoresUntargetable: true - the poison was already applied while the
   // target WAS targetable; going untargetable afterward (e.g. Velorya's
   // Lunar Eclipse) shouldn't let already-active ticks skip, same reasoning
@@ -360,14 +375,14 @@ function tickPoisonIfAny(character, game, log) {
   // Oraclus's Prophecy of Doom trigger - same deferred handling as
   // divineJudgmentTriggerLogEntry directly above.
   if (result.prophecyOfDoomTriggerLogEntry) log.push({ ...result.prophecyOfDoomTriggerLogEntry, hearts: heartsSnapshot(game) });
-  // Grimtal's Beast Form reversion (Death-Triggered Reversion #36) - a
-  // single poison tick is its own complete "burst" (one hit, no loop), so
-  // checking once right here after it resolves is correct - see
-  // finalizeAction's own comment for the full two-bugs-deep reasoning this
-  // approach is based on.
+  // Grimtal's Beast Form reversion (Death-Triggered Reversion #36) - same
+  // before/after countKO comparison as finalizeAction (see that function's
+  // own comment for the full three-bugs-deep reasoning this is based on) -
+  // confirmed real bug, 2026-09-12: an ungated version reverted him on
+  // literally the next poison tick regardless of whether anyone died.
   {
     const grimtal = game.characters.grimtal;
-    if (grimtal && grimtal.special?.beastFormActive) {
+    if (grimtal && grimtal.special?.beastFormActive && countKO(game) > koCountBefore) {
       grimtal.special.beastFormActive = false;
       grimtal.untargetable = false;
       log.push({ type: 'beast-form-end', characterId: 'grimtal', hearts: heartsSnapshot(game) });
@@ -1101,6 +1116,16 @@ export function resolveFullControl(game, log, casterCharacterId) {
 }
 
 export function executeAction(game, characterId, actionId, targetId, extra) {
+  // Snapshot BEFORE this action runs, for Grimtal's Beast Form reversion
+  // check in finalizeAction below - confirmed real bug, 2026-09-12: without
+  // this, finalizeAction's own reversion check ran unconditionally at the
+  // end of EVERY action, not just ones where a death actually happened -
+  // reverting Grimtal on the very next action after casting Beast Form
+  // regardless of what that action was, since a check keyed purely on "is
+  // beastFormActive still true" has no way to tell "a death just happened
+  // during THIS action" apart from "no death happened at all, he's just
+  // still transformed from before."
+  const koCountBefore = countKO(game);
   const effectiveTargetId = (mirageBurstTargetsChronox(game, characterId, actionId) || earthshatterMayTargetChronox(game, characterId, actionId))
     ? 'chronox' : targetId;
   const candidateRecord = buildActionAgainstChronoxRecord(game, characterId, actionId, effectiveTargetId);
@@ -1156,7 +1181,7 @@ export function executeAction(game, characterId, actionId, targetId, extra) {
       chronoxChar.special.lastActionAgainstMe = candidateRecord;
     }
   }
-  finalizeAction(game, log, result, characterId, actionId, targetId);
+  finalizeAction(game, log, result, characterId, actionId, targetId, koCountBefore);
   return result;
 }
 
@@ -1166,7 +1191,18 @@ export function executeAction(game, characterId, actionId, targetId, extra) {
 // snapshot, deferred rebirth/mirror log entries) without needing a fake
 // entry in some character's actions map. Pure extraction - executeAction's
 // own behavior is unchanged.
-export function finalizeAction(game, log, result, characterId, actionId, targetId) {
+//
+// koCountBefore: the result of countKO(game) taken BEFORE this action ran -
+// used by the Beast Form reversion check below to tell "a death actually
+// happened during THIS action" apart from "no death happened, Grimtal's
+// just still transformed from an earlier action" (confirmed real bug,
+// 2026-09-12 - see that check's own comment). Defaults to the CURRENT KO
+// count when a caller doesn't pass one explicitly, which makes the
+// before/after comparison always read as "no death happened" - the safe,
+// conservative default for any call site that can't itself have caused a
+// death (e.g. the mind-control-resist case in executeActionAsPuppet, where
+// nothing happened at all).
+export function finalizeAction(game, log, result, characterId, actionId, targetId, koCountBefore = countKO(game)) {
   // Blade's Rebirth and Athena's curse-mirror log entries are deferred
   // until here so they land AFTER the triggering attack's own log entry,
   // not before it. Rebirth can also fire on the MIRROR hit itself (curse
@@ -1226,13 +1262,21 @@ export function finalizeAction(game, log, result, characterId, actionId, targetI
   //      still a beast when that whole burst started. Confirmed ruling:
   //      immunity must hold for the ENTIRE burst/action, reverting only
   //      once it fully finishes, not at the first mid-burst death.
-  // Checking live state once here, after every nested applyDamage call this
-  // whole action could ever trigger has already completed, is the only
-  // place that's both simple AND correctly matches "the meteor rained down
-  // while he was still a beast."
+  //   3. Checking ONLY `beastFormActive` here, with no regard for whether a
+  //      death actually happened during THIS action, was ALSO wrong -
+  //      confirmed real bug, 2026-09-12, found immediately after fix #2
+  //      shipped: this ran unconditionally at the end of EVERY action, so
+  //      Grimtal reverted on the very next action after casting Beast Form
+  //      regardless of what that action even was, since nothing here could
+  //      tell "a death just happened" apart from "he's just still
+  //      transformed from before, nothing died this time." Fixed by
+  //      comparing countKO(game) against koCountBefore (captured at the
+  //      very start of executeAction, before this action ran at all) -
+  //      only reverts when that count actually went UP during this
+  //      specific action.
   {
     const grimtal = game.characters.grimtal;
-    if (grimtal && grimtal.special?.beastFormActive) {
+    if (grimtal && grimtal.special?.beastFormActive && countKO(game) > koCountBefore) {
       grimtal.special.beastFormActive = false;
       grimtal.untargetable = false;
       log.push({ type: 'beast-form-end', characterId: 'grimtal' });
@@ -1283,6 +1327,10 @@ export function executeActionAsPuppet(game, melyssaCharacterId, puppetCharacterI
 
 export function resolveJesterBall(game, holderCharacterId, choice, extra) {
   const log = [];
+  // Snapshot for Grimtal's Beast Form reversion check further down - same
+  // before/after comparison finalizeAction uses (see that function's own
+  // comment for the full reasoning).
+  const koCountBefore = countKO(game);
   const res = boingo.jesterBallResolution[choice];
   // Jester Ball explosions (Take, or an un-intercepted 5th Pass) can deal
   // real damage to whoever's currently holding it - Chronox's Rewind needs
@@ -1353,12 +1401,13 @@ export function resolveJesterBall(game, holderCharacterId, choice, extra) {
   // divineJudgmentTriggerLogEntry directly above.
   if (result?.prophecyOfDoomTriggerLogEntry) log.push(result.prophecyOfDoomTriggerLogEntry);
   // Grimtal's Beast Form reversion (Death-Triggered Reversion #36) - same
-  // once-per-whole-action check as finalizeAction's own (see that
-  // function's comment for the full two-bugs-deep reasoning) - a Jester
-  // Ball explosion can KO someone while Grimtal is transformed too.
+  // once-per-whole-action, before/after countKO check as finalizeAction's
+  // own (see that function's comment for the full three-bugs-deep
+  // reasoning) - a Jester Ball explosion can KO someone while Grimtal is
+  // transformed too.
   {
     const grimtal = game.characters.grimtal;
-    if (grimtal && grimtal.special?.beastFormActive) {
+    if (grimtal && grimtal.special?.beastFormActive && countKO(game) > koCountBefore) {
       grimtal.special.beastFormActive = false;
       grimtal.untargetable = false;
       log.push({ type: 'beast-form-end', characterId: 'grimtal' });

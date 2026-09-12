@@ -13,7 +13,7 @@ import {
   getUsableActions, getUsablePuppetActions, executeAction, isValidTarget, isValidMindControlTarget,
   isValidPuppetTarget, markCharacterActed, finalizeAction, executeActionAsPuppet,
   isMelyssaLoneDuel, LONE_DUEL_EXCEPTIONS, buildActionAgainstChronoxRecord, chronoxStateActuallyChanged,
-  resolveOraclusPredictionIfPending, isValidRuneVisionAttackerPick, isValidRuneVisionTargetPick,
+  resolveOraclusPredictionIfPending, isValidRuneVisionAttackerPick, isValidRuneVisionTargetPick, countKO,
 } from './engine/turnEngine.js';
 import { applyDamage, heartsSnapshot } from './engine/damagePipeline.js';
 import {
@@ -454,6 +454,11 @@ function executeSelfChoke(game, melyssaId, puppetId) {
   // though Self Choke's ignoresShield: true + guaranteed flat 2 means that
   // gate can never actually block it in practice, unlike a normal attack).
   const candidateRecord = buildActionAgainstChronoxRecord(game, melyssaId, 'selfChoke', puppetId);
+  // Snapshot for Grimtal's Beast Form reversion check inside finalizeAction
+  // below - see that function's own comment in turnEngine.js for the full
+  // reasoning (a death-count before/after comparison, so he only reverts
+  // when THIS action actually caused a death, not unconditionally).
+  const koCountBefore = countKO(game);
   const log = [];
   const result = applyDamage(game, log, {
     sourceCharacterId: melyssaId,
@@ -483,7 +488,7 @@ function executeSelfChoke(game, melyssaId, puppetId) {
   // resolveOraclusPredictionIfPending's own comment for why this ordering
   // matters for voice-priority arbitration.
   resolveOraclusPredictionIfPending(game, log, melyssaId, 'selfChoke', puppetId, result);
-  finalizeAction(game, log, result, melyssaId, 'selfChoke', puppetId);
+  finalizeAction(game, log, result, melyssaId, 'selfChoke', puppetId, koCountBefore);
   return result;
 }
 
