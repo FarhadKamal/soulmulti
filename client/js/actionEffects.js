@@ -395,6 +395,26 @@ export function handleLogEntryForEffects(entry, game) {
     return;
   }
 
+  // Blade's Blood Frenzy: same multi-hit dispatch shape as Grim Barrage
+  // above (independent random-target strikes, entry.hits, the SAME target
+  // can legitimately appear more than once), but each strike is a genuine
+  // Blood Hunt hit under the hood - confirmed ruling that no new victim art
+  // is needed, it should just reuse Blood Hunt's own existing claw-marks-
+  // scaled-to-streak + shake-at-3+ effect per strike (see the 'bloodHunt'
+  // block below for the single-hit version this mirrors). Uses each hit's
+  // own climbed h.streak value, NOT a shared/frozen number, since the
+  // streak genuinely increments strike-by-strike within the burst.
+  if (entry.type === 'special' && entry.actionId === 'bloodFrenzy') {
+    for (const hit of entry.hits || []) {
+      if (!isKO(hit.targetId) && !hit.dodged && hit.amountDealt > 0) {
+        applyHitFlash(hit.targetId, hit.amountDealt);
+        if (hit.streak >= 3) addEffect(hit.targetId, 'shake', EFFECT_DURATION_MS.shake);
+        addEffect(hit.targetId, 'claw', EFFECT_DURATION_MS.claw, hit.streak || 1);
+      }
+    }
+    return;
+  }
+
   if (entry.type !== 'attack' && entry.type !== 'special') return;
   const { characterId, actionId, dodged, amountDealt, streak, flip, outcome, grudgeCount, isNewTarget, wasMarked } = entry;
   // Boingo's Massive Fart can redirect a single-target attack onto a
