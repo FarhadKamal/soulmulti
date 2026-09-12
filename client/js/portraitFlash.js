@@ -41,13 +41,6 @@ const IDLE_PORTRAIT_MAX_ROUND = 3;
 // than the sound's own full length, per explicit choice.
 const EARTHSHATTER_FLASH_DURATION_MS = 4500;
 
-// Grimtal's Grim Barrage portrait stays up longer than the default flash -
-// raised to match Earthshatter's own 4.5s duration (confirmed ruling,
-// 2026-09-01), even though its sound effect itself is shorter (~2.7s, see
-// sound.js's ACTION_SOUND.grimBarrage) and it has no exclusive sound lock
-// unlike Earthshatter's.
-const GRIM_BARRAGE_FLASH_DURATION_MS = 4500;
-
 // Chronox's World Stops portrait similarly stays up longer than the
 // default flash - sized to roughly match its own voice line (~4.68s) and
 // sound effect (~4.03s, see sound.js's ACTION_SOUND.worldStops) so the
@@ -275,6 +268,16 @@ export function getPersistentPortrait(character) {
   // once this persistent override wins first, same priority position every
   // other persistent portrait here already relies on.
   if (character.id === 'draxus' && character.special?.hasRevivedOnce) return v('assets/images/draxus/alive.jpg');
+  // Grimtal's Beast Form (Death-Triggered Reversion #36) - held for the
+  // entire duration of the transformation, driven by real serialized state
+  // (beastFormActive), same shape as Velorya's own untargetable-driven
+  // hided.jpg above - it has no fixed timer, so this must be real ongoing
+  // state read directly off the broadcast, not a client-local timed flash.
+  // Overrides idle/injured/his own attack-flash entirely while active
+  // (checked at the same priority position every other persistent portrait
+  // here already occupies), reverting automatically the instant
+  // beastFormActive flips back false (see grimtal.js's registerOnAnyDeath).
+  if (character.id === 'grimtal' && character.special?.beastFormActive) return v('assets/images/grimtal/beast.jpg');
   return null;
 }
 
@@ -919,8 +922,17 @@ export function handleLogEntryForFlash(entry, game) {
       break;
     case 'claimKill':
       setFlash(characterId, 'assets/images/grimtal/claim_kill.jpg'); break;
-    case 'grimBarrage':
-      setFlash(characterId, 'assets/images/grimtal/grim_barrage.jpg', GRIM_BARRAGE_FLASH_DURATION_MS); break;
+    case 'beastForm':
+      // The persistent transformed portrait itself is handled by
+      // getPersistentPortrait's own beastFormActive check above (real
+      // state, not a timed flash, since the effect has no fixed duration) -
+      // this case only fires a brief cast-moment flash, same "cast flash
+      // AND persistent state, not either/or" pattern Rowan's Petrify
+      // already establishes just above.
+      setFlash(characterId, 'assets/images/grimtal/beast.jpg'); break;
+    case 'beastAttack':
+      if (!dodged) setFlash(characterId, 'assets/images/grimtal/beast_attack.jpg');
+      break;
     case 'mirageMark':
       setFlash(characterId, 'assets/images/illyra/mirage_mark.jpg'); break;
     case 'mirageBurst':

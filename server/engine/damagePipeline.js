@@ -218,6 +218,30 @@ export function tryIllyraDodgeStatus(target, game, log, attackerId) {
   return false;
 }
 
+// Grimtal's Beast Form (Death-Triggered Reversion #36) - while active, he's
+// immune to any NEW negative status being applied. Deliberately does NOT
+// need to be threaded into every one of the 7 other status-application
+// sites Clean Slate/Illyra's dodge already hook (Curse Strike, Time Freeze
+// x2, Hidden Mark, Silence Lock, Skull Crack) the way those two are -
+// Beast Form also sets `character.untargetable = true`, and every one of
+// those 7 is a player-PICKED target routed through turnEngine.js's
+// isValidTarget (which already rejects any untargetable character at the
+// targeting-UI layer itself, same protection Velorya's Lunar Eclipse
+// already relies on) - so he can never be legally selected as their target
+// in the first place. Only wired in explicitly where something has its OWN
+// dedicated bypass-untargetable mechanism: applyDamage's own check below
+// (covers Fowl Play's chicken status, Melyssa's Full Control, and any
+// future Environmental-Attack-shaped damage source that sets
+// ignoresUntargetable), and boingo.js's fowlPlay.execute (excludes him from
+// the chicken-victim candidate pool directly, since isChicken itself is set
+// outside applyDamage). An already-active status from BEFORE he transformed
+// is untouched either way (this only blocks fresh applications) -
+// transforming does not cleanse anything, matching Fowl Play's own
+// "in-progress state is preserved" rule elsewhere.
+export function tryBeastFormImmunity(target, game) {
+  return target.id === 'grimtal' && !!target.special?.beastFormActive;
+}
+
 export function applyDamage(game, log, {
   sourceCharacterId,
   targetCharacterId,
@@ -318,6 +342,22 @@ export function applyDamage(game, log, {
   // Untargetable is enforced primarily at the targeting UI layer; this is a
   // defensive re-check so a bug upstream can't sneak damage through.
   if (target.untargetable && !ignoresUntargetable) {
+    return result;
+  }
+
+  // Grimtal's Beast Form (Death-Triggered Reversion #36) - a hard,
+  // UNCONDITIONAL damage-immunity floor, deliberately checked AFTER the
+  // ignoresUntargetable-respecting check above rather than folded into it.
+  // Confirmed ruling: complete damage immunity while transformed, not a
+  // floor-at-1 (unlike Draxus's Deathless Fury) - and critically, this must
+  // hold even against sources that explicitly bypass untargetable (Fowl
+  // Play's chicken status, Melyssa's Full Control, any future Environmental
+  // Attack), which the plain `target.untargetable` check above alone would
+  // NOT stop, since those sources set ignoresUntargetable: true precisely
+  // to defeat that check. No `ignores*` flag can override this - it is not
+  // itself one of the ignores* flags, by design, since nothing in the game
+  // has ever needed to bypass Beast Form specifically.
+  if (tryBeastFormImmunity(target, game)) {
     return result;
   }
 

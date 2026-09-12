@@ -230,7 +230,13 @@ export function renderBattle(root, state) {
       isFrozenVisual: frozenIdsSet.has(character.id),
       isPuppet: character.id === puppetHighlightId || character.id === activePuppetId,
       isHypnotized: character.id === activePuppetId,
-      isPetrifiedOther: isPetrified && character.id !== 'rowan',
+      // Grimtal's Beast Form (Death-Triggered Reversion #36) - excluded
+      // same as Rowan himself and an already-KO'd character above: he's
+      // untargetable/transformed, "turned to stone" makes no visual sense
+      // layered on top of that, and Petrify has zero mechanical effect on
+      // anyone regardless (purely visual), so this is display-only
+      // correctness, not a defense interaction.
+      isPetrifiedOther: isPetrified && character.id !== 'rowan' && !character.special?.beastFormActive,
     }));
   });
   scroll.appendChild(board);
@@ -1422,6 +1428,16 @@ function statusBadges(character) {
       }
       break;
     case 'grimtal': {
+      // Beast Form (Death-Triggered Reversion #36) - a persistent reminder
+      // of the ongoing untargetable/immune state while active, same "one-
+      // shot cast flash alone is easy to forget several turns later"
+      // reasoning as Everbloom/Piercing Wand's own persistent badges. No
+      // duration/countdown shown since it has none - it ends on an external
+      // event (any KO anywhere), not a timer.
+      if (character.special.beastFormActive) {
+        badges.push({ text: '🐺 Beast Form', cls: 'warn', title: 'Untargetable, immune to all damage and new negative status - reverts the instant ANY character is KO\'d' });
+        break;
+      }
       // Skull Crack: 3 total casts per match - shown as REMAINING/3 (not
       // used/3, unlike Boingo's Jester Ball badge above), so the number
       // counts down to 0 as he spends them, matching how a limited-use
@@ -1959,7 +1975,7 @@ const ACTION_LABELS = {
   mirrorReflect: 'Mirror Reflect', silenceLock: 'Silence Lock', petrify: 'Petrify',
   everbloom: 'Everbloom', threefoldVeil: 'Threefold Veil', cleanSlate: 'Clean Slate',
   piercingWand: 'Piercing Wand', wandMastery: 'Wand Mastery', lifebond: 'Lifebond',
-  grimStrike: 'Grim Strike', skullCrack: 'Skull Crack', claimKill: 'Claim the Kill', grimBarrage: 'Grim Barrage',
+  grimStrike: 'Grim Strike', skullCrack: 'Skull Crack', claimKill: 'Claim the Kill', beastForm: 'Beast Form', beastAttack: 'Beast Attack',
   mirageMark: 'Mirage Mark', mirageBurst: 'Mirage Burst', mirageOverload: 'Mirage Overload',
   runeStrike: 'Rune Strike', runeVision: 'Rune Vision', runeVisionTargetPick: 'Rune Vision', prophecyOfDoom: 'Prophecy of Doom',
   mindControl: 'Mind Control', fullControl: 'Full Control',
@@ -1991,6 +2007,12 @@ function describeLogEntry(entry) {
         // enemy AND the random hearts it actually cost her this cast,
         // including if it happened to KO her too.
         return `${name(entry.characterId)} used ${actionLabel(entry.actionId)} on ${name(actualAttackTargetId(entry))}${entry.amountDealt != null ? ` - ${entry.amountDealt} damage` : ''}${entry.koTriggered ? ' - KO!' : ''} (sacrificed ${entry.selfCost} heart${entry.selfCost > 1 ? 's' : ''}${entry.selfResult?.koTriggered ? ' - KO!' : ''})`;
+      }
+      if (entry.actionId === 'beastAttack') {
+        // High/low damage tier (Death-Triggered Reversion #36) - noted
+        // explicitly since the number alone (2 vs 3) doesn't otherwise
+        // explain WHY this particular target took more/less than usual.
+        return `${name(entry.characterId)} used ${actionLabel(entry.actionId)} on ${name(actualAttackTargetId(entry))}${entry.amountDealt != null ? ` - ${entry.amountDealt} damage` : ''}${entry.isHighTier ? ' (highest hearts!)' : ''}${entry.koTriggered ? ' - KO!' : ''}`;
       }
       return `${name(entry.characterId)} used ${actionLabel(entry.actionId)} on ${name(actualAttackTargetId(entry))}${entry.amountDealt != null ? ` - ${entry.amountDealt} damage` : ''}${entry.koTriggered ? ' - KO!' : ''}`;
     case 'special':
@@ -2031,18 +2053,13 @@ function describeLogEntry(entry) {
         );
         return `${name(entry.characterId)} unleashed Earthshatter - ${parts.join(', ')}`;
       }
-      if (entry.actionId === 'grimBarrage') {
-        // 3 independent random-target hits (not pre-aggregated points like
-        // Earthshatter) - each entry in entry.hits is its own separate
-        // swing, so the SAME target can legitimately appear more than once
-        // if the random assignment landed on them repeatedly.
-        if (!entry.hits || entry.hits.length === 0) {
-          return `${name(entry.characterId)} unleashed Grim Barrage - the barrage found no one left to strike!`;
-        }
-        const parts = entry.hits.map((h) =>
-          `${name(h.targetId)} (${h.amountDealt != null ? `${h.amountDealt} dmg` : '0 dmg'}${h.koTriggered ? ' - KO!' : ''}${h.blockedBy ? `, headache blocked by ${h.blockedBy === 'cleanSlate' ? 'Clean Slate' : 'Illusion'}` : ''})`
-        );
-        return `${name(entry.characterId)} unleashed Grim Barrage - ${parts.join(', ')}`;
+      if (entry.actionId === 'beastForm') {
+        // Death-Triggered Reversion #36 - the cast itself, no target/damage
+        // of its own (that's beastAttack's own 'attack' entry below). The
+        // persistent untargetable/immune state while active is conveyed by
+        // the status badge (statusBadges below) and the tile itself no
+        // longer being clickable, not by anything in this one-shot log line.
+        return `${name(entry.characterId)} transforms into a Beast!`;
       }
       if (entry.actionId === 'shadowArmy') {
         // No single target - strikes every currently-living marked enemy
@@ -2256,6 +2273,8 @@ function describeLogEntry(entry) {
     }
     case 'eclipse-end':
       return `${name(entry.characterId)}'s Lunar Eclipse ends`;
+    case 'beast-form-end':
+      return `${name(entry.characterId)} reverts back to normal form`;
     case 'jester-ball-take':
       return `${name(entry.targetCharacterId)} took the Jester Ball${entry.amountDealt != null ? ` - -${entry.amountDealt} hearts` : ''}`;
     case 'jester-ball-pass':

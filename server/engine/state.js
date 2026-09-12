@@ -95,7 +95,7 @@ function baseSpecialFor(id) {
       // usedFowlPlay: his desperation special (hearts <= 3, confirmed
       // ruling), own dedicated one-time flag separate from usedSpecial
       // (already spoken for by Jester Ball) - same multi-special pattern
-      // as Chronox's usedWorldStops/Grimtal's usedGrimBarrage. Who's
+      // as Chronox's usedWorldStops/Grimtal's usedBeastForm. Who's
       // currently chickenified lives per-character on each victim's own
       // `isChicken` flag, and the shared countdown lives on `game`,
       // not here - see createCharacter's own comment and createGame's
@@ -345,19 +345,22 @@ function baseSpecialFor(id) {
       // the victim, matching every other caster-side effect in the
       // codebase (Akyros's marks, Athena's curseTargetCharacterId, Rowan's
       // poisonTargets).
-      // usedGrimBarrage: his desperation special (hearts <= 3, confirmed
-      // ruling) - own dedicated one-time flag, separate from usedSpecial
-      // (already spoken for by Skull Crack), same multi-special pattern as
-      // Chronox's usedWorldStops. 3 independent random-target hits, each
-      // Environmental Attack (bypasses dodge, shield still absorbs) and
-      // each rolling its own headache-roll attempt on whoever it lands on
-      // - see grimtal.js's grimBarrage action.
       // lastKillCreditSourceFor: { [victimCharacterId]: 'own' | 'unclaimed' }
       // - which counter each victim's most recent KO credit landed in,
       // needed so a Resurrection Gamble revival (Draxus's Cheat Death,
       // taxonomy #32) can roll back the exact counter that was actually
       // incremented rather than guessing. See grimtal.js's registerOnAnyDeath/
       // registerOnOtherRevived pair.
+      // beastFormActive/usedBeastForm: Beast Form (Death-Triggered
+      // Reversion #36, hearts<=3, confirmed ruling 2026-09-12, replaces the
+      // old Grim Barrage desperation special) - usedBeastForm is the
+      // one-time-use gate (own dedicated flag, separate from usedSpecial,
+      // same multi-special pattern as Skull Crack's own skullCrackUsed).
+      // beastFormActive is the live transformation flag: true means his
+      // entire normal kit is hidden in favor of the single synthetic
+      // beastAttack action, he's untargetable + fully damage-immune +
+      // immune to any NEW negative status, and he reverts the instant ANY
+      // character anywhere is KO'd (see grimtal.js's registerOnAnyDeath).
       return {
         ownKillCount: 0,
         claimedKillCount: 0,
@@ -366,8 +369,9 @@ function baseSpecialFor(id) {
         skullCrackUsed: 0,
         headacheVictimId: null,
         headacheRollPending: true,
-        usedGrimBarrage: false,
         lastKillCreditSourceFor: {},
+        beastFormActive: false,
+        usedBeastForm: false,
       };
     case 'illyra':
       // mirageMarks: Map<targetCharacterId, stackCount> - how many

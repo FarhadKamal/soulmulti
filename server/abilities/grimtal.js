@@ -5,11 +5,11 @@ import { registerOnOwnDeath } from '../engine/categories/onOwnDeath.js';
 import { registerOnOtherRevived } from '../engine/categories/onOtherRevived.js';
 import { registerOnAnyDeath } from '../engine/categories/onAnyDeath.js';
 
-// Grim Barrage: 4 independent random-target hits (raised from 3, confirmed
-// ruling), 2 damage each - see the action definition below for the full
-// reasoning.
-const GRIM_BARRAGE_TOTAL_HITS = 4;
-const GRIM_BARRAGE_DAMAGE_PER_HIT = 2;
+// Beast Attack's two discrete damage tiers (confirmed ruling, 2026-09-12,
+// "high 3 low 2") - see the beastAttack action below for the full targeting
+// rule.
+const BEAST_ATTACK_HIGH_DAMAGE = 3;
+const BEAST_ATTACK_LOW_DAMAGE = 2;
 
 // KO-branch cleanup (see engine/categories/onOwnDeath.js) - his own death
 // ends Skull Crack's pending headache immediately, no one left to have
@@ -38,7 +38,17 @@ registerOnOwnDeath('grimtal', (character) => {
 // unclaimed kill via the else branch (someone/something else's kill either
 // way, from Grimtal's perspective). Fires on EVERY death in the game except
 // his own (diedCharacterId !== 'grimtal') and only while he's alive himself
-// to receive credit.
+// to receive credit. Deliberately does NOT special-case a Beast Attack kill
+// - confirmed ruling, 2026-09-12: "grimtal every condition save for later.
+// but beast kill someone will not count it for grimtal" - a Beast Attack
+// kill IS attributed via sourceCharacterId === 'grimtal' same as any other
+// of his own kills, so without an explicit exclusion it WOULD bank toward
+// ownKillCount. Handled instead by the beastForm reversion callback further
+// down simply never reading/using ownKillCount/claimedKillCount for Beast
+// Attack's own damage formula - the counters keep incrementing in the
+// background exactly as they always did, they just have no bearing on
+// beastAttack's fixed two-tier damage, and Grim Strike's own formula only
+// ever matters again once he's back in human form anyway.
 registerOnAnyDeath((diedCharacterId, sourceCharacterId, isMirror, game) => {
   if (diedCharacterId === 'grimtal') return;
   const grimtal = game.characters.grimtal;
@@ -68,6 +78,24 @@ registerOnAnyDeath((diedCharacterId, sourceCharacterId, isMirror, game) => {
     grimtal.special.unclaimedKillCount += 1;
     grimtal.special.lastKillCreditSourceFor = { ...grimtal.special.lastKillCreditSourceFor, [diedCharacterId]: 'unclaimed' };
   }
+});
+
+// Beast Form reversion (Death-Triggered Reversion #36) - fires on EVERY
+// death in the match, checked independently of who died or who dealt the
+// killing blow. Confirmed ruling: "unless he can kill someone. or someone
+// kill someone," clarified explicitly to mean ANY kill by ANY character
+// reverts him, not just a kill he personally lands. Deliberately a SEPARATE
+// registerOnAnyDeath callback from the kill-credit one above (different
+// concern, both need to independently observe every death) - both still
+// run on the same real KO event without conflict. Nothing here touches
+// ownKillCount/claimedKillCount at all - they're exactly as they were the
+// instant he transformed.
+registerOnAnyDeath((diedCharacterId, sourceCharacterId, isMirror, game, log) => {
+  const grimtal = game.characters.grimtal;
+  if (!grimtal || !grimtal.special.beastFormActive) return;
+  grimtal.special.beastFormActive = false;
+  grimtal.untargetable = false;
+  log.push({ type: 'beast-form-end', characterId: 'grimtal' });
 });
 
 // Revival cleanup (see engine/categories/onOtherRevived.js) - his Skull
@@ -183,7 +211,13 @@ export const actions = {
   grimStrike: {
     label: 'Grim Strike',
     needsTarget: true,
-    isLegal: () => true,
+    // Hidden while beastFormActive (Death-Triggered Reversion #36) - his
+    // entire normal kit is locked out in favor of the single synthetic
+    // beastAttack action. isLegal returning false is enough on its own to
+    // hide the button (same pattern every other conditionally-hidden action
+    // in the game already uses), so no separate `hidden` flag is needed
+    // here.
+    isLegal: (character) => !character.special.beastFormActive,
     execute(character, targetId, game, log) {
       // ownKillCount: KOs he's personally landed (auto-incremented in
       // damagePipeline.js's KO branch). claimedKillCount: kills OTHERS
@@ -204,11 +238,12 @@ export const actions = {
   // that slot). Legal only while there's an actual unclaimed kill banked -
   // the button disappears entirely once everything banked has been
   // claimed, same "hidden via isLegal alone" pattern Rowan's discoverable
-  // spells use (no separate hidden field needed).
+  // spells use (no separate hidden field needed). Also hidden while
+  // beastFormActive, same reasoning as grimStrike above.
   claimKill: makeSetupAction({
     label: 'Claim the Kill',
     actionId: 'claimKill',
-    isLegal: (character) => character.special.unclaimedKillCount > 0,
+    isLegal: (character) => !character.special.beastFormActive && character.special.unclaimedKillCount > 0,
     mutate(character) {
       character.special.unclaimedKillCount -= 1;
       character.special.claimedKillCount += 1;
@@ -238,7 +273,8 @@ export const actions = {
     // jesterBallsUsed) rather than the shared usedSpecial boolean, since
     // that flag is read elsewhere as a flat "has the ONE special move been
     // used" signal and only flips true once all 3 are spent (see execute).
-    isLegal: (character) => character.special.skullCrackUsed < 3,
+    // Also hidden while beastFormActive, same reasoning as grimStrike above.
+    isLegal: (character) => !character.special.beastFormActive && character.special.skullCrackUsed < 3,
     execute(character, targetId, game, log) {
       character.special.skullCrackUsed += 1;
       if (character.special.skullCrackUsed >= 3) character.usedSpecial = true;
@@ -290,154 +326,73 @@ export const actions = {
       return result;
     },
   },
-  // Grim Barrage: his desperation special (confirmed ruling), legal only
-  // once he's genuinely on the brink (hearts <= 3 - same gate direction as
-  // Tharox's Earthshatter/Illyra's Mirage Overload, a comeback move, not an
-  // opener). No-target, one-time use, own dedicated usedGrimBarrage flag
-  // (separate from usedSpecial, already spoken for by Skull Crack).
-  //
-  // 4 independent hits (raised from 3, confirmed ruling), each fully
-  // independently random across every currently-alive OPPONENT (same "no
-  // even split, no minimum-per-target guarantee" reasoning as
-  // Earthshatter/Mirage Overload - a lopsided or single-target result,
-  // even all 4 landing on one unlucky opponent, is completely normal, not
-  // a bug). Modeled as separate hit EVENTS (not pre-aggregated damage
-  // points like Earthshatter) since the headache-arming attempt needs to
-  // be gated per hit. The FIRST hit that successfully arms the headache
-  // wins and locks it in for the rest of the cast - later hits never
-  // re-attempt or overwrite it, even if they themselves also land real
-  // damage (confirmed ruling, corrected 2026-08-31 from an earlier "each
-  // hit rolls independently" version, which let a later successful hit
-  // silently overwrite an earlier one - live report: repeatedly never
-  // seeing headache land from this move traced back to exactly this).
-  //
-  // Each hit is Environmental Attack (ignoresDodge: true, shield still
-  // absorbs normally - NOT ignoresShield, unlike Skull Crack's own pierce
-  // damage) - confirmed ruling, deliberately different shield interaction
-  // from his normal-turn Skull Crack.
-  grimBarrage: {
-    label: 'Grim Barrage',
+  // Beast Form (Death-Triggered Reversion #36, confirmed ruling 2026-09-12,
+  // replaces the old Grim Barrage desperation special): hearts<=3, one-time
+  // use, same gate direction as Tharox's Earthshatter/Illyra's Mirage
+  // Overload (a comeback move, not an opener). No-target cast - this IS the
+  // transformation itself, not an attack. While active (beastFormActive),
+  // his entire normal kit is hidden (grimStrike/claimKill/skullCrack all
+  // check this flag in their own isLegal above) in favor of the single
+  // synthetic beastAttack action below. Untargetable is set directly here,
+  // which alone already blocks every player-picked-target status/attack in
+  // the game (isValidTarget rejects any untargetable character). Full
+  // damage immunity is additionally enforced unconditionally inside
+  // applyDamage itself (tryBeastFormImmunity, damagePipeline.js) to also
+  // cover the few things with their own dedicated bypass-untargetable
+  // mechanism (Fowl Play's chicken status, Melyssa's Full Control) - see
+  // that function's own comment for the full boundary. Reverts to human
+  // form the
+  // instant ANY character anywhere is KO'd - see the registerOnAnyDeath
+  // callback near the top of this file - NOT a fixed duration, NOT tied to
+  // his own turns, NOT consumed specifically by his own successful kill
+  // (any kill by anyone ends it).
+  beastForm: {
+    label: 'Beast Form',
     needsTarget: false,
     special: true,
-    isLegal: (character) => character.hearts <= 3 && !character.special.usedGrimBarrage,
+    isLegal: (character) => character.hearts <= 3 && !character.special.usedBeastForm,
     execute(character, targetId, game, log) {
-      character.special.usedGrimBarrage = true;
-      let others = Object.values(game.characters).filter((c) => c.id !== character.id && !c.isKO);
-      const hits = [];
-      // Confirmed ruling (2026-08-31, corrected from "each hit rolls
-      // independently"): the FIRST hit in the sequence that successfully
-      // arms the headache wins and locks it in for the rest of this cast -
-      // no later hit, successful or not, re-attempts or overwrites it.
-      // Without this, a later hit that dealt 0 damage (fully shield-
-      // absorbed) or KO'd its target left the flags untouched (correct),
-      // but a later hit that ALSO landed real damage on a valid target
-      // would silently re-arm/overwrite an already-armed headache - not
-      // wrong exactly, just not what was wanted: the first success should
-      // be the one that counts, full stop.
-      let headacheArmed = false;
-      // First mid-cast Rebirth save (if any) - surfaced as the top-level
-      // rebirthLogEntry return field, matching the single-field contract
-      // finalizeAction() already checks for every other ability (see
-      // turnEngine.js) - same fix as Earthshatter's own (2026-08-31). Same
-      // reasoning extended to mirrorReflectLogEntry (Rowan's Mirror
-      // Reflect, safe to capture only the first occurrence since it
-      // self-deactivates the instant it fires - rowan.js's own
-      // mirrorReflectActive = false) - each hit's own result already
-      // carries these via the `...result` spread below, but finalizeAction
-      // only ever reads them from the top-level return value, never from
-      // inside an array element.
-      //
-      // Athena's curse-mirror needs full aggregation instead (mirrorTotal
-      // below, not a single captured entry) - unlike Rebirth/Mirror
-      // Reflect, her curse has no self-deactivating flag, so more than one
-      // of Grim Barrage's up-to-4 hits landing on the cursed caster each
-      // independently triggers a fresh mirror hit. Capturing only the
-      // first silently dropped every subsequent mirror hit's damage from
-      // the log line while the damage itself still correctly applied to
-      // hearts - same real bug confirmed on Earthshatter's own identical
-      // pattern (2026-09-01 live report), fixed here too for consistency.
-      let rebirthLogEntry = null;
-      let mirrorReflectLogEntry = null;
-      let mirrorTotal = 0;
-      let mirrorTargetId = null;
-      let mirrorKoTriggered = false;
-      let mirrorRevived = false;
-      // Athena's Divine Judgment trigger - same "first occurrence wins" as
-      // rebirthLogEntry/mirrorReflectLogEntry above (self-clears the
-      // instant it fires, so only the first hit that triggers it can ever
-      // matter). Added 2026-09-05, alongside the identical fix to Mirage
-      // Burst (illyra.js) after the same gap was confirmed live there.
-      let divineJudgmentTriggerLogEntry = null;
-      // Oraclus's Prophecy of Doom trigger - same "first occurrence wins"
-      // reasoning as divineJudgmentTriggerLogEntry directly above.
-      let prophecyOfDoomTriggerLogEntry = null;
-      for (let i = 0; i < GRIM_BARRAGE_TOTAL_HITS; i++) {
-        if (others.length === 0) break;
-        const target = others[Math.floor(Math.random() * others.length)];
-        const result = applyDamage(game, log, {
-          sourceCharacterId: character.id,
-          targetCharacterId: target.id,
-          amount: GRIM_BARRAGE_DAMAGE_PER_HIT,
-          ignoresDodge: true,
-          // Confirmed bug (2026-08-31, live report: "is grimtal barrage
-          // not landing on velorya eclipse? it is environmental attack") -
-          // Environmental Attack bypasses Untargetable entirely by
-          // definition (same taxonomy rule Earthshatter/Mirage Burst
-          // already follow), but this call was missing the flag - a hit
-          // randomly landing on an untargetable target (e.g. Velorya
-          // mid-Lunar Eclipse) silently no-op'd instead, wasting the swing.
-          ignoresUntargetable: true,
-        });
-        // Same landed/blocked/headache-arming logic as Skull Crack's own
-        // execute above, just repeated per hit instead of once - skipped
-        // entirely once headacheArmed is already true. blockedBy names
-        // WHICH mechanic actually fired (confirmed bug, 2026-09-01 - see
-        // chronox.js's identical fix/comment on Time Freeze for the full
-        // reasoning).
-        let blockedBy = null;
-        if (!headacheArmed && result.amountDealt > 0 && !result.koTriggered) {
-          if (tryTriggerCleanSlate(target, game, log)) {
-            blockedBy = 'cleanSlate';
-          } else if (tryIllyraDodgeStatus(target, game, log, character.id)) {
-            blockedBy = 'illyra';
-          } else {
-            character.special.headacheVictimId = target.id;
-            character.special.headacheRollPending = true;
-            headacheArmed = true;
-          }
-        }
-        if (result.rebirthLogEntry && !rebirthLogEntry) rebirthLogEntry = result.rebirthLogEntry;
-        if (result.mirrorLogEntry) {
-          mirrorTotal += result.mirrorLogEntry.amount;
-          mirrorTargetId = result.mirrorLogEntry.toCharacterId;
-          mirrorKoTriggered = result.mirrorLogEntry.koTriggered;
-          mirrorRevived = result.mirrorLogEntry.revived;
-        }
-        if (result.mirrorResult?.rebirthLogEntry && !rebirthLogEntry) rebirthLogEntry = result.mirrorResult.rebirthLogEntry;
-        if (result.mirrorReflectLogEntry && !mirrorReflectLogEntry) mirrorReflectLogEntry = result.mirrorReflectLogEntry;
-        if (result.mirrorReflectResult?.rebirthLogEntry && !rebirthLogEntry) rebirthLogEntry = result.mirrorReflectResult.rebirthLogEntry;
-        if (result.divineJudgmentTriggerLogEntry && !divineJudgmentTriggerLogEntry) divineJudgmentTriggerLogEntry = result.divineJudgmentTriggerLogEntry;
-        if (result.prophecyOfDoomTriggerLogEntry && !prophecyOfDoomTriggerLogEntry) prophecyOfDoomTriggerLogEntry = result.prophecyOfDoomTriggerLogEntry;
-        hits.push({ targetId: target.id, blockedBy, ...result });
-        // A hit that KO's its target removes them from the pool for any
-        // REMAINING hits this same cast - confirmed ruling (2026-08-31,
-        // live report: a 4-hit barrage killed Tharox on hit 1, then wasted
-        // all 3 remaining hits re-rolling his already-dead body instead of
-        // redirecting to Illyra, the only other living opponent). Tharox's
-        // own Earthshatter has the same fix (2026-08-31) for the same
-        // underlying reason.
-        if (result.koTriggered) {
-          others = others.filter((c) => c.id !== target.id);
-        }
-      }
-      log.push({ type: 'special', characterId: character.id, actionId: 'grimBarrage', hits });
-      const mirrorLogEntry = mirrorTargetId
-        ? {
-          type: 'curse-mirror', fromCharacterId: 'athena', toCharacterId: mirrorTargetId,
-          amount: mirrorTotal, koTriggered: mirrorKoTriggered, revived: mirrorRevived,
-        }
-        : null;
-      return { hits, rebirthLogEntry, mirrorLogEntry, mirrorReflectLogEntry, divineJudgmentTriggerLogEntry, prophecyOfDoomTriggerLogEntry };
+      character.special.usedBeastForm = true;
+      character.special.beastFormActive = true;
+      character.untargetable = true;
+      log.push({ type: 'special', characterId: character.id, actionId: 'beastForm' });
+      return {};
+    },
+  },
+  // Beast Attack: the ONLY action available while beastFormActive - a
+  // fully normal Physical Attack (shield absorbs, dodge mechanics apply,
+  // no bypass of any kind), manually targeted. Damage is entirely
+  // independent of Grim Strike's own kill-count formula (confirmed ruling:
+  // "grimtal every condition save for later. but beast kill someone will
+  // not count it for grimtal") - two discrete tiers based on the TARGET's
+  // current hearts, not his own stats: BEAST_ATTACK_HIGH_DAMAGE against
+  // whoever currently holds the STRICTLY highest hearts among valid
+  // targets, BEAST_ATTACK_LOW_DAMAGE against everyone else. A tie for
+  // highest hearts defaults every tied character to the low tier, not the
+  // high tier (confirmed ruling: "if multiple player same max health. then
+  // also lower damage"). hidden: true keeps it out of the normal legal-
+  // action listing on its own (mirrors Zerathys's soulSwapWrath) - it's
+  // only ever surfaced by the client because it's the SOLE legal action
+  // once beastFormActive is true (every other action's own isLegal returns
+  // false), not because anything special-cases it into visibility.
+  beastAttack: {
+    label: 'Beast Attack',
+    needsTarget: true,
+    hidden: true,
+    isLegal: (character) => !!character.special.beastFormActive,
+    execute(character, targetId, game, log) {
+      const others = Object.values(game.characters).filter((c) => c.id !== character.id && !c.isKO);
+      const highestHearts = others.length > 0 ? Math.max(...others.map((c) => c.hearts)) : 0;
+      const highestHolders = others.filter((c) => c.hearts === highestHearts);
+      const isHighTier = highestHolders.length === 1 && highestHolders[0].id === targetId;
+      const amount = isHighTier ? BEAST_ATTACK_HIGH_DAMAGE : BEAST_ATTACK_LOW_DAMAGE;
+      const result = applyDamage(game, log, {
+        sourceCharacterId: character.id,
+        targetCharacterId: targetId,
+        amount,
+      });
+      log.push({ type: 'attack', characterId: character.id, actionId: 'beastAttack', targetId, isHighTier, ...result });
+      return result;
     },
   },
 };

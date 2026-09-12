@@ -294,7 +294,12 @@ const ACTION_SOUND = {
   lifebond: 'magic',
   grimStrike: 'sword_thud',
   skullCrack: 'bullet_hit',
-  grimBarrage: 'grim_barrage',
+  // Death-Triggered Reversion #36 - reusing existing files for now (the old
+  // Grim Barrage sound for the transformation moment, his own normal-hit
+  // sound for Beast Attack strikes); user said "we will find" a dedicated
+  // sound later, so these are placeholders, not a final decision.
+  beastForm: 'grim_barrage',
+  beastAttack: 'sword_thud',
   // Reuses Grimtal's spear-thrust impact sound - fitting for her own
   // spear-lunge sacrifice attack, per explicit request.
   divineSacrifice: 'sword_thud',

@@ -1339,14 +1339,26 @@ function chooseMarinMove(character, game, usable) {
 // as Rowan's Arcane Study fallback.
 function chooseGrimtalMove(character, game, usable) {
   const byId = Object.fromEntries(usable.map((a) => [a.actionId, a]));
-  // Grim Barrage: a desperation move, only legal once hearts <= 3. No-target,
+  // While beastFormActive, getLegalActions only ever offers beastAttack -
+  // targets the biggest current threat (falling back to lowest hearts),
+  // same priority order Skull Crack's own targeting below already uses.
+  // No lethal-kill-first check needed here the way Grim Strike gets one
+  // below - Beast Attack's damage is fixed per tier regardless of target,
+  // so there's no "undercounting his real damage" risk to guard against.
+  if (byId.beastAttack) {
+    const targets = validTargetsFor(game, character, 'beastAttack');
+    const targetId = biggestThreatTarget(game, character, targets) || lowestHeartsTarget(game, targets) || pickRandom(targets);
+    return { actionId: 'beastAttack', targetId };
+  }
+  // Beast Form (Death-Triggered Reversion #36, replaces the old Grim
+  // Barrage): a desperation move, only legal once hearts <= 3. No-target,
   // no real downside to casting it the instant it's available - same "cast
   // eagerly once legal" policy as every other one-time desperation special
   // in the roster (World Stops, Earthshatter, Fowl Play). Checked before
   // even Claim the Kill - free value with zero opportunity cost beats a
   // permanent-upside pick that still costs the turn either way.
-  if (byId.grimBarrage) {
-    return { actionId: 'grimBarrage', targetId: null };
+  if (byId.beastForm) {
+    return { actionId: 'beastForm', targetId: null };
   }
   // Secure an outright kill with Grim Strike before Claim the Kill - same
   // fix/reasoning as chooseRowanMove's own check (confirmed bug: a "no

@@ -200,7 +200,18 @@ export const actions = {
       && Object.values(game.characters).some((c) => c.id !== character.id && !c.isKO),
     execute(character, targetId, game, log) {
       character.special.usedFowlPlay = true;
-      const candidates = Object.values(game.characters).filter((c) => c.id !== character.id && !c.isKO);
+      // Grimtal's Beast Form (Death-Triggered Reversion #36, confirmed
+      // 2026-09-12: "he cannot be chicken / stone during beast form") - a
+      // second exception alongside Marin's Clean Slate below. Filtered out
+      // of the candidate pool entirely up front (a plain boolean check, not
+      // a stateful consuming trigger like tryTriggerCleanSlate, so it's
+      // safe to just filter rather than route through a per-candidate
+      // try-style call) - he's simply never chickenified at all while
+      // transformed, same "excluded entirely, not chickenified-then-
+      // reverted" shape as a blocked Marin.
+      const candidates = Object.values(game.characters).filter(
+        (c) => c.id !== character.id && !c.isKO && !c.special?.beastFormActive
+      );
       // Marin's Clean Slate - confirmed ruling: "only marin clean slate
       // can protect her from chicken status" - the one exception in the
       // whole roster. Checked per-candidate the same way every other

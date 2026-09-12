@@ -79,6 +79,19 @@ export function getLegalActions(character, game) {
   }
   const mod = ABILITY_MODULES[character.id];
   if (!mod) return [];
+  // Grimtal's Beast Form (Death-Triggered Reversion #36) - same override
+  // shape as isChickenified above: while transformed, the ONLY legal action
+  // is beastAttack, short-circuiting the generic filter below entirely.
+  // beastAttack itself is declared with `hidden: true` in grimtal.js (same
+  // convention as Zerathys's soulSwapWrath - a real actions-map entry that
+  // should never appear via the generic per-hero filter, only ever surfaced
+  // through an explicit override like this one), so without this branch the
+  // generic `!def.hidden` filter below would exclude it and leave him with
+  // ZERO legal actions while transformed - confirmed caught before ever
+  // shipping, by re-reading this exact filter line during implementation.
+  if (character.id === 'grimtal' && character.special.beastFormActive) {
+    return [{ actionId: 'beastAttack', ...mod.actions.beastAttack }];
+  }
   const silenced = isSilenced(character, game);
   return Object.entries(mod.actions)
     .filter(([, def]) => !def.hidden && def.isLegal(character, game) && !(silenced && def.special))

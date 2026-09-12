@@ -378,26 +378,9 @@ export function handleLogEntryForEffects(entry, game) {
     return;
   }
 
-  // Grim Barrage: same "one overwhelming blow, scaled up to hit everyone
-  // it landed on" reuse of the bigshatter effect as Earthshatter above -
-  // 3 independent random-target hits rather than pre-aggregated points, so
-  // the SAME target can legitimately fire this effect more than once in a
-  // row if the random assignment landed on them repeatedly (each entry in
-  // entry.hits is its own separate swing).
-  if (entry.type === 'special' && entry.actionId === 'grimBarrage') {
-    for (const hit of entry.hits || []) {
-      if (!isKO(hit.targetId) && hit.amountDealt > 0) {
-        applyHitFlash(hit.targetId, hit.amountDealt);
-        addEffect(hit.targetId, 'shake', EFFECT_DURATION_MS.shake);
-        addEffect(hit.targetId, 'bigshatter', EFFECT_DURATION_MS.bigshatter);
-      }
-    }
-    return;
-  }
-
-  // Blade's Blood Frenzy: same multi-hit dispatch shape as Grim Barrage
-  // above (independent random-target strikes, entry.hits, the SAME target
-  // can legitimately appear more than once), but each strike is a genuine
+  // Blade's Blood Frenzy: independent random-target strikes, entry.hits,
+  // the SAME target can legitimately appear more than once - each strike is
+  // a genuine
   // Blood Hunt hit under the hood - confirmed ruling that no new victim art
   // is needed, it should just reuse Blood Hunt's own existing claw-marks-
   // scaled-to-streak + shake-at-3+ effect per strike (see the 'bloodHunt'
@@ -416,7 +399,7 @@ export function handleLogEntryForEffects(entry, game) {
   }
 
   if (entry.type !== 'attack' && entry.type !== 'special') return;
-  const { characterId, actionId, dodged, amountDealt, streak, flip, outcome, grudgeCount, isNewTarget, wasMarked } = entry;
+  const { characterId, actionId, dodged, amountDealt, streak, flip, outcome, grudgeCount, isNewTarget, wasMarked, isHighTier } = entry;
   // Boingo's Massive Fart can redirect a single-target attack onto a
   // DIFFERENT character than the one actually chosen - entry.targetId is
   // always the ORIGINAL choice, entry.targetCharacterId (present whenever
@@ -661,6 +644,17 @@ export function handleLogEntryForEffects(entry, game) {
   // the portrait flash (normal_attack.jpg) already carries the hit itself.
   if (actionId === 'grimStrike' && targetId && !dodged && amountDealt >= 2) {
     addEffect(targetId, 'shake', EFFECT_DURATION_MS.shake);
+  }
+
+  // Beast Attack (Death-Triggered Reversion #36): reuses Blade's own
+  // claw/blood-slash effect - a natural fit since it's also bare claws,
+  // confirmed ruling ("yes - reuse the existing claw/blood-slash effect").
+  // No streak to scale off (unlike Blade's own Blood Hunt), so a fixed
+  // claw count is used instead - shakes on the high-damage tier only, same
+  // "escalation cue on the bigger hit" reasoning as Grim Strike above.
+  if (actionId === 'beastAttack' && targetId && !dodged && amountDealt > 0) {
+    if (isHighTier) addEffect(targetId, 'shake', EFFECT_DURATION_MS.shake);
+    addEffect(targetId, 'claw', EFFECT_DURATION_MS.claw, 3);
   }
 
   // Divine Sacrifice, victim side: a searing crimson-gold pierce/gash mark
