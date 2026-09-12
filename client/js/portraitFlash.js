@@ -86,6 +86,14 @@ const SHADOW_ARMY_FLASH_DURATION_MS = 4500;
 // simultaneous reactions across the board).
 const LIFEBOND_FLASH_DURATION_MS = 4500;
 
+// Blade's Blood Frenzy (hearts<=3 one-time special) - same 4.5s multi-beat
+// scale as Shadow Army above, covering his own cast pose for the whole
+// 2-5 strike burst duration (no dedicated per-victim art - confirmed
+// ruling: these are otherwise ordinary Blood Hunt hits, just randomly
+// targeted, so the normal generic hit-flash/shake effect already covers
+// each victim without any new asset work).
+const BLOOD_FRENZY_FLASH_DURATION_MS = 4500;
+
 // Velorya's Moonlit Theft (Siphon #35) - same 4.5s multi-beat scale as
 // Lifebond/Shadow Army above (one cast, multiple simultaneous victim
 // reactions, though here only ever the shield-capable subset of heroes).
@@ -806,6 +814,8 @@ export function handleLogEntryForFlash(entry, game) {
     case 'bloodHunt':
       if (!dodged) setFlash(characterId, 'assets/images/blade/strike.jpg');
       break;
+    case 'bloodFrenzy':
+      setFlash(characterId, 'assets/images/blade/blood_frenzy.jpg', BLOOD_FRENZY_FLASH_DURATION_MS); break;
     case 'grudgeStrike':
       if (!dodged) setFlash(characterId, 'assets/images/kaelis/grudge.jpg');
       break;

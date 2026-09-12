@@ -102,7 +102,18 @@ function baseSpecialFor(id) {
       // fowlPlayHitsOnBoingo counter.
       return { jesterBallsUsed: 0, usedFowlPlay: false };
     case 'blade':
-      return { streakTargetId: null, streakCount: 0, rebirthUsed: false };
+      // bloodFrenzyUnleashed: permanent, one-way flag flipped by his
+      // hearts<=3 one-time special (Blood Frenzy, confirmed ruling
+      // 2026-09-12) - once true, Blood Hunt's own streak-reset-on-target-
+      // switch rule (executed in bloodHunt.execute) is permanently disabled
+      // for the REST OF THE MATCH, not just during the burst itself.
+      // usedBloodFrenzy: separate one-time gate (same reasoning as every
+      // other hearts<=3 special's own dedicated flag, e.g. Tharox's
+      // usedEarthshatter) - usedSpecial stays reserved for Rebirth.
+      return {
+        streakTargetId: null, streakCount: 0, rebirthUsed: false,
+        bloodFrenzyUnleashed: false, usedBloodFrenzy: false,
+      };
     case 'athena':
       // divineJudgmentTargetId: her hearts<=3 one-time special's marked
       // victim - completely independent of curseTargetCharacterId above

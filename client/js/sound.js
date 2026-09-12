@@ -253,6 +253,7 @@ const ACTION_SOUND = {
   fowlPlay: 'chicken_cast',
   chickenAttack: 'chicken_attack',
   bloodHunt: 'sword',
+  bloodFrenzy: 'sword',
   curseStrike: 'curse',
   divineRestore: 'divinerestore',
   selfChoke: 'self_choke',

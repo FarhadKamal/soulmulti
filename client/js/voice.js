@@ -172,6 +172,7 @@ const ACTION_VOICE_LINES = {
   zerathys: { chargeUp: 'charge', thunderWrath: 'release', soulSwap: 'soul_swap' },
   tharox: { titanToss: 'titan_toss', titanSmash: 'titan_smash', glorySmash: 'glory', earthshatter: 'earthshatter' },
   akyros: { hiddenMark: 'hidden_mark', shadowExecution: 'shadow', shadowArmy: 'call_army' },
+  blade: { bloodFrenzy: 'blood_frenzy' },
   // mindControl's line fires from main.js's dedicated 'mind-control-select'
   // sound branch (via playMoveVoice(entry.characterId, 'mindControl')), not
   // the generic bottom-of-switch call every other actionId uses - selection

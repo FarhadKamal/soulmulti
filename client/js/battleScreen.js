@@ -1337,6 +1337,14 @@ function statusBadges(character) {
       break;
     case 'blade':
       if (character.special.streakCount > 0) badges.push({ text: `Streak x${character.special.streakCount}`, cls: 'warn' });
+      if (character.special.bloodFrenzyUnleashed) {
+        // Persistent reminder that Blood Frenzy's permanent effect (streak
+        // never resets on a target switch, for the rest of the match) is
+        // active - a one-shot cast flash alone would be easy to forget
+        // about several turns later, same "ongoing state deserves an
+        // ongoing badge" reasoning as Everbloom/Piercing Wand above.
+        badges.push({ text: '🩸', title: 'Blood Frenzy unleashed - Blood Hunt streak never resets, even on a new target' });
+      }
       break;
     case 'kaelis':
       if (character.special.ashkaHealsRemaining > 0) {
@@ -1939,6 +1947,7 @@ const ACTION_LABELS = {
   smash: 'Smash', titanToss: 'Titan Toss', titanSmash: 'Titan Smash', glorySmash: 'Glory Smash', earthshatter: 'Earthshatter',
   chargeUp: 'Charge Up', thunderWrath: 'Thunder Wrath', soulSwap: 'Soul Swap', soulSwapWrath: 'Thunder Wrath (free)',
   hiddenMark: 'Hidden Mark', fatalSlash: 'Fatal Slash', shadowExecution: 'Shadow Execution', shadowArmy: 'Shadow Army',
+  bloodFrenzy: 'Blood Frenzy',
   lunarStrike: 'Lunar Strike', moonstep: 'Moonstep', lunarEclipse: 'Lunar Eclipse', moonlitTheft: 'Moonlit Theft',
   chaosGamble: 'Chaos Gamble', jesterBall: 'Jester Ball', fowlPlay: 'Fowl Play', chickenAttack: 'Chicken Attack', bloodHunt: 'Blood Hunt',
   curseStrike: 'Curse Strike', divineRestore: 'Divine Restore', divineSacrifice: 'Divine Sacrifice', divineJudgment: 'Divine Judgment',
@@ -2049,6 +2058,24 @@ function describeLogEntry(entry) {
           `${name(h.targetId)} (${h.amountDealt != null ? `${h.amountDealt} dmg` : '0 dmg'}${h.koTriggered ? ' - KO!' : ''})`
         );
         return `${name(entry.characterId)} summoned their Shadow Army - ${parts.join(', ')}`;
+      }
+      if (entry.actionId === 'bloodFrenzy') {
+        // Blade's Blood Frenzy (hearts<=3 one-time special) - 2-5 random-
+        // target strikes, each a full normal Blood Hunt hit (shield/dodge
+        // apply, unlike Shadow Army's bypass-everything hits above), streak
+        // climbing WITHIN the burst itself (entry.hits[i].streak, see
+        // blade.js's own execute()). Empty hits only if every enemy was
+        // already KO'd/untargetable the instant this resolved - shouldn't
+        // be reachable in real play (isLegal only gates on hearts/one-time-
+        // use, not on a live target existing), but guarded the same way as
+        // every other multi-hit special's own empty-hits edge case.
+        if (!entry.hits || entry.hits.length === 0) {
+          return `${name(entry.characterId)} unleashed Blood Frenzy, but no one was left to strike!`;
+        }
+        const parts = entry.hits.map((h) =>
+          `${name(h.targetId)} (streak ${h.streak}${h.dodged ? ' - dodged!' : h.amountDealt != null ? `, ${h.amountDealt} dmg` : ''}${h.koTriggered ? ' - KO!' : ''})`
+        );
+        return `${name(entry.characterId)} unleashed Blood Frenzy - ${parts.join(', ')}`;
       }
       if (entry.actionId === 'petrify') {
         // Petrify (Rowan's hearts<=3 one-time bonus action) - its own

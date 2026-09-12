@@ -29,6 +29,7 @@ const FLASH_IMAGES = [
   'assets/images/blade/alive.jpg',
   'assets/images/blade/guitar.jpg',
   'assets/images/blade/strike.jpg',
+  'assets/images/blade/blood_frenzy.jpg',
   'assets/images/boingo/circus.jpg',
   'assets/images/boingo/hardpunch.jpg',
   'assets/images/boingo/laughing.jpg',
