@@ -1,4 +1,4 @@
-import { applyDamage, tryTriggerCleanSlate, tryIllyraDodgeStatus } from '../engine/damagePipeline.js';
+import { applyDamage, applyShield, tryTriggerCleanSlate, tryIllyraDodgeStatus } from '../engine/damagePipeline.js';
 import { registerDodgeDefense } from '../engine/categories/dodgeDefenseRegistry.js';
 import { makeSetupAction } from '../engine/categories/neutralAction.js';
 import { registerOnOwnDeath } from '../engine/categories/onOwnDeath.js';
@@ -159,8 +159,20 @@ registerDodgeDefense('grimtal', {
         target.hearts += 1;
         healed += 1;
       } else {
-        target.shield += 1;
-        shielded += 1;
+        // Confirmed real bug, 2026-09-12: this used to do a raw
+        // `target.shield += 1`, bypassing applyShield()'s own Rowan Silence
+        // Lock check entirely - every other shield source in the game
+        // (Athena, Tharox, Boingo, Zerathys, Chronox) correctly does
+        // nothing while silenced, but this overflow-to-shield path silently
+        // still worked. Routed through applyShield now for consistency -
+        // non-decaying (matches this source's original always-permanent
+        // behavior, no { decaying: true } option passed). applyShield
+        // returns nothing, so `shielded` is measured from the real
+        // before/after delta rather than assumed - a silenced Grimtal
+        // correctly reports 0 shielded that point, not 1.
+        const shieldBefore = target.shield;
+        applyShield(game, target.id, 1);
+        shielded += target.shield - shieldBefore;
       }
     }
     log.push({ type: 'grim-ward-reward', targetCharacterId: target.id, healed, shielded });
