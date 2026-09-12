@@ -1280,6 +1280,30 @@ function chooseRowanMove(character, game, usable) {
 // Study fallback), and who Wand Strike hits otherwise.
 function chooseMarinMove(character, game, usable) {
   const byId = Object.fromEntries(usable.map((a) => [a.actionId, a]));
+  // Secure an outright kill FIRST, before even considering Lifebond -
+  // confirmed real bug via a live match log, 2026-09-12: Marin at 1 heart
+  // cast Lifebond (a genuine no-op - the shared average was also 1, nothing
+  // changed) while Draxus, her only other living opponent, was ALSO at
+  // exactly 1 heart - a trivial Wand Strike would have won the match
+  // outright instead. This check used to sit AFTER the Lifebond block
+  // below, so Lifebond's own early return short-circuited before ever
+  // reaching it whenever the average merely tied her current hearts (not
+  // even a real improvement). A kill available THIS turn always outranks a
+  // special cast, same "secure a kill before studying" reasoning
+  // chooseRowanMove's own identical check already uses. Marin's own
+  // Piercing Wand upgrade (Pure Attack once discovered) still deals the
+  // same 1 damage as plain Wand Strike, so no separate check needed for
+  // that variant.
+  {
+    const wandTargets = validTargetsFor(game, character, 'wandStrike');
+    const killTarget = wandTargets.find((tid) => {
+      const t = game.characters[tid];
+      return t.hearts <= Math.max(0, 1 - t.shield);
+    });
+    if (killTarget) {
+      return { actionId: 'wandStrike', targetId: killTarget };
+    }
+  }
   // Lifebond (hearts<=3 one-time special): unlike Rowan's Petrify/Akyros's
   // Shadow Army, this is NOT a free unconditional take - it can genuinely
   // hurt her if she'd end up worse off than her current hearts (e.g. she's
@@ -1296,23 +1320,6 @@ function chooseMarinMove(character, game, usable) {
     const shared = Math.floor(total / living.length);
     if (shared >= character.hearts) {
       return { actionId: 'lifebond', targetId: null };
-    }
-  }
-  // Secure an outright kill before studying - same fix/reasoning as
-  // chooseRowanMove's own identical check above (confirmed bug via a real
-  // match log: the bot kept re-discovering spells turn after turn against
-  // a 1-heart enemy instead of ending the match with a trivial 1-damage
-  // Wand Strike). Marin's own Piercing Wand upgrade (Pure Attack once
-  // discovered) still deals the same 1 damage as plain Wand Strike, so no
-  // separate check needed for that variant.
-  {
-    const wandTargets = validTargetsFor(game, character, 'wandStrike');
-    const killTarget = wandTargets.find((tid) => {
-      const t = game.characters[tid];
-      return t.hearts <= Math.max(0, 1 - t.shield);
-    });
-    if (killTarget) {
-      return { actionId: 'wandStrike', targetId: killTarget };
     }
   }
   if (byId.arcaneStudy) {
