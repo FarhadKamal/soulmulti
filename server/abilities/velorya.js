@@ -84,7 +84,21 @@ export const actions = {
     label: 'Moonlit Theft',
     needsTarget: false,
     special: true,
-    isLegal: (character) => character.hearts <= MOONLIT_THEFT_HEARTS_THRESHOLD && !character.special.usedMoonlitTheft,
+    // Confirmed ruling, 2026-09-12: "no need to show cast button if no
+    // shield available on any heros" - hidden whenever nobody else on the
+    // board currently has any shield to steal, so her one-time use is never
+    // wasted on a cast that would resolve as a total no-op. Live-checked
+    // every time this is evaluated (not cached at hearts<=3 threshold time),
+    // since enemy shield totals shift turn to turn as Chrono Guard resets/
+    // Divine Restore fires/Jester Ball rewards land - same reasoning as the
+    // bot AI's own MOONLIT_THEFT_MIN_WORTHWHILE_SHIELD gate below, just
+    // requiring >0 instead of a meaningfully-worthwhile minimum for a human
+    // player (any actual theft, however small, is still a real action - the
+    // stricter bar is reserved for the bot's own judgment call, not for
+    // hiding the button from a human who might want to snipe even 1 shield).
+    isLegal: (character, game) => character.hearts <= MOONLIT_THEFT_HEARTS_THRESHOLD
+      && !character.special.usedMoonlitTheft
+      && Object.values(game.characters).some((c) => c.id !== character.id && !c.isKO && c.shield > 0),
     execute(character, targetId, game, log) {
       character.special.usedMoonlitTheft = true;
       const others = Object.values(game.characters).filter((c) => c.id !== character.id && !c.isKO);
