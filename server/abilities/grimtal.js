@@ -84,15 +84,19 @@ registerOnAnyDeath((diedCharacterId, sourceCharacterId, isMirror, game) => {
 // "unless he can kill someone. or someone kill someone," clarified
 // explicitly to mean ANY kill by ANY character reverts him, not just a kill
 // he personally lands. NOT implemented as its own registerOnAnyDeath
-// callback here (a real bug, fixed 2026-09-12, was caused by exactly that
-// approach - see damagePipeline.js's own comment at the fix site for the
-// full ordering-bug explanation) - the actual revert now lives directly in
-// damagePipeline.js's applyDamage, checked AFTER the full runOnAnyDeath
-// dispatch for a death has completely settled, so any death-cascade side
-// effect from the SAME triggering death (Oraclus's Prophecy of Doom,
-// Athena's Divine Judgment) still sees him as immune while it resolves.
-// Nothing touches ownKillCount/claimedKillCount at all - they're exactly as
-// they were the instant he transformed.
+// callback here, and NOT checked per-applyDamage-call either - two real
+// bugs, both confirmed live and fixed 2026-09-12, ruled both of those out:
+// a per-KO-branch check can fire mid-cascade, before a LATER reaction from
+// the SAME death (Prophecy of Doom, Divine Judgment) gets to hit him, and
+// even deferring that check still isn't right, since a single multi-hit
+// burst can kill someone else mid-loop while he's still transformed, and
+// immunity must hold for that WHOLE burst, not just until its first death.
+// The actual revert now lives in turnEngine.js, checked exactly once at
+// each true top-level action-completion point (finalizeAction,
+// resolveJesterBall, tickPoisonIfAny) - see finalizeAction's own comment
+// for the full two-bugs-deep reasoning. Nothing touches
+// ownKillCount/claimedKillCount at all - they're exactly as they were the
+// instant he transformed.
 
 // Revival cleanup (see engine/categories/onOtherRevived.js) - his Skull
 // Crack headache doesn't survive a target's own revival either, same
@@ -337,10 +341,11 @@ export const actions = {
   // cover the few things with their own dedicated bypass-untargetable
   // mechanism (Fowl Play's chicken status, Melyssa's Full Control) - see
   // that function's own comment for the full boundary. Reverts to human
-  // form the instant ANY character anywhere is KO'd - see
-  // damagePipeline.js's applyDamage, right after its own runOnAnyDeath
-  // dispatch - NOT a fixed duration, NOT tied to his own turns, NOT
-  // consumed specifically by his own successful kill (any kill by anyone
+  // form the instant ANY character anywhere is KO'd - checked once per
+  // whole action, in turnEngine.js's finalizeAction (and its sibling
+  // top-level completion points) - NOT a fixed duration, NOT tied to his
+  // own turns, NOT consumed specifically by his own successful kill (any
+  // kill by anyone
   // ends it).
   beastForm: {
     label: 'Beast Form',

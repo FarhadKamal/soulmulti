@@ -360,6 +360,19 @@ function tickPoisonIfAny(character, game, log) {
   // Oraclus's Prophecy of Doom trigger - same deferred handling as
   // divineJudgmentTriggerLogEntry directly above.
   if (result.prophecyOfDoomTriggerLogEntry) log.push({ ...result.prophecyOfDoomTriggerLogEntry, hearts: heartsSnapshot(game) });
+  // Grimtal's Beast Form reversion (Death-Triggered Reversion #36) - a
+  // single poison tick is its own complete "burst" (one hit, no loop), so
+  // checking once right here after it resolves is correct - see
+  // finalizeAction's own comment for the full two-bugs-deep reasoning this
+  // approach is based on.
+  {
+    const grimtal = game.characters.grimtal;
+    if (grimtal && grimtal.special?.beastFormActive) {
+      grimtal.special.beastFormActive = false;
+      grimtal.untargetable = false;
+      log.push({ type: 'beast-form-end', characterId: 'grimtal', hearts: heartsSnapshot(game) });
+    }
+  }
 }
 
 // Rowan's Silence Lock, same victim-turn-tick shape as poison above.
@@ -1193,6 +1206,38 @@ export function finalizeAction(game, log, result, characterId, actionId, targetI
   // Oraclus's Prophecy of Doom trigger - same deferred reasoning as
   // divineJudgmentTriggerLogEntry directly above.
   if (result?.prophecyOfDoomTriggerLogEntry) log.push(result.prophecyOfDoomTriggerLogEntry);
+  // Grimtal's Beast Form reversion (Death-Triggered Reversion #36) -
+  // checked ONCE here, as the very last thing before this whole action's
+  // batch closes out, rather than per-applyDamage-call inside
+  // damagePipeline.js (two real bugs, both confirmed live and fixed
+  // 2026-09-12, before landing on this approach):
+  //   1. A per-KO-branch check inside applyDamage itself fired at whatever
+  //      point in a callback chain a death happened to resolve, which could
+  //      be BEFORE a later reaction from that SAME death (Oraclus's
+  //      Prophecy of Doom, Athena's Divine Judgment) got a chance to hit
+  //      Grimtal - stripping his immunity mid-cascade instead of only once
+  //      the WHOLE triggering death's side effects had settled.
+  //   2. Deferring that per-call check via a result field (matching every
+  //      other entry in this function) still wasn't right: a single
+  //      multi-hit burst (e.g. Prophecy of Doom's own meteor loop) can kill
+  //      someone ELSE mid-loop while Grimtal is still transformed, and a
+  //      per-KO check would revert him right then, letting the SAME
+  //      burst's LATER hits land on him for real - even though he was
+  //      still a beast when that whole burst started. Confirmed ruling:
+  //      immunity must hold for the ENTIRE burst/action, reverting only
+  //      once it fully finishes, not at the first mid-burst death.
+  // Checking live state once here, after every nested applyDamage call this
+  // whole action could ever trigger has already completed, is the only
+  // place that's both simple AND correctly matches "the meteor rained down
+  // while he was still a beast."
+  {
+    const grimtal = game.characters.grimtal;
+    if (grimtal && grimtal.special?.beastFormActive) {
+      grimtal.special.beastFormActive = false;
+      grimtal.untargetable = false;
+      log.push({ type: 'beast-form-end', characterId: 'grimtal' });
+    }
+  }
   applyEndOfActionChecks(game);
   game.log.push(...log, { type: 'end-action', round: game.round, characterId, actionId, targetId, hearts: heartsSnapshot(game) });
 }
@@ -1307,6 +1352,18 @@ export function resolveJesterBall(game, holderCharacterId, choice, extra) {
   // Oraclus's Prophecy of Doom trigger - same deferred handling as
   // divineJudgmentTriggerLogEntry directly above.
   if (result?.prophecyOfDoomTriggerLogEntry) log.push(result.prophecyOfDoomTriggerLogEntry);
+  // Grimtal's Beast Form reversion (Death-Triggered Reversion #36) - same
+  // once-per-whole-action check as finalizeAction's own (see that
+  // function's comment for the full two-bugs-deep reasoning) - a Jester
+  // Ball explosion can KO someone while Grimtal is transformed too.
+  {
+    const grimtal = game.characters.grimtal;
+    if (grimtal && grimtal.special?.beastFormActive) {
+      grimtal.special.beastFormActive = false;
+      grimtal.untargetable = false;
+      log.push({ type: 'beast-form-end', characterId: 'grimtal' });
+    }
+  }
   applyEndOfActionChecks(game);
   game.log.push(...log, { type: 'end-action', round: game.round, characterId: holderCharacterId, actionId: `jesterBall:${choice}`, hearts: heartsSnapshot(game) });
   return result;

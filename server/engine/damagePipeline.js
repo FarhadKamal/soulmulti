@@ -542,30 +542,6 @@ export function applyDamage(game, log, {
     if (anyDeathExtra?.prophecyOfDoomTriggerLogEntry) {
       result.prophecyOfDoomTriggerLogEntry = anyDeathExtra.prophecyOfDoomTriggerLogEntry;
     }
-    // Grimtal's Beast Form reversion (Death-Triggered Reversion #36) -
-    // confirmed real bug, 2026-09-12: this used to be its own
-    // registerOnAnyDeath callback (grimtal.js), registered BEFORE Oraclus's
-    // Prophecy of Doom callback (module import order in turnEngine.js:
-    // grimtal.js is imported earlier than oraclus.js) - so when Oraclus
-    // died, Grimtal's reversion fired FIRST in that same runOnAnyDeath
-    // pass, stripping his immunity/untargetable BEFORE Prophecy of Doom's
-    // own nested applyDamage calls (fired moments later in the SAME
-    // cascade, off the SAME death) got a chance to hit him - a live match
-    // log showed him reverting with no visible cause, then the meteor
-    // strike landing on him for real damage despite still being "in Beast
-    // Form" moments earlier in the log. Fixed by checking this explicitly
-    // here instead, AFTER the full runOnAnyDeath dispatch above has
-    // completely settled (including every nested applyDamage call any
-    // callback in that pass may have triggered) - so any death-cascade
-    // side effect from the SAME triggering death still sees him as
-    // immune, and only once everything from this exact KO has fully
-    // resolved does he actually revert.
-    const grimtal = game.characters.grimtal;
-    if (grimtal && grimtal.special?.beastFormActive) {
-      grimtal.special.beastFormActive = false;
-      grimtal.untargetable = false;
-      log.push({ type: 'beast-form-end', characterId: 'grimtal' });
-    }
   }
 
   // onHitLanded dispatch (see engine/categories/onHitLanded.js): Melyssa's
