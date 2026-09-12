@@ -252,7 +252,16 @@ export const actions = {
     isLegal: (character) => character.hearts <= 3 && !character.special.usedWorldStops,
     execute(character, targetId, game, log) {
       character.special.usedWorldStops = true;
-      const opponents = Object.values(game.characters).filter((c) => c.id !== character.id && !c.isKO);
+      // Grimtal's Beast Form (Death-Triggered Reversion #36) - excluded
+      // from the opponent pool entirely, same reasoning as every other
+      // bypass-everything mechanic that doesn't route through applyDamage
+      // (confirmed ruling, 2026-09-13). He's immune to any NEW negative
+      // status while transformed, and World Stops' freeze doesn't go
+      // through applyDamage/isValidTarget at all, so it would otherwise
+      // silently skip that check entirely.
+      const opponents = Object.values(game.characters).filter(
+        (c) => c.id !== character.id && !c.isKO && !(c.id === 'grimtal' && c.special?.beastFormActive)
+      );
       const frozenIds = [];
       const blockedIds = [];
       for (const opponent of opponents) {

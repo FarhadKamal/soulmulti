@@ -155,7 +155,20 @@ export const actions = {
     isLegal: (character) => character.hearts <= LIFEBOND_HEARTS_THRESHOLD && !character.special.usedLifebond,
     execute(character, targetId, game, log) {
       character.special.usedLifebond = true;
-      const living = Object.values(game.characters).filter((c) => !c.isKO);
+      // Grimtal's Beast Form (Death-Triggered Reversion #36) - confirmed
+      // ruling, 2026-09-13: "yes - Beast Form should also block Lifebond
+      // from touching him," a real gap found live (his hearts changed
+      // 2->1 mid-transformation despite supposed complete immunity, since
+      // Lifebond deliberately bypasses applyDamage entirely - see this
+      // action's own doc comment above - so the generic
+      // tryBeastFormImmunity check inside applyDamage never had a chance
+      // to run). Excluded from the pool entirely, both the sum AND the
+      // divisor - not just "untouched but still counted," which would
+      // silently skew the shared value for everyone else based on a
+      // number he never actually contributed while immune.
+      const living = Object.values(game.characters).filter(
+        (c) => !c.isKO && !(c.id === 'grimtal' && c.special?.beastFormActive)
+      );
       const total = living.reduce((sum, c) => sum + c.hearts, 0);
       const shared = Math.floor(total / living.length);
       const changes = living.map((c) => ({ characterId: c.id, before: c.hearts, after: shared }));

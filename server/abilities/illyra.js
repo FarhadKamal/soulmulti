@@ -164,7 +164,15 @@ export const actions = {
     },
     execute(character, targetId, game, log) {
       character.special.mirageOverloadUsed = true;
-      const others = Object.values(game.characters).filter((c) => c.id !== character.id && !c.isKO);
+      // Grimtal's Beast Form (Death-Triggered Reversion #36) - excluded
+      // from the target pool entirely, confirmed ruling 2026-09-13: he's
+      // immune to any NEW negative status while transformed, and planting
+      // a Mirage stack is exactly that - a status application that never
+      // routes through applyDamage/isValidTarget at all (the damage only
+      // happens later, when Mirage Burst detonates these marks).
+      const others = Object.values(game.characters).filter(
+        (c) => c.id !== character.id && !c.isKO && !(c.id === 'grimtal' && c.special?.beastFormActive)
+      );
       const aliveCount = others.length + 1; // +1 for herself
       const totalStacks = OVERLOAD_STACKS_BY_ALIVE_COUNT[aliveCount] ?? 0;
       const marks = character.special.mirageMarks;

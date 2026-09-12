@@ -1046,7 +1046,19 @@ function assignRandomTargets(puppetIds, targetPool) {
 // before the burst began).
 export function resolveFullControl(game, log, casterCharacterId) {
   const others = Object.values(game.characters).filter((c) => c.id !== casterCharacterId && !c.isKO);
-  const puppets = others.filter((c) => !tryTriggerCleanSlate(c, game, log));
+  // Grimtal's Beast Form (Death-Triggered Reversion #36) - excluded from
+  // the PUPPET pool specifically (confirmed ruling, 2026-09-13), NOT the
+  // target pool (`others` above stays untouched - he still can be a random
+  // target here, fully protected as one via applyDamage's own
+  // tryBeastFormImmunity check regardless). His kit is locked to
+  // beastAttack only while transformed, and FULL_CONTROL_ACTION_ID forces
+  // a puppet's own normal attack directly (bypassing that action's own
+  // isLegal check entirely) - without this exclusion he'd be forced to
+  // fire grimStrike, his human-form attack, contradicting the whole point
+  // of the lockout.
+  const puppets = others
+    .filter((c) => !(c.id === 'grimtal' && c.special?.beastFormActive))
+    .filter((c) => !tryTriggerCleanSlate(c, game, log));
   // melyssa.js's own isLegal already requires >=2 other living characters
   // before this action is even castable, but a puppet still needs a real
   // target pool of size >= 1 to do anything (e.g. a genuine 1v1 where the

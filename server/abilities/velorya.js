@@ -98,10 +98,18 @@ export const actions = {
     // hiding the button from a human who might want to snipe even 1 shield).
     isLegal: (character, game) => character.hearts <= MOONLIT_THEFT_HEARTS_THRESHOLD
       && !character.special.usedMoonlitTheft
-      && Object.values(game.characters).some((c) => c.id !== character.id && !c.isKO && c.shield > 0),
+      && Object.values(game.characters).some((c) => c.id !== character.id && !c.isKO && !(c.id === 'grimtal' && c.special?.beastFormActive) && c.shield > 0),
     execute(character, targetId, game, log) {
       character.special.usedMoonlitTheft = true;
-      const others = Object.values(game.characters).filter((c) => c.id !== character.id && !c.isKO);
+      // Grimtal's Beast Form (Death-Triggered Reversion #36) - same
+      // exclusion as Marin's Lifebond (confirmed ruling, 2026-09-13: "yes -
+      // Beast Form should also block" bypass-everything mechanics like
+      // this one, which never route through applyDamage's own
+      // tryBeastFormImmunity check at all). A transformed Grimtal keeps
+      // whatever shield he has, untouched.
+      const others = Object.values(game.characters).filter(
+        (c) => c.id !== character.id && !c.isKO && !(c.id === 'grimtal' && c.special?.beastFormActive)
+      );
       const changes = [];
       let stolenTotal = 0;
       for (const c of others) {

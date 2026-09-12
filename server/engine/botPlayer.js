@@ -617,8 +617,11 @@ function chooseVeloryaMove(character, game, usable) {
   // fires, Jester Ball rewards land, etc.), so holding it isn't wasted -
   // she'll take it the moment the board is actually worth raiding.
   if (byId.moonlitTheft) {
+    // Same Beast Form exclusion as velorya.js's own execute() - a
+    // transformed Grimtal's shield is untouchable, so it shouldn't count
+    // toward "is this worth casting."
     const totalEnemyShield = Object.values(game.characters)
-      .filter((c) => c.id !== character.id && !c.isKO)
+      .filter((c) => c.id !== character.id && !c.isKO && !(c.id === 'grimtal' && c.special?.beastFormActive))
       .reduce((sum, c) => sum + c.shield, 0);
     if (totalEnemyShield >= MOONLIT_THEFT_MIN_WORTHWHILE_SHIELD) {
       return { actionId: 'moonlitTheft', targetId: null };
@@ -1315,7 +1318,13 @@ function chooseMarinMove(character, game, usable) {
   // normally instead, waiting for a more favorable moment (the average
   // recalculates fresh every time this is checked).
   if (byId.lifebond) {
-    const living = Object.values(game.characters).filter((c) => !c.isKO);
+    // Same Beast Form exclusion as marin.js's own execute() - a
+    // transformed Grimtal is excluded from the pool entirely, so this
+    // predicted outcome needs to match that or the bot could misjudge
+    // whether casting is actually favorable.
+    const living = Object.values(game.characters).filter(
+      (c) => !c.isKO && !(c.id === 'grimtal' && c.special?.beastFormActive)
+    );
     const total = living.reduce((sum, c) => sum + c.hearts, 0);
     const shared = Math.floor(total / living.length);
     if (shared >= character.hearts) {
