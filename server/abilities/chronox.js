@@ -381,6 +381,26 @@ export const actions = {
       // no-op (both undefined) for every other character.
       const controlling = caster.special.controlling;
       const puppetCharacterId = caster.special.puppetCharacterId;
+      // Grimtal's Beast Form (Death-Triggered Reversion #36) needs the same
+      // "survive the restore" treatment as controlling/deathproofActive
+      // just above - a wholesale caster-object restore from a PRE-transform
+      // snapshot would silently un-transform him (flipping beastFormActive/
+      // untargetable back to false and, worse, usedBeastForm back to false
+      // too - letting him cast it again later this match even though his
+      // one-time transformation genuinely already happened). Confirmed
+      // live/reachable, 2026-09-13: rewinding a hit that predated his
+      // transform restored his higher pre-hit hearts total right alongside
+      // it, and only happened to re-trigger the transform because he was
+      // still independently hearts<=3 after the very next hit - had that
+      // next hit not dropped him back to <=3, or had usedBeastForm not
+      // reset, he'd have been silently stuck human (or worse, able to
+      // transform a second time) for no in-fiction reason. Only relevant
+      // when Grimtal himself is the rewound caster; harmless no-op
+      // (undefined) for every other character.
+      const beastFormActive = caster.special.beastFormActive;
+      const usedBeastForm = caster.special.usedBeastForm;
+      const beastFormTurnCount = caster.special.beastFormTurnCount;
+      const untargetable = caster.untargetable;
       // Draxus's Deathless Fury window flag needs the same "survive the
       // restore" treatment, for the same underlying reason - Melyssa can
       // puppet him into attacking Chronox WHILE deathproofActive is still
@@ -451,6 +471,12 @@ export const actions = {
       caster.special.controlling = controlling;
       caster.special.puppetCharacterId = puppetCharacterId;
       if (deathproofActive !== undefined) caster.special.deathproofActive = deathproofActive;
+      if (beastFormActive !== undefined) {
+        caster.special.beastFormActive = beastFormActive;
+        caster.special.usedBeastForm = usedBeastForm;
+        caster.special.beastFormTurnCount = beastFormTurnCount;
+        caster.untargetable = untargetable;
+      }
       if (record.jesterBallSnapshot !== undefined) {
         game.jesterBall = structuredClone(record.jesterBallSnapshot);
       }
