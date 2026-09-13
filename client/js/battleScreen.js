@@ -1436,6 +1436,15 @@ function statusBadges(character) {
       // event (any KO anywhere), not a timer.
       if (character.special.beastFormActive) {
         badges.push({ text: '🐺 Beast Form', cls: 'warn', title: 'Untargetable, immune to all damage and new negative status - reverts the instant ANY character is KO\'d' });
+        // Passive regeneration cadence (confirmed ruling, 2026-09-13): heals
+        // 1 heart on every OTHER of his own turn-starts, only while hearts
+        // <= 4. Shown only while that threshold still applies - once he's
+        // healthier than that, the regen can never fire again until (if
+        // ever) he drops back down, so the badge would be misleading noise.
+        if (character.hearts <= 4) {
+          const turnsUntilHeal = character.special.beastFormTurnCount % 2 === 0 ? 2 : 1;
+          badges.push({ text: `❤️‍🩹 ${turnsUntilHeal}`, title: `Regenerates 1 heart in ${turnsUntilHeal} more of his own turn${turnsUntilHeal > 1 ? 's' : ''}` });
+        }
         break;
       }
       // Skull Crack: 3 total casts per match - shown as REMAINING/3 (not
@@ -2238,6 +2247,8 @@ function describeLogEntry(entry) {
     }
     case 'ashka-heal':
       return `${name(entry.characterId)}'s Ashka heals +${entry.healed}`;
+    case 'beast-regen':
+      return `${name(entry.characterId)}'s wounds knit shut - +${entry.healed}`;
     case 'ashkas-vengeance-activate':
       return `${name(entry.characterId)}'s Ashka awakens - vengeance stirs!`;
     case 'ashkas-vengeance-strike':

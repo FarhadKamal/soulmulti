@@ -1,4 +1,4 @@
-import { applyDamage, applyShield, tryTriggerCleanSlate, tryIllyraDodgeStatus } from '../engine/damagePipeline.js';
+import { applyDamage, applyHeal, applyShield, tryTriggerCleanSlate, tryIllyraDodgeStatus } from '../engine/damagePipeline.js';
 import { registerDodgeDefense } from '../engine/categories/dodgeDefenseRegistry.js';
 import { makeSetupAction } from '../engine/categories/neutralAction.js';
 import { registerOnOwnDeath } from '../engine/categories/onOwnDeath.js';
@@ -10,6 +10,17 @@ import { registerOnAnyDeath } from '../engine/categories/onAnyDeath.js';
 // rule.
 const BEAST_ATTACK_HIGH_DAMAGE = 3;
 const BEAST_ATTACK_LOW_DAMAGE = 2;
+
+// Beast Form's own passive regeneration (confirmed ruling, 2026-09-13):
+// heals 1 heart on every OTHER of his own turn-starts while transformed
+// (2nd, 4th, 6th...), and only while hearts <= this threshold - stops
+// helping once he's already reasonably healthy again, even mid-
+// transformation. The cast turn itself does not count as turn 1 - his
+// first REAL turn-start while ALREADY transformed is turn 1 (confirmed
+// ruling: "starts fresh at his own next turn after casting"), so the 2nd
+// such turn-start is when the first heal actually fires.
+const BEAST_REGEN_HEARTS_THRESHOLD = 4;
+const BEAST_REGEN_HEAL_AMOUNT = 1;
 
 // KO-branch cleanup (see engine/categories/onOwnDeath.js) - his own death
 // ends Skull Crack's pending headache immediately, no one left to have
@@ -156,6 +167,26 @@ export function onTurnStart(character, game, log) {
   // starts, not the victim's (he IS the victim here) - a fresh cycle begins
   // for whoever hits him from this point on.
   character.special.lastHitByThisCycle.clear();
+  // Beast Form's own passive regeneration (confirmed ruling, 2026-09-13) -
+  // only relevant while transformed. Counts this as one more of his own
+  // turn-starts, then heals 1 heart on every OTHER such turn-start (2nd,
+  // 4th, 6th...), but only while hearts <= BEAST_REGEN_HEARTS_THRESHOLD -
+  // stops helping once he's already reasonably healthy again, even
+  // mid-transformation. Fires unconditionally at turn-start (same
+  // "beginCharacterTurn calls onTurnStart before any freeze/skip check"
+  // shape Kaelis's own Ashka heal-over-time already establishes) - a
+  // frozen/headache-skipped turn still counts toward the cadence, it just
+  // also still heals if it lands on an even count, matching how every
+  // other turn-start passive in the game already behaves.
+  if (character.special.beastFormActive) {
+    character.special.beastFormTurnCount += 1;
+    if (character.special.beastFormTurnCount % 2 === 0 && character.hearts <= BEAST_REGEN_HEARTS_THRESHOLD) {
+      const healed = applyHeal(game, character.id, BEAST_REGEN_HEAL_AMOUNT);
+      if (healed > 0) {
+        log.push({ type: 'beast-regen', characterId: character.id, healed, hearts: game.characters[character.id].hearts });
+      }
+    }
+  }
 }
 
 // Dodge Defense category registration (see
@@ -355,6 +386,7 @@ export const actions = {
     execute(character, targetId, game, log) {
       character.special.usedBeastForm = true;
       character.special.beastFormActive = true;
+      character.special.beastFormTurnCount = 0;
       character.untargetable = true;
       log.push({ type: 'special', characterId: character.id, actionId: 'beastForm' });
       return {};

@@ -507,6 +507,16 @@ function playLogEntrySound(entry, game) {
     playMoveVoice('kaelis', 'callAshka');
     return;
   }
+  if (entry.type === 'beast-regen') {
+    // Grimtal's Beast Form passive regeneration - not a player-picked
+    // action (no actionId on this entry type), same reasoning as
+    // ashka-heal above. Confirmed ruling: no separate sound effect layer
+    // (the existing generic healing.mp3 would clash with the deliberately
+    // unsettling/corrupted tone) - the beast_heal.mp3 voice line (a pained
+    // roar, not relief) carries the whole moment on its own.
+    playMoveVoice('grimtal', 'beastRegen');
+    return;
+  }
   if (entry.type === 'ashkas-vengeance-strike') {
     // Ashka's Vengeance bonus strike - own dedicated sfx (confirmed
     // ruling: no voice line needed for this, "no need"). Plays every time

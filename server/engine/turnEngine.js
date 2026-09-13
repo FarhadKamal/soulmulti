@@ -384,6 +384,7 @@ function tickPoisonIfAny(character, game, log) {
     const grimtal = game.characters.grimtal;
     if (grimtal && grimtal.special?.beastFormActive && countKO(game) > koCountBefore) {
       grimtal.special.beastFormActive = false;
+      grimtal.special.beastFormTurnCount = 0;
       grimtal.untargetable = false;
       log.push({ type: 'beast-form-end', characterId: 'grimtal', hearts: heartsSnapshot(game) });
     }
@@ -1290,6 +1291,7 @@ export function finalizeAction(game, log, result, characterId, actionId, targetI
     const grimtal = game.characters.grimtal;
     if (grimtal && grimtal.special?.beastFormActive && countKO(game) > koCountBefore) {
       grimtal.special.beastFormActive = false;
+      grimtal.special.beastFormTurnCount = 0;
       grimtal.untargetable = false;
       log.push({ type: 'beast-form-end', characterId: 'grimtal' });
     }
@@ -1421,6 +1423,7 @@ export function resolveJesterBall(game, holderCharacterId, choice, extra) {
     const grimtal = game.characters.grimtal;
     if (grimtal && grimtal.special?.beastFormActive && countKO(game) > koCountBefore) {
       grimtal.special.beastFormActive = false;
+      grimtal.special.beastFormTurnCount = 0;
       grimtal.untargetable = false;
       log.push({ type: 'beast-form-end', characterId: 'grimtal' });
     }

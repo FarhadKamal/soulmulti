@@ -361,6 +361,16 @@ function baseSpecialFor(id) {
       // beastAttack action, he's untargetable + fully damage-immune +
       // immune to any NEW negative status, and he reverts the instant ANY
       // character anywhere is KO'd (see grimtal.js's registerOnAnyDeath).
+      // beastFormTurnCount: counts his own turn-starts since transforming
+      // (confirmed ruling, 2026-09-13: the cast turn itself does NOT
+      // count as turn 1 - his first REAL turn-start while already
+      // transformed is turn 1) - drives the passive regeneration heal,
+      // which fires only on EVERY OTHER such turn-start (2nd, 4th, 6th...)
+      // and only while hearts <= 4. Reset to 0 whenever beastFormActive
+      // flips (both on cast and on reversion), so it can never carry stale
+      // state into some future, currently-unreachable second
+      // transformation (Beast Form is one-time-use, but state is kept
+      // honest regardless).
       return {
         ownKillCount: 0,
         claimedKillCount: 0,
@@ -372,6 +382,7 @@ function baseSpecialFor(id) {
         lastKillCreditSourceFor: {},
         beastFormActive: false,
         usedBeastForm: false,
+        beastFormTurnCount: 0,
       };
     case 'illyra':
       // mirageMarks: Map<targetCharacterId, stackCount> - how many

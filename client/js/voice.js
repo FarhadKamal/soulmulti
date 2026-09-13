@@ -262,6 +262,11 @@ const ACTION_VOICE_LINES = {
     // combined into one clip during recording) - no chained-playback logic
     // needed on the code side.
     beastForm: 'beast_cast',
+    // Beast Form's passive regeneration - dispatched explicitly from
+    // main.js's own 'beast-regen' handler (not a real actionId, same
+    // "not player-triggered" shape as Kaelis's callAshka reuse for
+    // ashka-heal), reusing this same key purely as a lookup convenience.
+    beastRegen: 'beast_heal',
   },
   illyra: {
     mirageMark: 'mark',

@@ -580,6 +580,15 @@ export function handleLogEntryForFlash(entry, game) {
     if (!isKO(entry.characterId)) setFlash(entry.characterId, 'assets/images/kaelis/bird.jpg');
     return;
   }
+  if (entry.type === 'beast-regen') {
+    // Grimtal's Beast Form passive regeneration (own dedicated type, same
+    // "not player-triggered, no actionId" reasoning as ashka-heal above) -
+    // the persistent beast.jpg portrait (getPersistentPortrait) already
+    // covers him for the rest of the transformation, so this is only ever
+    // a brief flash on the turn it actually fires.
+    if (!isKO(entry.characterId)) setFlash(entry.characterId, 'assets/images/grimtal/beast_heal.jpg');
+    return;
+  }
   if (entry.type === 'ashkas-vengeance-strike') {
     // Ashka's Vengeance (Kaelis's hearts<=3 passive, taxonomy: Pure Attack
     // #1 + Passive Action #23) - a fully automatic bonus strike, own
