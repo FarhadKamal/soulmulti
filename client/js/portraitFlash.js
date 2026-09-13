@@ -589,6 +589,21 @@ export function handleLogEntryForFlash(entry, game) {
     if (!isKO(entry.characterId)) setFlash(entry.characterId, 'assets/images/grimtal/beast_heal.jpg');
     return;
   }
+  if (entry.type === 'beast-form-end') {
+    // Grimtal's Beast Form reversion - confirmed real gap, 2026-09-13: the
+    // persistent beast.jpg portrait (getPersistentPortrait above) just
+    // silently snaps back to his normal idle/human art the instant
+    // beastFormActive flips false, with no transition moment shown at all.
+    // This brief flash covers that instant - claws/hide visibly reverting
+    // mid-change, same "own dedicated type, no actionId" reasoning as
+    // ashka-heal/beast-regen above. getPersistentPortrait's own
+    // beastFormActive check has already gone false by the time this
+    // renders (the flag flips before the log entry is even pushed), so it
+    // won't fight this flash - the persistent portrait naturally takes
+    // over again once this flash's own timer expires.
+    if (!isKO(entry.characterId)) setFlash(entry.characterId, 'assets/images/grimtal/beast_end.jpg');
+    return;
+  }
   if (entry.type === 'ashkas-vengeance-strike') {
     // Ashka's Vengeance (Kaelis's hearts<=3 passive, taxonomy: Pure Attack
     // #1 + Passive Action #23) - a fully automatic bonus strike, own
