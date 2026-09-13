@@ -513,6 +513,27 @@ input {
   50% { opacity: 1; }
 }
 
+/* Grimtal's Beast Form - persistent while transformed, same "border glow
+   via ::before" shape as .cursed-mark/.ice-frozen above but deliberately
+   slower and softer (3.4s vs. their 2.2-2.4s, lower peak opacity, no corner
+   icon): this is live for potentially many consecutive turns in a match,
+   not a short recurring tick, so a fast/bright pulse would read as an alert
+   or become distracting noise rather than an ambient "still dangerous"
+   cue. */
+.char-tile.beast-form-active {
+  border-color: #8a1414 !important;
+  box-shadow: 0 0 14px rgba(200, 30, 30, 0.4), inset 0 0 22px rgba(120, 0, 0, 0.2);
+}
+.char-tile.beast-form-active::before {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background: radial-gradient(circle at 50% 30%, rgba(200, 30, 30, 0.16), rgba(200, 30, 30, 0) 65%);
+  animation: tile-beast-pulse 3.4s ease-in-out infinite;
+}
+@keyframes tile-beast-pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 0.9; }
+}
+
 .jesterball-holding-icon {
   position: absolute; top: 6px; left: 8px; font-size: 32px;
   filter: drop-shadow(0 0 6px rgba(255, 100, 30, 0.9));

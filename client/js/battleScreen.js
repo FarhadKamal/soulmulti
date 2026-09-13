@@ -560,6 +560,17 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
   // together).
   if (isDivineJudgmentMarked && !character.isKO) tile.classList.add('divine-judgment-mark');
   if (isFrozenVisual && !character.isKO) tile.classList.add('ice-frozen');
+  // Grimtal's Beast Form (Death-Triggered Reversion #36) - real serialized
+  // state, not a timed flash, same pattern as .ice-frozen above: a
+  // continuous low-key red pulse for as long as he's transformed, distinct
+  // from the flash-only cast/attack art. Deliberately subtle (no icon,
+  // slower/softer pulse than the curse/divine-judgment marks) since this
+  // persists across many turns in a long match, unlike those - a hard
+  // strobe would just become noise rather than a useful "still dangerous"
+  // cue (confirmed direction, 2026-09-13: user asked for animation opinion,
+  // "do your best" - went with continuous-but-subtle over an eye-catching
+  // flash loop).
+  if (character.special?.beastFormActive && !character.isKO) tile.classList.add('beast-form-active');
   // Grimtal's Skull Crack headache: persistent (server-state-driven, not a
   // timed flash) swirl overlay for as long as the roll is pending - same
   // "real serialized state" pattern as .ice-frozen above, not a one-shot
