@@ -230,13 +230,7 @@ export function renderBattle(root, state) {
       isFrozenVisual: frozenIdsSet.has(character.id),
       isPuppet: character.id === puppetHighlightId || character.id === activePuppetId,
       isHypnotized: character.id === activePuppetId,
-      // Grimtal's Beast Form (Death-Triggered Reversion #36) - excluded
-      // same as Rowan himself and an already-KO'd character above: he's
-      // untargetable/transformed, "turned to stone" makes no visual sense
-      // layered on top of that, and Petrify has zero mechanical effect on
-      // anyone regardless (purely visual), so this is display-only
-      // correctness, not a defense interaction.
-      isPetrifiedOther: isPetrified && character.id !== 'rowan' && !character.special?.beastFormActive,
+      isPetrifiedOther: isPetrified && character.id !== 'rowan',
     }));
   });
   scroll.appendChild(board);
@@ -1109,7 +1103,12 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
   if (isVictorious) {
     portrait.src = v(`assets/victory/${character.id}.jpg`);
   } else if (isPetrifiedOther && !character.isKO) {
-    portrait.src = v(`assets/images/${character.id}/stone.jpg`);
+    // Grimtal's Beast Form (Death-Triggered Reversion #36) gets its own
+    // petrified art (beast_stone.jpg) rather than the plain human stone.jpg
+    // - his beast body looks nothing like his human one, so a single stone
+    // image can't represent both states correctly.
+    const stoneFile = character.special?.beastFormActive ? 'beast_stone.jpg' : 'stone.jpg';
+    portrait.src = v(`assets/images/${character.id}/${stoneFile}`);
   } else if (flashSrc) {
     // Already wrapped with v() at its source in portraitFlash.js.
     portrait.src = flashSrc;
