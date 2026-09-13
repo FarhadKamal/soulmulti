@@ -2338,6 +2338,15 @@ function describeLogEntry(entry) {
 function renderGameOver(game, youAreOwner) {
   const wrap = document.createElement('div');
   wrap.className = 'game-over';
+  // Confirmed request: the normal in-match top-right controls (Leave/
+  // Refresh/Fullscreen) never reach this screen at all - renderBattle
+  // returns early into renderGameOver before ever appending topControls.
+  // Only the fullscreen toggle is relevant here (Leave/Refresh are already
+  // covered by this screen's own Exit/Main Menu buttons below).
+  const topControls = document.createElement('div');
+  topControls.className = 'top-right-controls';
+  topControls.appendChild(renderFullscreenButton());
+  wrap.appendChild(topControls);
   const title = document.createElement('h2');
   title.textContent = game.winnerPlayerId ? 'Match over!' : 'Draw!';
   wrap.appendChild(title);
@@ -2369,13 +2378,33 @@ function renderGameOver(game, youAreOwner) {
 
   // Available to anyone regardless of ownership - a full exit back to the
   // create/join entry screen, distinct from "Play Again" above (which only
-  // the owner can trigger and keeps everyone in the same room/code).
+  // the owner can trigger and keeps everyone in the same room/code). Sends
+  // leave-room first (proper server-side cleanup: seat/spectator removal,
+  // ownership handoff if needed) - this is the normal, graceful path.
   const exitBtn = document.createElement('button');
   exitBtn.className = 'game-over-pill game-over-pill--exit';
   exitBtn.innerHTML = '<span>🚪</span> Exit';
   exitBtn.title = 'Exit to Main Menu';
   exitBtn.onclick = () => send('leave-room');
   btnRow.appendChild(exitBtn);
+
+  // Guaranteed local fallback, independent of any server round-trip -
+  // confirmed real user report: after a turn-timeout auto-converted their
+  // seat to a bot mid-match (still watching as the room's owner/Guest), the
+  // win screen's normal buttons stopped responding for them, with no way
+  // back to the main menu short of a manual browser refresh ("user will
+  // feel discomfort"). Rather than keep chasing the exact server-side
+  // ownership/broadcast edge case that caused it (traced deeply, no
+  // definitive root cause found), this button sidesteps it entirely - a
+  // plain page reload always works regardless of what state the room/
+  // session is actually in server-side, dropping the WebSocket and putting
+  // the browser back through the normal connect flow to the entry screen.
+  const mainMenuBtn = document.createElement('button');
+  mainMenuBtn.className = 'game-over-pill game-over-pill--exit';
+  mainMenuBtn.innerHTML = '<span>🏠</span> Main Menu';
+  mainMenuBtn.title = 'Return to Main Menu (reloads the page)';
+  mainMenuBtn.onclick = () => window.location.reload();
+  btnRow.appendChild(mainMenuBtn);
 
   wrap.appendChild(btnRow);
 
