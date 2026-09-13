@@ -3,6 +3,7 @@ import {
   isChickenified, FOWL_PLAY_BOINGO_HIT_INTERVAL,
 } from './turnEngine.js';
 import { isFrozenByChronox } from './damagePipeline.js';
+import { BEAST_ATTACK_HIGH_DAMAGE, BEAST_ATTACK_LOW_DAMAGE } from '../abilities/grimtal.js';
 
 // Pure decision logic for PC-controlled characters - no DOM, no side
 // effects. Given a character whose turn it is, returns the action+target
@@ -1348,16 +1349,39 @@ function chooseMarinMove(character, game, usable) {
 // as Rowan's Arcane Study fallback.
 function chooseGrimtalMove(character, game, usable) {
   const byId = Object.fromEntries(usable.map((a) => [a.actionId, a]));
-  // While beastFormActive, getLegalActions only ever offers beastAttack -
-  // targets the biggest current threat (falling back to lowest hearts),
-  // same priority order Skull Crack's own targeting below already uses.
-  // No lethal-kill-first check needed here the way Grim Strike gets one
-  // below - Beast Attack's damage is fixed per tier regardless of target,
-  // so there's no "undercounting his real damage" risk to guard against.
+  // While beastFormActive, getLegalActions only ever offers beastAttack.
+  // Unlike every other targeting decision here, "biggest threat" is the
+  // wrong heuristic: Beast Attack's damage is fixed per TIER (see
+  // grimtal.js's beastAttack action) - 3 dmg to whoever is the SOLE
+  // current highest-hearts holder among the living, 2 dmg to anyone else -
+  // entirely independent of who's been hurting him. Picking by recent
+  // damage dealt ignored both an available kill and the tier mechanic
+  // itself (confirmed bug, 2026-09-13: bot kept "looking for KO only" in
+  // the sense of just chasing whoever attacked it, missing real kills and
+  // never going for the bonus-damage tier target). Priority: 1) an outright
+  // kill this hit's own tier can actually reach (mirrors the tier math
+  // exactly rather than assuming max damage, so it never overcounts),
+  // 2) the high-tier target (bonus damage, same target Beast Attack's own
+  // "highest hearts" line already rewards), 3) lowest hearts as a generic
+  // fallback.
   if (byId.beastAttack) {
     const targets = validTargetsFor(game, character, 'beastAttack');
-    const targetId = biggestThreatTarget(game, character, targets) || lowestHeartsTarget(game, targets) || pickRandom(targets);
-    return { actionId: 'beastAttack', targetId };
+    if (targets.length > 0) {
+      const living = Object.values(game.characters).filter((c) => c.id !== character.id && !c.isKO);
+      const highestHearts = living.length > 0 ? Math.max(...living.map((c) => c.hearts)) : 0;
+      const highestHolders = living.filter((c) => c.hearts === highestHearts);
+      const highTierTargetId = highestHolders.length === 1 ? highestHolders[0].id : null;
+      const tierFor = (tid) => (tid === highTierTargetId ? BEAST_ATTACK_HIGH_DAMAGE : BEAST_ATTACK_LOW_DAMAGE);
+      const killTarget = targets.find((tid) => {
+        const t = game.characters[tid];
+        return t.hearts <= Math.max(0, tierFor(tid) - t.shield);
+      });
+      const targetId = killTarget
+        || (highTierTargetId && targets.includes(highTierTargetId) ? highTierTargetId : null)
+        || lowestHeartsTarget(game, targets)
+        || pickRandom(targets);
+      return { actionId: 'beastAttack', targetId };
+    }
   }
   // Beast Form (Death-Triggered Reversion #36, replaces the old Grim
   // Barrage): a desperation move, only legal once hearts <= 3. No-target,

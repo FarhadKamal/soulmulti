@@ -8,8 +8,8 @@ import { registerOnAnyDeath } from '../engine/categories/onAnyDeath.js';
 // Beast Attack's two discrete damage tiers (confirmed ruling, 2026-09-12,
 // "high 3 low 2") - see the beastAttack action below for the full targeting
 // rule.
-const BEAST_ATTACK_HIGH_DAMAGE = 3;
-const BEAST_ATTACK_LOW_DAMAGE = 2;
+export const BEAST_ATTACK_HIGH_DAMAGE = 3;
+export const BEAST_ATTACK_LOW_DAMAGE = 2;
 
 // Beast Form's own passive regeneration (confirmed ruling, 2026-09-13):
 // heals 1 heart on every OTHER of his own turn-starts while transformed
