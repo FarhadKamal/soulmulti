@@ -952,8 +952,10 @@ export function handleLogEntryForFlash(entry, game) {
       // state, not a timed flash, since the effect has no fixed duration) -
       // this case only fires a brief cast-moment flash, same "cast flash
       // AND persistent state, not either/or" pattern Rowan's Petrify
-      // already establishes just above.
-      setFlash(characterId, 'assets/images/grimtal/beast.jpg'); break;
+      // already establishes just above. Uses a distinct mid-transformation
+      // image (beast_start.jpg) rather than the persistent already-
+      // transformed beast.jpg, mirroring beast_end.jpg's reversion flash.
+      setFlash(characterId, 'assets/images/grimtal/beast_start.jpg'); break;
     case 'beastAttack':
       if (!dodged) setFlash(characterId, 'assets/images/grimtal/beast_attack.jpg');
       break;

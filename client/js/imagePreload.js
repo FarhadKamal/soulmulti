@@ -99,6 +99,7 @@ const FLASH_IMAGES = [
   'assets/images/grimtal/power.jpg',
   'assets/images/grimtal/claim_kill.jpg',
   'assets/images/grimtal/beast.jpg',
+  'assets/images/grimtal/beast_start.jpg',
   'assets/images/grimtal/beast_attack.jpg',
   'assets/images/grimtal/beast_heal.jpg',
   'assets/images/grimtal/beast_end.jpg',
