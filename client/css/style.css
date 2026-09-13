@@ -514,24 +514,25 @@ input {
 }
 
 /* Grimtal's Beast Form - persistent while transformed, same "border glow
-   via ::before" shape as .cursed-mark/.ice-frozen above but deliberately
-   slower and softer (3.4s vs. their 2.2-2.4s, lower peak opacity, no corner
-   icon): this is live for potentially many consecutive turns in a match,
-   not a short recurring tick, so a fast/bright pulse would read as an alert
-   or become distracting noise rather than an ambient "still dangerous"
-   cue. */
+   via ::before" shape as .cursed-mark/.ice-frozen above. First pass
+   (2026-09-13) was too subtle to actually read during play (confirmed
+   live feedback) - strengthened border/glow intensity and widened the
+   pulse's opacity swing so it's clearly visible at a glance, while keeping
+   the cycle itself a bit slower than the curse/divine-judgment marks
+   (2.8s vs. their 2.2-2.4s) since this can stay live for many consecutive
+   turns rather than a short recurring tick. */
 .char-tile.beast-form-active {
-  border-color: #8a1414 !important;
-  box-shadow: 0 0 14px rgba(200, 30, 30, 0.4), inset 0 0 22px rgba(120, 0, 0, 0.2);
+  border-color: #c81e1e !important;
+  box-shadow: 0 0 20px rgba(220, 30, 30, 0.6), inset 0 0 28px rgba(150, 0, 0, 0.3);
 }
 .char-tile.beast-form-active::before {
   content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
-  background: radial-gradient(circle at 50% 30%, rgba(200, 30, 30, 0.16), rgba(200, 30, 30, 0) 65%);
-  animation: tile-beast-pulse 3.4s ease-in-out infinite;
+  background: radial-gradient(circle at 50% 30%, rgba(220, 30, 30, 0.28), rgba(220, 30, 30, 0) 65%);
+  animation: tile-beast-pulse 2.8s ease-in-out infinite;
 }
 @keyframes tile-beast-pulse {
-  0%, 100% { opacity: 0.5; }
-  50% { opacity: 0.9; }
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
 }
 
 .jesterball-holding-icon {
