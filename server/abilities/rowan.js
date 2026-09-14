@@ -195,9 +195,17 @@ export const actions = {
         if (c.special?.grudgeCounts?.has(character.id)) c.special.grudgeCounts.delete(character.id);
         if (c.special?.poisonTargets?.has(character.id)) c.special.poisonTargets.delete(character.id);
         if (c.special?.silenceTargets?.has(character.id)) c.special.silenceTargets.delete(character.id);
-        if (c.special?.streakTargetId === character.id) {
-          c.special.streakTargetId = null;
-          c.special.streakCount = 0;
+        // Blade's Blood Hunt (redesigned 2026-09-14, per-target hit
+        // counter) - same "counts as a cleansable status" reasoning as the
+        // grudge clear just above: wipes Blade's own tally against Rowan
+        // specifically back to a cold slate, so Blade's next hit on him
+        // restarts at 1 instead of continuing wherever the cycle was.
+        // hitCountByTarget is a plain object (not a Map, unlike
+        // grudgeCounts/poisonTargets/silenceTargets above), so this reads
+        // via bracket access and deletes the key rather than calling .has/
+        // .delete.
+        if (c.special?.hitCountByTarget && character.id in c.special.hitCountByTarget) {
+          delete c.special.hitCountByTarget[character.id];
         }
       }
       character.skipNextTurn = false;

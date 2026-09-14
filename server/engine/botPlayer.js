@@ -664,41 +664,35 @@ function chooseVeloryaMove(character, game, usable) {
   return { actionId: 'lunarStrike', targetId: pickDefaultTarget(game, character, 'lunarStrike') };
 }
 
+// Blade's next Blood Hunt hit-count against a given target (redesigned
+// 2026-09-14, per-target hit counter - see blade.js's nextBladeHitCount).
+// Mirrors that function's own cycling math without mutating state, purely
+// for bot decision-making.
+function bladeNextHitCount(character, targetId) {
+  const current = character.special.hitCountByTarget?.[targetId] || 0;
+  return (current % 3) + 1;
+}
+
 function chooseBladeMove(character, game, usable) {
-  // Only one real action - the decision is entirely about target. Staying
-  // on the same streak target keeps compounding damage; only switch if
-  // that target is no longer valid or a clean kill is available elsewhere.
+  // Redesigned 2026-09-14: no more single locked streak target to stay on
+  // - every living target has their OWN independent hit-count, so the
+  // decision each turn is genuinely "who's sitting at the best count right
+  // now" (prefer whoever his next hit would peak at 3, i.e. currently at
+  // count 2) rather than "keep hitting whoever I started on."
   const targets = validTargetsFor(game, character, 'bloodHunt');
   if (targets.length === 0) return { actionId: 'bloodHunt', targetId: null };
-  const streakTarget = character.special.streakTargetId;
-  if (streakTarget && targets.includes(streakTarget)) {
-    // A streak locked onto Athena needs its own safety check, separate from
-    // pickDefaultTarget's (which this branch bypasses entirely) - Blood
-    // Hunt's damage compounds every consecutive hit (1, 2, 3...), so a
-    // streak that was perfectly safe when it started can become self-lethal
-    // via her curse mirror as it grows, with nothing here ever having
-    // checked for that. Same class of bug as Akyros/Zerathys's own cursed-
-    // Athena guards: break off the streak (switch target) once continuing
-    // it would kill Blade himself through the mirror, unless she's the only
-    // living enemy left.
-    if (streakTarget === 'athena' && isCursedByLiveAthena(game, character)) {
-      const nextStreakDamage = character.special.streakCount + 1;
-      const otherTargets = targets.filter((tid) => tid !== 'athena');
-      if (character.hearts <= nextStreakDamage && otherTargets.length > 0) {
-        return { actionId: 'bloodHunt', targetId: pickDefaultTarget(game, character, 'bloodHunt') };
-      }
-    }
-    // A streak locked onto a Mirror-Reflect-active Rowan takes 3 reflect
-    // damage on every single consecutive hit, same compounding-risk shape
-    // as the Athena guard just above - break off unless he's the only
-    // living target left.
-    if (streakTarget === 'rowan' && isMirrorReflectActive(game)) {
-      const otherTargets = targets.filter((tid) => tid !== 'rowan');
-      if (otherTargets.length > 0) {
-        return { actionId: 'bloodHunt', targetId: pickDefaultTarget(game, character, 'bloodHunt') };
-      }
-    }
-    return { actionId: 'bloodHunt', targetId: streakTarget };
+  // Same compounding-risk safety checks as before (a hit against a
+  // cursed-by-live-Athena or Mirror-Reflect-active Rowan mirrors/reflects
+  // damage back onto Blade), now evaluated per-candidate rather than
+  // against one locked streak target - excludes a candidate unless
+  // they're the only living target left.
+  const unsafe = (tid) => (tid === 'athena' && isCursedByLiveAthena(game, character))
+    || (tid === 'rowan' && isMirrorReflectActive(game));
+  const safeTargets = targets.length > 1 ? targets.filter((tid) => !unsafe(tid)) : targets;
+  const pool = safeTargets.length > 0 ? safeTargets : targets;
+  const peakTargets = pool.filter((tid) => (character.special.hitCountByTarget?.[tid] || 0) === 2);
+  if (peakTargets.length > 0) {
+    return { actionId: 'bloodHunt', targetId: focusFireTarget(game, peakTargets) || pickRandom(peakTargets) };
   }
   return { actionId: 'bloodHunt', targetId: pickDefaultTarget(game, character, 'bloodHunt') };
 }
@@ -858,20 +852,23 @@ function chooseBoingoMove(character, game, usable) {
 // is treated as an urgent, forward-looking threat - his NEXT bloodHunt hit
 // (if left alone) deals exactly this much damage and would only grow further.
 // This deliberately outranks biggestThreatTarget's backward-looking damage
-// tally, since a streak of 2+ is a known, escalating future hit, not just a
-// historical one.
-const BLADE_STREAK_DANGER_THRESHOLD = 2;
+// tally, since a count of 2 (next hit peaks at 3) is a known, escalating
+// future hit, not just a historical one.
+const BLADE_HITCOUNT_DANGER_THRESHOLD = 2;
 
-// A live enemy Blade with a dangerous streak specifically against Melyssa -
-// puppeting him to redirect bloodHunt at a different target resets his
-// streak (see server/abilities/blade.js), defusing the escalating threat
-// before it lands. Returns Blade's characterId, or null if no such threat
-// exists among the given candidate pool.
+// A live enemy Blade whose CURRENT hit-count against Melyssa specifically
+// is already at the danger threshold (redesigned 2026-09-14, per-target
+// hit counter - his next hit on her would peak at 3) - puppeting him to
+// redirect bloodHunt at a different target doesn't reset anything anymore
+// (counts are per-target and persistent), but it does mean that turn's hit
+// lands on someone else instead of continuing to threaten her. Returns
+// Blade's characterId, or null if no such threat exists among the given
+// candidate pool.
 function bladeStreakThreatAgainstMelyssa(game, melyssaId, candidateIds) {
   for (const tid of candidateIds) {
     const c = game.characters[tid];
-    if (c.id === 'blade' && !c.isKO && c.special.streakTargetId === melyssaId
-      && c.special.streakCount >= BLADE_STREAK_DANGER_THRESHOLD) {
+    if (c.id === 'blade' && !c.isKO
+      && (c.special.hitCountByTarget?.[melyssaId] || 0) >= BLADE_HITCOUNT_DANGER_THRESHOLD) {
       return tid;
     }
   }
@@ -1023,18 +1020,17 @@ function rowanHasUrgentNegativeStatus(game, character) {
   });
 }
 
-// True whenever a live Blade has his Blood Hunt streak locked onto Rowan
-// with real momentum behind it (2+ means his NEXT hit deals 3+, since
-// streakCount tracks the damage his last hit dealt and each consecutive
-// hit adds 1 more) - unlike a fresh 1-count streak, which is just a normal
-// attack and not yet worth reacting to specially. Purify wipes the streak-
-// lock outright (see purify.execute's streakTargetId clear in rowan.js),
-// forcing Blade back to a cold 1-damage opener next time he attacks
-// instead of letting the compounding damage keep snowballing.
+// True whenever a live Blade's CURRENT hit-count against Rowan specifically
+// is already at 2 (redesigned 2026-09-14, per-target hit counter - his
+// NEXT hit on Rowan would peak at 3) - unlike a fresh/absent count, which
+// is just a normal attack and not yet worth reacting to specially. Purify
+// wipes Blade's tally against Rowan back to a cold slate (see purify.
+// execute's hitCountByTarget delete in rowan.js), forcing his next hit on
+// Rowan to restart at 1 instead of continuing wherever the cycle was.
 function rowanFacingGrowingBladeStreak(game, character) {
   const blade = game.characters['blade'];
-  return !!(blade && !blade.isKO && blade.special.streakTargetId === character.id
-    && blade.special.streakCount >= 2);
+  return !!(blade && !blade.isKO
+    && (blade.special.hitCountByTarget?.[character.id] || 0) >= 2);
 }
 
 // A minor status (Kaelis grudge count, Akyros mark, Blade's streak-lock)
@@ -1733,24 +1729,30 @@ export function chooseBotMelyssaPuppetAction(puppetCharacter, game, melyssaId) {
 
   // Puppeted Blade needs his OWN dedicated target decision too, for the
   // exact same reason as Zerathys above: chooseBladeMove (see its own
-  // comments) deliberately STAYS on an existing streak target whenever
-  // it's still valid - correct for his own real turn, but backwards here.
-  // The entire point of bot-Melyssa choosing to puppet a Blade who has a
-  // dangerous streak against her (see bladeStreakThreatAgainstMelyssa in
-  // chooseMelyssaMove) is to break that streak by redirecting his attack
-  // elsewhere - left unchecked, the normal chooser would just re-lock onto
-  // her again, wasting the puppeted turn and leaving the threat intact.
-  if (puppetCharacter.id === 'blade' && melyssa && puppetCharacter.special.streakTargetId === melyssa.id
-    && puppetCharacter.special.streakCount >= 1 && usable.some((a) => a.actionId === 'bloodHunt')) {
+  // comments) might still legitimately pick Melyssa if her count against
+  // her happens to be the best available (redesigned 2026-09-14, per-
+  // target hit counter - no more single locked streak to stay on, but the
+  // best-current-count preference can still land on her). The entire point
+  // of bot-Melyssa choosing to puppet a Blade who's dangerous to her (see
+  // bladeStreakThreatAgainstMelyssa in chooseMelyssaMove) is to spend his
+  // puppeted turn hitting someone ELSE instead - left unchecked, the
+  // normal chooser could just re-target her anyway, wasting the puppeted
+  // turn and leaving the threat intact.
+  if (puppetCharacter.id === 'blade' && melyssa
+    && (puppetCharacter.special.hitCountByTarget?.[melyssa.id] || 0) >= BLADE_HITCOUNT_DANGER_THRESHOLD
+    && usable.some((a) => a.actionId === 'bloodHunt')) {
     const targets = validTargetsFor(game, puppetCharacter, 'bloodHunt').filter((tid) => tid !== melyssa.id);
     if (targets.length > 0) {
-      // Redirecting resets his streak to 1 against whoever is picked (see
-      // bloodHunt's execute in blade.js) - any legal target off Melyssa's
-      // side defuses the threat, so just take the best remaining target by
-      // the same priority pickDefaultTarget itself uses (focus fire >
-      // biggest recent threat > lowest hearts), restricted to this pool.
-      const redirectTarget = focusFireTarget(game, targets) || biggestThreatTarget(game, puppetCharacter, targets)
-        || lowestHeartsTarget(game, targets) || pickRandom(targets);
+      // Redirecting doesn't reset anything anymore (counts are per-target
+      // and persistent) - it just means this turn's hit lands on someone
+      // off Melyssa's side. Prefer whoever's own count is at the same
+      // peak-2 threshold first (best available damage elsewhere), else the
+      // normal priority (focus fire > biggest recent threat > lowest
+      // hearts).
+      const peakTargets = targets.filter((tid) => (puppetCharacter.special.hitCountByTarget?.[tid] || 0) === 2);
+      const pool = peakTargets.length > 0 ? peakTargets : targets;
+      const redirectTarget = focusFireTarget(game, pool) || biggestThreatTarget(game, puppetCharacter, pool)
+        || lowestHeartsTarget(game, pool) || pickRandom(pool);
       return { kind: 'realAction', actionId: 'bloodHunt', targetId: redirectTarget };
     }
   }

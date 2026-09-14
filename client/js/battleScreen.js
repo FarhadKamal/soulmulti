@@ -213,6 +213,18 @@ export function renderBattle(root, state) {
   // here (game is in scope) and passed down like every other per-tile flag,
   // since renderCharacterTile itself has no access to the full game object.
   const isPetrified = isPetrifyActive(game);
+  // Blade's Blood Hunt (redesigned 2026-09-14, per-target hit counter) -
+  // same "badge on the VICTIM's own tile" reasoning as Kaelis's grudge/
+  // Illyra's mirage-mark badges above: it's a per-relationship count (his
+  // Nth hit on THIS specific character), not something that fits on
+  // Blade's own tile since he tracks several independently at once.
+  // hitCountByTarget arrives as a plain object already (never a Map on the
+  // server side, unlike mirageMarks/silenceTargets - no conversion needed).
+  const blade = Object.values(game.characters).find((c) => c.id === 'blade');
+  const bladeHitCountFor = (characterId) => {
+    if (!blade || blade.isKO || blade.id === characterId) return 0;
+    return blade.special?.hitCountByTarget?.[characterId] || 0;
+  };
   Object.values(game.characters).forEach((character) => {
     board.appendChild(renderCharacterTile(character, {
       isActing: character.id === actingCharacterId,
@@ -225,6 +237,7 @@ export function renderBattle(root, state) {
       silencedTurns: silencedTurnsFor(character.id),
       isDazed: isDazedFor(character.id),
       mirageMarkCount: mirageMarksFor(character.id),
+      bladeHitCount: bladeHitCountFor(character.id),
       isCursed: character.id === cursedId,
       isDivineJudgmentMarked: character.id === divineJudgmentTargetId,
       isFrozenVisual: frozenIdsSet.has(character.id),
@@ -534,7 +547,7 @@ function computeFrozenIdsSet(game) {
   return ids;
 }
 
-function renderCharacterTile(character, { isActing, isMine, isTargetable, onTargetClick, isHoldingBall, isCursed, isDivineJudgmentMarked, isFrozenVisual, isVictorious, isPuppet, isHypnotized, grudgeCount, isPoisoned, silencedTurns, isDazed, mirageMarkCount, isPetrifiedOther = false }) {
+function renderCharacterTile(character, { isActing, isMine, isTargetable, onTargetClick, isHoldingBall, isCursed, isDivineJudgmentMarked, isFrozenVisual, isVictorious, isPuppet, isHypnotized, grudgeCount, isPoisoned, silencedTurns, isDazed, mirageMarkCount, bladeHitCount, isPetrifiedOther = false }) {
   const def = CHARACTERS[character.id];
   const tile = document.createElement('div');
   tile.className = 'char-tile';
@@ -1061,6 +1074,20 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
     tile.appendChild(mirage);
   }
 
+  if (bladeHitCount > 0 && !character.isKO) {
+    // Blade's Blood Hunt (redesigned 2026-09-14, per-target hit counter) -
+    // same per-relationship badge reasoning as Kaelis's grudge/Illyra's
+    // mirage-mark badges above. bladeHitCount is the damage his MOST
+    // RECENT Blood Hunt against this specific character dealt (1-3,
+    // cycling); the badge previews what his NEXT hit on them would deal.
+    const bladeBadge = document.createElement('div');
+    bladeBadge.className = 'blade-hitcount-badge';
+    bladeBadge.textContent = `🗡️${bladeHitCount}`;
+    const nextHit = (bladeHitCount % 3) + 1;
+    bladeBadge.title = `Blade's hit count on you: ${bladeHitCount} (his next Blood Hunt on you would deal ${nextHit})`;
+    tile.appendChild(bladeBadge);
+  }
+
   if (isPoisoned && !character.isKO) {
     // Rowan's Poison Cloud - same per-relationship-badge reasoning as
     // Kaelis's grudge badge above, positioned bottom-left so it never
@@ -1351,17 +1378,19 @@ function statusBadges(character) {
         badges.push({ text: `Charge: ${character.special.chargeCount}/2` });
       }
       break;
-    case 'blade':
-      if (character.special.streakCount > 0) badges.push({ text: `Streak x${character.special.streakCount}`, cls: 'warn' });
-      if (character.special.bloodFrenzyUnleashed) {
-        // Persistent reminder that Blood Frenzy's permanent effect (streak
-        // never resets on a target switch, for the rest of the match) is
-        // active - a one-shot cast flash alone would be easy to forget
-        // about several turns later, same "ongoing state deserves an
-        // ongoing badge" reasoning as Everbloom/Piercing Wand above.
-        badges.push({ text: '🩸', title: 'Blood Frenzy unleashed - Blood Hunt streak never resets, even on a new target' });
-      }
+    case 'blade': {
+      // Redesigned 2026-09-14: no more single global streak to summarize
+      // here - each per-target hit count is shown on that VICTIM's own
+      // tile instead (see the blade-hitcount-badge wiring in
+      // renderCharacterTile/its caller above), same "per-relationship
+      // state belongs on the other tile" reasoning as Kaelis's grudge.
+      // This own-tile badge just gives a quick "how many different people
+      // has he drawn blood from" count, since that's not otherwise visible
+      // without scanning every other tile.
+      const targetsHit = Object.keys(character.special.hitCountByTarget || {}).length;
+      if (targetsHit > 0) badges.push({ text: `Blood drawn: ${targetsHit}` });
       break;
+    }
     case 'kaelis':
       if (character.special.ashkaHealsRemaining > 0) {
         badges.push({ text: `Ashka heals: ${character.special.ashkaHealsRemaining}` });

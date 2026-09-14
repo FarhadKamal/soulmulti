@@ -102,17 +102,24 @@ function baseSpecialFor(id) {
       // fowlPlayHitsOnBoingo counter.
       return { jesterBallsUsed: 0, usedFowlPlay: false };
     case 'blade':
-      // bloodFrenzyUnleashed: permanent, one-way flag flipped by his
-      // hearts<=3 one-time special (Blood Frenzy, confirmed ruling
-      // 2026-09-12) - once true, Blood Hunt's own streak-reset-on-target-
-      // switch rule (executed in bloodHunt.execute) is permanently disabled
-      // for the REST OF THE MATCH, not just during the burst itself.
-      // usedBloodFrenzy: separate one-time gate (same reasoning as every
-      // other hearts<=3 special's own dedicated flag, e.g. Tharox's
-      // usedEarthshatter) - usedSpecial stays reserved for Rebirth.
+      // hitCountByTarget: per-TARGET hit counter (confirmed redesign,
+      // 2026-09-14 - replaces the old single global streakCount/
+      // streakTargetId/bloodFrenzyUnleashed shape). Each living character
+      // Blade has ever hit gets their own independent counter, keyed by
+      // their character id, cycling 1->2->3->1->2->3... - his Nth hit on
+      // THAT SPECIFIC character deals ((N-1) % 3) + 1 damage, regardless of
+      // who else he's hit in between. Never reset by a target switch, by
+      // his own Rebirth, or by anything else for the rest of the match
+      // (confirmed ruling: "counter will not reset on rebirth") - only a
+      // fresh game resets it. This replaces the old design's core flaw: a
+      // single running streak rewarded only "keep hitting the same person
+      // forever" with no real targeting decision, since switching reset
+      // the counter and was therefore almost always mathematically wrong.
+      // usedBloodFrenzy: same one-time gate shape as every other hearts<=3
+      // special's own dedicated flag (e.g. Tharox's usedEarthshatter) -
+      // usedSpecial stays reserved for Rebirth.
       return {
-        streakTargetId: null, streakCount: 0, rebirthUsed: false,
-        bloodFrenzyUnleashed: false, usedBloodFrenzy: false,
+        hitCountByTarget: {}, rebirthUsed: false, usedBloodFrenzy: false,
       };
     case 'athena':
       // divineJudgmentTargetId: her hearts<=3 one-time special's marked

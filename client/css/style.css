@@ -588,6 +588,20 @@ input {
   box-shadow: 0 0 6px rgba(142, 91, 196, 0.6);
   pointer-events: none; z-index: 5;
 }
+/* Blade's Blood Hunt per-target hit count (redesigned 2026-09-14) - every
+   fixed corner/center slot above is already claimed, so this stacks
+   directly above the mirage-mark badge in the same bottom-center column
+   (both are per-relationship counters that could plausibly be live on the
+   same tile at once, e.g. Blade and Illyra both having hit the same
+   target). */
+.blade-hitcount-badge {
+  position: absolute; bottom: 28px; left: 50%; translate: -50% 0;
+  background: rgba(139, 0, 0, 0.85); color: #fff;
+  font-size: 0.85em; font-weight: 700;
+  padding: 2px 6px; border-radius: 10px;
+  box-shadow: 0 0 6px rgba(139, 0, 0, 0.6);
+  pointer-events: none; z-index: 5;
+}
 @keyframes tile-ball-wobble {
   0%, 100% { transform: rotate(-8deg) scale(1); }
   50% { transform: rotate(8deg) scale(1.08); }

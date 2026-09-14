@@ -1,25 +1,30 @@
 import { applyDamage, registerRebirth } from '../engine/damagePipeline.js';
 
-// Blood Frenzy: hearts<=3 one-time special (confirmed ruling, 2026-09-12).
-// Two effects, one permanent and one immediate:
-//   1. Permanently disables Blood Hunt's own streak-reset-on-target-switch
-//      rule for the REST OF THE MATCH (bloodFrenzyUnleashed flag, checked
-//      inside bloodHunt.execute below) - from this point on, EVERY future
-//      Blood Hunt (chosen-target OR this burst's own random hits) just
-//      keeps building the same one streakCount forever, regardless of who
-//      he actually hits.
-//   2. Immediately unleashes a burst of consecutive random strikes against
-//      LIVING ENEMIES (never himself, never an ally in a team mode) - each
-//      strike is a full, normal Blood Hunt hit in every respect (shield/
-//      dodge/untargetable all apply exactly as they would to a normal
-//      chosen-target Blood Hunt), just with the target picked at random
-//      each time (fully independent per strike - the same enemy CAN be hit
-//      more than once in one burst) instead of player-chosen. The streak
-//      climbs WITHIN the burst itself, strike by strike, exactly like a
-//      real multi-turn streak would (confirmed via example: streak=1
-//      walking in -> burst hits deal 2, then 3, then 4) - it's the same
-//      running counter as everywhere else, just several hits landing in
-//      one action instead of one per turn.
+// Blood Hunt's per-target hit counter (confirmed redesign, 2026-09-14 -
+// see state.js's own hitCountByTarget comment for the full "why"). Cycles
+// 1->2->3->1->2->3... independently per target character id. Shared by
+// both bloodHunt.execute (a single chosen-target hit) and bloodFrenzy's
+// own burst (each randomly-targeted strike advances THAT target's own
+// counter, same rule, no separate math).
+function nextBladeHitCount(character, targetId) {
+  const current = character.special.hitCountByTarget[targetId] || 0;
+  const next = (current % 3) + 1;
+  character.special.hitCountByTarget[targetId] = next;
+  return next;
+}
+
+// Blood Frenzy: hearts<=3 one-time special. Immediately unleashes a burst
+// of consecutive random strikes against LIVING ENEMIES (never himself,
+// never an ally in a team mode) - each strike is a full, normal Blood Hunt
+// hit in every respect (shield/dodge/untargetable all apply exactly as
+// they would to a normal chosen-target Blood Hunt), just with the target
+// picked at random each time (fully independent per strike - the same
+// enemy CAN be hit more than once in one burst) instead of player-chosen.
+// Confirmed ruling, 2026-09-14: purely random, no rebalancing against the
+// new per-target counters - "someone can get big damage, someone even can
+// get 0 damage" is the intended chaotic spread, not a bug to smooth out.
+// Each strike reads/advances whichever target it randomly lands on's own
+// existing counter via nextBladeHitCount - no separate burst-only math.
 // Strike count scales with TOTAL alive characters (Blade included),
 // confirmed ruling: 4 alive -> 5 strikes, 3 alive -> 3 strikes, 2 alive ->
 // 2 strikes. Once he's the last two standing, only Blade and one opponent
@@ -53,8 +58,10 @@ registerRebirth('blade', (character) => {
   // carrying it over from the moment he died.
   character.skipNextTurn = false;
   character.skipHeadacheTurn = false;
-  character.special.streakTargetId = null;
-  character.special.streakCount = 0;
+  // hitCountByTarget deliberately NOT cleared here - confirmed ruling,
+  // 2026-09-14: "counter will not reset on rebirth". Every per-target
+  // count he's built up survives his own death/revival, same as it
+  // survives a target switch.
 });
 
 export const actions = {
@@ -63,25 +70,13 @@ export const actions = {
     needsTarget: true,
     isLegal: () => true,
     execute(character, targetId, game, log) {
-      // Blood Frenzy (confirmed ruling, 2026-09-12): once unleashed, the
-      // streak never resets on a target switch again for the rest of the
-      // match - streakTargetId tracking becomes permanently moot from here
-      // on, the counter just always increments regardless of who's hit.
-      if (character.special.bloodFrenzyUnleashed) {
-        character.special.streakCount += 1;
-      } else if (character.special.streakTargetId === targetId) {
-        character.special.streakCount += 1;
-      } else {
-        character.special.streakTargetId = targetId;
-        character.special.streakCount = 1;
-      }
-      const amount = character.special.streakCount;
+      const amount = nextBladeHitCount(character, targetId);
       const result = applyDamage(game, log, {
         sourceCharacterId: character.id,
         targetCharacterId: targetId,
         amount,
       });
-      log.push({ type: 'attack', characterId: character.id, actionId: 'bloodHunt', targetId, streak: character.special.streakCount, ...result });
+      log.push({ type: 'attack', characterId: character.id, actionId: 'bloodHunt', targetId, streak: amount, ...result });
       return result;
     },
   },
@@ -92,7 +87,6 @@ export const actions = {
     isLegal: (character) => character.hearts <= BLOOD_FRENZY_HEARTS_THRESHOLD && !character.special.usedBloodFrenzy,
     execute(character, targetId, game, log) {
       character.special.usedBloodFrenzy = true;
-      character.special.bloodFrenzyUnleashed = true;
       const aliveCount = Object.values(game.characters).filter((c) => !c.isKO).length;
       const strikeCount = bloodFrenzyStrikeCount(aliveCount);
       const hits = [];
@@ -113,28 +107,19 @@ export const actions = {
         const pool = livingEnemiesFor(character, game);
         if (pool.length === 0) break; // everyone's already down - burst ends early
         const target = pool[Math.floor(Math.random() * pool.length)];
-        character.special.streakCount += 1;
-        const amount = character.special.streakCount;
+        // Reads/advances THIS target's own independent counter, same rule
+        // as a normal chosen-target Blood Hunt - a random burst hit landing
+        // on someone at their 3rd-hit peak deals 3, the very next strike
+        // landing on them again (or anyone else already partway through
+        // their own cycle) deals whatever THEIR count is at, entirely
+        // independent of every other target's own progress. Confirmed
+        // ruling: purely random spread, no burst-only rebalancing.
+        const amount = nextBladeHitCount(character, target.id);
         const result = applyDamage(game, log, {
           sourceCharacterId: character.id,
           targetCharacterId: target.id,
           amount,
         });
-        // Confirmed real bug, 2026-09-12: this used to re-read
-        // character.special.streakCount HERE (after applyDamage already
-        // returned) instead of using the `amount` already captured above -
-        // normally identical, but a nested reflect/mirror counter-hit
-        // triggered BY this very strike (e.g. Rowan's Mirror Reflect
-        // bouncing 3 damage back onto Blade himself, hard enough to KO him
-        // and trigger his own Rebirth, which resets streakCount to 0 as
-        // part of its revival reset) can mutate streakCount to something
-        // else WHILE this applyDamage call is still in progress, before
-        // control even returns here - showing a mismatched "streak 0, 3
-        // dmg" line where amountDealt (correct) and streak (stale-read,
-        // wrong) silently disagreed. Using the locally-captured `amount`
-        // guarantees this entry reflects the value this specific strike
-        // actually used, regardless of what happens to the live counter as
-        // a side effect of the hit landing.
         hits.push({ targetId: target.id, streak: amount, amountDealt: result.amountDealt, dodged: result.dodged, koTriggered: result.koTriggered });
         if (result.rebirthLogEntry && !rebirthLogEntry) rebirthLogEntry = result.rebirthLogEntry;
         if (result.mirrorLogEntry && !mirrorLogEntry) mirrorLogEntry = result.mirrorLogEntry;

@@ -79,12 +79,12 @@ export function isFrozenByChronox(character, game) {
 // True if character currently has any of the 5 genuine debuff-style
 // negative statuses another character has placed on them (Athena's curse,
 // Chronox's freeze, Akyros's Hidden Mark, Rowan's Silence Lock, Grimtal's
-// Skull Crack headache) - deliberately excludes Blade's streak-lock and
-// Kaelis's grudge count, since both are the ATTACKER's own tracked
-// resource rather than a status placed ON the victim (same ruling already
-// established for what Rowan's Purify treats as "urgent" vs. what it
-// merely sweeps up as a side effect - see rowanHasUrgentNegativeStatus in
-// botPlayer.js). Used by Marin's Clean Slate: both its reactive trigger
+// Skull Crack headache) - deliberately excludes Blade's per-target hit
+// count and Kaelis's grudge count, since both are the ATTACKER's own
+// tracked resource rather than a status placed ON the victim (same ruling
+// already established for what Rowan's Purify treats as "urgent" vs. what
+// it merely sweeps up as a side effect - see rowanHasUrgentNegativeStatus
+// in botPlayer.js). Used by Marin's Clean Slate: both its reactive trigger
 // condition (fires the first time this becomes true) and, while her
 // immunity window is active, to block these 5 specific status-applications
 // from landing on her at all (see the isImmuneToNegativeStatus carve-outs
