@@ -27,6 +27,7 @@ const FLASH_IMAGES = [
   'assets/images/athena/sacrifice.jpg',
   'assets/images/athena/judgment.jpg',
   'assets/images/blade/alive.jpg',
+  'assets/images/blade/rebirth.jpg',
   'assets/images/blade/guitar.jpg',
   'assets/images/blade/strike.jpg',
   'assets/images/blade/blood_frenzy.jpg',

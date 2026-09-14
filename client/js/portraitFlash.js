@@ -604,6 +604,25 @@ export function handleLogEntryForFlash(entry, game) {
     if (!isKO(entry.characterId)) setFlash(entry.characterId, 'assets/images/grimtal/beast_end.jpg');
     return;
   }
+  if (entry.type === 'rebirth') {
+    // Blade's Rebirth - confirmed real gap, 2026-09-14: getPersistentPortrait's
+    // own rebirthUsed check (above) already flips to the persistent
+    // alive.jpg the instant this triggers, with no transition moment for
+    // the actual revival itself - same "own dedicated type, no actionId"
+    // shape as beast-form-end just above, and same reasoning (the
+    // underlying flag has already gone true by the time this log entry is
+    // pushed, so this flash needs to override the persistent portrait
+    // rather than compete with it). Deliberately NOT gated on
+    // !isKO(entry.targetCharacterId) - he was never actually KO'd in the
+    // first place (Rebirth intercepts the killing blow before applyDamage's
+    // KO branch ever sets isKO=true), so there's no koed.jpg step in this
+    // sequence at all (confirmed ruling, 2026-09-14: "Normal -> rebirth.jpg
+    // flash -> alive.jpg", no koed step since he's mechanically never
+    // dead). Once this flash's own timer expires, getPersistentPortrait's
+    // alive.jpg naturally takes over for the rest of the match.
+    setFlash(entry.targetCharacterId, 'assets/images/blade/rebirth.jpg');
+    return;
+  }
   if (entry.type === 'ashkas-vengeance-strike') {
     // Ashka's Vengeance (Kaelis's hearts<=3 passive, taxonomy: Pure Attack
     // #1 + Passive Action #23) - a fully automatic bonus strike, own
