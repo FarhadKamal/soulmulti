@@ -209,32 +209,28 @@ registerDodgeDefense('grimtal', {
     target.special.lastHitByThisCycle.add(sourceCharacterId);
   },
   consume(target, game, sourceCharacterId, log) {
+    // Confirmed ruling, 2026-09-14: Grim Ward's dodge reward is shield-only
+    // now - it no longer heals hearts at all, even below max. Previously
+    // healed hearts first and only overflowed to shield once already at
+    // max; now every point always stacks onto shield instead, so a
+    // healthy Grimtal keeps accumulating shield across repeated dodges
+    // rather than topping out. Routed through applyShield (not a raw
+    // target.shield += 1) so Rowan's Silence Lock still correctly blocks it
+    // like every other shield source in the game - see the removed heal
+    // branch's own 2026-09-12 comment for the bug that fix addressed;
+    // still relevant here since this is the same call. Non-decaying (no
+    // { decaying: true } option), matching this source's original
+    // always-permanent behavior. applyShield returns nothing, so `shielded`
+    // is measured from the real before/after delta rather than assumed - a
+    // silenced Grimtal correctly reports 0 shielded, not the full amount.
     const aliveCount = Object.values(game.characters).filter((c) => !c.isKO).length;
     const points = aliveCount >= 4 ? 2 : aliveCount === 3 ? 1 : 0;
-    let healed = 0;
-    let shielded = 0;
+    const shieldBefore = target.shield;
     for (let i = 0; i < points; i++) {
-      if (target.hearts < target.maxHearts) {
-        target.hearts += 1;
-        healed += 1;
-      } else {
-        // Confirmed real bug, 2026-09-12: this used to do a raw
-        // `target.shield += 1`, bypassing applyShield()'s own Rowan Silence
-        // Lock check entirely - every other shield source in the game
-        // (Athena, Tharox, Boingo, Zerathys, Chronox) correctly does
-        // nothing while silenced, but this overflow-to-shield path silently
-        // still worked. Routed through applyShield now for consistency -
-        // non-decaying (matches this source's original always-permanent
-        // behavior, no { decaying: true } option passed). applyShield
-        // returns nothing, so `shielded` is measured from the real
-        // before/after delta rather than assumed - a silenced Grimtal
-        // correctly reports 0 shielded that point, not 1.
-        const shieldBefore = target.shield;
-        applyShield(game, target.id, 1);
-        shielded += target.shield - shieldBefore;
-      }
+      applyShield(game, target.id, 1);
     }
-    log.push({ type: 'grim-ward-reward', targetCharacterId: target.id, healed, shielded });
+    const shielded = target.shield - shieldBefore;
+    log.push({ type: 'grim-ward-reward', targetCharacterId: target.id, healed: 0, shielded });
   },
 });
 
