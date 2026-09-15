@@ -1194,7 +1194,7 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
   } else if (character.hearts <= character.maxHearts / 2) {
     portrait.src = v(`assets/injured/${character.id}.jpg`);
   } else {
-    portrait.src = v(`assets/portraits/${character.id}.jpg`);
+    portrait.src = v(`assets/images/${character.id}/portrait.jpg`);
   }
   portrait.alt = def.name;
   // Soul Swap: a quick color-invert flash directly on the victim's own
