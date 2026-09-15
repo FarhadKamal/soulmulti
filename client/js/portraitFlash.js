@@ -281,26 +281,16 @@ export function getPersistentPortrait(character) {
   return null;
 }
 
-// Every character's idle/untouched portrait, keyed by id - the 8 "own turn
-// started, took no damage since last turn, above half health" flashes.
-const IDLE_IMAGE = {
-  athena: 'assets/images/athena/apple.jpg',
-  velorya: 'assets/images/velorya/dance.jpg',
-  boingo: 'assets/images/boingo/circus.jpg',
-  zerathys: 'assets/images/zerathys/glass.jpg',
-  tharox: 'assets/images/tharox/roar.jpg',
-  blade: 'assets/images/blade/guitar.jpg',
-  chronox: 'assets/images/chronox/space.jpg',
-  akyros: 'assets/images/akyros/rose.jpg',
-  melyssa: 'assets/images/melyssa/chess.jpg',
-  kaelis: 'assets/images/kaelis/idle.jpg',
-  draxus: 'assets/images/draxus/idle.jpg',
-  rowan: 'assets/images/rowan/idle.jpg',
-  marin: 'assets/images/marin/idle.jpg',
-  grimtal: 'assets/images/grimtal/idle.jpg',
-  illyra: 'assets/images/illyra/idle.jpg',
-  oraclus: 'assets/images/oraclus/idle.jpg',
-};
+// Every character's idle/untouched portrait ("own turn started, took no
+// damage since last turn, above half health" flash). Every hero's file now
+// lives at the same path shape (confirmed rename, 2026-09-15 - 9 heroes
+// used to have their own themed filename here, e.g. blade/guitar.jpg,
+// athena/apple.jpg; renamed to idle.jpg across the board for consistency
+// with the 7 heroes that already used it), so this is a plain computed
+// path rather than a per-hero lookup table.
+function idleImagePath(characterId) {
+  return `assets/images/${characterId}/idle.jpg`;
+}
 
 // Per-character idle-flash duration overrides (falls back to the shared
 // FLASH_DURATION_MS for everyone not listed here). Grimtal's flute-playing
@@ -361,8 +351,7 @@ export function checkIdlePortrait(character, round) {
     return false;
   }
   if (isIdle) {
-    const src = IDLE_IMAGE[character.id];
-    if (src) setFlash(character.id, src, IDLE_DURATION_MS[character.id]);
+    setFlash(character.id, idleImagePath(character.id), IDLE_DURATION_MS[character.id]);
   }
   heartsAtLastTurnStart.set(character.id, character.hearts);
   return isIdle;
