@@ -13,9 +13,11 @@ import { v } from './assetVersion.js';
 const BADGE_ICONS = [
   'assets/badge/beast.png',
   'assets/badge/blade_hit.png',
+  'assets/badge/glory_smash.png',
   'assets/badge/skull.png',
   'assets/badge/skull_crack.png',
   'assets/badge/skull_heart.png',
+  'assets/badge/tharox_charge.png',
 ];
 
 // Flash/persistent-portrait images - filenames don't follow a fixed

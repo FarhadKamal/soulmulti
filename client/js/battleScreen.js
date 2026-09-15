@@ -1371,10 +1371,14 @@ function statusBadges(character) {
         badges.push({ text: 'World Stops active', cls: 'warn' });
       }
       break;
-    case 'tharox':
-      if (character.special.hasCharge) badges.push({ text: 'Charge ready', cls: 'warn' });
-      badges.push({ text: `Glory Smash: ${character.special.glorySmashesUsed}/2` });
+    case 'tharox': {
+      if (character.special.hasCharge) {
+        badges.push({ icon: 'assets/badge/tharox_charge.png', cls: 'warn', title: 'Charge ready - Titan Toss is armed' });
+      }
+      const glorySmashRemaining = 2 - character.special.glorySmashesUsed;
+      badges.push({ icon: 'assets/badge/glory_smash.png', text: `${glorySmashRemaining}/2`, title: 'Glory Smash casts remaining' });
       break;
+    }
     case 'zerathys':
       // Overcharge Collapse (Passive Action #23, no button - see
       // zerathys.js) - while hearts <= 3, Charge Up is hidden and Thunder
