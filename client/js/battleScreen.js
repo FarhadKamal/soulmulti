@@ -1505,7 +1505,7 @@ function statusBadges(character) {
       // counts down to 0 as he spends them, matching how a limited-use
       // resource reads most intuitively at a glance.
       const remaining = 3 - character.special.skullCrackUsed;
-      badges.push({ icon: 'assets/badge/skull_crack.png', text: `Skull Crack: ${remaining}/3` });
+      badges.push({ icon: 'assets/badge/skull_crack.png', text: `${remaining}/3`, title: 'Skull Crack casts remaining' });
       if (character.special.unclaimedKillCount > 0) {
         badges.push({ icon: 'assets/badge/skull.png', text: `${character.special.unclaimedKillCount}`, cls: 'warn', title: 'Unclaimed kills banked - cast Claim the Kill to convert into permanent power' });
       }
