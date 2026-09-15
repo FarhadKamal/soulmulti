@@ -12,6 +12,7 @@ import { v } from './assetVersion.js';
 // icons, not full portrait art), kept in its own list.
 const BADGE_ICONS = [
   'assets/badge/beast.png',
+  'assets/badge/blade_hit.png',
   'assets/badge/skull.png',
   'assets/badge/skull_crack.png',
   'assets/badge/skull_heart.png',

@@ -1084,7 +1084,14 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
     // cycling); the badge previews what his NEXT hit on them would deal.
     const bladeBadge = document.createElement('div');
     bladeBadge.className = 'blade-hitcount-badge';
-    bladeBadge.textContent = `🗡️${bladeHitCount}`;
+    // Custom icon (confirmed 2026-09-15, matches Grimtal's own badge-icon
+    // treatment) instead of the plain 🗡️ emoji.
+    const bladeIcon = document.createElement('img');
+    bladeIcon.src = v('assets/badge/blade_hit.png');
+    bladeIcon.className = 'status-badge-icon';
+    bladeIcon.alt = '';
+    bladeBadge.appendChild(bladeIcon);
+    bladeBadge.appendChild(document.createTextNode(`${bladeHitCount}`));
     const nextHit = (bladeHitCount % 3) + 1;
     bladeBadge.title = `Blade's hit count on you: ${bladeHitCount} (his next Blood Hunt on you would deal ${nextHit})`;
     tile.appendChild(bladeBadge);
