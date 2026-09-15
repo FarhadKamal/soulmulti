@@ -597,10 +597,9 @@ input {
    target). */
 .blade-hitcount-badge {
   position: absolute; bottom: 28px; left: 50%; translate: -50% 0;
-  background: rgba(139, 0, 0, 0.85); color: #fff;
+  background: rgba(28, 28, 44, 0.9); border: 1px solid #444; color: #fff;
   font-size: 0.85em; font-weight: 700;
   padding: 2px 6px; border-radius: 10px;
-  box-shadow: 0 0 6px rgba(139, 0, 0, 0.6);
   pointer-events: none; z-index: 5;
 }
 @keyframes tile-ball-wobble {
