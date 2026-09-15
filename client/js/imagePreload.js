@@ -13,6 +13,7 @@ import { v } from './assetVersion.js';
 const BADGE_ICONS = [
   'assets/badge/beast.png',
   'assets/badge/skull.png',
+  'assets/badge/skull_crack.png',
   'assets/badge/skull_heart.png',
 ];
 
