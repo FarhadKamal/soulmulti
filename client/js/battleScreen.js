@@ -1167,7 +1167,7 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
     // shared assets/images/boingo/chicken_roast.jpg.
     portrait.src = v(`assets/images/${character.id}/chicken_roast.jpg`);
   } else if (character.isKO) {
-    portrait.src = v(`assets/koed/${character.id}.jpg`);
+    portrait.src = v(`assets/images/${character.id}/koed.jpg`);
   } else if (character.isChicken) {
     // Boingo's Fowl Play - THIS character's own hero-specific chicken art
     // overrides their own idle/injured portrait for as long as they're
@@ -1192,7 +1192,7 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
     // injured image after alive is alive.jpg".
     portrait.src = v('assets/images/draxus/alive.jpg');
   } else if (character.hearts <= character.maxHearts / 2) {
-    portrait.src = v(`assets/injured/${character.id}.jpg`);
+    portrait.src = v(`assets/images/${character.id}/injured.jpg`);
   } else {
     portrait.src = v(`assets/images/${character.id}/portrait.jpg`);
   }

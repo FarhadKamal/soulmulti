@@ -8,7 +8,7 @@ import { CHARACTER_IDS } from './characters.js';
 import { v } from './assetVersion.js';
 
 // Per-character, one file per folder, filename === characterId.
-const PER_CHARACTER_FOLDERS = ['assets/koed', 'assets/victory', 'assets/injured'];
+const PER_CHARACTER_FOLDERS = ['assets/victory'];
 
 // Flash/persistent-portrait images - filenames don't follow a fixed
 // pattern (varies per character/action), so listed explicitly. Kept in
@@ -228,12 +228,17 @@ export function preloadBattleImages() {
   for (const folder of PER_CHARACTER_FOLDERS) {
     for (const id of CHARACTER_IDS) paths.push(`${folder}/${id}.jpg`);
   }
-  // Default battle portrait - moved into each hero's own images/<id>/
-  // folder as portrait.jpg (confirmed rename, 2026-09-15; previously
-  // assets/portraits/<id>.jpg, which fit PER_CHARACTER_FOLDERS' shape -
-  // now a different shape (per-hero subfolder, fixed filename), so it's a
-  // dedicated loop rather than a 4th entry there.
-  for (const id of CHARACTER_IDS) paths.push(`assets/images/${id}/portrait.jpg`);
+  // Default battle portrait, KO'd, and injured images - moved into each
+  // hero's own images/<id>/ folder as portrait.jpg/koed.jpg/injured.jpg
+  // (confirmed rename, 2026-09-15; previously assets/portraits/<id>.jpg,
+  // assets/koed/<id>.jpg, assets/injured/<id>.jpg, which fit
+  // PER_CHARACTER_FOLDERS' shape - now a different shape, per-hero
+  // subfolder with a fixed filename rather than a shared top-level folder
+  // with characterId as the filename, so this is a dedicated loop rather
+  // than 3 more PER_CHARACTER_FOLDERS entries.
+  for (const id of CHARACTER_IDS) {
+    paths.push(`assets/images/${id}/portrait.jpg`, `assets/images/${id}/koed.jpg`, `assets/images/${id}/injured.jpg`);
+  }
   // Plain Image() objects, never attached to the DOM - the browser caches
   // the response as soon as it loads regardless, so a later portrait.src =
   // same path is served from cache instantly. No onload/onerror handling
