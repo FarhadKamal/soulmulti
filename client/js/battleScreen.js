@@ -1392,19 +1392,14 @@ function statusBadges(character) {
         badges.push({ text: `Charge: ${character.special.chargeCount}/2` });
       }
       break;
-    case 'blade': {
-      // Redesigned 2026-09-14: no more single global streak to summarize
-      // here - each per-target hit count is shown on that VICTIM's own
-      // tile instead (see the blade-hitcount-badge wiring in
-      // renderCharacterTile/its caller above), same "per-relationship
-      // state belongs on the other tile" reasoning as Kaelis's grudge.
-      // This own-tile badge just gives a quick "how many different people
-      // has he drawn blood from" count, since that's not otherwise visible
-      // without scanning every other tile.
-      const targetsHit = Object.keys(character.special.hitCountByTarget || {}).length;
-      if (targetsHit > 0) badges.push({ text: `Blood drawn: ${targetsHit}` });
-      break;
-    }
+    // No dedicated Blade badge on his own tile - his per-target hit counts
+    // are shown on each VICTIM's own tile instead (see the
+    // blade-hitcount-badge wiring in renderCharacterTile/its caller above),
+    // same "per-relationship state belongs on the other tile" reasoning as
+    // Kaelis's grudge. Confirmed ruling, 2026-09-15: an own-tile "Blood
+    // drawn: N" summary badge used to sit here but was removed as
+    // redundant - the per-victim badge already makes the full picture
+    // clear without it.
     case 'kaelis':
       if (character.special.ashkaHealsRemaining > 0) {
         badges.push({ text: `Ashka heals: ${character.special.ashkaHealsRemaining}` });
