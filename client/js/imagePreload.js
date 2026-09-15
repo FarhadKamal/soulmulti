@@ -7,9 +7,6 @@
 import { CHARACTER_IDS } from './characters.js';
 import { v } from './assetVersion.js';
 
-// Per-character, one file per folder, filename === characterId.
-const PER_CHARACTER_FOLDERS = ['assets/victory'];
-
 // Flash/persistent-portrait images - filenames don't follow a fixed
 // pattern (varies per character/action), so listed explicitly. Kept in
 // sync with every literal 'assets/images/...jpg' path referenced in
@@ -225,19 +222,16 @@ export function preloadBattleImages() {
   if (started) return readyPromise;
   started = true;
   const paths = [...FLASH_IMAGES, ...CHICKEN_IMAGES, ...DIVINE_JUDGMENT_STRUCK_IMAGES, ...PROPHECY_OF_DOOM_STRIKE_IMAGES, ...ASHKAS_VENGEANCE_STRIKE_IMAGES, ...SHADOW_ARMY_STRIKE_IMAGES, ...PETRIFY_STONE_IMAGES, ...SELF_CHOKE_VICTIM_IMAGES, ...LIFEBOND_REACTION_IMAGES, ...MOONLIT_THEFT_REACTION_IMAGES];
-  for (const folder of PER_CHARACTER_FOLDERS) {
-    for (const id of CHARACTER_IDS) paths.push(`${folder}/${id}.jpg`);
-  }
-  // Default battle portrait, KO'd, and injured images - moved into each
-  // hero's own images/<id>/ folder as portrait.jpg/koed.jpg/injured.jpg
-  // (confirmed rename, 2026-09-15; previously assets/portraits/<id>.jpg,
-  // assets/koed/<id>.jpg, assets/injured/<id>.jpg, which fit
-  // PER_CHARACTER_FOLDERS' shape - now a different shape, per-hero
-  // subfolder with a fixed filename rather than a shared top-level folder
-  // with characterId as the filename, so this is a dedicated loop rather
-  // than 3 more PER_CHARACTER_FOLDERS entries.
+  // Default battle portrait, KO'd, injured, and victory images - each now
+  // lives inside the hero's own images/<id>/ folder with a fixed filename
+  // (confirmed rename, 2026-09-15; previously 4 separate top-level folders
+  // - assets/portraits/, assets/koed/, assets/injured/, assets/victory/ -
+  // each holding one file per hero named <id>.jpg).
   for (const id of CHARACTER_IDS) {
-    paths.push(`assets/images/${id}/portrait.jpg`, `assets/images/${id}/koed.jpg`, `assets/images/${id}/injured.jpg`);
+    paths.push(
+      `assets/images/${id}/portrait.jpg`, `assets/images/${id}/koed.jpg`,
+      `assets/images/${id}/injured.jpg`, `assets/images/${id}/victory.jpg`,
+    );
   }
   // Plain Image() objects, never attached to the DOM - the browser caches
   // the response as soon as it loads regardless, so a later portrait.src =

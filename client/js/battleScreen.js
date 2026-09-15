@@ -511,7 +511,7 @@ function renderVictoryPortraits(game) {
     const box = document.createElement('div');
     box.className = 'victory-portrait-box';
     const img = document.createElement('img');
-    img.src = v(`assets/victory/${id}.jpg`);
+    img.src = v(`assets/images/${id}/victory.jpg`);
     img.alt = CHARACTERS[id]?.name || id;
     box.appendChild(img);
     const label = document.createElement('div');
@@ -1139,7 +1139,7 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
   // !character.isKO, letting the normal isKO branch further below win for
   // them instead.
   if (isVictorious) {
-    portrait.src = v(`assets/victory/${character.id}.jpg`);
+    portrait.src = v(`assets/images/${character.id}/victory.jpg`);
   } else if (isPetrifiedOther && !character.isKO) {
     // Grimtal's Beast Form (Death-Triggered Reversion #36) gets its own
     // petrified art (beast_stone.jpg) rather than the plain human stone.jpg
