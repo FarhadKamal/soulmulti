@@ -5,6 +5,7 @@ import { playUiClick } from './sound.js';
 import { getFlashSrc, getPersistentPortrait, isMindControlOverlayActive, isEarthshatterOverlayActive, isPetrifyActive } from './portraitFlash.js';
 import { getActiveEffects, getClawCount, getCrackCount, getPowSize, getVortexSize, getAxechopTier, getLightningTier, getWildLightningTier, getDarkslashVariant } from './actionEffects.js';
 import { renderFullscreenButton } from './fullscreen.js';
+import { renderMusicMuteButton } from './musicMute.js';
 import { v, hardRefresh } from './assetVersion.js';
 
 // Whether the log/chat drawer is open - module state (not part of `state`
@@ -103,6 +104,7 @@ export function renderBattle(root, state) {
   topControls.className = 'top-right-controls';
   topControls.appendChild(renderLeaveButton());
   topControls.appendChild(renderHardRefreshIconButton());
+  topControls.appendChild(renderMusicMuteButton());
   topControls.appendChild(renderFullscreenButton());
   wrap.appendChild(topControls);
 
@@ -2396,6 +2398,7 @@ function renderGameOver(game, youAreOwner) {
   // covered by this screen's own Exit/Main Menu buttons below).
   const topControls = document.createElement('div');
   topControls.className = 'top-right-controls';
+  topControls.appendChild(renderMusicMuteButton());
   topControls.appendChild(renderFullscreenButton());
   wrap.appendChild(topControls);
   const title = document.createElement('h2');

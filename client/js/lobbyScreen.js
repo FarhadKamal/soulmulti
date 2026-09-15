@@ -2,6 +2,7 @@ import { CHARACTERS } from './characters.js';
 import { send } from './net.js';
 import { renderChatPanel } from './chatPanel.js';
 import { renderFullscreenButton } from './fullscreen.js';
+import { renderMusicMuteButton } from './musicMute.js';
 import { hardRefresh } from './assetVersion.js';
 
 // Whether the About panel is open - module state (not part of the shared
@@ -51,6 +52,7 @@ export function renderLobby(root, { room, error, connectionLost }, { onEnterMatc
   // something needed once you're already in a room or mid-match.
   if (!room) topControls.appendChild(renderAboutButton(rerender));
   topControls.appendChild(renderHardRefreshButton());
+  topControls.appendChild(renderMusicMuteButton());
   topControls.appendChild(renderFullscreenButton());
   header.appendChild(topControls);
 

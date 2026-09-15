@@ -21,6 +21,42 @@ function get(name) {
 let musicAudio = null;
 let musicTrack = null; // 'menu' | 'battle' | null
 
+// Music-only mute (musicMute.js's global toggle button) - deliberately
+// separate from sound effects (playSound below) and voice lines (voice.js,
+// its own file entirely), per explicit request: "mute the background music
+// only, not sound effect or voice." Persisted across reloads/reconnects
+// via localStorage, read once at module-load time so a freshly created
+// musicAudio node (every track switch makes a new Audio object - see
+// startMusic below) picks up the current mute state immediately rather
+// than needing a separate "re-apply on track change" call site.
+const MUSIC_MUTE_KEY = 'soulclash-music-muted';
+let musicMuted = false;
+try {
+  musicMuted = localStorage.getItem(MUSIC_MUTE_KEY) === 'true';
+} catch {
+  // localStorage unavailable (private mode, etc.) - default to unmuted.
+}
+
+export function isMusicMuted() {
+  return musicMuted;
+}
+
+export function setMusicMuted(muted) {
+  musicMuted = muted;
+  if (musicAudio) musicAudio.muted = muted;
+  try {
+    localStorage.setItem(MUSIC_MUTE_KEY, String(muted));
+  } catch {
+    // ignore - mute still applies for the rest of this session even if it
+    // can't persist across reloads.
+  }
+}
+
+export function toggleMusicMuted() {
+  setMusicMuted(!musicMuted);
+  return musicMuted;
+}
+
 const BATTLE_TRACKS = ['bgm-battle.mp3', 'bgm-battle-2.mp3', 'bgm-battle-3.mp3'];
 const MENU_TRACKS = ['bgm-menu.mp3', 'bgm-menu-2.mp3', 'bgm-menu-3.mp3'];
 // Tharox's Earthshatter/Boingo's ball etc. don't touch background music at
@@ -89,6 +125,7 @@ function startMusic(track, file, volume) {
     const node = new Audio(v(`assets/sounds/${file}`));
     node.loop = true;
     node.volume = volume;
+    node.muted = musicMuted;
     node.play().catch(() => {});
     musicAudio = node;
     musicTrack = track;
