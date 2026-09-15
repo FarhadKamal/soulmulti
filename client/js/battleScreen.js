@@ -1482,7 +1482,7 @@ function statusBadges(character) {
       // duration/countdown shown since it has none - it ends on an external
       // event (any KO anywhere), not a timer.
       if (character.special.beastFormActive) {
-        badges.push({ icon: 'assets/badge/beast.png', text: 'Beast Form', cls: 'warn', title: 'Untargetable, immune to all damage and new negative status - reverts the instant ANY character is KO\'d' });
+        badges.push({ icon: 'assets/badge/beast.png', cls: 'warn', title: 'Beast Form - untargetable, immune to all damage and new negative status - reverts the instant ANY character is KO\'d' });
         // Passive regeneration cadence (confirmed ruling, 2026-09-13): heals
         // 1 heart on every OTHER of his own turn-starts, only while hearts
         // <= 4. Shown only while that threshold still applies - once he's
