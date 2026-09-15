@@ -132,18 +132,6 @@ export function isMindControlOverlayActive(characterId) {
   return mindControlOverlayIds.has(characterId);
 }
 
-// Tharox's Earthshatter: same timed-Set-of-ids shape as the mind-control
-// overlay above, but populated with every VICTIM who actually took damage
-// this cast (read from the log entry's own `hits` array), not a fixed list
-// handed in directly - see handleLogEntryForFlash's own 'earthshatter' case
-// below. Shares the same duration as his own EARTHSHATTER_FLASH_DURATION_MS
-// cast flash so both effects start and end together.
-const earthshatterOverlayIds = new Set();
-let earthshatterOverlayTimer = null;
-
-export function isEarthshatterOverlayActive(characterId) {
-  return earthshatterOverlayIds.has(characterId);
-}
 // Tracks each idle-portrait character's hearts as of their last turn start,
 // to detect "untouched since last turn" - same reasoning as
 // athenaHeartsAtLastTurnStart etc. in the main game.
@@ -727,29 +715,29 @@ export function handleLogEntryForFlash(entry, game) {
   if (entry.type === 'special' && entry.actionId === 'earthshatter') {
     // Tharox's own cast flash still fires via the generic switch below (his
     // characterId is 'attack'/'special'-shaped like any other action) -
-    // this block ONLY handles the separate victim-overlay layer, read from
-    // entry.hits (per-target results, see tharox.js's own execute() - the
-    // real shape is { targetId, amountDealt, koTriggered }, NOT
-    // targetCharacterId/dodged - Earthshatter always sets ignoresDodge:
-    // true on every point, so there's no dodge concept to check here at
-    // all). Every victim who actually took real damage (amountDealt > 0)
-    // gets the falling-stone overlay for the same duration as his own cast
-    // flash - one shared timer, since the whole AoE resolves as a single
-    // instant burst, same reasoning as Full Control's own shared overlay
-    // timer above.
-    if (earthshatterOverlayTimer) clearTimeout(earthshatterOverlayTimer);
-    earthshatterOverlayIds.clear();
+    // this block handles the per-victim strike art, read from entry.hits
+    // (see tharox.js's own execute() - shape is { targetId, amountDealt,
+    // koTriggered }, NOT targetCharacterId/dodged - Earthshatter always
+    // sets ignoresDodge: true on every point, so there's no dodge concept
+    // to check here at all). Replaces the old shared falling-stone
+    // earthshatter_overlay.jpg (2026-09-15) with real per-victim art
+    // (earthshatter_strike.jpg, one per hero, same pattern as
+    // judgement_strike.jpg/doom_strike.jpg/ashka_strike.jpg/
+    // shadow_strike.jpg) - each victim now shows THEIR OWN reaction
+    // instead of a generic overlay layered on top of their portrait.
+    // Deliberately NOT gated on !isKO(hit.targetId) - a hit that KO'd its
+    // target should still show the strike art overriding the plain
+    // koed.jpg for EARTHSHATTER_FLASH_DURATION_MS, same reasoning as every
+    // other trigger flash in this file (confirmed explicit direction,
+    // 2026-09-15: "animation should stay long, don't show koed image too
+    // fast" - this WAS excluding KO'd victims entirely under the old
+    // overlay mechanism, the exact opposite of every sibling flash's own
+    // established rule, so this rebuild also fixes that inconsistency,
+    // not just the art itself).
     for (const hit of entry.hits || []) {
-      if (hit.amountDealt > 0 && !isKO(hit.targetId)) {
-        earthshatterOverlayIds.add(hit.targetId);
+      if (hit.amountDealt > 0) {
+        setFlash(hit.targetId, `assets/images/${hit.targetId}/earthshatter_strike.jpg`, EARTHSHATTER_FLASH_DURATION_MS);
       }
-    }
-    if (earthshatterOverlayIds.size > 0) {
-      earthshatterOverlayTimer = setTimeout(() => {
-        earthshatterOverlayTimer = null;
-        earthshatterOverlayIds.clear();
-        onFlashExpired();
-      }, EARTHSHATTER_FLASH_DURATION_MS);
     }
     // Deliberately NOT returning here - falls through to the generic
     // switch below so Tharox's own 'assets/images/tharox/final.jpg' cast
