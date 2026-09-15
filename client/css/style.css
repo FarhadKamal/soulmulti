@@ -302,6 +302,7 @@ input {
   background: #1c1c2c; border: 1px solid #444; color: #9a9aa8; margin: 2px 4px 0 0;
 }
 .status-badge--warn { border-color: #ffd75e; color: #ffd75e; }
+.status-badge-icon { width: 1.1em; height: 1.1em; vertical-align: -0.2em; margin-right: 3px; object-fit: contain; }
 
 /* Reactive one-shot tile animations - ported from the main game's
    dashboard.css (same keyframes/timings), driven by actionEffects.js

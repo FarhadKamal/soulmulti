@@ -7,6 +7,15 @@
 import { CHARACTER_IDS } from './characters.js';
 import { v } from './assetVersion.js';
 
+// Small persistent status-badge icons (battleScreen.js's statusBadges) -
+// a different category from the battle-image flashes below (tiny UI
+// icons, not full portrait art), kept in its own list.
+const BADGE_ICONS = [
+  'assets/badge/beast.png',
+  'assets/badge/skull.png',
+  'assets/badge/skull_heart.png',
+];
+
 // Flash/persistent-portrait images - filenames don't follow a fixed
 // pattern (varies per character/action), so listed explicitly. Kept in
 // sync with every literal 'assets/images/...jpg' path referenced in
@@ -221,7 +230,7 @@ let readyPromise = null;
 export function preloadBattleImages() {
   if (started) return readyPromise;
   started = true;
-  const paths = [...FLASH_IMAGES, ...CHICKEN_IMAGES, ...DIVINE_JUDGMENT_STRUCK_IMAGES, ...PROPHECY_OF_DOOM_STRIKE_IMAGES, ...ASHKAS_VENGEANCE_STRIKE_IMAGES, ...SHADOW_ARMY_STRIKE_IMAGES, ...PETRIFY_STONE_IMAGES, ...SELF_CHOKE_VICTIM_IMAGES, ...LIFEBOND_REACTION_IMAGES, ...MOONLIT_THEFT_REACTION_IMAGES];
+  const paths = [...FLASH_IMAGES, ...BADGE_ICONS, ...CHICKEN_IMAGES, ...DIVINE_JUDGMENT_STRUCK_IMAGES, ...PROPHECY_OF_DOOM_STRIKE_IMAGES, ...ASHKAS_VENGEANCE_STRIKE_IMAGES, ...SHADOW_ARMY_STRIKE_IMAGES, ...PETRIFY_STONE_IMAGES, ...SELF_CHOKE_VICTIM_IMAGES, ...LIFEBOND_REACTION_IMAGES, ...MOONLIT_THEFT_REACTION_IMAGES];
   // Default battle portrait, KO'd, injured, and victory images - each now
   // lives inside the hero's own images/<id>/ folder with a fixed filename
   // (confirmed rename, 2026-09-15; previously 4 separate top-level folders

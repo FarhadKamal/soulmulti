@@ -1315,10 +1315,22 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
   if (badges.length > 0) {
     const badgeRow = document.createElement('div');
     badgeRow.className = 'status-badge-row';
-    badges.forEach(({ text, cls, title }) => {
+    badges.forEach(({ text, cls, title, icon }) => {
       const badge = document.createElement('span');
       badge.className = 'status-badge' + (cls ? ` status-badge--${cls}` : '');
-      badge.textContent = text;
+      // Optional custom icon (Grimtal's Beast Form/regen/unclaimed-kill
+      // badges, confirmed 2026-09-15) - a real image instead of an emoji
+      // glyph, prepended before the text/number. Emoji-only badges
+      // elsewhere in this file are untouched, no icon field means no
+      // change in behavior.
+      if (icon) {
+        const img = document.createElement('img');
+        img.src = v(icon);
+        img.className = 'status-badge-icon';
+        img.alt = '';
+        badge.appendChild(img);
+      }
+      if (text) badge.appendChild(document.createTextNode(text));
       // Icon-only badges (e.g. Marin's passives) carry their full name here
       // instead of in the visible text, so a hover still reveals what the
       // icon means without cluttering the tile - optional, most badges
@@ -1474,7 +1486,7 @@ function statusBadges(character) {
       // duration/countdown shown since it has none - it ends on an external
       // event (any KO anywhere), not a timer.
       if (character.special.beastFormActive) {
-        badges.push({ text: '🐺 Beast Form', cls: 'warn', title: 'Untargetable, immune to all damage and new negative status - reverts the instant ANY character is KO\'d' });
+        badges.push({ icon: 'assets/badge/beast.png', text: 'Beast Form', cls: 'warn', title: 'Untargetable, immune to all damage and new negative status - reverts the instant ANY character is KO\'d' });
         // Passive regeneration cadence (confirmed ruling, 2026-09-13): heals
         // 1 heart on every OTHER of his own turn-starts, only while hearts
         // <= 4. Shown only while that threshold still applies - once he's
@@ -1482,7 +1494,7 @@ function statusBadges(character) {
         // ever) he drops back down, so the badge would be misleading noise.
         if (character.hearts <= 4) {
           const turnsUntilHeal = character.special.beastFormTurnCount % 2 === 0 ? 2 : 1;
-          badges.push({ text: `❤️‍🩹 ${turnsUntilHeal}`, title: `Regenerates 1 heart in ${turnsUntilHeal} more of his own turn${turnsUntilHeal > 1 ? 's' : ''}` });
+          badges.push({ icon: 'assets/badge/skull_heart.png', text: `${turnsUntilHeal}`, title: `Regenerates 1 heart in ${turnsUntilHeal} more of his own turn${turnsUntilHeal > 1 ? 's' : ''}` });
         }
         break;
       }
@@ -1493,7 +1505,7 @@ function statusBadges(character) {
       const remaining = 3 - character.special.skullCrackUsed;
       badges.push({ text: `Skull Crack: ${remaining}/3` });
       if (character.special.unclaimedKillCount > 0) {
-        badges.push({ text: `💀 ${character.special.unclaimedKillCount}`, cls: 'warn', title: 'Unclaimed kills banked - cast Claim the Kill to convert into permanent power' });
+        badges.push({ icon: 'assets/badge/skull.png', text: `${character.special.unclaimedKillCount}`, cls: 'warn', title: 'Unclaimed kills banked - cast Claim the Kill to convert into permanent power' });
       }
       break;
     }
