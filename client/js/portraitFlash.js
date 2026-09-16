@@ -611,12 +611,21 @@ export function handleLogEntryForFlash(entry, game) {
     // ruling: "we will create ashka is attaking for each hero"), same
     // per-victim-art pattern as Divine Judgment/Prophecy of Doom -
     // assets/images/<victimId>/ashka_strike.jpg, held for
-    // ASHKAS_VENGEANCE_STRIKE_FLASH_DURATION_MS (not gated on amountDealt>0
-    // the way most attack flashes are, since this is always exactly 1 flat
-    // pure damage with no dodge to fail against - it always lands unless
-    // the target already died before this fires, guarded by isKO below).
+    // ASHKAS_VENGEANCE_STRIKE_FLASH_DURATION_MS. Confirmed real bug,
+    // 2026-09-16: the old gate here was "not gated on amountDealt>0... it
+    // always lands unless the target already died" - written before
+    // Grimtal's Beast Form existed, which is a SECOND way this can
+    // correctly deal 0 despite Ashka's Vengeance's normal unblockable
+    // nature (tryBeastFormImmunity in damagePipeline.js sits above every
+    // ignoresShield/ignoresDodge/ignoresUntargetable flag, so it still
+    // blocks this true-pure hit even though nothing else can) - live
+    // report: "ashka should not even target grimtal in beast form... i
+    // have seen ashka hit animation on grimtal during beast form." Now
+    // explicitly gated on amountDealt>0 to catch this (and any other
+    // future zero-damage source) generically, rather than re-special-
+    // casing Beast Form here by name.
     if (!isKO(entry.characterId)) setFlash(entry.characterId, 'assets/images/kaelis/surprise.jpg');
-    if (!isKO(entry.targetId) || entry.koTriggered) {
+    if (entry.amountDealt > 0 && (!isKO(entry.targetId) || entry.koTriggered)) {
       setFlash(entry.targetId, `assets/images/${entry.targetId}/ashka_strike.jpg`, ASHKAS_VENGEANCE_STRIKE_FLASH_DURATION_MS);
     }
     return;
