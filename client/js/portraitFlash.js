@@ -793,13 +793,31 @@ export function handleLogEntryForFlash(entry, game) {
     case 'divineJudgment':
       setFlash(characterId, 'assets/images/athena/judgment.jpg'); break;
     case 'glorySmash':
-      setFlash(characterId, 'assets/images/tharox/glory.jpg'); break;
+      setFlash(characterId, 'assets/images/tharox/glory.jpg');
+      // Per-victim reaction art (confirmed direction, 2026-09-16: reuse the
+      // same "heavy physical blow" concept across Smash/Titan Smash/Glory
+      // Smash rather than Earthshatter's own ground-shattering art, which
+      // is a different concept - same per-victim-hero art pattern as
+      // judgement_strike.jpg/doom_strike.jpg/ashka_strike.jpg/
+      // shadow_strike.jpg/earthshatter_strike.jpg). Gated on amountDealt>0
+      // (not dodged) since Glory Smash always lands (no dodge concept for
+      // it server-side) but could still be fully shield-absorbed.
+      if (amountDealt > 0 && !isKO(targetCharacterId)) {
+        setFlash(targetCharacterId, `assets/images/${targetCharacterId}/tharox_smash_strike.jpg`);
+      }
+      break;
     case 'earthshatter':
       setFlash(characterId, 'assets/images/tharox/final.jpg', EARTHSHATTER_FLASH_DURATION_MS); break;
     case 'titanToss':
       setFlash(characterId, 'assets/images/tharox/toss.jpg'); break;
     case 'smash': case 'titanSmash':
       if (!dodged) setFlash(characterId, 'assets/images/tharox/smash.jpg');
+      // Same per-victim reaction art as Glory Smash above - gated on both
+      // !dodged and amountDealt>0 since these two CAN be dodged (unlike
+      // Glory Smash).
+      if (!dodged && amountDealt > 0 && !isKO(targetCharacterId)) {
+        setFlash(targetCharacterId, `assets/images/${targetCharacterId}/tharox_smash_strike.jpg`);
+      }
       break;
     case 'soulSwap':
       setFlash(characterId, 'assets/images/zerathys/soul.jpg'); break;
