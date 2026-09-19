@@ -55,7 +55,17 @@ registerRebirth('blade', (character) => {
   character.special.rebirthUsed = true;
   character.usedSpecial = true;
   // Comes back fresh: clear any lingering negative status rather than
-  // carrying it over from the moment he died.
+  // carrying it over from the moment he died. Akyros's Shadow Seal's
+  // lockedHearts gets the same "fresh means negative status will remove"
+  // treatment - confirmed reachable, 2026-09-20: a sealed Blade dying and
+  // reviving here with hearts reset to 2 could otherwise leave a stale
+  // lockedHearts higher than his new real hearts (the same invalid-state
+  // bug Soul Swap/Lifebond needed clampLockedHearts for - see
+  // damagePipeline.js's own comment), except here the cleaner fix is a
+  // full reset to 0 rather than a clamp, since he's not staying sealed at
+  // all - a KO/revival is a clean break, not a continuation of whatever
+  // state he died carrying.
+  character.lockedHearts = 0;
   character.skipNextTurn = false;
   character.skipHeadacheTurn = false;
   // hitCountByTarget deliberately NOT cleared here - confirmed ruling,

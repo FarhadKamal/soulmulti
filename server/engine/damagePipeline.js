@@ -32,6 +32,30 @@ export { registerRebirth };
 // turns and several OTHER characters' actions later during a busy
 // World-Stops/multi-KO stretch. Purely a display bug - no combat-
 // resolution damage was ever actually misapplied.
+// Akyros's Shadow Seal - lockedHearts must never exceed a character's
+// current hearts (it's defined as "a portion of current hearts locked
+// away," not an independent pool - see state.js's own comment). Every
+// mechanic that routes hearts changes through applyDamage/applyHeal is
+// automatically safe (the amount deducted/added there never pushes hearts
+// below lockedHearts in a way that breaks that invariant - a KO already
+// fires the instant the active pool hits 0). But a handful of abilities
+// directly assign character.hearts OUTSIDE that path entirely (Zerathys's
+// Soul Swap - a direct two-party exchange; Marin's Lifebond - a many-way
+// average) - confirmed reachable bug, 2026-09-20: Soul Swap dropping a
+// sealed character's hearts below their own lockedHearts left an invalid
+// state (lockedHearts > hearts) that the KO check never re-evaluates until
+// the NEXT hit lands, silently corrupting that next hit's outcome. Any
+// ability that sets character.hearts directly (not through applyDamage/
+// applyHeal) MUST call this immediately after, for every character whose
+// hearts it touched - clamps lockedHearts down to the new hearts value,
+// never up (a swap/average can only ever reveal MORE of what's already
+// locked, never lock away newly-arrived hearts on its own).
+export function clampLockedHearts(character) {
+  if (character.lockedHearts > character.hearts) {
+    character.lockedHearts = character.hearts;
+  }
+}
+
 export function heartsSnapshot(game) {
   const snap = {};
   for (const c of Object.values(game.characters)) {
@@ -424,6 +448,20 @@ export function applyDamage(game, log, {
   });
   if (earlyExtra) Object.assign(result, earlyExtra);
 
+  // Akyros's Shadow Seal - a KO can now fire from the ACTIVE pool
+  // (hearts - lockedHearts) hitting 0 even while real hearts reads higher
+  // (see the KO branch below), so every defensive mechanic that gates on
+  // "would this hit actually kill" must check the same active-pool
+  // condition, not the plain hearts === 0 every character effectively
+  // still uses outside a Shadow Seal window (lockedHearts defaults to 0,
+  // so this is equivalent for everyone else). Confirmed reachable bug,
+  // 2026-09-20: Rebirth/Deathless Fury only ever checked hearts === 0,
+  // silently skipping their own intercept entirely for a sealed character
+  // whose active pool was exhausted while real hearts was still nonzero -
+  // confirmed ruling: these defensive mechanics should still get a chance
+  // to trigger, same as against any other KO source.
+  const wouldKO = target.hearts - target.lockedHearts <= 0;
+
   // Rebirth (category-driven, see engine/categories/rebirthRegistry.js +
   // onOtherRevived.js): automatic, intercepts the KO the instant it would
   // happen. `rebirthResetter` looks up whichever character's own module
@@ -432,7 +470,7 @@ export function applyDamage(game, log, {
   // "already used" is a universal one-shot Rebirth precondition, not
   // something specific to any one character's reset logic.
   const rebirthResetter = getRebirthResetter(target.id);
-  if (rebirthResetter && target.hearts === 0 && !target.special.rebirthUsed && !ignoresRebirth) {
+  if (rebirthResetter && wouldKO && !target.special.rebirthUsed && !ignoresRebirth) {
     rebirthResetter(target, game, log);
     result.revived = true;
     // Every OTHER character's stale reference to the now-revived target
@@ -446,7 +484,7 @@ export function applyDamage(game, log, {
     // runs mid-way through the ability's execute(), before its own
     // log.push() for the attack/special line itself.
     result.rebirthLogEntry = { type: 'rebirth', targetCharacterId };
-  } else if (target.id === 'draxus' && target.hearts === 0
+  } else if (target.id === 'draxus' && wouldKO
     && (target.special.deathproofActive || target.special.reviveImmortalActive) && !ignoresImmortal) {
     // Floors at 1 instead of KO - NOT a revival event (isKO is never set,
     // no "comes back fresh" cleanup like Rebirth's above, since he never
@@ -464,8 +502,14 @@ export function applyDamage(game, log, {
     // onTurnStart) since the two windows are conceptually distinct even
     // though they never overlap in practice.
     target.hearts = 1;
+    // Akyros's Shadow Seal - flooring hearts to 1 could otherwise leave
+    // lockedHearts (captured before this hit) higher than the new hearts
+    // value, the same invalid-state bug Soul Swap/Lifebond needed
+    // clampLockedHearts for (see that helper's own comment). A no-op for
+    // anyone not currently sealed.
+    clampLockedHearts(target);
     result.deathproofSave = true;
-  } else if (target.hearts - target.lockedHearts <= 0) {
+  } else if (wouldKO) {
     // Akyros's Shadow Seal - a victim with locked hearts KOs the instant
     // their ACTIVE pool (hearts - lockedHearts) is exhausted, even though
     // `hearts` itself may still read higher; the locked portion is simply

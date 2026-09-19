@@ -158,6 +158,11 @@ export function executeCheatDeath(character, game, log) {
   // THEIR ability modules' own registerOnOtherRevived callbacks, invoked
   // below) plus his own transient self-state.
   clearNegativeStatuses(character, game, log);
+  // Akyros's Shadow Seal - same "fresh means negative status will remove"
+  // treatment as Blade's own Rebirth reset (see registerRebirth('blade',
+  // ...) in blade.js for the full reasoning) - a full reset to 0 rather
+  // than a clamp, since a revived Draxus isn't staying sealed at all.
+  character.lockedHearts = 0;
   character.skipNextTurn = false;
   character.skipHeadacheTurn = false;
   // Every OTHER character's stale reference to him (a pending headache

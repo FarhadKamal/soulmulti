@@ -1,4 +1,4 @@
-import { applyDamage, applyShield } from '../engine/damagePipeline.js';
+import { applyDamage, applyShield, clampLockedHearts } from '../engine/damagePipeline.js';
 import { makeSetupAction } from '../engine/categories/neutralAction.js';
 
 const DAMAGE_BY_CHARGE = [1, 2, 3];
@@ -94,6 +94,14 @@ export const actions = {
       const tmp = character.hearts;
       character.hearts = target.hearts;
       target.hearts = tmp;
+      // Akyros's Shadow Seal - this directly assigns hearts outside
+      // applyDamage/applyHeal, so lockedHearts on EITHER side of the swap
+      // could now exceed the new hearts value (confirmed reachable bug,
+      // 2026-09-20 - see clampLockedHearts's own comment for the full
+      // reasoning). Clamp both unconditionally; a no-op for anyone not
+      // currently sealed (lockedHearts is 0 by default).
+      clampLockedHearts(character);
+      clampLockedHearts(target);
       log.push({ type: 'special', characterId: character.id, actionId: 'soulSwap', targetId });
       return { swapped: true };
     },

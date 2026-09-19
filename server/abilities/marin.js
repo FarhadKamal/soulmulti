@@ -1,4 +1,4 @@
-import { applyDamage, applyHeal, hasNegativeStatus, clearNegativeStatuses, heartsSnapshot } from '../engine/damagePipeline.js';
+import { applyDamage, applyHeal, hasNegativeStatus, clearNegativeStatuses, heartsSnapshot, clampLockedHearts } from '../engine/damagePipeline.js';
 import { registerDodgeDefense } from '../engine/categories/dodgeDefenseRegistry.js';
 import { makeDiscoveryKit } from '../engine/categories/discoveryKit.js';
 
@@ -172,7 +172,15 @@ export const actions = {
       const total = living.reduce((sum, c) => sum + c.hearts, 0);
       const shared = Math.floor(total / living.length);
       const changes = living.map((c) => ({ characterId: c.id, before: c.hearts, after: shared }));
-      for (const c of living) c.hearts = shared;
+      for (const c of living) {
+        c.hearts = shared;
+        // Akyros's Shadow Seal - this directly assigns hearts outside
+        // applyDamage/applyHeal, same reachable-bug reasoning as Soul
+        // Swap's own identical fix (see clampLockedHearts's comment) - a
+        // sealed character's lockedHearts could now exceed the new shared
+        // value. A no-op for anyone not currently sealed.
+        clampLockedHearts(c);
+      }
       log.push({ type: 'special', characterId: character.id, actionId: 'lifebond', changes, hearts: heartsSnapshot(game) });
       return {};
     },
