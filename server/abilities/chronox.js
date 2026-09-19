@@ -337,11 +337,26 @@ export const actions = {
           worldStopsFrozenIds: character.special.worldStopsFrozenIds,
           worldStopsSkipsApplied: character.special.worldStopsSkipsApplied,
         };
+        // Boingo's Fowl Play needs the same "survive the restore" treatment
+        // as every other live-state field above - his own isChicken (a
+        // top-level field, not nested under .special) is part of the
+        // wholesale character-object restore below. If the recorded hit
+        // landed on Chronox WHILE he was chickenified, but the window
+        // naturally ended before Rewind was cast, restoring the stale
+        // snapshot silently re-chickenifies him even though the real match
+        // already correctly reverted him - confirmed live, 2026-09-16:
+        // "chronox was showing chicken long time" - the returned
+        // getUsableActions([]) then only ever offered chickenAttack, whose
+        // own target rule (another living chicken, or Boingo) had no valid
+        // target left once Boingo died, producing endless "no valid
+        // targets, skips their turn" for the rest of the match.
+        const isChickenNoCaster = character.isChicken;
         Object.assign(character, structuredClone(record.chronoxSnapshot));
         character.special.rewindUsesRemaining = rewindUsesRemaining;
         character.usedSpecial = usedSpecialNoCaster;
         character.special.usedWorldStops = usedWorldStopsNoCaster;
         Object.assign(character.special, freezeStateNoCaster);
+        character.isChicken = isChickenNoCaster;
         if (record.jesterBallSnapshot !== undefined) {
           game.jesterBall = structuredClone(record.jesterBallSnapshot);
         }
@@ -401,6 +416,17 @@ export const actions = {
       const usedBeastForm = caster.special.usedBeastForm;
       const beastFormTurnCount = caster.special.beastFormTurnCount;
       const untargetable = caster.untargetable;
+      // Boingo's Fowl Play - same "survive the restore" treatment as
+      // Beast Form/deathproofActive/controlling above, for BOTH the caster
+      // and Chronox himself (isChicken is a top-level field, not nested
+      // under .special, but the same wholesale Object.assign restore below
+      // still touches it on whichever character object it's applied to).
+      // Confirmed live, 2026-09-16: "chronox was showing chicken long
+      // time" - see the null-caster branch's own comment above for the
+      // full reasoning and symptom (endless "no valid targets" skips once
+      // chickenAttack's own target pool ran out).
+      const casterIsChicken = caster.isChicken;
+      const chronoxIsChicken = character.isChicken;
       // Draxus's Deathless Fury window flag needs the same "survive the
       // restore" treatment, for the same underlying reason - Melyssa can
       // puppet him into attacking Chronox WHILE deathproofActive is still
@@ -477,6 +503,8 @@ export const actions = {
         caster.special.beastFormTurnCount = beastFormTurnCount;
         caster.untargetable = untargetable;
       }
+      caster.isChicken = casterIsChicken;
+      character.isChicken = chronoxIsChicken;
       if (record.jesterBallSnapshot !== undefined) {
         game.jesterBall = structuredClone(record.jesterBallSnapshot);
       }
