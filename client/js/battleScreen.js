@@ -1365,7 +1365,7 @@ function statusBadges(character) {
   // any character. Cleared back to 0 the instant Akyros dies.
   if (character.lockedHearts > 0) {
     badges.push({
-      icon: 'assets/badge/seal_heart2.png',
+      icon: 'assets/badge/seal_heart.png',
       text: `${character.lockedHearts}`,
       cls: 'warn',
       title: `${character.lockedHearts} heart${character.lockedHearts === 1 ? '' : 's'} locked by Shadow Seal - inert until Akyros dies`,
