@@ -1258,10 +1258,26 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
   } else {
     // Filled heart glyphs for current hearts, dimmed hollow ones for the
     // rest of maxHearts - text glyphs rather than image assets, styled via
-    // CSS, so no new asset files needed for this.
+    // CSS, so no new asset files needed for this. Akyros's Shadow Seal
+    // (see state.js's lockedHearts) locks away the LAST `lockedHearts` of
+    // the filled hearts - the active pool that actually determines KO is
+    // the FIRST (hearts - lockedHearts) of them (matches shadowSeal's own
+    // active = min(hearts, 2) split in akyros.js). Rendered as a distinct
+    // dark/shadowed heart-icon--locked style so a player can see at a
+    // glance which of a sealed victim's hearts are currently inert,
+    // instead of every heart looking identically "full" and misleadingly
+    // implying they all still count toward survival.
+    const activeCount = character.hearts - (character.lockedHearts || 0);
     for (let i = 0; i < character.maxHearts; i++) {
       const heart = document.createElement('span');
-      heart.className = i < character.hearts ? 'heart-icon heart-icon--full' : 'heart-icon heart-icon--empty';
+      if (i < activeCount) {
+        heart.className = 'heart-icon heart-icon--full';
+      } else if (i < character.hearts) {
+        heart.className = 'heart-icon heart-icon--locked';
+        heart.title = 'Locked by Shadow Seal - inert until Akyros dies';
+      } else {
+        heart.className = 'heart-icon heart-icon--empty';
+      }
       heart.textContent = '♥';
       hearts.appendChild(heart);
     }

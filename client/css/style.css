@@ -263,6 +263,12 @@ input {
 .heart-icon { font-size: 1.1em; line-height: 1; }
 .heart-icon--full { color: #ff5e7a; }
 .heart-icon--empty { color: #3a3a48; }
+/* Akyros's Shadow Seal - a locked heart is still "there" (unlike an empty
+   one) but inert, so it gets its own dark shadow-purple styling with a
+   faint glow rather than either the vivid full-heart red or the flat
+   empty-heart grey, matching Shadow Seal's own black-tendril/red-glow
+   visual theme. */
+.heart-icon--locked { color: #4a1a3a; text-shadow: 0 0 4px rgba(180, 30, 90, 0.6); }
 .char-flag { font-size: 0.8em; opacity: 0.8; }
 .char-shield {
   display: inline-flex; align-items: center; gap: 5px; margin-top: 4px;
