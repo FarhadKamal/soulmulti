@@ -471,15 +471,16 @@ function chooseChronoxMove(character, game, usable) {
 
 function chooseAkyrosMove(character, game, usable) {
   const byId = Object.fromEntries(usable.map((a) => [a.actionId, a]));
-  // Shadow Army (hearts<=3, Absolute Attack #33): unlike every other action
-  // here, it's untargeted and hits EVERY currently-living marked enemy at
-  // once for unblockable damage (bypasses shield/dodge/untargetable
-  // entirely) - no per-target risk to weigh (no Mirror Reflect/curse-mirror
-  // avoidance needed the way markedTargets/fatalTargets require below,
-  // since he isn't choosing who to hit). Always take it once legal - it's
-  // strictly the highest-value move available whenever it's on the table.
-  if (byId.shadowArmy) {
-    return { actionId: 'shadowArmy', targetId: null };
+  // Shadow Seal (hearts<=3, replaces Shadow Army): unlike every other
+  // action here, it's untargeted and hits EVERY other currently-living
+  // character at once (not mark-gated) - no per-target risk to weigh (no
+  // Mirror Reflect/curse-mirror avoidance needed the way markedTargets/
+  // fatalTargets require below, since he isn't choosing who to hit and it
+  // deals no damage of its own to reflect). Always take it once legal - a
+  // one-time setup move that makes every future hit on the board more
+  // lethal, strictly worth taking whenever it's on the table.
+  if (byId.shadowSeal) {
+    return { actionId: 'shadowSeal', targetId: null };
   }
   let markedTargets = validTargetsFor(game, character, 'shadowExecution');
   let fatalTargets = validTargetsFor(game, character, 'fatalSlash');
@@ -601,7 +602,7 @@ function chooseAkyrosMove(character, game, usable) {
 }
 
 // Minimum combined enemy shield worth burning the one-time Moonlit Theft
-// cast on - unlike Petrify/Shadow Army (free bonus actions, always take
+// cast on - unlike Petrify/Shadow Seal (free bonus actions, always take
 // when legal), this genuinely consumes her turn for a payoff that scales
 // with how much shield is actually out there. A near-empty board (0-1
 // total) isn't worth spending the only cast on; 2+ combined starts being a
@@ -1305,7 +1306,7 @@ function chooseMarinMove(character, game, usable) {
     }
   }
   // Lifebond (hearts<=3 one-time special): unlike Rowan's Petrify/Akyros's
-  // Shadow Army, this is NOT a free unconditional take - it can genuinely
+  // Shadow Seal, this is NOT a free unconditional take - it can genuinely
   // hurt her if she'd end up worse off than her current hearts (e.g. she's
   // the healthiest of a low-average group). Only cast when it's actually
   // favorable: the shared average would leave her at or above her current

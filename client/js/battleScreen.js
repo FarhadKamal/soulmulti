@@ -1357,6 +1357,20 @@ function statusBadges(character) {
   // generic badge below is accurate for him again - no dedicated case
   // needed.
   if (character.usedSpecial && character.id !== 'tharox') badges.push({ text: 'Special used', cls: 'warn' });
+  // Akyros's Shadow Seal - shown on the VICTIM's own tile (this function
+  // runs per-character, not just for Akyros), same "per-relationship state
+  // belongs on the affected tile" reasoning as Blade's hit-count badge.
+  // lockedHearts lives directly on the character (see state.js), not
+  // nested in `special`, since the generic KO check needs to see it for
+  // any character. Cleared back to 0 the instant Akyros dies.
+  if (character.lockedHearts > 0) {
+    badges.push({
+      icon: 'assets/badge/seal_heart2.png',
+      text: `${character.lockedHearts}`,
+      cls: 'warn',
+      title: `${character.lockedHearts} heart${character.lockedHearts === 1 ? '' : 's'} locked by Shadow Seal - inert until Akyros dies`,
+    });
+  }
   switch (character.id) {
     case 'chronox':
       badges.push({ text: `Rewind: ${character.special.rewindUsesRemaining}/2` });
@@ -2018,7 +2032,7 @@ const ACTION_LABELS = {
   cyclonePunch: 'Cyclone Punch', timeFreeze: 'Time Freeze', rewind: 'Rewind', worldStops: 'World Stops',
   smash: 'Smash', titanToss: 'Titan Toss', titanSmash: 'Titan Smash', glorySmash: 'Glory Smash', earthshatter: 'Earthshatter',
   chargeUp: 'Charge Up', thunderWrath: 'Thunder Wrath', soulSwap: 'Soul Swap', soulSwapWrath: 'Thunder Wrath (free)',
-  hiddenMark: 'Hidden Mark', fatalSlash: 'Fatal Slash', shadowExecution: 'Shadow Execution', shadowArmy: 'Shadow Army',
+  hiddenMark: 'Hidden Mark', fatalSlash: 'Fatal Slash', shadowExecution: 'Shadow Execution', shadowSeal: 'Shadow Seal',
   bloodFrenzy: 'Blood Frenzy',
   lunarStrike: 'Lunar Strike', moonstep: 'Moonstep', lunarEclipse: 'Lunar Eclipse', moonlitTheft: 'Moonlit Theft',
   chaosGamble: 'Chaos Gamble', jesterBall: 'Jester Ball', fowlPlay: 'Fowl Play', chickenAttack: 'Chicken Attack', bloodHunt: 'Blood Hunt',
@@ -2117,20 +2131,18 @@ function describeLogEntry(entry) {
         // longer being clickable, not by anything in this one-shot log line.
         return `${name(entry.characterId)} transforms into a Beast!`;
       }
-      if (entry.actionId === 'shadowArmy') {
-        // No single target - strikes every currently-living marked enemy
-        // at once (entry.hits is empty only if every marked enemy died
-        // between isLegal's own check and this cast actually resolving,
-        // e.g. to a poison tick earlier the same round - shouldn't be
-        // reachable in real play, same edge-case note as Earthshatter's
-        // own empty-hits branch above).
-        if (!entry.hits || entry.hits.length === 0) {
-          return `${name(entry.characterId)} summoned their Shadow Army, but no marked enemy remained!`;
+      if (entry.actionId === 'shadowSeal') {
+        // Shadow Seal (Akyros's hearts<=3 one-time special, replaces Shadow
+        // Army) - entry.changes (server's akyros.js) carries one
+        // { characterId, lockedHearts } per OTHER living character it
+        // touched (never Akyros himself, never mark-gated). No damage is
+        // dealt - this only sets how many of each victim's current hearts
+        // are locked away.
+        if (!entry.changes || entry.changes.length === 0) {
+          return `${name(entry.characterId)} unleashed Shadow Seal!`;
         }
-        const parts = entry.hits.map((h) =>
-          `${name(h.targetId)} (${h.amountDealt != null ? `${h.amountDealt} dmg` : '0 dmg'}${h.koTriggered ? ' - KO!' : ''})`
-        );
-        return `${name(entry.characterId)} summoned their Shadow Army - ${parts.join(', ')}`;
+        const parts = entry.changes.map((c) => `${name(c.characterId)} (${c.lockedHearts} locked)`);
+        return `${name(entry.characterId)} unleashed Shadow Seal - ${parts.join(', ')}`;
       }
       if (entry.actionId === 'skullCrack') {
         // Confirmed real bug, 2026-09-12: the generic SPECIAL fallback
@@ -2148,9 +2160,9 @@ function describeLogEntry(entry) {
       if (entry.actionId === 'bloodFrenzy') {
         // Blade's Blood Frenzy (hearts<=3 one-time special) - 2-5 random-
         // target strikes, each a full normal Blood Hunt hit (shield/dodge
-        // apply, unlike Shadow Army's bypass-everything hits above), streak
-        // climbing WITHIN the burst itself (entry.hits[i].streak, see
-        // blade.js's own execute()). Empty hits only if every enemy was
+        // apply, unlike Shadow Seal's own bypass-defense-entirely shape),
+        // streak climbing WITHIN the burst itself (entry.hits[i].streak,
+        // see blade.js's own execute()). Empty hits only if every enemy was
         // already KO'd/untargetable the instant this resolved - shouldn't
         // be reachable in real play (isLegal only gates on hearts/one-time-
         // use, not on a live target existing), but guarded the same way as

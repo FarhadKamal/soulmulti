@@ -351,12 +351,25 @@ export const actions = {
         // target left once Boingo died, producing endless "no valid
         // targets, skips their turn" for the rest of the match.
         const isChickenNoCaster = character.isChicken;
+        // Akyros's Shadow Seal needs the same "survive the restore"
+        // treatment as isChicken just above - lockedHearts is a top-level
+        // field (not nested under .special, same reasoning) set once,
+        // globally, by a completely separate character's cast - nothing to
+        // do with the recorded hit against Chronox at all. If Shadow Seal
+        // is cast (or Akyros later dies, clearing it) at any point between
+        // this snapshot and Chronox eventually casting Rewind, restoring
+        // the stale snapshot would silently re-lock (or un-lock) his hearts
+        // for no in-fiction reason - the exact same bug shape as every
+        // other field protected in this file, see soulclash_feedback_
+        // rewind_new_ability_checklist project memory.
+        const lockedHeartsNoCaster = character.lockedHearts;
         Object.assign(character, structuredClone(record.chronoxSnapshot));
         character.special.rewindUsesRemaining = rewindUsesRemaining;
         character.usedSpecial = usedSpecialNoCaster;
         character.special.usedWorldStops = usedWorldStopsNoCaster;
         Object.assign(character.special, freezeStateNoCaster);
         character.isChicken = isChickenNoCaster;
+        character.lockedHearts = lockedHeartsNoCaster;
         if (record.jesterBallSnapshot !== undefined) {
           game.jesterBall = structuredClone(record.jesterBallSnapshot);
         }
@@ -427,6 +440,12 @@ export const actions = {
       // chickenAttack's own target pool ran out).
       const casterIsChicken = caster.isChicken;
       const chronoxIsChicken = character.isChicken;
+      // Akyros's Shadow Seal - same "survive the restore" treatment as
+      // isChicken just above, for BOTH the caster and Chronox himself
+      // (either one could be carrying locked hearts at snapshot time). See
+      // the null-caster branch's own comment above for the full reasoning.
+      const casterLockedHearts = caster.lockedHearts;
+      const chronoxLockedHearts = character.lockedHearts;
       // Draxus's Deathless Fury window flag needs the same "survive the
       // restore" treatment, for the same underlying reason - Melyssa can
       // puppet him into attacking Chronox WHILE deathproofActive is still
@@ -505,6 +524,8 @@ export const actions = {
       }
       caster.isChicken = casterIsChicken;
       character.isChicken = chronoxIsChicken;
+      caster.lockedHearts = casterLockedHearts;
+      character.lockedHearts = chronoxLockedHearts;
       if (record.jesterBallSnapshot !== undefined) {
         game.jesterBall = structuredClone(record.jesterBallSnapshot);
       }

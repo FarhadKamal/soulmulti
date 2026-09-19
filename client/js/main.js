@@ -678,16 +678,11 @@ function playLogEntrySound(entry, game) {
       }
     }
   }
-  // Akyros's Shadow Army: same multi-victim shape as Mirage Burst above -
-  // no single koTriggered/targetCharacterId at the top level, see
-  // entry.hits instead (akyros.js's own shadowArmy execute()).
-  if (entry.actionId === 'shadowArmy') {
-    for (const hit of entry.hits || []) {
-      if (hit.koTriggered) {
-        setTimeout(() => playKoedFor(hit.targetId, game, entry.characterId), 200);
-      }
-    }
-  }
+  // Akyros's Shadow Seal (replaces Shadow Army) deals no damage of its own
+  // and can never directly KO anyone on cast (entry.changes only ever
+  // carries { characterId, lockedHearts }, no koTriggered field at all) -
+  // no multi-victim KO-voice handling needed here, unlike Mirage Burst
+  // above.
   // Athena's Divine Sacrifice can KO HERSELF via its own separate self-cost
   // roll (entry.selfResult.koTriggered) - a distinct outcome from the enemy
   // target's own koTriggered above (both could even fire from the same

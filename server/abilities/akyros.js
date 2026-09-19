@@ -1,4 +1,4 @@
-import { applyDamage, tryTriggerCleanSlate, tryIllyraDodgeStatus } from '../engine/damagePipeline.js';
+import { applyDamage, tryTriggerCleanSlate, tryIllyraDodgeStatus, heartsSnapshot } from '../engine/damagePipeline.js';
 import { registerDodgeDefense } from '../engine/categories/dodgeDefenseRegistry.js';
 import { registerOnOwnDeath } from '../engine/categories/onOwnDeath.js';
 import { registerOnOtherRevived } from '../engine/categories/onOtherRevived.js';
@@ -16,14 +16,18 @@ function livingMarkedEnemies(game, akyros) {
   );
 }
 
-// Absolute Attack (taxonomy #33, design-locked 2026-09-08, see project
-// memory soulclash_mechanic_taxonomy.md): Shadow Army's own hearts<=3
-// threshold - once crossed, the button stays available every one of his
-// own turns for the rest of the match (no usedSpecial gate, unlike Shadow
-// Execution - confirmed ruling: "this special button will remain until his
-// koed").
-const SHADOW_ARMY_HEARTS_THRESHOLD = 3;
-const SHADOW_ARMY_DAMAGE = 2;
+// Shadow Seal (design-locked 2026-09-19, replaces Shadow Army): hearts<=3
+// one-time special, NOT gated on any mark. Every OTHER living character's
+// current hearts are split into an active pool (min(current, 2)) and a
+// locked remainder - locked hearts are lost/irrelevant on death, only the
+// active pool determines when a hit actually KOs them (see state.js's
+// lockedHearts + damagePipeline.js's KO check). Healing still raises the
+// active pool normally (it operates on `hearts`, and lockedHearts never
+// exceeds it). No turn-based expiry - the ONLY unlock trigger is Akyros's
+// own death, instant and unconditional, clearing every remaining locked
+// heart across every victim at once (see registerOnOwnDeath below).
+const SHADOW_SEAL_HEARTS_THRESHOLD = 3;
+const SHADOW_SEAL_ACTIVE_CAP = 2;
 
 // Dodge Defense category registration (see
 // engine/categories/dodgeDefense.js) - additive, not yet consumed by
@@ -41,9 +45,18 @@ registerDodgeDefense('akyros', {
 // KO-branch cleanup (see engine/categories/onOwnDeath.js) - marks (hidden
 // and revealed) die with him, no point keeping track once he can never use
 // Fatal Slash/Shadow Execution again.
-registerOnOwnDeath('akyros', (character) => {
+registerOnOwnDeath('akyros', (character, game) => {
   character.special.marks.clear();
   character.special.revealedMarks.clear();
+  // Shadow Seal's only unlock trigger - confirmed ruling: "lock will be
+  // immedialty clear if caster died." Instant and unconditional, across
+  // EVERY character still carrying locked hearts (not just his own marked
+  // targets - Shadow Seal isn't mark-gated), including Akyros himself for
+  // consistency even though a dead character's own lockedHearts no longer
+  // matters gameplay-wise.
+  for (const c of Object.values(game.characters)) {
+    c.lockedHearts = 0;
+  }
 });
 
 // Revival cleanup (see engine/categories/onOtherRevived.js) - his current
@@ -138,61 +151,38 @@ export const actions = {
       return result;
     },
   },
-  // Absolute Attack (taxonomy #33, design-locked 2026-09-08): hearts<=3
-  // repeatable special - deliberately NOT gated by usedSpecial (confirmed
-  // ruling: "this special button will remain until his koed"), so it stays
-  // available every one of his own turns for the rest of the match
-  // alongside (not instead of) Shadow Execution's own separate one-time
-  // usedSpecial gate. Requires at least one currently-living marked enemy
-  // to be legal, same anyEnemyIsMarked gate Shadow Execution already uses.
-  shadowArmy: {
-    label: 'Shadow Army',
+  // Shadow Seal (design-locked 2026-09-19): hearts<=3 one-time special,
+  // NOT mark-gated (unlike Shadow Execution/the old Shadow Army). Hits
+  // every OTHER living character simultaneously - deliberately bypasses
+  // applyDamage entirely, same "this isn't a normal instance of that
+  // mechanic" reasoning as Marin's Lifebond/Velorya's Moonlit Theft, since
+  // it deals no damage and has no attacker/defender relationship to
+  // resolve (no shield interaction, can't be dodged).
+  shadowSeal: {
+    label: 'Shadow Seal',
     needsTarget: false,
     special: true,
-    isLegal: (character, game) => character.hearts <= SHADOW_ARMY_HEARTS_THRESHOLD && anyEnemyIsMarked(game, character.id),
+    isLegal: (character) => character.hearts <= SHADOW_SEAL_HEARTS_THRESHOLD && !character.special.usedShadowSeal,
     execute(character, targetId, game, log) {
-      const targets = livingMarkedEnemies(game, character);
-      const hits = [];
-      // Multi-target loop - same "first occurrence wins" deferred-field
-      // capture as Earthshatter/Grim Barrage/Mirage Burst (see those files'
-      // own comments for the full reasoning), since finalizeAction only
-      // ever reads these fields off the top-level return value, not off
-      // each individual hit buried inside `hits`.
-      let rebirthLogEntry = null;
-      let mirrorLogEntry = null;
-      let mirrorReflectLogEntry = null;
-      let fowlPlayRevertLogEntry = null;
-      let divineJudgmentTriggerLogEntry = null;
-      let prophecyOfDoomTriggerLogEntry = null;
-      for (const target of targets) {
-        // Absolute Attack (#33): ignores shield, dodge, AND untargetable
-        // all at once (confirmed ruling: "nothing can defend it. dodge or
-        // even untargetable") - a strictly stronger bypass than any single
-        // existing attack-delivery type. Reveals every mark it hits, same
-        // as Fatal Slash/Shadow Execution's own reveal behavior - marks
-        // themselves are NOT consumed, so a living marked survivor can be
-        // struck again by a later cast.
-        character.special.revealedMarks.add(target.id);
-        const result = applyDamage(game, log, {
-          sourceCharacterId: character.id,
-          targetCharacterId: target.id,
-          amount: SHADOW_ARMY_DAMAGE,
-          ignoresShield: true,
-          ignoresDodge: true,
-          ignoresUntargetable: true,
-        });
-        hits.push({ targetId: target.id, amountDealt: result.amountDealt, koTriggered: result.koTriggered });
-        if (result.rebirthLogEntry && !rebirthLogEntry) rebirthLogEntry = result.rebirthLogEntry;
-        if (result.mirrorLogEntry && !mirrorLogEntry) mirrorLogEntry = result.mirrorLogEntry;
-        if (result.mirrorResult?.rebirthLogEntry && !rebirthLogEntry) rebirthLogEntry = result.mirrorResult.rebirthLogEntry;
-        if (result.mirrorReflectLogEntry && !mirrorReflectLogEntry) mirrorReflectLogEntry = result.mirrorReflectLogEntry;
-        if (result.mirrorReflectResult?.rebirthLogEntry && !rebirthLogEntry) rebirthLogEntry = result.mirrorReflectResult.rebirthLogEntry;
-        if (result.fowlPlayRevertLogEntry && !fowlPlayRevertLogEntry) fowlPlayRevertLogEntry = result.fowlPlayRevertLogEntry;
-        if (result.divineJudgmentTriggerLogEntry && !divineJudgmentTriggerLogEntry) divineJudgmentTriggerLogEntry = result.divineJudgmentTriggerLogEntry;
-        if (result.prophecyOfDoomTriggerLogEntry && !prophecyOfDoomTriggerLogEntry) prophecyOfDoomTriggerLogEntry = result.prophecyOfDoomTriggerLogEntry;
+      character.special.usedShadowSeal = true;
+      // Grimtal's Beast Form (Death-Triggered Reversion #36) - same
+      // exclusion as Lifebond/Moonlit Theft (confirmed ruling, 2026-09-13:
+      // "yes - Beast Form should also block" bypass-everything mechanics
+      // like this one, which never route through applyDamage's own
+      // tryBeastFormImmunity check at all). A transformed Grimtal is left
+      // completely untouched.
+      const others = Object.values(game.characters).filter(
+        (c) => c.id !== character.id && !c.isKO && !(c.id === 'grimtal' && c.special?.beastFormActive)
+      );
+      const changes = [];
+      for (const c of others) {
+        const active = Math.min(c.hearts, SHADOW_SEAL_ACTIVE_CAP);
+        const locked = c.hearts - active;
+        changes.push({ characterId: c.id, lockedHearts: locked });
+        c.lockedHearts = locked;
       }
-      log.push({ type: 'special', characterId: character.id, actionId: 'shadowArmy', hits });
-      return { hits, rebirthLogEntry, mirrorLogEntry, mirrorReflectLogEntry, fowlPlayRevertLogEntry, divineJudgmentTriggerLogEntry, prophecyOfDoomTriggerLogEntry };
+      log.push({ type: 'special', characterId: character.id, actionId: 'shadowSeal', changes, hearts: heartsSnapshot(game) });
+      return {};
     },
   },
 };

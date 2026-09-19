@@ -465,7 +465,14 @@ export function applyDamage(game, log, {
     // though they never overlap in practice.
     target.hearts = 1;
     result.deathproofSave = true;
-  } else if (target.hearts === 0) {
+  } else if (target.hearts - target.lockedHearts <= 0) {
+    // Akyros's Shadow Seal - a victim with locked hearts KOs the instant
+    // their ACTIVE pool (hearts - lockedHearts) is exhausted, even though
+    // `hearts` itself may still read higher; the locked portion is simply
+    // lost/irrelevant on death (confirmed ruling - see state.js's
+    // lockedHearts comment). lockedHearts is 0 for every character outside
+    // a Shadow Seal window, so this is equivalent to the old `target.hearts
+    // === 0` check for everyone else.
     target.isKO = true;
     result.koTriggered = true;
     // KO-branch cleanup (see engine/categories/onOwnDeath.js): dispatches

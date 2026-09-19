@@ -277,7 +277,11 @@ const ACTION_SOUND = {
   hiddenMark: 'hiddenmark',
   fatalSlash: 'sword',
   shadowExecution: 'shadowexecution',
-  shadowArmy: 'stabbing',
+  // Shadow Seal (replaces Shadow Army) - reuses Athena's own curse sound
+  // effect per explicit direction ("sound effect we can use same curse"),
+  // same reuse pattern as Petrify/Lifebond/Moonlit Theft above - thematically
+  // both are curse-shaped debuffs, no dedicated sound needed.
+  shadowSeal: 'curse',
   lunarStrike: 'sword',
   moonstep: 'moonstep',
   lunarEclipse: 'eclipse',

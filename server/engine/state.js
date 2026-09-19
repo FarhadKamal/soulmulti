@@ -76,7 +76,7 @@ function baseSpecialFor(id) {
     case 'zerathys':
       return { chargeCount: 0 };
     case 'akyros':
-      return { marks: new Set(), revealedMarks: new Set(), everMarkedIds: new Set(), dodgedAttackerIds: new Set() };
+      return { marks: new Set(), revealedMarks: new Set(), everMarkedIds: new Set(), dodgedAttackerIds: new Set(), usedShadowSeal: false };
     case 'velorya':
       // usedMoonlitTheft: hearts<=3 one-time special (see velorya.js) -
       // drains every other living character's shield to 0 and takes it
@@ -497,6 +497,22 @@ export function createCharacter(defId, ownerId) {
     // same reason skipNextTurn/skipHeadacheTurn do - a plain, universally-
     // applicable flag rather than a per-hero-shaped state blob.
     isChicken: false,
+    // Akyros's Shadow Seal (hearts<=3 special, replaces Shadow Army) - how
+    // many of this character's CURRENT hearts are locked away/inert. Lives
+    // directly on the character (not nested in `special`) for the same
+    // reason isChicken does - the generic KO check in damagePipeline.js's
+    // applyDamage needs to see it for ANY character, not just whoever cast
+    // it. Active hearts = hearts - lockedHearts; a hit that brings active
+    // hearts to 0 KOs the character even though `hearts` itself may still
+    // read higher - the locked portion is simply lost/irrelevant on death,
+    // never "spilled into" (confirmed ruling: "if 2 hearts unlocked, and 4
+    // hearts locked total 6 hearts, but got 3 damage. defenately knocked
+    // out"). Healing still raises `hearts` (and therefore the active pool)
+    // normally; the locked portion stays locked regardless. Cleared back to
+    // 0 on every living character the instant Akyros himself dies (the
+    // ONLY unlock trigger - no turn-based expiry) - see akyros.js's own
+    // registerOnOwnDeath.
+    lockedHearts: 0,
   };
 }
 

@@ -171,7 +171,10 @@ const ACTION_VOICE_LINES = {
   athena: { divineRestore: 'devine', divineSacrifice: 'sacrifice', divineJudgment: 'divine_judgment' },
   zerathys: { chargeUp: 'charge', thunderWrath: 'release', soulSwap: 'soul_swap' },
   tharox: { titanToss: 'titan_toss', titanSmash: 'titan_smash', glorySmash: 'glory', earthshatter: 'earthshatter' },
-  akyros: { hiddenMark: 'hidden_mark', shadowExecution: 'shadow', shadowArmy: 'call_army' },
+  // shadowSeal: "Your heart... isn't yours anymore." - quiet/whispered
+  // delivery (design-locked 2026-09-19, replaces the old shadowArmy/
+  // call_army line).
+  akyros: { hiddenMark: 'hidden_mark', shadowExecution: 'shadow', shadowSeal: 'shadow_seal' },
   blade: { bloodFrenzy: 'blood_frenzy' },
   // mindControl's line fires from main.js's dedicated 'mind-control-select'
   // sound branch (via playMoveVoice(entry.characterId, 'mindControl')), not

@@ -14,6 +14,7 @@ const BADGE_ICONS = [
   'assets/badge/beast.png',
   'assets/badge/blade_hit.png',
   'assets/badge/glory_smash.png',
+  'assets/badge/seal_heart2.png',
   'assets/badge/skull.png',
   'assets/badge/skull_crack.png',
   'assets/badge/skull_heart.png',
@@ -25,12 +26,12 @@ const BADGE_ICONS = [
 // sync with every literal 'assets/images/...jpg' path referenced in
 // portraitFlash.js.
 const FLASH_IMAGES = [
-  'assets/images/akyros/call_army.jpg',
   'assets/images/akyros/dodge.jpg',
   'assets/images/akyros/fatal.jpg',
   'assets/images/akyros/hidden.jpg',
   'assets/images/akyros/idle.jpg',
   'assets/images/akyros/shadow.jpg',
+  'assets/images/akyros/shadow_seal.jpg',
   'assets/images/athena/idle.jpg',
   'assets/images/athena/curse.jpg',
   'assets/images/athena/heal.jpg',
@@ -201,11 +202,11 @@ const ASHKAS_VENGEANCE_STRIKE_IMAGES = CHARACTER_IDS.filter((id) => id !== 'kael
   (id) => `assets/images/${id}/ashka_strike.jpg`
 );
 
-// Akyros's Shadow Army (Absolute Attack #33) - same per-victim-hero art
-// pattern as the three above, one shadow_strike.jpg per possible victim
-// (everyone except Akyros himself, who is never his own marked target).
-const SHADOW_ARMY_STRIKE_IMAGES = CHARACTER_IDS.filter((id) => id !== 'akyros').map(
-  (id) => `assets/images/${id}/shadow_strike.jpg`
+// Akyros's Shadow Seal (replaces Shadow Army) - same per-victim-hero art
+// pattern as the sets above, one shadow_seal_strike.jpg per possible victim
+// (everyone except Akyros himself, who is never touched by his own cast).
+const SHADOW_SEAL_STRIKE_IMAGES = CHARACTER_IDS.filter((id) => id !== 'akyros').map(
+  (id) => `assets/images/${id}/shadow_seal_strike.jpg`
 );
 
 // Rowan's Petrify (Neutral Action #25 + Bonus) - same per-victim-hero art
@@ -263,7 +264,7 @@ let readyPromise = null;
 export function preloadBattleImages() {
   if (started) return readyPromise;
   started = true;
-  const paths = [...FLASH_IMAGES, ...BADGE_ICONS, ...CHICKEN_IMAGES, ...DIVINE_JUDGMENT_STRUCK_IMAGES, ...PROPHECY_OF_DOOM_STRIKE_IMAGES, ...ASHKAS_VENGEANCE_STRIKE_IMAGES, ...SHADOW_ARMY_STRIKE_IMAGES, ...PETRIFY_STONE_IMAGES, ...SELF_CHOKE_VICTIM_IMAGES, ...LIFEBOND_REACTION_IMAGES, ...MOONLIT_THEFT_REACTION_IMAGES];
+  const paths = [...FLASH_IMAGES, ...BADGE_ICONS, ...CHICKEN_IMAGES, ...DIVINE_JUDGMENT_STRUCK_IMAGES, ...PROPHECY_OF_DOOM_STRIKE_IMAGES, ...ASHKAS_VENGEANCE_STRIKE_IMAGES, ...SHADOW_SEAL_STRIKE_IMAGES, ...PETRIFY_STONE_IMAGES, ...SELF_CHOKE_VICTIM_IMAGES, ...LIFEBOND_REACTION_IMAGES, ...MOONLIT_THEFT_REACTION_IMAGES];
   // Default battle portrait, KO'd, injured, and victory images - each now
   // lives inside the hero's own images/<id>/ folder with a fixed filename
   // (confirmed rename, 2026-09-15; previously 4 separate top-level folders
