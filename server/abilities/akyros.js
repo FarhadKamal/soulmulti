@@ -1,4 +1,4 @@
-import { applyDamage, tryTriggerCleanSlate, tryIllyraDodgeStatus, heartsSnapshot } from '../engine/damagePipeline.js';
+import { applyDamage, tryTriggerCleanSlate, heartsSnapshot } from '../engine/damagePipeline.js';
 import { registerDodgeDefense } from '../engine/categories/dodgeDefenseRegistry.js';
 import { registerOnOwnDeath } from '../engine/categories/onOwnDeath.js';
 import { registerOnOtherRevived } from '../engine/categories/onOtherRevived.js';
@@ -94,14 +94,15 @@ export const actions = {
         log.push({ type: 'hidden-mark', characterId: character.id, targetId, hidden: true, blockedBy: 'cleanSlate' });
         return {};
       }
-      // Illyra's passive: a 50% chance the mark itself simply doesn't
-      // take - same "never added to everMarkedIds" reasoning as the Clean
-      // Slate case just above, an attempt that never actually lands
-      // shouldn't burn her "once ever" mark eligibility.
-      if (tryIllyraDodgeStatus(target, game, log, character.id)) {
-        log.push({ type: 'hidden-mark', characterId: character.id, targetId, hidden: true, blockedBy: 'illyra' });
-        return {};
-      }
+      // Illyra's passive does NOT block Hidden Mark - confirmed rule
+      // change, 2026-09-20 (was previously wired in, see git history):
+      // Hidden Mark is tagged Unrevealed Threat (#24, "a genuine negative
+      // status... IS a real threat mechanically"), not No Threat (#12,
+      // what Illyra's own Mirage Mark uses) - her passive dodge is meant
+      // for actual attacks/threats being evaded, and letting it also block
+      // a hidden status APPLICATION made no sense for that category.
+      // Clean Slate (just above) remains the ONLY thing that can stop a
+      // Hidden Mark attempt from landing.
       character.special.marks.add(targetId);
       // Once marked, a target can never be marked again for the rest of the
       // match - even after the mark is revealed/consumed by Fatal Slash or
