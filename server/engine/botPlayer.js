@@ -17,6 +17,25 @@ function livingEnemies(game, character) {
   );
 }
 
+// Akyros's Shadow Seal - a sealed character's real `hearts` can read much
+// higher than what actually determines their survival (the active pool,
+// hearts - lockedHearts - see damagePipeline.js's own wouldKO check).
+// Confirmed reachable bug, 2026-09-20 (user observation from live play):
+// every bot target-lethality/weakness heuristic below read raw `.hearts`
+// directly, so a sealed opponent sitting on a nearly-exhausted active pool
+// but a high real-hearts total looked perfectly healthy to bots, while
+// Akyros himself (genuinely lower on real hearts from his own trades) kept
+// looking like the best target - bots never recognized an easy kill right
+// in front of them. Every TARGET lethality/weakness check below now reads
+// through this helper instead of raw `.hearts`. Deliberately NOT used for
+// a bot's own SELF-preservation/desperation checks (e.g. "am I hearts<=3
+// enough to use my own special") - those intentionally stay on real hearts
+// to match the actual server-side isLegal() gates, which are themselves
+// defined against real hearts, not the active pool.
+function activeHearts(character) {
+  return character.hearts - (character.lockedHearts || 0);
+}
+
 // Confirmed ruling, 2026-09-05: "ai bot should not attack athena. if she
 // cast judgement strike to them.. only if no option available or 1 vs 1
 // situation." A bot who is CURRENTLY MARKED by Athena's Divine Judgment
@@ -68,8 +87,8 @@ function pickRandom(ids) {
 // Ties (e.g. everyone at full health) are broken randomly, not by seat order.
 function lowestHeartsTarget(game, targetIds) {
   if (targetIds.length === 0) return null;
-  const minHearts = Math.min(...targetIds.map((tid) => game.characters[tid].hearts));
-  const tied = targetIds.filter((tid) => game.characters[tid].hearts === minHearts);
+  const minHearts = Math.min(...targetIds.map((tid) => activeHearts(game.characters[tid])));
+  const tied = targetIds.filter((tid) => activeHearts(game.characters[tid]) === minHearts);
   return pickRandom(tied);
 }
 
@@ -141,19 +160,18 @@ const LOW_HEARTS_THRESHOLD = 3;
 // full health kept freely attacking both of them unchallenged the whole
 // game and mopped up the survivor.
 function focusFireTarget(game, targetIds) {
-  const wounded = targetIds.filter((tid) => {
-    const t = game.characters[tid];
-    return t.hearts < t.maxHearts && t.hearts <= LOW_HEARTS_THRESHOLD;
-  });
+  // Akyros's Shadow Seal - "wounded and close to dying" now means a low
+  // ACTIVE pool, not just a low real-hearts-vs-max gap (a sealed target
+  // can sit at full real hearts while their active pool is nearly
+  // exhausted, which is exactly the case this function needs to catch -
+  // see activeHearts's own comment). "Already taken damage" is folded into
+  // the same active-pool <= threshold check instead of a separate
+  // hearts < maxHearts comparison, since a sealed target's real hearts may
+  // never have dropped at all despite genuinely being one hit from death.
+  const wounded = targetIds.filter((tid) => activeHearts(game.characters[tid]) <= LOW_HEARTS_THRESHOLD);
   if (wounded.length === 0) return null;
-  const maxMissing = Math.max(...wounded.map((tid) => {
-    const t = game.characters[tid];
-    return t.maxHearts - t.hearts;
-  }));
-  const tied = wounded.filter((tid) => {
-    const t = game.characters[tid];
-    return t.maxHearts - t.hearts === maxMissing;
-  });
+  const minActive = Math.min(...wounded.map((tid) => activeHearts(game.characters[tid])));
+  const tied = wounded.filter((tid) => activeHearts(game.characters[tid]) === minActive);
   return pickRandom(tied);
 }
 
@@ -201,7 +219,7 @@ function pickDefaultTarget(game, character, actionId, minDamage = null) {
   if (isMirrorReflectActive(game) && pool.includes('rowan')) {
     const rowanTarget = game.characters['rowan'];
     const wouldKillRowan = minDamage !== null
-      && rowanTarget.hearts <= Math.max(0, minDamage - rowanTarget.shield);
+      && activeHearts(rowanTarget) <= Math.max(0, minDamage - rowanTarget.shield);
     if (!wouldKillRowan) {
       const nonRowanSafe = pool.filter((tid) => tid !== 'rowan');
       if (nonRowanSafe.length > 0) pool = nonRowanSafe;
@@ -250,7 +268,7 @@ function chooseTharoxMove(character, game, usable) {
     const smashTargets = validTargetsFor(game, character, 'smash');
     const securesKill = smashTargets.find((tid) => {
       const t = game.characters[tid];
-      return t.hearts <= Math.max(0, 1 - t.shield);
+      return activeHearts(t) <= Math.max(0, 1 - t.shield);
     });
     if (securesKill) {
       return { actionId: 'smash', targetId: securesKill };
@@ -294,7 +312,7 @@ function chooseZerathysMove(character, game, usable) {
     const wrathTargets = validTargetsFor(game, character, 'thunderWrath');
     const killableTargets = wrathTargets.filter((tid) => {
       const t = game.characters[tid];
-      return t.hearts <= Math.max(0, wrathDamage - t.shield);
+      return activeHearts(t) <= Math.max(0, wrathDamage - t.shield);
     });
     if (killableTargets.length > 0) {
       // When multiple targets are all killable this turn, prefer one that
@@ -316,7 +334,11 @@ function chooseZerathysMove(character, game, usable) {
   }
   // Soul Swap is strongest when the target has meaningfully more hearts
   // than Zerathys - stealing their pool and dumping his lower total onto
-  // them. Use it opportunistically once available.
+  // them. Use it opportunistically once available. Deliberately reads REAL
+  // hearts here, not activeHearts() - this is a direct stat swap (see
+  // zerathys.js), not a lethality check, and the swap moves the target's
+  // whole real hearts total (locked portion included, then clamped - see
+  // clampLockedHearts) regardless of how much of it is currently sealed.
   if (byId.soulSwap) {
     const targets = validTargetsFor(game, character, 'soulSwap');
     const maxHearts = Math.max(...targets.map((tid) => game.characters[tid].hearts));
@@ -337,7 +359,7 @@ function chooseZerathysMove(character, game, usable) {
     const athena = game.characters['athena'];
     const maxChargeDamage = 3;
     const mirrorSurvivableNow = character.hearts > wrathDamage;
-    const wouldKillAthenaNow = athena.hearts <= Math.max(0, wrathDamage - athena.shield);
+    const wouldKillAthenaNow = activeHearts(athena) <= Math.max(0, wrathDamage - athena.shield);
     // Checked FIRST, regardless of whether the current hit happens to be
     // survivable: if Zerathys can never actually WIN this 1v1 by trading
     // small safe hits (he'll always be behind since he's taking equal
@@ -351,7 +373,7 @@ function chooseZerathysMove(character, game, usable) {
     // kill on its own (handled above) or charging further would leave
     // Athena still alive and unkillable even at max charge.
     const canForceMutualKillAtMax = !wouldKillAthenaNow
-      && athena.hearts <= Math.max(0, maxChargeDamage - athena.shield);
+      && activeHearts(athena) <= Math.max(0, maxChargeDamage - athena.shield);
     if (canForceMutualKillAtMax) {
       if (chargeCount < 2 && byId.chargeUp) {
         return { actionId: 'chargeUp', targetId: null };
@@ -422,7 +444,7 @@ export function chooseSoulSwapWrathTarget(character, game, excludeOwnerId = null
   if (targets.length === 0) return null;
   const securesKill = targets.find((tid) => {
     const t = game.characters[tid];
-    return t.hearts <= Math.max(0, 1 - t.shield);
+    return activeHearts(t) <= Math.max(0, 1 - t.shield);
   });
   if (securesKill) return securesKill;
   // Prefer an unshielded target so the hit actually lands instead of being
@@ -495,8 +517,8 @@ function chooseAkyrosMove(character, game, usable) {
   // before excluding him from ITS pool specifically.
   if (isMirrorReflectActive(game) && (markedTargets.includes('rowan') || fatalTargets.includes('rowan'))) {
     const rowan = game.characters['rowan'];
-    const shadowWouldKill = rowan.hearts <= 3;
-    const fatalWouldKill = rowan.hearts <= Math.max(0, 2 - rowan.shield);
+    const shadowWouldKill = activeHearts(rowan) <= 3;
+    const fatalWouldKill = activeHearts(rowan) <= Math.max(0, 2 - rowan.shield);
     if (!shadowWouldKill && markedTargets.length > 1) {
       markedTargets = markedTargets.filter((tid) => tid !== 'rowan');
     }
@@ -517,7 +539,7 @@ function chooseAkyrosMove(character, game, usable) {
     const athena = game.characters['athena'];
     const shadowLegal = !!byId.shadowExecution && markedTargets.includes('athena');
     const bestDamage = shadowLegal ? 3 : 2; // marked Fatal Slash is 2
-    const wouldKillAthenaNow = athena.hearts <= Math.max(0, bestDamage - (shadowLegal ? 0 : athena.shield));
+    const wouldKillAthenaNow = activeHearts(athena) <= Math.max(0, bestDamage - (shadowLegal ? 0 : athena.shield));
     const mirrorSurvivableNow = character.hearts > bestDamage;
     const otherTargets = fatalTargets.filter((tid) => tid !== 'athena');
     // A kill on Athena is only worth taking unconditionally if Akyros
@@ -570,7 +592,7 @@ function chooseAkyrosMove(character, game, usable) {
     // got the next hit in first.
     const killableMarked = markedTargets.filter((tid) => {
       const t = game.characters[tid];
-      return t.hearts <= Math.max(0, 3 - t.shield);
+      return activeHearts(t) <= Math.max(0, 3 - t.shield);
     });
     if (killableMarked.length > 0) {
       const target = biggestThreatTarget(game, character, killableMarked) || lowestHeartsTarget(game, killableMarked);
@@ -578,7 +600,7 @@ function chooseAkyrosMove(character, game, usable) {
     }
     const weakest = lowestHeartsTarget(game, markedTargets);
     const shieldedTarget = markedTargets.find((tid) => game.characters[tid].shield > 0);
-    if (weakest && game.characters[weakest].hearts <= 3) {
+    if (weakest && activeHearts(game.characters[weakest]) <= 3) {
       return { actionId: 'shadowExecution', targetId: weakest };
     }
     if (shieldedTarget) {
@@ -752,7 +774,7 @@ function chooseAthenaMove(character, game, usable) {
   if (byId.divineSacrifice) {
     const allTargets = validTargetsFor(game, character, 'divineSacrifice');
     if (character.hearts > ATHENA_SACRIFICE_MAX_SELF_COST) {
-      const sureKills = allTargets.filter((tid) => game.characters[tid].hearts <= ATHENA_SACRIFICE_FINISH_THRESHOLD);
+      const sureKills = allTargets.filter((tid) => activeHearts(game.characters[tid]) <= ATHENA_SACRIFICE_FINISH_THRESHOLD);
       if (sureKills.length > 0) {
         const targetId = lowestHeartsTarget(game, sureKills) || pickRandom(sureKills);
         return { actionId: 'divineSacrifice', targetId };
@@ -794,8 +816,13 @@ function chooseAthenaMove(character, game, usable) {
     // instead - a target with more hearts left can keep attacking Athena
     // for longer, making the eventual mirror damage add up more.
     if (currentCursed && targets.includes(currentCursed)) {
+      // Akyros's Shadow Seal - "healthier" here means more remaining
+      // survivability (how much longer they can keep attacking Athena
+      // before dying), which is the ACTIVE pool, not real hearts - a
+      // sealed target with high real hearts but a near-exhausted active
+      // pool is a poor choice to switch the curse onto.
       const healthierOptions = targets.filter((tid) =>
-        game.characters[tid].hearts > game.characters[currentCursed].hearts + 2
+        activeHearts(game.characters[tid]) > activeHearts(game.characters[currentCursed]) + 2
       );
       return { actionId: 'curseStrike', targetId: pickRandom(healthierOptions) || currentCursed };
     }
@@ -811,8 +838,11 @@ function chooseAthenaMove(character, game, usable) {
     // (early game, or everyone's been ignoring her).
     const threatId = biggestThreatTarget(game, character, targets);
     if (threatId) return { actionId: 'curseStrike', targetId: threatId };
-    const maxHearts = Math.max(...targets.map((tid) => game.characters[tid].hearts));
-    const tiedBest = targets.filter((tid) => game.characters[tid].hearts === maxHearts);
+    // Same activeHearts reasoning as healthierOptions above - "most hearts"
+    // as a fallback tiebreak should mean most remaining survivability, not
+    // raw real hearts.
+    const maxHearts = Math.max(...targets.map((tid) => activeHearts(game.characters[tid])));
+    const tiedBest = targets.filter((tid) => activeHearts(game.characters[tid]) === maxHearts);
     const targetId = pickRandom(tiedBest);
     if (targetId) return { actionId: 'curseStrike', targetId };
   }
@@ -1135,7 +1165,12 @@ function rowanFacingHealthyKaelis(game, character) {
   const kaelis = game.characters['kaelis'];
   if (!kaelis || kaelis.isKO || kaelis.untargetable) return false;
   if (character.special.poisonTargets.has('kaelis')) return false;
-  return kaelis.hearts > LOW_HEARTS_THRESHOLD;
+  // Akyros's Shadow Seal - "healthy" here means genuine remaining
+  // survivability/runway, which is the active pool - a sealed Kaelis with
+  // high real hearts but a near-exhausted active pool isn't actually
+  // healthy, poison's slow bleed wouldn't get the long runway this exists
+  // to exploit.
+  return activeHearts(kaelis) > LOW_HEARTS_THRESHOLD;
 }
 
 function chooseRowanMove(character, game, usable) {
@@ -1252,7 +1287,7 @@ function chooseRowanMove(character, game, usable) {
     const wandTargets = validTargetsFor(game, character, 'wandStrike');
     const killTarget = wandTargets.find((tid) => {
       const t = game.characters[tid];
-      return t.hearts <= Math.max(0, 1 - t.shield);
+      return activeHearts(t) <= Math.max(0, 1 - t.shield);
     });
     if (killTarget) {
       return { actionId: 'wandStrike', targetId: killTarget };
@@ -1299,7 +1334,7 @@ function chooseMarinMove(character, game, usable) {
     const wandTargets = validTargetsFor(game, character, 'wandStrike');
     const killTarget = wandTargets.find((tid) => {
       const t = game.characters[tid];
-      return t.hearts <= Math.max(0, 1 - t.shield);
+      return activeHearts(t) <= Math.max(0, 1 - t.shield);
     });
     if (killTarget) {
       return { actionId: 'wandStrike', targetId: killTarget };
@@ -1368,10 +1403,16 @@ function chooseGrimtalMove(character, game, usable) {
       const highestHearts = living.length > 0 ? Math.max(...living.map((c) => c.hearts)) : 0;
       const highestHolders = living.filter((c) => c.hearts === highestHearts);
       const highTierTargetId = highestHolders.length === 1 ? highestHolders[0].id : null;
+      // tierFor deliberately stays on REAL hearts above (highestHearts/
+      // highestHolders) - it mirrors grimtal.js's own beastAttack tier
+      // rule exactly, which is itself defined against real hearts, not the
+      // active pool. Only the actual lethality check below switches to
+      // activeHearts - "would this hit kill them" is Shadow-Seal-aware,
+      // "which damage tier does this hit deal" is not.
       const tierFor = (tid) => (tid === highTierTargetId ? BEAST_ATTACK_HIGH_DAMAGE : BEAST_ATTACK_LOW_DAMAGE);
       const killTarget = targets.find((tid) => {
         const t = game.characters[tid];
-        return t.hearts <= Math.max(0, tierFor(tid) - t.shield);
+        return activeHearts(t) <= Math.max(0, tierFor(tid) - t.shield);
       });
       const targetId = killTarget
         || (highTierTargetId && targets.includes(highTierTargetId) ? highTierTargetId : null)
@@ -1402,7 +1443,7 @@ function chooseGrimtalMove(character, game, usable) {
     const grimTargets = validTargetsFor(game, character, 'grimStrike');
     const killTarget = grimTargets.find((tid) => {
       const t = game.characters[tid];
-      return t.hearts <= Math.max(0, 1 - t.shield);
+      return activeHearts(t) <= Math.max(0, 1 - t.shield);
     });
     if (killTarget) {
       return { actionId: 'grimStrike', targetId: killTarget };
@@ -1453,7 +1494,7 @@ function illyraUrgentBurstTarget(character, game) {
   for (const [tid, count] of character.special.mirageMarks) {
     if (count <= 0) continue;
     const target = game.characters[tid];
-    if (target && !target.isKO && target.hearts <= count) return tid;
+    if (target && !target.isKO && activeHearts(target) <= count) return tid;
   }
   return null;
 }
@@ -1805,7 +1846,7 @@ export function chooseBotMelyssaPuppetAction(puppetCharacter, game, melyssaId) {
     // Self Choke always deals exactly 1 flat, ignoresShield damage (see
     // executeSelfChoke in index.js) - safe to hardcode that amount here
     // rather than importing the ability module just to read a constant.
-    const selfChokeWouldKill = puppetCharacter.hearts <= 1;
+    const selfChokeWouldKill = activeHearts(puppetCharacter) <= 1;
     // Lone-duel stall guard (see isMelyssaLoneDuel's own comment in
     // turnEngine.js): with only Melyssa and this one enemy left, Athena's
     // Curse Strike is the one remaining zero-damage move that
