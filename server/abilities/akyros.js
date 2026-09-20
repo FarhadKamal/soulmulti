@@ -26,8 +26,32 @@ function livingMarkedEnemies(game, akyros) {
 // exceeds it). No turn-based expiry - the ONLY unlock trigger is Akyros's
 // own death, instant and unconditional, clearing every remaining locked
 // heart across every victim at once (see registerOnOwnDeath below).
+// **Threshold Shift (#38, Shadow Toll) note**: this threshold is checked
+// against Akyros's own EFFECTIVE hearts count (hearts - convertedHeartCount),
+// not raw hearts - see shadowSeal's own isLegal below.
 const SHADOW_SEAL_HEARTS_THRESHOLD = 3;
 const SHADOW_SEAL_ACTIVE_CAP = 2;
+
+// Shadow Toll (Threshold Shift #38, design-locked 2026-09-20): a
+// repeatable Normal Action, pure turn-cost, no other downside. Converts
+// exactly one of Akyros's own currently-red hearts to a violet "converted"
+// heart per cast - purely a bookkeeping counter (convertedHeartCount),
+// never touches his real `hearts` value or his own KO condition (he still
+// dies at hearts === 0 same as anyone else). The ONLY thing that reads
+// convertedHeartCount is Shadow Seal's own isLegal threshold check just
+// below, letting him deliberately shift when Shadow Seal becomes
+// available rather than only via taking real damage. Fully symmetric,
+// mutually-exclusive-visibility relationship with Shadow Seal: legal only
+// while his EFFECTIVE hearts (hearts - convertedHeartCount) is still
+// ABOVE the threshold (i.e. Shadow Seal isn't legal yet) and he hasn't
+// used Shadow Seal, and only while at least one red heart remains to
+// convert. Confirmed ruling, explicitly re-stated mid-design: "if he ever
+// already used seal shadow, then it will not possible to cast it" - once
+// usedShadowSeal flips true, this is gone for good regardless of what the
+// live threshold would otherwise say.
+function akyrosEffectiveHearts(character) {
+  return character.hearts - character.special.convertedHeartCount;
+}
 
 // Dodge Defense category registration (see
 // engine/categories/dodgeDefense.js) - additive, not yet consumed by
@@ -152,6 +176,25 @@ export const actions = {
       return result;
     },
   },
+  // Shadow Toll (Threshold Shift #38, design-locked 2026-09-20): see its
+  // own top-of-file comment for the full mechanic. A Normal Action (not
+  // Special - doesn't touch usedSpecial/Shadow Execution's own gate at
+  // all), no target, no damage of its own.
+  shadowToll: {
+    label: 'Shadow Toll',
+    needsTarget: false,
+    isLegal: (character) => !character.special.usedShadowSeal
+      && akyrosEffectiveHearts(character) > SHADOW_SEAL_HEARTS_THRESHOLD
+      && character.special.convertedHeartCount < character.hearts,
+    execute(character, targetId, game, log) {
+      character.special.convertedHeartCount += 1;
+      log.push({
+        type: 'special', characterId: character.id, actionId: 'shadowToll',
+        convertedHeartCount: character.special.convertedHeartCount, hearts: heartsSnapshot(game),
+      });
+      return {};
+    },
+  },
   // Shadow Seal (design-locked 2026-09-19): hearts<=3 one-time special,
   // NOT mark-gated (unlike Shadow Execution/the old Shadow Army). Hits
   // every OTHER living character simultaneously - deliberately bypasses
@@ -163,7 +206,11 @@ export const actions = {
     label: 'Shadow Seal',
     needsTarget: false,
     special: true,
-    isLegal: (character) => character.hearts <= SHADOW_SEAL_HEARTS_THRESHOLD && !character.special.usedShadowSeal,
+    // Threshold Shift (#38, Shadow Toll) - checks his EFFECTIVE hearts
+    // (hearts - convertedHeartCount), not raw hearts, so converting hearts
+    // via Shadow Toll can bring this threshold within reach on his own
+    // schedule rather than only via taking real damage.
+    isLegal: (character) => akyrosEffectiveHearts(character) <= SHADOW_SEAL_HEARTS_THRESHOLD && !character.special.usedShadowSeal,
     execute(character, targetId, game, log) {
       character.special.usedShadowSeal = true;
       // Grimtal's Beast Form (Death-Triggered Reversion #36) - same

@@ -269,6 +269,12 @@ input {
    empty-heart grey, matching Shadow Seal's own black-tendril/red-glow
    visual theme. */
 .heart-icon--locked { color: #4a1a3a; text-shadow: 0 0 4px rgba(180, 30, 90, 0.6); }
+/* Akyros's Shadow Toll (Threshold Shift #38) - a heart HE converted
+   himself is still fully "live" (counts normally toward his own KO,
+   unlike a locked heart), so it gets a distinct, vivid deep violet/purple
+   rather than the muted/inert locked-heart styling above - it's meant to
+   read as "changed," not "disabled." */
+.heart-icon--converted { color: #9d4edd; text-shadow: 0 0 4px rgba(157, 78, 221, 0.6); }
 .char-flag { font-size: 0.8em; opacity: 0.8; }
 .char-shield {
   display: inline-flex; align-items: center; gap: 5px; margin-top: 4px;

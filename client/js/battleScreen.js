@@ -1268,9 +1268,22 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
     // instead of every heart looking identically "full" and misleadingly
     // implying they all still count toward survival.
     const activeCount = character.hearts - (character.lockedHearts || 0);
+    // Akyros's Shadow Toll (Threshold Shift #38) - convertedHeartCount
+    // only ever lives on his own character.special (see state.js), so
+    // this reads 0/undefined for every other hero automatically, no
+    // character.id check needed. A converted heart is still fully "live"
+    // (counts normally toward HIS OWN KO, unlike a locked heart which is
+    // inert on someone ELSE's tile) - rendered within the FIRST N of the
+    // active range so it's visually distinct (violet) from his remaining
+    // normal red hearts, rather than looking identical to every other
+    // full heart.
+    const convertedCount = character.special?.convertedHeartCount || 0;
     for (let i = 0; i < character.maxHearts; i++) {
       const heart = document.createElement('span');
-      if (i < activeCount) {
+      if (i < convertedCount && i < activeCount) {
+        heart.className = 'heart-icon heart-icon--converted';
+        heart.title = 'Converted by Shadow Toll - no longer counts toward his Shadow Seal threshold';
+      } else if (i < activeCount) {
         heart.className = 'heart-icon heart-icon--full';
       } else if (i < character.hearts) {
         heart.className = 'heart-icon heart-icon--locked';
@@ -2048,7 +2061,7 @@ const ACTION_LABELS = {
   cyclonePunch: 'Cyclone Punch', timeFreeze: 'Time Freeze', rewind: 'Rewind', worldStops: 'World Stops',
   smash: 'Smash', titanToss: 'Titan Toss', titanSmash: 'Titan Smash', glorySmash: 'Glory Smash', earthshatter: 'Earthshatter',
   chargeUp: 'Charge Up', thunderWrath: 'Thunder Wrath', soulSwap: 'Soul Swap', soulSwapWrath: 'Thunder Wrath (free)',
-  hiddenMark: 'Hidden Mark', fatalSlash: 'Fatal Slash', shadowExecution: 'Shadow Execution', shadowSeal: 'Shadow Seal',
+  hiddenMark: 'Hidden Mark', fatalSlash: 'Fatal Slash', shadowExecution: 'Shadow Execution', shadowSeal: 'Shadow Seal', shadowToll: 'Shadow Toll',
   bloodFrenzy: 'Blood Frenzy',
   lunarStrike: 'Lunar Strike', moonstep: 'Moonstep', lunarEclipse: 'Lunar Eclipse', moonlitTheft: 'Moonlit Theft',
   chaosGamble: 'Chaos Gamble', jesterBall: 'Jester Ball', fowlPlay: 'Fowl Play', chickenAttack: 'Chicken Attack', bloodHunt: 'Blood Hunt',
@@ -2146,6 +2159,13 @@ function describeLogEntry(entry) {
         // the status badge (statusBadges below) and the tile itself no
         // longer being clickable, not by anything in this one-shot log line.
         return `${name(entry.characterId)} transforms into a Beast!`;
+      }
+      if (entry.actionId === 'shadowToll') {
+        // Shadow Toll (Akyros's repeatable Normal Action, Threshold Shift
+        // #38) - converts one of his own hearts to violet each cast,
+        // shifting when Shadow Seal's own threshold becomes legal. No
+        // target, no damage.
+        return `${name(entry.characterId)} paid Shadow Toll - ${entry.convertedHeartCount} heart${entry.convertedHeartCount === 1 ? '' : 's'} converted`;
       }
       if (entry.actionId === 'shadowSeal') {
         // Shadow Seal (Akyros's hearts<=3 one-time special, replaces Shadow

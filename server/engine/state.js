@@ -76,7 +76,15 @@ function baseSpecialFor(id) {
     case 'zerathys':
       return { chargeCount: 0 };
     case 'akyros':
-      return { marks: new Set(), revealedMarks: new Set(), everMarkedIds: new Set(), dodgedAttackerIds: new Set(), usedShadowSeal: false };
+      // convertedHeartCount: Shadow Toll (Threshold Shift #38, design-
+      // locked 2026-09-20) - how many of Akyros's OWN current hearts he's
+      // personally converted to violet/"no longer his own." Pure
+      // bookkeeping, not a separate pool - still counts as an ordinary
+      // heart for his own KO (hearts === 0 kills him same as anyone else),
+      // only Shadow Seal's own isLegal threshold reads it (see
+      // shadowSeal's isLegal in akyros.js: hearts - convertedHeartCount
+      // <= 3, instead of a plain hearts <= 3 check).
+      return { marks: new Set(), revealedMarks: new Set(), everMarkedIds: new Set(), dodgedAttackerIds: new Set(), usedShadowSeal: false, convertedHeartCount: 0 };
     case 'velorya':
       // usedMoonlitTheft: hearts<=3 one-time special (see velorya.js) -
       // drains every other living character's shield to 0 and takes it

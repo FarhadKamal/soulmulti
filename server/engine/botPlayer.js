@@ -491,6 +491,24 @@ function chooseChronoxMove(character, game, usable) {
   return { actionId: 'cyclonePunch', targetId: pickDefaultTarget(game, character, 'cyclonePunch') };
 }
 
+// Shadow Toll (Threshold Shift #38): the bot proactively converts hearts
+// to work toward unlocking Shadow Seal sooner, rather than only ever
+// reacting once real damage happens to cross the threshold - mirrors a
+// savvy human deliberately using the tool. Gated on hearts <= 5 (real
+// hearts, not effective) - confirmed reachable gap in an earlier draft
+// of this gate: a plain "below half of his 7 max" (<=3.5, i.e. <=3 for an
+// integer stat) fully OVERLAPS Shadow Seal's own hearts<=3 legal
+// threshold, which always wins first (see the byId.shadowSeal check
+// above) - that gate could never actually fire in practice. This flat
+// threshold instead sits comfortably ABOVE Shadow Seal's own gate (3),
+// giving him 1-2 turns of genuine proactive conversion runway before
+// Shadow Seal would naturally unlock anyway from real damage alone - only
+// once genuinely hurt, not at full (or near-full) health, since
+// converting still costs a full turn purely for future setup value, same
+// "no reason to rush it while healthy" caution as Tharox's own
+// charge-timing logic.
+const SHADOW_TOLL_BOT_MAX_HEARTS = 5;
+
 function chooseAkyrosMove(character, game, usable) {
   const byId = Object.fromEntries(usable.map((a) => [a.actionId, a]));
   // Shadow Seal (hearts<=3, replaces Shadow Army): unlike every other
@@ -503,6 +521,15 @@ function chooseAkyrosMove(character, game, usable) {
   // lethal, strictly worth taking whenever it's on the table.
   if (byId.shadowSeal) {
     return { actionId: 'shadowSeal', targetId: null };
+  }
+  // Checked right after Shadow Seal itself (which always wins once legal)
+  // and before the normal attack logic below - once he's moderately hurt
+  // and Shadow Toll is still on the table (i.e. Shadow Seal isn't legal
+  // yet), converting a heart is worth prioritizing over a normal attack
+  // THIS turn, working toward Shadow Seal on his own schedule rather than
+  // only via incoming damage.
+  if (byId.shadowToll && character.hearts <= SHADOW_TOLL_BOT_MAX_HEARTS) {
+    return { actionId: 'shadowToll', targetId: null };
   }
   let markedTargets = validTargetsFor(game, character, 'shadowExecution');
   let fatalTargets = validTargetsFor(game, character, 'fatalSlash');

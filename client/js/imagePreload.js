@@ -32,6 +32,7 @@ const FLASH_IMAGES = [
   'assets/images/akyros/idle.jpg',
   'assets/images/akyros/shadow.jpg',
   'assets/images/akyros/shadow_seal.jpg',
+  'assets/images/akyros/shadow_toll.jpg',
   'assets/images/athena/idle.jpg',
   'assets/images/athena/curse.jpg',
   'assets/images/athena/heal.jpg',

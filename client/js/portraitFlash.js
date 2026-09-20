@@ -851,6 +851,12 @@ export function handleLogEntryForFlash(entry, game) {
     case 'fatalSlash':
       if (!dodged) setFlash(characterId, 'assets/images/akyros/fatal.jpg');
       break;
+    case 'shadowToll':
+      // Threshold Shift (#38) - self-only, no victims, default flash
+      // duration (not the longer multi-beat SHADOW_SEAL_FLASH_DURATION_MS
+      // - this is a quiet single-character moment, not a dramatic
+      // multi-victim beat).
+      setFlash(characterId, 'assets/images/akyros/shadow_toll.jpg'); break;
     case 'shadowSeal':
       setFlash(characterId, 'assets/images/akyros/shadow_seal.jpg', SHADOW_SEAL_FLASH_DURATION_MS); break;
     case 'lunarEclipse':

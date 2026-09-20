@@ -446,6 +446,20 @@ export const actions = {
       // the null-caster branch's own comment above for the full reasoning.
       const casterLockedHearts = caster.lockedHearts;
       const chronoxLockedHearts = character.lockedHearts;
+      // Akyros's Shadow Toll/Shadow Seal (Threshold Shift #38 + Caster-
+      // Bound Lock #37) - same "survive the restore" treatment, both live
+      // only on Akyros's own .special object (nothing to do with Chronox
+      // himself, so only captured on the caster side here). If Akyros
+      // casts Shadow Toll (incrementing convertedHeartCount) or Shadow
+      // Seal (flipping usedShadowSeal) at any point between an old
+      // recorded attack's snapshot and Chronox eventually Rewinding that
+      // attack, restoring the stale snapshot would silently erase that
+      // progress - un-converting hearts he'd already converted, or worse,
+      // un-spending an already-used one-time Shadow Seal (letting him cast
+      // it again). Only relevant when Akyros himself is the rewound
+      // caster; harmless no-op (undefined) for every other character.
+      const casterConvertedHeartCount = caster.special.convertedHeartCount;
+      const casterUsedShadowSeal = caster.special.usedShadowSeal;
       // Draxus's Deathless Fury window flag needs the same "survive the
       // restore" treatment, for the same underlying reason - Melyssa can
       // puppet him into attacking Chronox WHILE deathproofActive is still
@@ -526,6 +540,14 @@ export const actions = {
       character.isChicken = chronoxIsChicken;
       caster.lockedHearts = casterLockedHearts;
       character.lockedHearts = chronoxLockedHearts;
+      // Only reapply if this snapshot could actually carry the field at
+      // all (caster.special exists on every character, but only Akyros's
+      // baseSpecialFor shape ever defines convertedHeartCount/
+      // usedShadowSeal in the first place) - undefined-guarded the same
+      // way deathproofActive/beastFormActive are above, harmless no-op for
+      // every other character.
+      if (casterConvertedHeartCount !== undefined) caster.special.convertedHeartCount = casterConvertedHeartCount;
+      if (casterUsedShadowSeal !== undefined) caster.special.usedShadowSeal = casterUsedShadowSeal;
       if (record.jesterBallSnapshot !== undefined) {
         game.jesterBall = structuredClone(record.jesterBallSnapshot);
       }

@@ -173,8 +173,10 @@ const ACTION_VOICE_LINES = {
   tharox: { titanToss: 'titan_toss', titanSmash: 'titan_smash', glorySmash: 'glory', earthshatter: 'earthshatter' },
   // shadowSeal: "Your heart... isn't yours anymore." - quiet/whispered
   // delivery (design-locked 2026-09-19, replaces the old shadowArmy/
-  // call_army line).
-  akyros: { hiddenMark: 'hidden_mark', shadowExecution: 'shadow', shadowSeal: 'shadow_seal' },
+  // call_army line). shadowToll: "This heart... no longer mine." - same
+  // quiet/whispered tone, deliberately mirrors shadowSeal's own line
+  // structure (design-locked 2026-09-20, Threshold Shift #38).
+  akyros: { hiddenMark: 'hidden_mark', shadowExecution: 'shadow', shadowSeal: 'shadow_seal', shadowToll: 'shadow_toll' },
   blade: { bloodFrenzy: 'blood_frenzy' },
   // mindControl's line fires from main.js's dedicated 'mind-control-select'
   // sound branch (via playMoveVoice(entry.characterId, 'mindControl')), not

@@ -277,6 +277,11 @@ const ACTION_SOUND = {
   hiddenMark: 'hiddenmark',
   fatalSlash: 'sword',
   shadowExecution: 'shadowexecution',
+  // Shadow Toll (Threshold Shift #38) - reuses the shared magic.mp3 sound
+  // effect per explicit direction, same reuse pattern as Moonlit Theft/
+  // Lifebond/Petrify above - a quiet personal transformation, no dedicated
+  // sound needed.
+  shadowToll: 'magic',
   // Shadow Seal (replaces Shadow Army) - reuses Athena's own curse sound
   // effect per explicit direction ("sound effect we can use same curse"),
   // same reuse pattern as Petrify/Lifebond/Moonlit Theft above - thematically
