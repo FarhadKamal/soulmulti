@@ -128,6 +128,10 @@ export function onTurnStart(character, game, log) {
       // fields need pushing here too.
       if (result.divineJudgmentTriggerLogEntry) log.push({ ...result.divineJudgmentTriggerLogEntry, hearts: heartsSnapshot(game) });
       if (result.prophecyOfDoomTriggerLogEntry) log.push({ ...result.prophecyOfDoomTriggerLogEntry, hearts: heartsSnapshot(game) });
+      // Melyssa's Friendship - same reasoning as the two lines above
+      // (confirmed real bug, 2026-09-20 - see melyssa.js's own onAnyDeath
+      // registration).
+      if (result.friendshipEndLogEntry) log.push({ ...result.friendshipEndLogEntry, hearts: heartsSnapshot(game) });
     }
   }
 }

@@ -160,6 +160,12 @@ export const actions = {
       // Oraclus's Prophecy of Doom trigger - same "first occurrence wins"
       // reasoning as divineJudgmentTriggerLogEntry directly above.
       let prophecyOfDoomTriggerLogEntry = null;
+      // Melyssa's Friendship - same "first occurrence wins" reasoning as
+      // divineJudgmentTriggerLogEntry above (confirmed real bug,
+      // 2026-09-20 - Earthshatter was the exact illustrative example used
+      // during design for the puppeted-AOE exception; see melyssa.js's own
+      // onAnyDeath registration for the full reasoning).
+      let friendshipEndLogEntry = null;
       for (let i = 0; i < EARTHSHATTER_TOTAL_DAMAGE; i++) {
         if (others.length === 0) break;
         const target = others[Math.floor(Math.random() * others.length)];
@@ -203,6 +209,7 @@ export const actions = {
         if (result.mirrorReflectResult?.rebirthLogEntry && !rebirthLogEntry) rebirthLogEntry = result.mirrorReflectResult.rebirthLogEntry;
         if (result.divineJudgmentTriggerLogEntry && !divineJudgmentTriggerLogEntry) divineJudgmentTriggerLogEntry = result.divineJudgmentTriggerLogEntry;
         if (result.prophecyOfDoomTriggerLogEntry && !prophecyOfDoomTriggerLogEntry) prophecyOfDoomTriggerLogEntry = result.prophecyOfDoomTriggerLogEntry;
+        if (result.friendshipEndLogEntry && !friendshipEndLogEntry) friendshipEndLogEntry = result.friendshipEndLogEntry;
         if (result.koTriggered) {
           koTriggeredByTarget[target.id] = true;
           others = others.filter((c) => c.id !== target.id);
@@ -224,7 +231,7 @@ export const actions = {
           amount: mirrorTotal, koTriggered: mirrorKoTriggered, revived: mirrorRevived,
         }
         : null;
-      return { hits, rebirthLogEntry, mirrorLogEntry, mirrorReflectLogEntry, divineJudgmentTriggerLogEntry, prophecyOfDoomTriggerLogEntry };
+      return { hits, rebirthLogEntry, mirrorLogEntry, mirrorReflectLogEntry, divineJudgmentTriggerLogEntry, prophecyOfDoomTriggerLogEntry, friendshipEndLogEntry };
     },
   },
 };

@@ -105,6 +105,10 @@ export const actions = {
       // reasoning as divineJudgmentTriggerLogEntry directly above (self-
       // clears the instant it fires).
       let prophecyOfDoomTriggerLogEntry = null;
+      // Melyssa's Friendship - same "first occurrence wins" reasoning as
+      // divineJudgmentTriggerLogEntry above (confirmed real bug,
+      // 2026-09-20, see melyssa.js's own onAnyDeath registration).
+      let friendshipEndLogEntry = null;
       // Snapshot the target list BEFORE clearing anything - iterating and
       // mutating the same Map in one pass is fine here since .set() never
       // adds new keys mid-loop (only zeroes existing ones), but snapshotting
@@ -139,9 +143,10 @@ export const actions = {
         if (result.mirrorReflectResult?.rebirthLogEntry && !rebirthLogEntry) rebirthLogEntry = result.mirrorReflectResult.rebirthLogEntry;
         if (result.divineJudgmentTriggerLogEntry && !divineJudgmentTriggerLogEntry) divineJudgmentTriggerLogEntry = result.divineJudgmentTriggerLogEntry;
         if (result.prophecyOfDoomTriggerLogEntry && !prophecyOfDoomTriggerLogEntry) prophecyOfDoomTriggerLogEntry = result.prophecyOfDoomTriggerLogEntry;
+        if (result.friendshipEndLogEntry && !friendshipEndLogEntry) friendshipEndLogEntry = result.friendshipEndLogEntry;
       }
       log.push({ type: 'special', characterId: character.id, actionId: 'mirageBurst', bursts });
-      return { bursts, rebirthLogEntry, mirrorLogEntry, mirrorReflectLogEntry, divineJudgmentTriggerLogEntry, prophecyOfDoomTriggerLogEntry };
+      return { bursts, rebirthLogEntry, mirrorLogEntry, mirrorReflectLogEntry, divineJudgmentTriggerLogEntry, prophecyOfDoomTriggerLogEntry, friendshipEndLogEntry };
     },
   },
   // Mirage Overload: her desperate last-stand special. No-target, one-time

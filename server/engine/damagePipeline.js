@@ -700,6 +700,14 @@ export function applyDamage(game, log, {
     if (anyDeathExtra?.prophecyOfDoomTriggerLogEntry) {
       result.prophecyOfDoomTriggerLogEntry = anyDeathExtra.prophecyOfDoomTriggerLogEntry;
     }
+    // Melyssa's Friendship - the bond quietly ending because the FRIEND
+    // (not Melyssa) just died to this hit. Same deferred pattern as
+    // divineJudgmentTriggerLogEntry/prophecyOfDoomTriggerLogEntry above -
+    // confirmed real bug, 2026-09-20 (see melyssa.js's own onAnyDeath
+    // registration for the full reasoning/live symptom).
+    if (anyDeathExtra?.friendshipEndLogEntry) {
+      result.friendshipEndLogEntry = anyDeathExtra.friendshipEndLogEntry;
+    }
   }
 
   // onHitLanded dispatch (see engine/categories/onHitLanded.js): Melyssa's

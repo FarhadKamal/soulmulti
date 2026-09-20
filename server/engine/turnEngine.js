@@ -425,6 +425,17 @@ function tickPoisonIfAny(character, game, log) {
   // Oraclus's Prophecy of Doom trigger - same deferred handling as
   // divineJudgmentTriggerLogEntry directly above.
   if (result.prophecyOfDoomTriggerLogEntry) log.push({ ...result.prophecyOfDoomTriggerLogEntry, hearts: heartsSnapshot(game) });
+  // Melyssa's Friendship - a poison tick that kills her current friend
+  // needs this path too, same deferred reasoning as every other entry on
+  // this call path. Confirmed real bug, 2026-09-20: a poison tick landing
+  // on Melyssa's friend during someone ELSE's turn (via
+  // getActingCharacterId's own beginCharacterTurn call, which pushes
+  // straight to game.log rather than a local per-action batch) is exactly
+  // how "The Friendship bond... has ended" first appeared in a live match
+  // log with no visible triggering line before it - the entry was pushed
+  // from inside the onAnyDeath callback BEFORE this poison-tick line
+  // itself had been pushed.
+  if (result.friendshipEndLogEntry) log.push({ ...result.friendshipEndLogEntry, hearts: heartsSnapshot(game) });
   // Grimtal's Beast Form reversion (Death-Triggered Reversion #36) - same
   // before/after countKO comparison as finalizeAction (see that function's
   // own comment for the full three-bugs-deep reasoning this is based on) -
@@ -1127,6 +1138,10 @@ export function finalizeAction(game, log, result, characterId, actionId, targetI
   // Oraclus's Prophecy of Doom trigger - same deferred reasoning as
   // divineJudgmentTriggerLogEntry directly above.
   if (result?.prophecyOfDoomTriggerLogEntry) log.push(result.prophecyOfDoomTriggerLogEntry);
+  // Melyssa's Friendship - same deferred reasoning as
+  // divineJudgmentTriggerLogEntry directly above (confirmed real bug,
+  // 2026-09-20 - see melyssa.js's own onAnyDeath registration).
+  if (result?.friendshipEndLogEntry) log.push(result.friendshipEndLogEntry);
   // Grimtal's Beast Form reversion (Death-Triggered Reversion #36) -
   // checked ONCE here, as the very last thing before this whole action's
   // batch closes out, rather than per-applyDamage-call inside
@@ -1288,6 +1303,10 @@ export function resolveJesterBall(game, holderCharacterId, choice, extra) {
   // Oraclus's Prophecy of Doom trigger - same deferred handling as
   // divineJudgmentTriggerLogEntry directly above.
   if (result?.prophecyOfDoomTriggerLogEntry) log.push(result.prophecyOfDoomTriggerLogEntry);
+  // Melyssa's Friendship - a Jester Ball explosion can KO her friend too,
+  // same deferred handling as every other call site (confirmed real bug,
+  // 2026-09-20 - see melyssa.js's own onAnyDeath registration).
+  if (result?.friendshipEndLogEntry) log.push(result.friendshipEndLogEntry);
   // Grimtal's Beast Form reversion (Death-Triggered Reversion #36) - same
   // once-per-whole-action, before/after countKO check as finalizeAction's
   // own (see that function's comment for the full three-bugs-deep

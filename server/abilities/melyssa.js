@@ -36,12 +36,18 @@ export function isCurrentFriend(game, characterId) {
   return currentFriendId(game) === characterId;
 }
 
-// Ends the bond and reverts everything to normal - shared by all 3 break
-// paths (voluntary choke, forced choke, Beast Form transformation) so the
-// actual cleanup can never drift out of sync between them. Deliberately
-// does NOT touch usedFriendship (stays permanently spent, matching every
-// other one-time special once cast) or re-open the button - Friendship is
-// truly one-time, breaking it is not "undoing the cast."
+// Ends the bond and reverts everything to normal - shared by the 2
+// DIRECT-call break paths (voluntary/forced Self Choke, Beast Form
+// transformation - both call this synchronously from their own execute(),
+// AFTER their own triggering log entry already exists, so pushing directly
+// to `log` there is correct). The THIRD path (the friend dying to someone
+// ELSE - see registerOnAnyDeath below) does NOT call this function - it
+// can't safely push to `log` at all from inside that callback (see its own
+// comment for why), so it duplicates just the state-clearing half inline
+// and defers its own log entry instead. Deliberately does NOT touch
+// usedFriendship (stays permanently spent, matching every other one-time
+// special once cast) or re-open the button - Friendship is truly one-time,
+// breaking it is not "undoing the cast."
 export function endFriendship(melyssa, game, log) {
   const friendId = melyssa.special.friendCharacterId;
   if (!friendId) return;
@@ -49,35 +55,53 @@ export function endFriendship(melyssa, game, log) {
   log.push({ type: 'friendship-end', characterId: 'melyssa', friendCharacterId: friendId, hearts: heartsSnapshot(game) });
 }
 
-// KO-branch cleanup (see engine/categories/onOwnDeath.js) - covers BOTH
-// directions symmetrically:
-// - Melyssa's OWN death (rule: "friend is freed instantly" - her own
-//   onOwnDeath fires when SHE is the one KO'd) - just clears
-//   friendCharacterId; there's no "friend" left to notify since the mutual
-//   no-attack/redirect checks all key off currentFriendId(game), which
-//   naturally reads null once this runs.
-// - The FRIEND's own death (rule 11: "friend dies to someone else, bond
-//   quietly ends") - registered generically below for every character, not
-//   just Melyssa, since we don't know in advance who her friend will be.
-//   Confirmed ruling, 2026-09-20: this also covers Draxus's Cheat Death
-//   (a genuine KO-then-later-revive, unlike Blade's Rebirth which
-//   intercepts BEFORE a real KO ever happens and so naturally never
-//   reaches this hook at all - the bond surviving Rebirth is a direct,
-//   accepted consequence of Rebirth's own interception timing, not special
-//   -cased here).
+// KO-branch cleanup (see engine/categories/onOwnDeath.js) - Melyssa's OWN
+// death (rule: "friend is freed instantly" - her own onOwnDeath fires when
+// SHE is the one KO'd) - just clears friendCharacterId; there's no
+// "friend" left to notify since the mutual no-attack/redirect checks all
+// key off currentFriendId(game), which naturally reads null once this
+// runs. No log entry needed here - her own KO already gets its own line
+// from whatever killed her.
 registerOnOwnDeath('melyssa', (character) => {
   character.special.friendCharacterId = null;
 });
-// The FRIEND's own death (rule 11) - onOwnDeath only supports one callback
-// PER character id (a Map, see onOwnDeath.js), and we don't know in
-// advance who Melyssa's friend will be, so this has to be onAnyDeath
-// instead (a list, fires for every KO in the game regardless of who).
+// The FRIEND's own death (rule 11: "friend dies to someone else, bond
+// quietly ends") - registered generically below for every character, not
+// just Melyssa, since we don't know in advance who her friend will be.
+// Confirmed ruling, 2026-09-20: this also covers Draxus's Cheat Death (a
+// genuine KO-then-later-revive, unlike Blade's Rebirth which intercepts
+// BEFORE a real KO ever happens and so naturally never reaches this hook
+// at all - the bond surviving Rebirth is a direct, accepted consequence of
+// Rebirth's own interception timing, not special-cased here).
+//
+// Confirmed REAL bug, 2026-09-20: this callback fires SYNCHRONOUSLY, deep
+// inside whatever applyDamage call actually killed the friend (Grimtal's
+// own onAnyDeath/onOwnDeath registrations, and every other deferred-entry
+// site in this codebase - Rebirth, Athena's curse-mirror, Divine Judgment,
+// Prophecy of Doom, Fowl Play's revert - all hit this exact same trap and
+// needed the same fix) - it runs BEFORE the triggering action's own caller
+// has pushed ITS OWN log entry yet. Pushing 'friendship-end' directly here
+// (as an earlier version of this code did) landed it BEFORE the real
+// killing blow's own line in the log - confirmed live: "The Friendship
+// bond... has ended" appeared with no visible cause, because the actual
+// killing hit's own entry (e.g. a poison tick fired from
+// getActingCharacterId's own beginCharacterTurn call, which pushes
+// directly to game.log) hadn't been pushed yet at the point this callback
+// ran. Fixed the same way every other entry in this position already is:
+// clear the state here (safe, no log dependency), but DEFER the log entry
+// itself via the return value - damagePipeline.js's own onAnyDeath
+// dispatch call site merges it onto `result.friendshipEndLogEntry`, and
+// every call site that already pushes divineJudgmentTriggerLogEntry/
+// prophecyOfDoomTriggerLogEntry AFTER its own triggering line now pushes
+// this one the same way.
 registerOnAnyDeath((diedCharacterId, sourceCharacterId, isMirror, game, log) => {
   const melyssa = game.characters.melyssa;
   if (!melyssa || melyssa.isKO) return undefined;
-  if (melyssa.special.friendCharacterId !== diedCharacterId) return undefined;
-  endFriendship(melyssa, game, log);
-  return undefined;
+  const friendId = melyssa.special.friendCharacterId;
+  if (friendId !== diedCharacterId) return undefined;
+  melyssa.special.friendCharacterId = null;
+  const entry = { type: 'friendship-end', characterId: 'melyssa', friendCharacterId: friendId, hearts: heartsSnapshot(game) };
+  return { friendshipEndLogEntry: entry };
 });
 
 // Guaranteed puppet control (confirmed ruling: "melyssa can even controll

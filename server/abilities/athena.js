@@ -247,6 +247,11 @@ export const actions = {
       if (selfResult.fowlPlayRevertLogEntry) log.push({ ...selfResult.fowlPlayRevertLogEntry, hearts: heartsSnapshot(game) });
       if (selfResult.divineJudgmentTriggerLogEntry) log.push({ ...selfResult.divineJudgmentTriggerLogEntry, hearts: heartsSnapshot(game) });
       if (selfResult.prophecyOfDoomTriggerLogEntry) log.push({ ...selfResult.prophecyOfDoomTriggerLogEntry, hearts: heartsSnapshot(game) });
+      // Melyssa's Friendship - if Athena herself is the current friend and
+      // this self-inflicted sacrifice cost happens to be the killing blow
+      // (confirmed real bug, 2026-09-20 - see melyssa.js's own onAnyDeath
+      // registration).
+      if (selfResult.friendshipEndLogEntry) log.push({ ...selfResult.friendshipEndLogEntry, hearts: heartsSnapshot(game) });
       return result;
     },
   },
