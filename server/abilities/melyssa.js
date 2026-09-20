@@ -1,19 +1,98 @@
-import { isSilenced } from '../engine/damagePipeline.js';
+import { isSilenced, clearStatusesFromOneSource, heartsSnapshot } from '../engine/damagePipeline.js';
 import { registerOnHitLanded } from '../engine/categories/onHitLanded.js';
+import { registerOnOwnDeath } from '../engine/categories/onOwnDeath.js';
+import { registerOnOtherRevived } from '../engine/categories/onOtherRevived.js';
+import { registerOnAnyDeath } from '../engine/categories/onAnyDeath.js';
 
-// Full Control's hearts<=3 gate (also drives the guaranteed-Mind-Control
-// passive below - both use this same threshold, confirmed ruling: "when
-// her health will be <=3").
-const FULL_CONTROL_HEARTS_THRESHOLD = 3;
+// Friendship's hearts<=3 gate (design-locked 2026-09-20, replaces Full
+// Control - see project memory soulclash_melyssa.md for the full design
+// history).
+const FRIENDSHIP_HEARTS_THRESHOLD = 3;
 
-// Passive (no button, always-on once hearts<=3): Mind Control's normal 50%
-// resist chance (turnEngine.js's executeActionAsPuppet) is removed
-// entirely - every puppeted action succeeds. Exported so
-// executeActionAsPuppet can check it without a circular import (melyssa.js
-// already sits below turnEngine.js in the dependency direction - ability
-// files import FROM the engine, never the reverse).
-export function hasGuaranteedMindControl(character) {
-  return !!character && character.hearts <= FULL_CONTROL_HEARTS_THRESHOLD;
+// Self Choke's own flat damage (see server/index.js's executeSelfChoke) -
+// duplicated here as a plain constant so isCurrentFriend-adjacent logic
+// elsewhere can reason about "would choking my friend right now be lethal"
+// without importing index.js (server/index.js is the top of the dependency
+// graph, ability files sit below the engine layer which sits below it -
+// importing back up would be circular).
+export const SELF_CHOKE_DAMAGE = 2;
+
+// True whenever Melyssa currently has an active Friendship bond - checked
+// from several places (isValidTarget's mutual no-attack block, Mind
+// Control's guaranteed-success passive, the redirect hook in
+// damagePipeline.js). A null/undefined melyssaCharacter (not in this
+// match, or somehow missing) safely returns false rather than throwing.
+export function currentFriendId(game) {
+  const melyssa = game.characters?.melyssa;
+  if (!melyssa || melyssa.isKO) return null;
+  return melyssa.special.friendCharacterId || null;
+}
+
+// True if `characterId` is Melyssa's current friend - used by
+// isValidTarget/isValidPuppetTarget (block Melyssa/her puppets from
+// targeting him) and by the reverse direction (block HIM from freely
+// targeting Melyssa on his own turn - see turnEngine.js's own hook).
+export function isCurrentFriend(game, characterId) {
+  return currentFriendId(game) === characterId;
+}
+
+// Ends the bond and reverts everything to normal - shared by all 3 break
+// paths (voluntary choke, forced choke, Beast Form transformation) so the
+// actual cleanup can never drift out of sync between them. Deliberately
+// does NOT touch usedFriendship (stays permanently spent, matching every
+// other one-time special once cast) or re-open the button - Friendship is
+// truly one-time, breaking it is not "undoing the cast."
+export function endFriendship(melyssa, game, log) {
+  const friendId = melyssa.special.friendCharacterId;
+  if (!friendId) return;
+  melyssa.special.friendCharacterId = null;
+  log.push({ type: 'friendship-end', characterId: 'melyssa', friendCharacterId: friendId, hearts: heartsSnapshot(game) });
+}
+
+// KO-branch cleanup (see engine/categories/onOwnDeath.js) - covers BOTH
+// directions symmetrically:
+// - Melyssa's OWN death (rule: "friend is freed instantly" - her own
+//   onOwnDeath fires when SHE is the one KO'd) - just clears
+//   friendCharacterId; there's no "friend" left to notify since the mutual
+//   no-attack/redirect checks all key off currentFriendId(game), which
+//   naturally reads null once this runs.
+// - The FRIEND's own death (rule 11: "friend dies to someone else, bond
+//   quietly ends") - registered generically below for every character, not
+//   just Melyssa, since we don't know in advance who her friend will be.
+//   Confirmed ruling, 2026-09-20: this also covers Draxus's Cheat Death
+//   (a genuine KO-then-later-revive, unlike Blade's Rebirth which
+//   intercepts BEFORE a real KO ever happens and so naturally never
+//   reaches this hook at all - the bond surviving Rebirth is a direct,
+//   accepted consequence of Rebirth's own interception timing, not special
+//   -cased here).
+registerOnOwnDeath('melyssa', (character) => {
+  character.special.friendCharacterId = null;
+});
+// The FRIEND's own death (rule 11) - onOwnDeath only supports one callback
+// PER character id (a Map, see onOwnDeath.js), and we don't know in
+// advance who Melyssa's friend will be, so this has to be onAnyDeath
+// instead (a list, fires for every KO in the game regardless of who).
+registerOnAnyDeath((diedCharacterId, sourceCharacterId, isMirror, game, log) => {
+  const melyssa = game.characters.melyssa;
+  if (!melyssa || melyssa.isKO) return undefined;
+  if (melyssa.special.friendCharacterId !== diedCharacterId) return undefined;
+  endFriendship(melyssa, game, log);
+  return undefined;
+});
+
+// Guaranteed puppet control (confirmed ruling: "melyssa can even controll
+// with 100% chance on her friends ability") - scoped SPECIFICALLY to
+// puppeting her current friend, not a whole-board passive the way the old
+// Full Control's hearts<=3 guarantee was. Mind Control's normal 50% resist
+// chance (turnEngine.js's executeActionAsPuppet) is removed entirely only
+// for this one specific puppet; every other character she puppets still
+// rolls the normal 50/50. Exported so executeActionAsPuppet can check it
+// without a circular import (melyssa.js already sits below turnEngine.js
+// in the dependency direction - ability files import FROM the engine,
+// never the reverse).
+export function hasGuaranteedMindControl(melyssaCharacter, puppetCharacterId) {
+  return !!melyssaCharacter && !melyssaCharacter.isKO
+    && melyssaCharacter.special.friendCharacterId === puppetCharacterId;
 }
 
 // Reactive shield (see engine/categories/onHitLanded.js): whenever damage
@@ -87,47 +166,47 @@ export const actions = {
       return { puppetCharacterId: targetId };
     },
   },
-  // Full Control: one-time hearts<=3 special (confirmed ruling: "when her
-  // health will be <=3"). Every other living character (minus a
-  // Clean-Slate-protected Marin, who's protected from being CONTROLLED but
-  // NOT from being a valid TARGET - confirmed ruling, 2026-09-04) becomes a
-  // puppet simultaneously, each independently assigned a random target
-  // from the full pool of other living characters, and fires their own
-  // real normal-tier attack at that target with full pure damage - no
-  // dodge, shield, untargetable, immortal, or Rebirth. This function only
-  // does the cast-time bookkeeping (usedFullControl flag, its own log
-  // entry) - the actual multi-hero burst (target assignment, per-hero
-  // action dispatch, defense bypass) is resolved by turnEngine.js's
-  // resolveFullControl, called from executeAction right after this
-  // execute() returns (see that file's own comment for why the split is
-  // necessary - melyssa.js can't import ABILITY_MODULES without a
-  // circular import). needsTarget: false - there's no player-chosen target
-  // at all, every assignment is decided randomly server-side.
-  fullControl: {
-    label: 'Full Control',
-    needsTarget: false,
+  // Friendship (design-locked 2026-09-20, replaces Full Control): one-time
+  // hearts<=3 special. Picks any other living, non-frozen, non-untargetable
+  // character (same eligibility as Mind Control's own target pool - no
+  // ally/enemy restriction, since this game has no teams) and forms a bond:
+  // neither can attack the other (turnEngine.js's isValidTarget/
+  // isValidPuppetTarget), Mind Control on the friend specifically becomes
+  // 100% guaranteed for the rest of the match (hasGuaranteedMindControl,
+  // scoped to just this one puppet - every OTHER character she puppets
+  // still rolls the normal 50/50), and any damage/status that would land
+  // on Melyssa
+  // redirects to the friend instead (with hearts-based spillover - see
+  // damagePipeline.js's applyDamage redirect hook). Retroactively cleanses
+  // whatever negative status the NEW friend had already inflicted on her
+  // before the bond formed (confirmed ruling: "if athena casted judgement
+  // strike or curse strike to melyssa... now melyssa cast friendship of
+  // athena... melyssa's judgement strike or curse status will remove" -
+  // scoped to just that one source, see clearStatusesFromOneSource).
+  friendship: {
+    label: 'Friendship',
+    needsTarget: true,
     special: true,
-    // Confirmed ruling: hidden entirely in a genuine 1v1 (only one other
-    // living character besides Melyssa) - there's no second character left
-    // for even a single puppet to attack, so resolveFullControl
-    // (turnEngine.js) would resolve as a complete no-op, wasting the
-    // one-time use for zero effect at the exact moment (desperation,
-    // hearts<=3) it matters most. Requires at least 2 OTHER living
-    // characters. NOT narrowed further to account for one of those 2
-    // possibly being a Clean-Slate-protected Marin (who could still be a
-    // puppet's TARGET even though she can't be a puppet herself, per the
-    // ruling above) - Clean Slate's armed/immunity state is real per-cast
-    // side-effecting logic (tryTriggerCleanSlate), not safe to peek at
-    // from a pure isLegal check without actually consuming it.
-    isLegal: (character, game) => {
-      if (character.hearts > FULL_CONTROL_HEARTS_THRESHOLD || character.special.usedFullControl) return false;
-      const othersAlive = Object.values(game.characters).filter((c) => c.id !== character.id && !c.isKO).length;
-      return othersAlive >= 2;
-    },
+    isLegal: (character) => character.hearts <= FRIENDSHIP_HEARTS_THRESHOLD && !character.special.usedFriendship,
     execute(character, targetId, game, log) {
-      character.special.usedFullControl = true;
-      log.push({ type: 'special', characterId: character.id, actionId: 'fullControl' });
+      character.special.usedFriendship = true;
+      character.special.friendCharacterId = targetId;
+      clearStatusesFromOneSource(character, game, log, targetId);
+      log.push({ type: 'special', characterId: character.id, actionId: 'friendship', targetId, hearts: heartsSnapshot(game) });
       return {};
     },
   },
 };
+
+// Friendship's own target-eligibility rule (same shape as Mind Control's
+// own isValidMindControlTarget in turnEngine.js, minus a circular import -
+// melyssa.js sits below turnEngine.js in the dependency graph, so this is
+// a self-contained reimplementation rather than an import). Exported so
+// turnEngine.js's own isValidTarget can dispatch to it for the
+// 'friendship' actionId specifically.
+export function isValidFriendshipTarget(game, targetId) {
+  const target = game.characters[targetId];
+  if (!target || target.id === 'melyssa') return false;
+  if (target.isKO || target.untargetable || target.skipNextTurn) return false;
+  return true;
+}

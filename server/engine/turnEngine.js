@@ -80,12 +80,47 @@ const CHEAT_DEATH_ACTION = {
   isLegal: () => true,
 };
 
+// Melyssa's Friendship - the forced-break endgame (confirmed ruling: "this
+// friendship will end in the last part. during 1 vs 1 situation at that
+// time melyssa will only have one option choke!"). Same synthetic,
+// character-agnostic-shaped override as CHICKEN_ATTACK_ACTION/
+// CHEAT_DEATH_ACTION above - not declared in melyssa.js's own actions map
+// since it only ever applies in this one specific stalemate. needsTarget:
+// false since there's only ever one possible target (her own friend, the
+// sole other living character) - executeFriendshipSelfChoke (index.js)
+// resolves it directly against him without needing a player-chosen target.
+const FRIENDSHIP_SELF_CHOKE_ACTION = {
+  label: 'Self Choke',
+  needsTarget: false,
+  isLegal: () => true,
+};
+
+// True in the specific forced-break condition: exactly 2 characters left
+// alive on the whole board, Melyssa and her own current friend. She can
+// never attack him (mutual no-attack), can't usefully puppet him (his own
+// attack has no valid target left besides her, which is also blocked), and
+// can't puppet anyone else (no one else is alive) - Self Choke against her
+// own friend is the only thing left she can do, every turn, until the
+// bond breaks or the match ends some other way (e.g. a lucky Draxus-style
+// revival elsewhere isn't possible here since only 2 are alive).
+export function isFriendshipForcedChoke(game, melyssaId) {
+  const melyssa = game.characters[melyssaId];
+  if (!melyssa || melyssa.id !== 'melyssa') return false;
+  const friendId = melyssa.special.friendCharacterId;
+  if (!friendId) return false;
+  const living = Object.values(game.characters).filter((c) => !c.isKO);
+  return living.length === 2 && living.some((c) => c.id === friendId);
+}
+
 export function getLegalActions(character, game) {
   if (character.id === 'draxus' && character.isKO && character.special.cheatDeathEligible) {
     return [{ actionId: 'cheatDeath', ...CHEAT_DEATH_ACTION }];
   }
   if (isChickenified(character)) {
     return [{ actionId: 'chickenAttack', ...CHICKEN_ATTACK_ACTION }];
+  }
+  if (character.id === 'melyssa' && isFriendshipForcedChoke(game, character.id)) {
+    return [{ actionId: 'friendshipSelfChoke', ...FRIENDSHIP_SELF_CHOKE_ACTION }];
   }
   const mod = ABILITY_MODULES[character.id];
   if (!mod) return [];
@@ -132,6 +167,13 @@ export function isValidTarget(game, characterId, actionId, targetId) {
   }
   if (target.ownerId === character.ownerId) return false;
   if (target.untargetable) return false;
+  // Melyssa's Friendship - mutual no-attack, fully enforced both
+  // directions (confirmed ruling): she can never target her friend with
+  // anything, and her friend can never target her either, for as long as
+  // the bond holds. Checked generically here (not per-actionId) so it
+  // covers every current and future targeted action automatically.
+  if (characterId === 'melyssa' && melyssa.isCurrentFriend(game, targetId)) return false;
+  if (targetId === 'melyssa' && melyssa.isCurrentFriend(game, characterId)) return false;
   if (actionId === 'shadowExecution') return character.special.marks.has(targetId);
   if (actionId === 'hiddenMark') return !character.special.everMarkedIds.has(targetId);
   // Chronox's Rewind lockout: the caster it was cast against cannot use
@@ -253,6 +295,14 @@ export function isValidPuppetTarget(game, puppetId, actionId, targetId) {
   if (!target || target.isKO) return false;
   const puppet = game.characters[puppetId];
   if (target.untargetable) return false;
+  // Melyssa's Friendship - mutual no-attack is ABSOLUTE for a direct
+  // single-target choice, even when SHE is the one puppeting (confirmed
+  // ruling: "still blocked - never a valid puppet target choice") -
+  // distinct from the puppeted-AOE exception (see damagePipeline.js's own
+  // redirect hook), which only ever suspends protection for an
+  // unavoidable side-effect of a global/multi-target action, never lets
+  // her deliberately choose her own friend to directly attack her.
+  if (targetId === 'melyssa' && melyssa.isCurrentFriend(game, puppetId)) return false;
   if (actionId === 'shadowExecution') return puppet.special.marks.has(targetId);
   if (actionId === 'hiddenMark') return !puppet.special.everMarkedIds.has(targetId);
   // Chronox's Rewind lockout applies here too - a puppeted attacker is
@@ -958,176 +1008,6 @@ function executeChickenAttack(character, targetId, game, log) {
   return result;
 }
 
-// Melyssa's Full Control (hearts<=3 special) - for each hero, the ONE
-// action id treated as "their normal attack" for this burst. Deliberately
-// NOT "the first non-special action in their file" - two heroes break that
-// assumption: Zerathys's first action is Charge Up (a no-target Neutral
-// setup move, never a real attack - his actual damage action is Thunder
-// Wrath), and Tharox's Smash can be ILLEGAL while he's mid-Titan-Toss-
-// charge (hasCharge:true), so he needs a function here rather than a fixed
-// id, picking whichever of Smash/Titan Smash is currently legal (confirmed
-// ruling: a charging Tharox uses Titan Smash for this burst instead of
-// being skipped). Two heroes' own normal action deals ZERO direct damage
-// (Illyra's Mirage Mark only plants a stack; explicitly still used here,
-// confirmed ruling - she just does 0 damage this burst) - Athena's own
-// Curse Strike has the same shape, but Divine Sacrifice (also a normal,
-// non-special action, just her SECOND one) deals real damage and was
-// explicitly chosen instead (confirmed ruling) despite its own random
-// self-cost side effect still applying normally. Every other hero has
-// exactly one unambiguous normal attack action.
-const FULL_CONTROL_ACTION_ID = {
-  chronox: 'cyclonePunch',
-  tharox: (character) => (character.special.hasCharge ? 'titanSmash' : 'smash'),
-  zerathys: 'thunderWrath',
-  akyros: 'fatalSlash',
-  velorya: 'lunarStrike',
-  boingo: 'chaosGamble',
-  blade: 'bloodHunt',
-  athena: 'divineSacrifice',
-  kaelis: 'grudgeStrike',
-  draxus: 'dyingBlow',
-  rowan: 'wandStrike',
-  marin: 'wandStrike',
-  grimtal: 'grimStrike',
-  illyra: 'mirageMark',
-  oraclus: 'runeStrike',
-};
-
-// Fisher-Yates, in place.
-function shuffleInPlace(arr) {
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr;
-}
-
-// Assigns each puppet a random target drawn from targetPool, excluding
-// themselves - independent per-puppet picks, NOT a clean 1-to-1 derangement
-// (confirmed ruling, 2026-09-04, superseding the original "clean cycle"
-// design): once a Clean-Slate-protected Marin was made a valid TARGET
-// without being a puppet herself (see resolveFullControl below), the
-// attacker pool and target pool can genuinely differ in size/membership,
-// so a strict derangement (which requires both pools to be the same set)
-// no longer applies. Multiple puppets CAN end up targeting the same
-// person, and some living characters may end up never attacked at all -
-// both are normal, expected outcomes now, not bugs.
-function assignRandomTargets(puppetIds, targetPool) {
-  const targetFor = {};
-  for (const attackerId of puppetIds) {
-    const choices = targetPool.filter((tid) => tid !== attackerId);
-    if (choices.length === 0) continue; // no valid target for this puppet - shouldn't happen given resolveFullControl's own isLegal-mirroring guard, but defensive
-    targetFor[attackerId] = choices[Math.floor(Math.random() * choices.length)];
-  }
-  return targetFor;
-}
-
-// Melyssa's Full Control (hearts<=3 special, see melyssa.js's fullControl
-// action, which just sets up and calls this). Two DIFFERENT pools
-// (confirmed ruling, 2026-09-04):
-// - PUPPETS (attackers): every other living character EXCEPT a
-//   Clean-Slate-protected Marin - Clean Slate protects her from being
-//   CONTROLLED (forced to attack), same exception Fowl Play has for being
-//   turned into a chicken.
-// - TARGETS: every other living character INCLUDING a Clean-Slate-
-//   protected Marin - Clean Slate does NOT protect her from being HIT by
-//   someone else's forced attack, only from being forced to attack
-//   herself. This also resolves the "1v1 with one Clean-Slate-protected
-//   character" edge case cleanly: a lone non-Marin puppet still has a real
-//   target (the protected Marin) to attack even though she isn't a puppet
-//   herself.
-// Each puppet fires their own real normal-tier attack (FULL_CONTROL_ACTION_ID
-// above) at their independently-assigned target (assignRandomTargets above)
-// - full pure damage, no defense of any kind (game.fullControlActive,
-// checked in damagePipeline.js's applyDamage). Resolved in a random order;
-// a puppet already KO'd by an earlier hit in this same burst by the time
-// their own turn in the sequence comes up simply does not attack
-// (confirmed ruling - same "a dead character never acts" rule as
-// everywhere else in the game, even though every target was assigned
-// before the burst began).
-export function resolveFullControl(game, log, casterCharacterId) {
-  const others = Object.values(game.characters).filter((c) => c.id !== casterCharacterId && !c.isKO);
-  // Grimtal's Beast Form (Death-Triggered Reversion #36) - excluded from
-  // the PUPPET pool specifically (confirmed ruling, 2026-09-13), NOT the
-  // target pool (`others` above stays untouched - he still can be a random
-  // target here, fully protected as one via applyDamage's own
-  // tryBeastFormImmunity check regardless). His kit is locked to
-  // beastAttack only while transformed, and FULL_CONTROL_ACTION_ID forces
-  // a puppet's own normal attack directly (bypassing that action's own
-  // isLegal check entirely) - without this exclusion he'd be forced to
-  // fire grimStrike, his human-form attack, contradicting the whole point
-  // of the lockout.
-  const puppets = others
-    .filter((c) => !(c.id === 'grimtal' && c.special?.beastFormActive))
-    .filter((c) => !tryTriggerCleanSlate(c, game, log));
-  // melyssa.js's own isLegal already requires >=2 other living characters
-  // before this action is even castable, but a puppet still needs a real
-  // target pool of size >= 1 to do anything (e.g. a genuine 1v1 where the
-  // sole other character is somehow Clean-Slate-protected - not reachable
-  // via isLegal today since Clean Slate is per-cast state, not predictable
-  // there, but guarded here defensively regardless).
-  if (puppets.length === 0 || others.length < 2) {
-    return { puppetIds: puppets.map((p) => p.id), attackerIds: [] };
-  }
-  const puppetIds = puppets.map((p) => p.id);
-  const targetPoolIds = others.map((c) => c.id);
-  const targetFor = assignRandomTargets(puppetIds, targetPoolIds);
-  const attackOrder = shuffleInPlace([...puppetIds]);
-  const attackerIds = [];
-  game.fullControlActive = true;
-  try {
-    for (const attackerId of attackOrder) {
-      const attacker = game.characters[attackerId];
-      if (!attacker || attacker.isKO) continue; // KO'd by an earlier hit this same burst
-      const targetId = targetFor[attackerId];
-      if (!targetId) continue; // no valid target was available for this puppet
-      const target = game.characters[targetId];
-      if (!target || target.isKO) continue; // target already KO'd this burst - nothing to hit
-      const mod = ABILITY_MODULES[attackerId];
-      const actionIdOrFn = FULL_CONTROL_ACTION_ID[attackerId];
-      const actionId = typeof actionIdOrFn === 'function' ? actionIdOrFn(attacker) : actionIdOrFn;
-      const actionDef = mod?.actions?.[actionId];
-      if (!actionDef) continue; // defensive - should never happen, every hero has an entry above
-      // Stamp each puppet's own attack entry (and any deferred
-      // rebirth/mirror-reflect entry it triggers) with the hearts snapshot
-      // AT THE MOMENT IT RESOLVES, not the burst's single trailing
-      // end-action snapshot - confirmed bug, 2026-09-04: a live 4-puppet
-      // burst showed all 3 attack lines sharing the exact same (final)
-      // hearts bracket, since none of these entries carried their own
-      // `hearts` field and battleScreen.js's renderFullLogWithCopy scans
-      // FORWARD to the next hearts-bearing entry to display one - with
-      // nothing in between, every line in the burst incorrectly borrowed
-      // the one shared end-of-batch snapshot instead of its own true
-      // incremental state. Same pattern tickPoisonIfAny already uses for
-      // its own standalone mid-batch entries.
-      const before = log.length;
-      const result = actionDef.execute(attacker, targetId, game, log);
-      attackerIds.push(attackerId);
-      if (result?.rebirthLogEntry) log.push(result.rebirthLogEntry);
-      if (result?.mirrorLogEntry) log.push(result.mirrorLogEntry);
-      if (result?.mirrorResult?.rebirthLogEntry) log.push(result.mirrorResult.rebirthLogEntry);
-      if (result?.mirrorReflectLogEntry) log.push(result.mirrorReflectLogEntry);
-      if (result?.mirrorReflectResult?.rebirthLogEntry) log.push(result.mirrorReflectResult.rebirthLogEntry);
-      // Athena's Divine Judgment trigger - if she's one of the puppets and
-      // dies mid-burst while a mark is still armed, this needs the same
-      // deferred handling as every other call site on this list, or it's
-      // silently dropped entirely (nothing else reads this field here).
-      if (result?.divineJudgmentTriggerLogEntry) log.push(result.divineJudgmentTriggerLogEntry);
-      // Oraclus's Prophecy of Doom trigger - same reasoning as
-      // divineJudgmentTriggerLogEntry directly above (if he's one of the
-      // puppets and dies mid-burst with a still-armed prophecy).
-      if (result?.prophecyOfDoomTriggerLogEntry) log.push(result.prophecyOfDoomTriggerLogEntry);
-      const snapshot = heartsSnapshot(game);
-      for (let i = before; i < log.length; i++) {
-        if (!log[i].hearts) log[i].hearts = snapshot;
-      }
-    }
-  } finally {
-    game.fullControlActive = false;
-  }
-  return { puppetIds, attackerIds };
-}
-
 export function executeAction(game, characterId, actionId, targetId, extra) {
   // Snapshot BEFORE this action runs, for Grimtal's Beast Form reversion
   // check in finalizeAction below - confirmed real bug, 2026-09-12: without
@@ -1153,28 +1033,20 @@ export function executeAction(game, characterId, actionId, targetId, extra) {
     // split as chickenAttack above; draxus.js's own executeCheatDeath does
     // the actual roll/revive/fresh-copy-reset logic.
     result = draxus.executeCheatDeath(character, game, log);
-  } else if (actionId === 'fullControl') {
-    // Melyssa's Full Control - melyssa.js's own actions.fullControl.execute
-    // only does the cast-time bookkeeping (usedFullControl flag, log
-    // entry); the actual multi-hero puppet-derangement burst has to live
-    // here rather than in melyssa.js itself, same "mechanism lives in the
-    // engine, the trigger/gate lives in the ability file" split Fowl Play
-    // already uses for executeChickenAttack/tickFowlPlayIfBoingoTurn -
-    // melyssa.js cannot import ABILITY_MODULES or call another hero's own
-    // actions.execute() without a circular import (ability files import
-    // FROM the engine, never the reverse).
-    const mod = ABILITY_MODULES[characterId];
-    const actionDef = mod.actions[actionId];
-    const castEntryIndex = log.length; // melyssa.js's own execute() pushes exactly one entry, right here
-    result = actionDef.execute(character, targetId, game, log, extra);
-    const burstResult = resolveFullControl(game, log, characterId);
-    result = { ...result, ...burstResult };
-    // Stamp the puppet list onto the CAST entry itself (not a separate
-    // entry) so the client can drive the mind-control face overlay - see
-    // portraitFlash.js's isMindControlOverlayActive - off this one 'special'
-    // entry alone, without needing to scan the whole burst's individual
-    // attack lines to reconstruct who was a puppet.
-    if (log[castEntryIndex]) log[castEntryIndex].puppetIds = burstResult.puppetIds;
+  } else if (actionId === 'friendshipSelfChoke') {
+    // Melyssa's Friendship forced-break endgame (see
+    // isFriendshipForcedChoke's own comment above) - the ONLY legal action
+    // she has left, every turn, once it's down to just her and her own
+    // friend. Same flat-2-ignoresShield damage as the normal puppeted Self
+    // Choke (index.js's executeSelfChoke), and always ends the bond
+    // afterward - not conditional on the hit actually killing him, the
+    // choke itself is what ends it.
+    const friendId = character.special.friendCharacterId;
+    result = applyDamage(game, log, {
+      sourceCharacterId: characterId, targetCharacterId: friendId, amount: 2, ignoresShield: true,
+    });
+    log.push({ type: 'attack', characterId, actionId: 'friendshipSelfChoke', targetId: friendId, ...result });
+    melyssa.endFriendship(character, game, log);
   } else {
     const mod = ABILITY_MODULES[characterId];
     const actionDef = mod.actions[actionId];
@@ -1316,11 +1188,13 @@ export function executeActionAsPuppet(game, melyssaCharacterId, puppetCharacterI
   // 'mind-control-resist' entry is pushed instead of ever calling
   // executeAction, so the puppet's own ability never actually runs (no
   // partial effects, no side effects at all from the attempted action).
-  // Melyssa's Full Control passive (hearts<=3, melyssa.js's
-  // hasGuaranteedMindControl) removes this roll entirely once she's this
-  // low - every puppeted action succeeds automatically from then on.
+  // Melyssa's Friendship (melyssa.js's hasGuaranteedMindControl) removes
+  // this roll entirely, but ONLY when the puppet being controlled right
+  // now IS her current friend - every other puppeted character still
+  // rolls the normal 50/50, unlike the old Full Control's whole-board
+  // guarantee.
   const melyssaChar = game.characters[melyssaCharacterId];
-  if (!melyssa.hasGuaranteedMindControl(melyssaChar) && Math.random() < 0.5) {
+  if (!melyssa.hasGuaranteedMindControl(melyssaChar, puppetCharacterId) && Math.random() < 0.5) {
     // controllingMelyssaId stamped directly on the entry (not post-hoc via
     // array indexing) for consistency with how a successful puppeted
     // action gets it below - client-side flash logic keys on this field.

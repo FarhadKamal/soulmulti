@@ -4,7 +4,7 @@ import { renderBattle } from './battleScreen.js';
 import { addChatMessage, clearChatMessages } from './chatPanel.js';
 import {
   startMenuMusic, startBattleMusic, stopMusic, startFrozenMusic, revertFromFrozenMusic,
-  startChickenMusic, revertFromChickenMusic, startFullControlMusic,
+  startChickenMusic, revertFromChickenMusic,
   playActionSound, playSound, playKO, playVictory, playDodge, playRebirth, playCoin,
 } from './sound.js';
 import { handleLogEntryForFlash, handleDodgeForFlash, checkIdlePortrait, registerFlashRerender, queueGrimtalPowerFlash, registerChickenCheck } from './portraitFlash.js';
@@ -631,15 +631,6 @@ function playLogEntrySound(entry, game) {
   // effect.
   if (entry.actionId === 'worldStops') {
     startFrozenMusic();
-  }
-  // Melyssa's Full Control: unlike World Stops above (a multi-turn
-  // lingering effect with a real 'world-stops-end' broadcast to revert
-  // on), the whole burst resolves within this one synchronous cast - so
-  // its own music swap is self-timed (startFullControlMusic in sound.js
-  // auto-reverts on its own short timer) rather than needing an explicit
-  // end event here.
-  if (entry.actionId === 'fullControl') {
-    startFullControlMusic();
   }
   playActionSound(entry.actionId);
   // Layered on top of the effect sound just played above, never replacing

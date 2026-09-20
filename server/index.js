@@ -16,6 +16,7 @@ import {
   resolveOraclusPredictionIfPending, isValidRuneVisionAttackerPick, isValidRuneVisionTargetPick, countKO,
 } from './engine/turnEngine.js';
 import { applyDamage, heartsSnapshot } from './engine/damagePipeline.js';
+import { endFriendship } from './abilities/melyssa.js';
 import {
   chooseBotMove, chooseBotJesterBallMove, chooseBotBoingoJesterBallMove, chooseSoulSwapWrathTarget,
   chooseBotMelyssaPuppetAction, chooseRuneVisionTargetPick,
@@ -479,6 +480,19 @@ function executeSelfChoke(game, melyssaId, puppetId) {
     }
   }
   log.push({ type: 'attack', characterId: melyssaId, actionId: 'selfChoke', targetId: puppetId, ...result });
+  // Melyssa's Friendship - Self Choke against her CURRENT friend always
+  // permanently ends the bond, whether she chose it voluntarily or it was
+  // her only legal option (the forced-choke endgame, see
+  // mindControlOptionsFor's own lone-duel handling) - confirmed ruling:
+  // "melyssa even can break friendhsip by giving early choke." Checked
+  // AFTER the damage/log push above (same ordering every other end-of-
+  // action side effect in this function follows), unconditionally (not
+  // gated on the hit actually killing him - the choke itself is what ends
+  // it, not the outcome).
+  const melyssaChar = game.characters[melyssaId];
+  if (melyssaChar && melyssaChar.special.friendCharacterId === puppetId) {
+    endFriendship(melyssaChar, game, log);
+  }
   // Oraclus's Rune Vision needs to see this too - Self Choke's true
   // attacker is Melyssa (matching its own established log attribution),
   // so a prediction of "Melyssa attacks <puppet>" is a legitimate, if

@@ -1,4 +1,4 @@
-import { applyDamage, applyHeal, applyShield, tryTriggerCleanSlate, tryIllyraDodgeStatus } from '../engine/damagePipeline.js';
+import { applyDamage, applyHeal, applyShield, tryTriggerCleanSlate, tryIllyraDodgeStatus, heartsSnapshot } from '../engine/damagePipeline.js';
 import { registerDodgeDefense } from '../engine/categories/dodgeDefenseRegistry.js';
 import { makeSetupAction } from '../engine/categories/neutralAction.js';
 import { registerOnOwnDeath } from '../engine/categories/onOwnDeath.js';
@@ -366,7 +366,8 @@ export const actions = {
   // damage immunity is additionally enforced unconditionally inside
   // applyDamage itself (tryBeastFormImmunity, damagePipeline.js) to also
   // cover the few things with their own dedicated bypass-untargetable
-  // mechanism (Fowl Play's chicken status, Melyssa's Full Control) - see
+  // mechanism (Fowl Play's chicken status, any future bypass-untargetable
+  // source) - see
   // that function's own comment for the full boundary. Reverts to human
   // form the instant ANY character anywhere is KO'd - checked once per
   // whole action, in turnEngine.js's finalizeAction (and its sibling
@@ -385,6 +386,27 @@ export const actions = {
       character.special.beastFormTurnCount = 0;
       character.untargetable = true;
       log.push({ type: 'special', characterId: character.id, actionId: 'beastForm' });
+      // Melyssa's Friendship (Redirect Bond, design-locked 2026-09-20) -
+      // confirmed ruling: "if melyssa make her friend grimtal beast.
+      // friendhsip will end! because for beast can't remember friendhsip."
+      // A beast has no memory of being anyone's friend - the transformation
+      // itself immediately and permanently ends the bond, whether Grimtal
+      // got here on his own (blocked entirely while friended - see
+      // turnEngine.js's own isValidTarget/getLegalActions restriction, not
+      // yet wired for AOE-shaped own-turn actions in this first slice) or
+      // was puppeted into it by Melyssa herself. Read directly off
+      // game.characters.melyssa rather than importing melyssa.js - no
+      // ability file in this codebase imports another sibling ability file
+      // directly (see the convention every other cross-character
+      // interaction follows: route through engine-layer state/registries
+      // instead), and `game` already holds every character's live state
+      // regardless. A no-op if Melyssa isn't in this match, is KO'd, or
+      // Grimtal isn't (or is no longer) her current friend.
+      const melyssaChar = game.characters.melyssa;
+      if (melyssaChar && !melyssaChar.isKO && melyssaChar.special.friendCharacterId === character.id) {
+        melyssaChar.special.friendCharacterId = null;
+        log.push({ type: 'friendship-end', characterId: 'melyssa', friendCharacterId: character.id, cause: 'beastForm', hearts: heartsSnapshot(game) });
+      }
       return {};
     },
   },

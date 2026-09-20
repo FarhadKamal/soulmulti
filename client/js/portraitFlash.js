@@ -74,6 +74,21 @@ const ASHKAS_VENGEANCE_STRIKE_FLASH_DURATION_MS = 3000;
 // reactions - no damage dealt, but the visual beat is the same).
 const SHADOW_SEAL_FLASH_DURATION_MS = 4500;
 
+// Melyssa's Friendship (Redirect Bond, design-locked 2026-09-20, replaces
+// Full Control) - the bond-forming moment (both her own cast flash and the
+// friend's own friendship_bond.jpg reaction) uses the same 4.5s dramatic
+// multi-beat scale as every other special-cast reaction in this file.
+const FRIENDSHIP_FLASH_DURATION_MS = 4500;
+
+// The protects_melyssa.jpg reaction - shown on MELYSSA's OWN tile whenever
+// a redirect actually happens (an attack meant for her landed on her
+// friend instead). Deliberately shorter than the cast/bond-forming beat
+// above - this can fire on EVERY hit she'd otherwise have taken for the
+// rest of the match while the bond holds, not a one-time dramatic moment,
+// so it uses the same everyday scale as a normal hit-flash rather than a
+// special's own longer multi-beat duration.
+const PROTECTS_MELYSSA_FLASH_DURATION_MS = FLASH_DURATION_MS;
+
 // Marin's Lifebond (Pool & Redistribute #34 + No Threat #12) - every living
 // character's own lifebond.jpg flashes at once, same 4.5s multi-beat scale
 // as Shadow Seal/Earthshatter/Grim Barrage above (one cast, multiple
@@ -114,24 +129,6 @@ const GRIMTAL_POWER_DELAY_MS = FLASH_DURATION_MS;
 // an earlier one, matching the main game's priority chain naturally
 // collapsing to "whichever fired most recently").
 const activeFlash = new Map(); // characterId -> { src, timer }
-
-// Melyssa's Full Control: a transparent "mind control" overlay (her own
-// glowing eyes, ghosted) layered ON TOP of every puppet's own portrait for
-// the duration of the burst - a SEPARATE mechanism from activeFlash above,
-// since that map only ever holds ONE image per character (a portrait
-// swap), while this needs to render alongside whatever the puppet's own
-// portrait/flash is already showing, on MULTIPLE characters at once for
-// the same shared duration. Populated by handleLogEntryForFlash's own
-// 'special'/actionId:'fullControl' case below with every puppet id at
-// once, cleared by a single shared timer (not one per character, since
-// they all start and end together as part of the same burst).
-const mindControlOverlayIds = new Set();
-let mindControlOverlayTimer = null;
-const MIND_CONTROL_OVERLAY_DURATION_MS = 5000;
-
-export function isMindControlOverlayActive(characterId) {
-  return mindControlOverlayIds.has(characterId);
-}
 
 // Tracks each idle-portrait character's hearts as of their last turn start,
 // to detect "untouched since last turn" - same reasoning as
@@ -432,23 +429,19 @@ export function handleLogEntryForFlash(entry, game) {
     setFlash(entry.controllingMelyssaId, 'assets/images/melyssa/mind_control_action.jpg');
   }
 
-  if (entry.type === 'special' && entry.actionId === 'fullControl') {
-    // Melyssa's Full Control: layers her own face (mind_control_overlay.jpg,
-    // an opaque image - CSS opacity in battleScreen.js does the actual
-    // fading, not image alpha) on top of every puppet's own portrait for
-    // the duration of the burst, sharing one timer since they all start and
-    // end together. Cleared/restarted on every fresh cast (clearTimeout
-    // first) so a second cast later in the same match can't leave an old
-    // timer racing a new one.
-    if (mindControlOverlayTimer) clearTimeout(mindControlOverlayTimer);
-    mindControlOverlayIds.clear();
-    for (const id of entry.puppetIds || []) mindControlOverlayIds.add(id);
-    mindControlOverlayTimer = setTimeout(() => {
-      mindControlOverlayTimer = null;
-      mindControlOverlayIds.clear();
-      onFlashExpired();
-    }, MIND_CONTROL_OVERLAY_DURATION_MS);
-    return;
+  if (entry.type === 'special' && entry.actionId === 'friendship') {
+    // Melyssa's Friendship (Redirect Bond, design-locked 2026-09-20,
+    // replaces Full Control) - the cast flash on HER OWN tile still fires
+    // via the generic switch below (case 'friendship'), this block handles
+    // the FRIEND's own reaction art (friendship_bond.jpg, one per hero,
+    // same per-victim-hero pattern as every other multi-hero art set in
+    // this file).
+    if (!isKO(entry.targetId)) {
+      setFlash(entry.targetId, `assets/images/${entry.targetId}/friendship_bond.jpg`, FRIENDSHIP_FLASH_DURATION_MS);
+    }
+    // Deliberately NOT returning here - falls through to the generic
+    // switch below so Melyssa's own 'assets/images/melyssa/friendship.jpg'
+    // cast flash (case 'friendship') still fires exactly as before.
   }
   if (entry.type === 'special' && entry.actionId === 'jesterBall') {
     lastJesterBallThrowerId = entry.characterId;
@@ -777,13 +770,28 @@ export function handleLogEntryForFlash(entry, game) {
     // cast flash (case 'shadowSeal') still fires exactly as before.
   }
 
+  // Melyssa's Friendship (Redirect Bond) - ANY attack/special entry that
+  // targeted her could have redirected to her friend instead
+  // (damagePipeline.js's own applyDamage redirect hook stamps
+  // redirectedToFriendId onto its result whenever this happens, spread
+  // into the log entry the same way every other applyDamage field is).
+  // Checked here, independent of actionId, since a redirect can happen on
+  // literally any attack in the game, not just a fixed set of actions -
+  // fires the protects_melyssa.jpg reaction on HER OWN tile (the friend
+  // physically stepping in), completely separate from whatever flash the
+  // ORIGINAL attacker's own action already triggers on their own tile via
+  // the switch below.
+  if (entry.redirectedToFriendId && !isKO('melyssa')) {
+    setFlash('melyssa', `assets/images/${entry.redirectedToFriendId}/protects_melyssa.jpg`, PROTECTS_MELYSSA_FLASH_DURATION_MS);
+  }
+
   if (entry.type !== 'attack' && entry.type !== 'special' && entry.type !== 'setup') return;
   const { characterId, actionId, dodged, amountDealt, targetCharacterId } = entry;
   if (isKO(characterId)) return;
 
   switch (actionId) {
-    case 'fullControl':
-      setFlash(characterId, 'assets/images/melyssa/full_control.jpg'); break;
+    case 'friendship':
+      setFlash(characterId, 'assets/images/melyssa/friendship.jpg', FRIENDSHIP_FLASH_DURATION_MS); break;
     case 'divineRestore':
       setFlash(characterId, 'assets/images/athena/heal.jpg'); break;
     case 'divineSacrifice':

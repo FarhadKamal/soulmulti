@@ -105,7 +105,7 @@ const FLASH_IMAGES = [
   'assets/images/melyssa/mind_control_action.jpg',
   'assets/images/melyssa/self_choke.jpg',
   'assets/images/melyssa/useless.jpg',
-  'assets/images/melyssa/full_control.jpg',
+  'assets/images/melyssa/friendship.jpg',
   'assets/images/melyssa/mind_control_overlay.jpg',
   'assets/images/kaelis/idle.jpg',
   'assets/images/kaelis/grudge.jpg',
@@ -217,6 +217,20 @@ const PETRIFY_STONE_IMAGES = CHARACTER_IDS.filter((id) => id !== 'rowan').map(
   (id) => `assets/images/${id}/stone.jpg`
 );
 
+// Melyssa's Friendship (Redirect Bond, design-locked 2026-09-20, replaces
+// Full Control) - TWO separate 15-hero sets (everyone except Melyssa
+// herself, who can never be her own friend): friendship_bond.jpg (the
+// moment the bond forms, shown on the FRIEND's own tile) and
+// protects_melyssa.jpg (the friend actively shielding her from an
+// incoming hit, shown on MELYSSA's own tile - see portraitFlash.js's
+// redirect-aware flash handling).
+const FRIENDSHIP_BOND_IMAGES = CHARACTER_IDS.filter((id) => id !== 'melyssa').map(
+  (id) => `assets/images/${id}/friendship_bond.jpg`
+);
+const PROTECTS_MELYSSA_IMAGES = CHARACTER_IDS.filter((id) => id !== 'melyssa').map(
+  (id) => `assets/images/${id}/protects_melyssa.jpg`
+);
+
 // Melyssa's Self Choke victim reaction - same per-victim-hero art pattern
 // as the sets above, one choke.jpg per possible puppet (everyone except
 // Melyssa herself, who can never be forced into her own Self Choke).
@@ -265,7 +279,7 @@ let readyPromise = null;
 export function preloadBattleImages() {
   if (started) return readyPromise;
   started = true;
-  const paths = [...FLASH_IMAGES, ...BADGE_ICONS, ...CHICKEN_IMAGES, ...DIVINE_JUDGMENT_STRUCK_IMAGES, ...PROPHECY_OF_DOOM_STRIKE_IMAGES, ...ASHKAS_VENGEANCE_STRIKE_IMAGES, ...SHADOW_SEAL_STRIKE_IMAGES, ...PETRIFY_STONE_IMAGES, ...SELF_CHOKE_VICTIM_IMAGES, ...LIFEBOND_REACTION_IMAGES, ...MOONLIT_THEFT_REACTION_IMAGES];
+  const paths = [...FLASH_IMAGES, ...BADGE_ICONS, ...CHICKEN_IMAGES, ...DIVINE_JUDGMENT_STRUCK_IMAGES, ...PROPHECY_OF_DOOM_STRIKE_IMAGES, ...ASHKAS_VENGEANCE_STRIKE_IMAGES, ...SHADOW_SEAL_STRIKE_IMAGES, ...PETRIFY_STONE_IMAGES, ...SELF_CHOKE_VICTIM_IMAGES, ...LIFEBOND_REACTION_IMAGES, ...MOONLIT_THEFT_REACTION_IMAGES, ...FRIENDSHIP_BOND_IMAGES, ...PROTECTS_MELYSSA_IMAGES];
   // Default battle portrait, KO'd, injured, and victory images - each now
   // lives inside the hero's own images/<id>/ folder with a fixed filename
   // (confirmed rename, 2026-09-15; previously 4 separate top-level folders

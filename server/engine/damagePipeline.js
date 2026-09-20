@@ -175,6 +175,53 @@ export function clearNegativeStatuses(character, game, log) {
   }
 }
 
+// Melyssa's Friendship (design-locked 2026-09-20) - unlike
+// clearNegativeStatuses above (which sweeps every OTHER character's status
+// on `character`, used for a full cleanse like Purify/Clean Slate), this
+// clears only whatever ONE SPECIFIC character (`fromCharacterId`) currently
+// has placed on `character` - confirmed ruling: "if Athena casted judgement
+// strike or curse strike to melyssa... now melyssa cast friendship of
+// athena... melyssa's judgement strike or curse status will remove", scoped
+// specifically to the new friend's own attribution, not a blanket sweep
+// from every source. Covers every status type this project tracks
+// per-caster against a victim - confirmed ruling: "everything attributable
+// to that friend" - including Rowan's poison (poisonTargets, stored on the
+// POISONER's own special, keyed by victim id - see rowan.js). Kaelis's
+// grudgeCounts is deliberately NOT included here: that field is stored on
+// the VICTIM's own special, keyed by ATTACKER id (the opposite direction -
+// "how many times has each attacker hit ME"), and only Kaelis's own
+// baseSpecialFor shape even has it - `character` here is Melyssa, who has
+// no grudgeCounts field of her own to clear, so this case can never
+// actually apply to her.
+export function clearStatusesFromOneSource(character, game, log, fromCharacterId) {
+  const from = game.characters[fromCharacterId];
+  if (!from) return;
+  const s = from.special;
+  if (!s) return;
+  if (s.curseTargetCharacterId === character.id) s.curseTargetCharacterId = null;
+  if (s.divineJudgmentTargetId === character.id) s.divineJudgmentTargetId = null;
+  if (s.freezeActive && s.freezeTargetId === character.id) {
+    s.freezeActive = false;
+    s.freezeTargetId = null;
+    character.skipNextTurn = false;
+    log.push({ type: 'freeze-end', targetCharacterId: character.id, hearts: heartsSnapshot(game) });
+  }
+  if (s.worldStopsActive && s.worldStopsFrozenIds?.has(character.id)) {
+    s.worldStopsFrozenIds.delete(character.id);
+    character.skipNextTurn = false;
+    if (s.worldStopsFrozenIds.size === 0) s.worldStopsActive = false;
+    log.push({ type: 'world-stops-end', targetCharacterId: character.id, hearts: heartsSnapshot(game) });
+  }
+  if (s.marks?.has(character.id)) s.marks.delete(character.id);
+  if (s.revealedMarks?.has(character.id)) s.revealedMarks.delete(character.id);
+  if (s.silenceTargets?.has(character.id)) s.silenceTargets.delete(character.id);
+  if (s.headacheVictimId === character.id) {
+    s.headacheVictimId = null;
+    s.headacheRollPending = false;
+  }
+  if (s.poisonTargets?.has(character.id)) s.poisonTargets.delete(character.id);
+}
+
 // True while Marin's Clean Slate immunity window is actively blocking new
 // negative statuses from landing on her (see marin.js's onTurnStart for the
 // countdown). Checked at each of the 4 status-application sites below
@@ -254,9 +301,9 @@ export function tryIllyraDodgeStatus(target, game, log, attackerId) {
 // already relies on) - so he can never be legally selected as their target
 // in the first place. Only wired in explicitly where something has its OWN
 // dedicated bypass-untargetable mechanism: applyDamage's own check below
-// (covers Fowl Play's chicken status, Melyssa's Full Control, and any
-// future Environmental-Attack-shaped damage source that sets
-// ignoresUntargetable), and boingo.js's fowlPlay.execute (excludes him from
+// (covers Fowl Play's chicken status, and any future Environmental-Attack-
+// shaped damage source that sets ignoresUntargetable), and boingo.js's
+// fowlPlay.execute (excludes him from
 // the chicken-victim candidate pool directly, since isChicken itself is set
 // outside applyDamage). An already-active status from BEFORE he transformed
 // is untouched either way (this only blocks fresh applications) -
@@ -345,22 +392,82 @@ export function applyDamage(game, log, {
     ignoresRebirth = true;
   }
 
-  // Melyssa's Full Control (hearts<=3 special) - confirmed ruling: every
-  // puppet's forced attack during the burst is "pure damage" with no
-  // defense of any kind, exactly like Fowl Play's chicken-status rule
-  // above, EXCEPT this bypass has to apply regardless of WHICH character is
-  // the target (every puppet hits a different puppet each burst, not a
-  // fixed status on one particular character) - so it's gated on a
-  // game-level flag set for the duration of the burst
-  // (game.fullControlActive, see melyssa.js's fullControl.execute), not a
-  // per-target property the way isChicken is. Set/cleared entirely within
-  // one synchronous execute() call, never visible to any other code path.
-  if (game.fullControlActive) {
-    ignoresUntargetable = true;
-    ignoresDodge = true;
-    ignoresShield = true;
-    ignoresImmortal = true;
-    ignoresRebirth = true;
+  // Melyssa's Friendship (design-locked 2026-09-20, Redirect Bond) - total
+  // redirect: any damage that would land on Melyssa while she has an active
+  // friend redirects to him instead, BEFORE any of her own defenses are
+  // even considered (this must be the very first thing checked, ahead of
+  // isChicken/dodge/shield/everything - she is simply never actually hit
+  // while the bond holds, the friend is). Deliberately does NOT apply when
+  // Melyssa herself is the sourceCharacterId - confirmed ruling: "if
+  // melyssa control her friend and use earthshatter... she can take random
+  // damage on that... because tharox cannot protect her because tharox is
+  // casting earthshatter" - when SHE chooses to puppet the friend into
+  // something that also hits her, that's her own informed gamble, not an
+  // attack FROM someone else, so the redirect is suspended for that one
+  // hit only (checked per-call via sourceCharacterId, not a global flag -
+  // no other hit in the same batch is affected).
+  //
+  // Respects the FRIEND's own full defense stack (shield/dodge/immunities)
+  // as if he were the original target (confirmed ruling) - achieved simply
+  // by re-running applyDamage against him instead of Melyssa, rather than
+  // hand-rolling a parallel damage calculation here. If the redirected
+  // amount would exceed his current remaining hearts, the leftover spills
+  // back onto MELYSSA (confirmed ruling, walked through with an exact
+  // worked example: friend already has 3 hearts left, a 5-damage redirect
+  // KOs him and the remaining 2 lands on her) - that spillover in turn
+  // respects HER OWN shield (recursing back into this same function a
+  // second time, now genuinely targeting her, with the redirect check
+  // skipped since friendId is used up / no longer relevant to this
+  // specific leftover amount).
+  if (target.id === 'melyssa' && !target.isKO && sourceCharacterId !== 'melyssa') {
+    const friendId = target.special.friendCharacterId;
+    const friend = friendId ? game.characters[friendId] : null;
+    if (friend && !friend.isKO) {
+      const beforeHearts = friend.hearts;
+      const redirectedResult = applyDamage(game, log, {
+        sourceCharacterId, targetCharacterId: friendId, amount,
+        ignoresShield, ignoresUntargetable, isMirror, isPoisonTick, isAshkaStrike,
+        ignoresDodge, ignoresImmortal, ignoresRebirth,
+      });
+      result.amountDealt = redirectedResult.amountDealt;
+      result.absorbed = redirectedResult.absorbed;
+      result.dodged = redirectedResult.dodged;
+      result.koTriggered = redirectedResult.koTriggered;
+      result.redirectedToFriendId = friendId;
+      if (redirectedResult.rebirthLogEntry) result.rebirthLogEntry = redirectedResult.rebirthLogEntry;
+      // Spillover: only possible if the friend actually KO'd from this
+      // redirected hit (if he survived, his hearts - however low -
+      // genuinely covered the full amount by definition, since applyDamage
+      // never lets hearts go negative). His `amountDealt` on the
+      // redirected hit is exactly how much reached his hearts (the same
+      // meaning that field has everywhere else in this codebase); the
+      // remainder of his PRE-HIT hearts total (beforeHearts) beyond that
+      // amountDealt is what he could never actually absorb - confirmed
+      // ruling, walked through with an exact worked example (friend at 3
+      // hearts, a 5-damage redirect KOs him, the leftover 2 lands on her).
+      // Deliberately does NOT reapply shield/dodge/untargetable on the
+      // spillover itself (ignoresUntargetable: true, ignoresDodge: true) -
+      // it's not a fresh attack choosing her as a target, it's damage that
+      // already "landed" and simply had nowhere else to go; her own SHIELD
+      // still applies normally though (confirmed ruling), since
+      // ignoresShield is passed through from the original call unchanged.
+      if (redirectedResult.koTriggered) {
+        const overflow = amount - result.absorbed - beforeHearts;
+        if (overflow > 0) {
+          const spilloverResult = applyDamage(game, log, {
+            sourceCharacterId, targetCharacterId: 'melyssa', amount: overflow,
+            ignoresShield, ignoresUntargetable: true, isMirror, isPoisonTick, isAshkaStrike,
+            ignoresDodge: true, ignoresImmortal, ignoresRebirth,
+          });
+          result.amountDealt += spilloverResult.amountDealt;
+          result.absorbed += spilloverResult.absorbed;
+          result.koTriggered = spilloverResult.koTriggered;
+          result.revived = spilloverResult.revived;
+          if (spilloverResult.rebirthLogEntry) result.rebirthLogEntry = spilloverResult.rebirthLogEntry;
+        }
+      }
+      return result;
+    }
   }
 
   // Untargetable is enforced primarily at the targeting UI layer; this is a
@@ -375,8 +482,8 @@ export function applyDamage(game, log, {
   // Confirmed ruling: complete damage immunity while transformed, not a
   // floor-at-1 (unlike Draxus's Deathless Fury) - and critically, this must
   // hold even against sources that explicitly bypass untargetable (Fowl
-  // Play's chicken status, Melyssa's Full Control, any future Environmental
-  // Attack), which the plain `target.untargetable` check above alone would
+  // Play's chicken status, any future Environmental Attack), which the
+  // plain `target.untargetable` check above alone would
   // NOT stop, since those sources set ignoresUntargetable: true precisely
   // to defeat that check. No `ignores*` flag can override this - it is not
   // itself one of the ignores* flags, by design, since nothing in the game

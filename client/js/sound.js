@@ -74,20 +74,6 @@ let preFrozenTrack = null; // 'menu' | 'battle' | null - remembers what to resto
 const CHICKEN_TRACK = 'bgm-chicken.mp3';
 let preChickenTrack = null;
 
-// Melyssa's Full Control: unlike Fowl Play/World Stops, this special
-// resolves entirely within one synchronous burst (no multi-turn lingering
-// window to key a start/end broadcast check off of) - so instead of the
-// swap-and-hold-until-an-explicit-end pattern those two use, this swaps in
-// briefly on cast and auto-reverts on its own timer (startFullControlMusic
-// below), matching the burst's own dramatic moment (same 4.5-5s scale as
-// Tharox's Earthshatter flash duration). Filename is genuinely
-// "bgm-fullcontol.mp3" (missing the second "r") - that's the actual
-// filename in the assets repo, not a typo introduced here.
-const FULL_CONTROL_TRACK = 'bgm-fullcontol.mp3';
-const FULL_CONTROL_MUSIC_DURATION_MS = 5000;
-let preFullControlTrack = null;
-let fullControlRevertTimer = null;
-
 // Browsers block audio autoplay until the user has interacted with the
 // page. Two distinct failure modes seen in practice: (1) a play() call
 // made asynchronously (e.g. from a WebSocket message handler, not
@@ -192,34 +178,6 @@ export function revertFromChickenMusic() {
   }
 }
 
-// Melyssa's Full Control - see FULL_CONTROL_TRACK's own comment above for
-// why this is a self-timed swap-and-auto-revert rather than the explicit
-// start/end pair every other special-music track uses. Safe to call
-// mid-timer (e.g. a second cast in a later match, or a rapid re-render) -
-// clears any pending revert first so timers never stack/race each other.
-export function startFullControlMusic() {
-  if (fullControlRevertTimer) {
-    clearTimeout(fullControlRevertTimer);
-    fullControlRevertTimer = null;
-  }
-  if (musicTrack !== 'fullControl') {
-    preFullControlTrack = musicTrack;
-  }
-  startMusic('fullControl', FULL_CONTROL_TRACK, 0.3);
-  fullControlRevertTimer = setTimeout(() => {
-    fullControlRevertTimer = null;
-    if (musicTrack !== 'fullControl') return; // something else already took over (e.g. chicken/frozen) - don't stomp it
-    const restoreTo = preFullControlTrack;
-    preFullControlTrack = null;
-    musicTrack = null;
-    if (restoreTo === 'menu') {
-      startMenuMusic();
-    } else {
-      startBattleMusic();
-    }
-  }, FULL_CONTROL_MUSIC_DURATION_MS);
-}
-
 export function stopMusic() {
   if (musicAudio) {
     musicAudio.pause();
@@ -303,6 +261,13 @@ const ACTION_SOUND = {
   curseStrike: 'curse',
   divineRestore: 'divinerestore',
   selfChoke: 'self_choke',
+  // Friendship (Redirect Bond, design-locked 2026-09-20, replaces Full
+  // Control) - reuses the shared magic.mp3 sound effect, same reuse
+  // pattern as Shadow Toll/Moonlit Theft/Lifebond above.
+  friendship: 'magic',
+  // The forced/voluntary break - same guaranteed flat-2 choke as normal
+  // Self Choke, reuses its own sound.
+  friendshipSelfChoke: 'self_choke',
   grudgeStrike: 'grudge_hit',
   callAshka: 'bird_heal',
   dyingBlow: 'axe_strike',

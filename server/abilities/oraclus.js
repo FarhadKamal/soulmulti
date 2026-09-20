@@ -107,9 +107,8 @@ registerOnAnyDeath((diedCharacterId, sourceCharacterId, isMirror, game, log) => 
   // this entry BEFORE the triggering attack's own line instead of after
   // it. Every deferred-push call site that already handles
   // divineJudgmentTriggerLogEntry (finalizeAction, tickPoisonIfAny,
-  // resolveJesterBall, resolveFullControl's loop) needs the same handling
-  // added for this new field too, or it's silently dropped, not just
-  // misordered.
+  // resolveJesterBall) needs the same handling added for this new field
+  // too, or it's silently dropped, not just misordered.
   return { prophecyOfDoomTriggerLogEntry: entry };
 });
 

@@ -189,7 +189,13 @@ const ACTION_VOICE_LINES = {
   // 'mind-control-resist' log-entry handler, not through the normal
   // actionId-keyed lookup every other entry here uses (the failed action
   // could be ANY actionId the puppet was attempting, not a fixed one).
-  melyssa: { mindControl: 'mind_control', selfChoke: 'self_choke', resist: 'useless', fullControl: 'all_puppets' },
+  // friendship: "You'll protect me now... won't you?" - soft/playful
+  // delivery (design-locked 2026-09-20, replaces the old fullControl/
+  // all_puppets line). friendshipSelfChoke deliberately NOT mapped here -
+  // it's a type: 'attack' entry with actionId 'friendshipSelfChoke',
+  // flows through the generic bottom-of-switch playMoveVoice call
+  // automatically, same as normal selfChoke's own entry does.
+  melyssa: { mindControl: 'mind_control', selfChoke: 'self_choke', resist: 'useless', friendship: 'friendship' },
   // grudgeStrike is a normal type: 'attack' entry - flows through the
   // generic bottom-of-switch playMoveVoice call automatically. callAshka's
   // "thank you, Ashka" line fires once, on the CAST itself (a normal

@@ -2,7 +2,7 @@ import { CHARACTERS } from './characters.js';
 import { send } from './net.js';
 import { renderChatPanel } from './chatPanel.js';
 import { playUiClick } from './sound.js';
-import { getFlashSrc, getPersistentPortrait, isMindControlOverlayActive, isPetrifyActive } from './portraitFlash.js';
+import { getFlashSrc, getPersistentPortrait, isPetrifyActive } from './portraitFlash.js';
 import { getActiveEffects, getClawCount, getCrackCount, getPowSize, getVortexSize, getAxechopTier, getLightningTier, getWildLightningTier, getDarkslashVariant } from './actionEffects.js';
 import { renderFullscreenButton } from './fullscreen.js';
 import { renderMusicMuteButton } from './musicMute.js';
@@ -1219,13 +1219,10 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
   // Melyssa's own face, faded in via CSS opacity (the source image is a
   // normal opaque JPG - Gemini couldn't reliably produce a real
   // transparent-alpha PNG, so the fade is done here instead of via image
-  // transparency), layered on top of a puppet's own portrait. Shared by
-  // BOTH Mind Control mechanics (confirmed ruling, 2026-09-05: "we can do
-  // mindcontrol ability animation also using same image"):
-  // - Full Control's multi-puppet burst (isMindControlOverlayActive, a
-  //   client-side timed Set in portraitFlash.js - see its own comment for
-  //   why this needs a timer rather than reading live server state, since
-  //   the whole burst resolves within one synchronous cast).
+  // transparency), layered on top of a puppet's own portrait. Originally
+  // shared with Full Control's own multi-puppet burst (retired 2026-09-20,
+  // replaced by Friendship - see melyssa.js) - now only the single window
+  // below still uses it:
   // - Normal single-puppet Mind Control (isPuppet, real server state -
   //   character.special.controlling/puppetCharacterId - spanning the
   //   whole control window exactly like the hypnotic-ripple pulse below).
@@ -1237,7 +1234,7 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
   // Never shown on Melyssa herself (she is never a puppet of either
   // mechanic) or on a KO'd character (matches every other timed effect's
   // own isKO guard in this file).
-  if ((isMindControlOverlayActive(character.id) || isPuppet) && !character.isKO) {
+  if (isPuppet && !character.isKO) {
     const mindControlOverlay = document.createElement('img');
     mindControlOverlay.className = 'char-portrait char-portrait--mind-control-overlay';
     mindControlOverlay.src = v('assets/images/melyssa/mind_control_overlay.jpg');
@@ -2077,7 +2074,7 @@ const ACTION_LABELS = {
   grimStrike: 'Grim Strike', skullCrack: 'Skull Crack', claimKill: 'Claim the Kill', beastForm: 'Beast Form', beastAttack: 'Beast Attack',
   mirageMark: 'Mirage Mark', mirageBurst: 'Mirage Burst', mirageOverload: 'Mirage Overload',
   runeStrike: 'Rune Strike', runeVision: 'Rune Vision', runeVisionTargetPick: 'Rune Vision', prophecyOfDoom: 'Prophecy of Doom',
-  mindControl: 'Mind Control', fullControl: 'Full Control',
+  mindControl: 'Mind Control', friendship: 'Friendship', friendshipSelfChoke: 'Self Choke',
 };
 
 // Rowan's and Marin's discoverable spells, shared by describeLogEntry's
@@ -2100,6 +2097,16 @@ function describeLogEntry(entry) {
       return `${name(entry.characterId)} took control of ${name(entry.targetId)}'s mind!`;
     case 'mind-control-resist':
       return `${name(entry.puppetCharacterId)}'s will resists ${name(entry.characterId)}'s control - ${actionLabel(entry.actionId)} fails!`;
+    case 'friendship-end':
+      // Melyssa's Friendship break - 3 separate paths all push this same
+      // entry type (voluntary/forced Self Choke in index.js/turnEngine.js,
+      // Beast Form transformation in grimtal.js), only the optional
+      // `cause` field distinguishes the Beast Form path from the other two
+      // (which read identically either way - both are "she chose/was
+      // forced to choke him").
+      return entry.cause === 'beastForm'
+        ? `${name(entry.friendCharacterId)}'s transformation shatters the Friendship bond!`
+        : `The Friendship bond with ${name(entry.friendCharacterId)} has ended.`;
     case 'attack':
       if (entry.actionId === 'divineSacrifice') {
         // Shows both sides of the gamble - the guaranteed 3 dealt to the
@@ -2274,16 +2281,12 @@ function describeLogEntry(entry) {
         }
         return `${name(entry.characterId)} used Rewind - undid ${name(entry.rewoundCasterId)}'s ${actionLabel(entry.rewoundActionId)}!`;
       }
-      if (entry.actionId === 'fullControl') {
-        // This entry is just the CAST itself (melyssa.js's own
-        // execute()) - the actual puppet-vs-puppet attacks that follow are
-        // separate, normal 'attack'-type entries pushed right after by
-        // turnEngine.js's resolveFullControl, each already rendering with
-        // its own puppet's real attack name/target/damage via the generic
-        // case 'attack' branch above. No victim list needed here the way
-        // Fowl Play's cast line has one - the follow-up lines already show
-        // exactly who hit whom.
-        return `${name(entry.characterId)} unleashed Full Control - everyone turns on each other!`;
+      if (entry.actionId === 'friendship') {
+        // Melyssa's Friendship (Redirect Bond, design-locked 2026-09-20,
+        // replaces Full Control) - the bond is NOT secret (no
+        // moderator-only concept here, unlike Akyros's Hidden Mark), so
+        // the friend's name is shown openly.
+        return `${name(entry.characterId)} formed a bond of Friendship with ${name(entry.targetId)}!`;
       }
       if (entry.actionId === 'divineJudgment') {
         // Deliberately vague about the CONSEQUENCE here (same "reveal the

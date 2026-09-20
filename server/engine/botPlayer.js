@@ -963,14 +963,27 @@ function zerathysSoulSwapRescueTarget(game, melyssaCharacter, candidateIds) {
 }
 
 function chooseMelyssaMove(character, game, usable) {
-  // Full Control: a desperation move, only legal once hearts <= 3. No
-  // target, no real downside to casting it the instant it's available -
-  // same "cast eagerly once legal" policy as every other one-time
-  // desperation special in the roster (Fowl Play, World Stops, Earthshatter,
-  // Grim Barrage). Checked ahead of the normal Mind Control puppet-picking
-  // logic below since it's free value with zero opportunity cost.
-  if (usable.some((a) => a.actionId === 'fullControl')) {
-    return { actionId: 'fullControl', targetId: null };
+  // Friendship (Redirect Bond, design-locked 2026-09-20, replaces Full
+  // Control): a desperation move, only legal once hearts <= 3 - same "cast
+  // eagerly once legal" policy as every other one-time desperation special
+  // in the roster. Checked ahead of the normal Mind Control puppet-picking
+  // logic below since it's free setup value with zero opportunity cost
+  // (unlike Full Control, this DOES need a target - who she bonds with
+  // matters). Prefers whoever currently has the MOST real hearts among
+  // legal candidates - the best "bodyguard" is whoever can actually
+  // survive the most redirected damage before any spillover ever reaches
+  // her (see damagePipeline.js's own redirect+spillover mechanic) -
+  // deliberately real hearts, not activeHearts, since Friendship's
+  // redirect has nothing to do with Shadow Seal's locked-hearts concept.
+  if (usable.some((a) => a.actionId === 'friendship')) {
+    const friendCandidates = Object.keys(game.characters).filter(
+      (tid) => tid !== character.id && !game.characters[tid].isKO && !game.characters[tid].untargetable
+    );
+    if (friendCandidates.length > 0) {
+      const maxHearts = Math.max(...friendCandidates.map((tid) => game.characters[tid].hearts));
+      const tiedBest = friendCandidates.filter((tid) => game.characters[tid].hearts === maxHearts);
+      return { actionId: 'friendship', targetId: pickRandom(tiedBest) };
+    }
   }
   const candidates = Object.keys(game.characters).filter((tid) => isValidMindControlTarget(game, tid));
   if (candidates.length === 0) return null; // defensive; shouldn't happen if usable is nonempty
