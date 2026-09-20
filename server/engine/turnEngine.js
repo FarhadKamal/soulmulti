@@ -112,7 +112,21 @@ export function isFriendshipForcedChoke(game, melyssaId) {
   return living.length === 2 && living.some((c) => c.id === friendId);
 }
 
-export function getLegalActions(character, game) {
+// isPuppeted: true when this call is resolving what Melyssa's FRIEND can be
+// puppeted into (getUsablePuppetActions below), false for the character's
+// own independent turn (getUsableActions). Slice 2 (design-locked
+// 2026-09-20, implemented 2026-09-21, confirmed ruling re-stated after a
+// live gap was found: "beast form is just example. you should ch[e]ck also
+// other") - the friend cannot freely CHOOSE, on his own turn, any action
+// that would also damage/harm Melyssa or is otherwise incompatible with
+// the bond (Beast Form) - see melyssa.js's own isActionBlockedByFriendship
+// for the full per-action reasoning. Deliberately does NOT apply when
+// isPuppeted is true - that's Melyssa's own informed gamble, not something
+// the friend himself is choosing (confirmed ruling, walked through with
+// Earthshatter as the illustrative example - see damagePipeline.js's own
+// redirect-suspension comment for the matching runtime-side half of this
+// same rule).
+export function getLegalActions(character, game, isPuppeted = false) {
   if (character.id === 'draxus' && character.isKO && character.special.cheatDeathEligible) {
     return [{ actionId: 'cheatDeath', ...CHEAT_DEATH_ACTION }];
   }
@@ -139,7 +153,8 @@ export function getLegalActions(character, game) {
   }
   const silenced = isSilenced(character, game);
   return Object.entries(mod.actions)
-    .filter(([, def]) => !def.hidden && def.isLegal(character, game) && !(silenced && def.special))
+    .filter(([actionId, def]) => !def.hidden && def.isLegal(character, game) && !(silenced && def.special)
+      && (isPuppeted || !melyssa.isActionBlockedByFriendship(character, game, actionId)))
     .map(([actionId, def]) => ({ actionId, ...def }));
 }
 
@@ -352,7 +367,7 @@ export function getUsableActions(character, game) {
 // isValidMindControlTarget's own hasAnyValidTarget branch already fixed
 // for Melyssa's own selection step).
 export function getUsablePuppetActions(puppetCharacter, game) {
-  return getLegalActions(puppetCharacter, game).filter((action) => {
+  return getLegalActions(puppetCharacter, game, true).filter((action) => {
     // Oraclus's Rune Vision is excluded from Mind Control entirely - it's
     // a two-stage SELECTION move (targets via isValidRuneVisionAttackerPick,
     // ally-allowed, not the enemy-only isValidPuppetTarget this function

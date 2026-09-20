@@ -1,5 +1,5 @@
 import {
-  getUsableActions, isValidTarget, isValidPuppetTarget, isValidMindControlTarget, isMelyssaLoneDuel, LONE_DUEL_EXCEPTIONS,
+  getUsableActions, getUsablePuppetActions, isValidTarget, isValidPuppetTarget, isValidMindControlTarget, isMelyssaLoneDuel, LONE_DUEL_EXCEPTIONS,
   isChickenified, FOWL_PLAY_BOINGO_HIT_INTERVAL,
 } from './turnEngine.js';
 import { isFrozenByChronox } from './damagePipeline.js';
@@ -1768,7 +1768,15 @@ export function chooseBotMelyssaPuppetAction(puppetCharacter, game, melyssaId) {
     const move = chooseBotJesterBallMove(puppetCharacter, game);
     return { kind: 'jesterBall', choice: move.choice, targetId: move.targetId };
   }
-  const usable = getUsableActions(puppetCharacter, game);
+  // getUsablePuppetActions (not getUsableActions) - this IS a puppeted
+  // context, and the two now genuinely diverge: Melyssa's Friendship
+  // Slice 2 blocks the friend from freely choosing an action that would
+  // endanger her on his OWN turn, but that block is deliberately lifted
+  // when Melyssa herself is puppeting him into it (confirmed ruling - her
+  // own informed gamble). Also correctly uses hasAnyValidPuppetTarget
+  // instead of hasAnyValidTarget under the hood, same fix this function
+  // already relied on getUsableActions NOT having before this change.
+  const usable = getUsablePuppetActions(puppetCharacter, game);
   if (usable.length === 0) {
     // No real action available - Self Choke is the only option. In
     // practice this should be unreachable (every living, non-frozen

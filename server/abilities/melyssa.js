@@ -36,6 +36,99 @@ export function isCurrentFriend(game, characterId) {
   return currentFriendId(game) === characterId;
 }
 
+// Slice 2 (design-locked 2026-09-20, implemented 2026-09-21): the friend
+// cannot freely CHOOSE, on his own independent turn, any action that would
+// also deal damage to or inflict a harmful status on Melyssa - confirmed
+// ruling, re-stated directly after a live gap was found: "beast form is
+// just example. you should ch[e]ck also other" - covers every AOE/global-
+// status action in the roster, not just Beast Form. Deliberately does NOT
+// apply when the SAME character is being puppeted by Melyssa herself into
+// the action (see turnEngine.js's own isPuppeted parameter on
+// getLegalActions) - that's her own informed gamble (confirmed ruling,
+// walked through with Earthshatter as the illustrative example), not
+// something the friend himself is choosing.
+//
+// One dedicated check per action, since each AOE/global-status ability has
+// a genuinely different "who does this actually touch" shape - deliberately
+// NOT a single generic "does actionId hit everyone" flag, since e.g.
+// Moonlit Theft only matters if Melyssa currently HAS shield to steal, and
+// Mirage Burst only matters if she's currently MARKED - a blanket block
+// would needlessly hide the button in cases where it genuinely couldn't
+// touch her at all this exact moment.
+function wouldEndangerMelyssa(character, game, actionId) {
+  const melyssa = game.characters.melyssa;
+  if (!melyssa || melyssa.isKO || melyssa.id === character.id) return false;
+  // Confirmed real bug caught before shipping: this whole restriction only
+  // ever applies to Melyssa's CURRENT FRIEND specifically - without this
+  // check, Earthshatter/World Stops/Fowl Play/Lifebond would be wrongly
+  // blocked for EVERY character in the match any time Melyssa is alive,
+  // bond or no bond, since those abilities always hit "every other living
+  // character" regardless of any relationship to her.
+  if (!isCurrentFriend(game, character.id)) return false;
+  switch (actionId) {
+    // Earthshatter (Tharox): random per-point damage across every OTHER
+    // living character - always a real risk to her whenever she's alive
+    // and not the caster (no narrower live condition to check, unlike the
+    // shield/mark-gated ones below).
+    case 'earthshatter':
+      return true;
+    // World Stops (Chronox): freezes every OTHER living character - a
+    // harmful STATUS, not damage, but still blocked per the "any harmful
+    // effect, damage or status" ruling.
+    case 'worldStops':
+      return true;
+    // Fowl Play (Boingo): chickenifies every OTHER living character - same
+    // "any harmful effect" reasoning as World Stops.
+    case 'fowlPlay':
+      return true;
+    // Lifebond (Marin): averages hearts across EVERY living character,
+    // caster included - blocked regardless of whether it would help or
+    // hurt her this exact moment (confirmed ruling: "marin cannot cast
+    // lifebond during that situation... even before" - no exemption for a
+    // possibly-beneficial outcome).
+    case 'lifebond':
+      return true;
+    // Moonlit Theft (Velorya): drains shield from every OTHER living
+    // character - only a real risk to her if she currently HAS shield to
+    // lose; a shieldless Melyssa has nothing this action could take.
+    case 'moonlitTheft':
+      return melyssa.shield > 0;
+    // Mirage Burst (Illyra): detonates every character CURRENTLY carrying
+    // a live mirage-mark stack - only a real risk to her if she's
+    // currently marked.
+    case 'mirageBurst': {
+      const illyra = game.characters.illyra;
+      const stacks = illyra?.special?.mirageMarks?.get('melyssa') || 0;
+      return stacks > 0;
+    }
+    // Beast Form (Grimtal): no direct damage/status at all - blocked for a
+    // completely different reason (identity-breaking, not endangerment -
+    // see the dedicated isBeastFormBlockedByFriendship export below,
+    // deliberately NOT folded into this function since the "why" is
+    // structurally different from every case above).
+    default:
+      return false;
+  }
+}
+
+// Beast Form's own restriction - separate from wouldEndangerMelyssa above
+// since the reasoning is different (identity-breaking, not "this would
+// hurt her"). Grimtal can never freely choose to transform on his own
+// turn while friended; puppeted by Melyssa herself, it's allowed (and
+// immediately ends the bond - see grimtal.js's own beastForm.execute()).
+export function isBeastFormBlockedByFriendship(character, game) {
+  return isCurrentFriend(game, character.id);
+}
+
+// Single entry point turnEngine.js's getLegalActions calls for every
+// action, regardless of which of the 7 it is - keeps the ability-specific
+// branching contained to this one file rather than scattered across the
+// engine layer.
+export function isActionBlockedByFriendship(character, game, actionId) {
+  if (actionId === 'beastForm') return isBeastFormBlockedByFriendship(character, game);
+  return wouldEndangerMelyssa(character, game, actionId);
+}
+
 // Ends the bond and reverts everything to normal - shared by the 2
 // DIRECT-call break paths (voluntary/forced Self Choke, Beast Form
 // transformation - both call this synchronously from their own execute(),
