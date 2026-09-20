@@ -419,9 +419,19 @@ export function applyDamage(game, log, {
   // second time, now genuinely targeting her, with the redirect check
   // skipped since friendId is used up / no longer relevant to this
   // specific leftover amount).
+  // Confirmed real bug, 2026-09-21: mutual no-attack is normally what
+  // prevents this, but Boingo's Fowl Play chicken status overrides EVERY
+  // kit-based rule in the game (confirmed ruling: chicken status overrides
+  // Friendship's own mutual no-attack the same way it overrides everything
+  // else) - so a chickenified friend CAN end up as the direct attacker
+  // against a chickenified Melyssa. Redirecting his own attack back onto
+  // himself would be nonsensical (he'd just be hitting himself), so he's
+  // explicitly excluded from being his OWN redirect destination - the hit
+  // simply lands on Melyssa directly in that one specific case, same as if
+  // she had no friend at all.
   if (target.id === 'melyssa' && !target.isKO && sourceCharacterId !== 'melyssa') {
     const friendId = target.special.friendCharacterId;
-    const friend = friendId ? game.characters[friendId] : null;
+    const friend = (friendId && friendId !== sourceCharacterId) ? game.characters[friendId] : null;
     if (friend && !friend.isKO) {
       const beforeHearts = friend.hearts;
       const redirectedResult = applyDamage(game, log, {
@@ -434,6 +444,18 @@ export function applyDamage(game, log, {
       result.dodged = redirectedResult.dodged;
       result.koTriggered = redirectedResult.koTriggered;
       result.redirectedToFriendId = friendId;
+      // Confirmed real bug, 2026-09-21: every attack-type log entry spreads
+      // this `result` object AFTER its own `targetId` field (e.g.
+      // executeChickenAttack's `log.push({ ..., targetId, ...result })`),
+      // so result.targetCharacterId (initialized above to Melyssa's own
+      // id, the original call's targetCharacterId) is what the client's
+      // actualAttackTargetId() actually displays - left at its original
+      // value, the log line still read "on Melyssa" even when the hit
+      // genuinely redirected and landed on the friend instead, completely
+      // misleading (her own hearts never moved, but the friend's did).
+      // Overwritten here to the real destination so every existing display
+      // site picks it up automatically, no client changes needed.
+      result.targetCharacterId = friendId;
       if (redirectedResult.rebirthLogEntry) result.rebirthLogEntry = redirectedResult.rebirthLogEntry;
       // Spillover: only possible if the friend actually KO'd from this
       // redirected hit (if he survived, his hearts - however low -
