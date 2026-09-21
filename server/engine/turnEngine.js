@@ -703,6 +703,22 @@ export function buildActionAgainstChronoxRecord(game, characterId, actionId, tar
   // it (or, worse, be silently dropped the way the mindControl bug was) -
   // confirmed reachable via direct testing when this character was added.
   if (actionId === 'runeVision') return null;
+  // Melyssa's friendship (choosing a protector, not an attack) gets the
+  // exact same treatment as runeVision above, for the same underlying
+  // reason - naming Chronox as her FRIEND genuinely sets targetId:
+  // 'chronox' (it reuses the normal single-target picker), but it deals no
+  // damage and inflicts no harmful status on him at all - if anything it's
+  // the opposite, a purely protective choice that costs him nothing.
+  // Confirmed real bug, 2026-09-21 (live report): without this exclusion,
+  // casting Friendship on him got recorded as "the most recent action
+  // against him," and his own later Rewind cast (undoing some completely
+  // unrelated later hit he took) instead silently undid the bond itself -
+  // "Chronox used Rewind - undid Melyssa's Friendship!" - which makes no
+  // sense narratively (he has no reason to want to undo becoming someone's
+  // protected friend) and no mechanical reason to exist (the bond is
+  // strictly beneficial to him: mutual no-attack, a guaranteed-success
+  // Mind Control target instead of the usual 50/50).
+  if (actionId === 'friendship') return null;
   // Melyssa's mindControl (puppet SELECTION, not an attack) gets the exact
   // same treatment as runeVision above, for the same underlying reason -
   // picking Chronox AS THE PUPPET genuinely sets targetId: 'chronox', but
