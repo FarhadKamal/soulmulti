@@ -7,7 +7,7 @@ import {
   startChickenMusic, revertFromChickenMusic,
   playActionSound, playSound, playKO, playVictory, playDodge, playRebirth, playCoin,
 } from './sound.js';
-import { handleLogEntryForFlash, handleDodgeForFlash, checkIdlePortrait, registerFlashRerender, queueGrimtalPowerFlash, registerChickenCheck, setDebugLogEntryIndex } from './portraitFlash.js';
+import { handleLogEntryForFlash, handleDodgeForFlash, checkIdlePortrait, registerFlashRerender, queueGrimtalPowerFlash, registerChickenCheck, setDebugLogEntryIndex, snapshotActiveFlashForDebug } from './portraitFlash.js';
 import { handleLogEntryForEffects, registerEffectRerender } from './actionEffects.js';
 import { preloadBattleImages, battleImagesReady } from './imagePreload.js';
 import { preloadBattleAudio } from './audioPreload.js';
@@ -235,6 +235,11 @@ function processNewLogEntries(game) {
     handleLogEntryForFlash(entry, game);
     handleDodgeForFlash(entry, game);
     handleLogEntryForEffects(entry, game);
+    // Debug mode's own render-time snapshot (see portraitFlash.js's own
+    // comment) - captured right after this entry's FULL effect chain has
+    // run, so it reflects exactly what would be visible right after this
+    // entry if the page rendered at that instant.
+    snapshotActiveFlashForDebug(startIndex + i);
   });
 }
 

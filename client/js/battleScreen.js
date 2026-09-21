@@ -1,7 +1,7 @@
 import { CHARACTERS } from './characters.js';
 import { send } from './net.js';
 import { playUiClick } from './sound.js';
-import { getFlashSrc, getPersistentPortrait, isPetrifyActive, getFlashCallHistory } from './portraitFlash.js';
+import { getFlashSrc, getPersistentPortrait, isPetrifyActive, getFlashCallHistory, getFlashSnapshotHistory } from './portraitFlash.js';
 import { getActiveEffects, getClawCount, getCrackCount, getPowSize, getVortexSize, getAxechopTier, getLightningTier, getWildLightningTier, getDarkslashVariant } from './actionEffects.js';
 import { renderFullscreenButton } from './fullscreen.js';
 import { renderMusicMuteButton } from './musicMute.js';
@@ -1924,6 +1924,24 @@ function formatFlashDebugAnnotation(logIndex) {
   return `[flash: ${text}]`;
 }
 
+// Debug mode's own render-time snapshot annotation (2026-09-21, follow-up
+// to a live report where the flash-CALL trace above showed nothing wrong
+// for the exact moment the user reported still seeing choke.jpg on Illyra
+// despite a confirmed dodge - ruling out "the wrong image was explicitly
+// set THIS entry" but not "a stale image from an earlier setFlash call was
+// still active"). Shows the FULL set of whatever's actually live in
+// activeFlash right after this entry's effect chain finished - a stale
+// choke.jpg still showing here several entries after it was last SET would
+// directly confirm a timing/expiry bug rather than a wrong-image bug.
+function formatFlashSnapshotAnnotation(logIndex) {
+  const snap = getFlashSnapshotHistory().find((s) => s.logEntryIndex === logIndex);
+  if (!snap || Object.keys(snap.snapshot).length === 0) return '';
+  const text = Object.entries(snap.snapshot)
+    .map(([id, src]) => `${id}=${src.replace('assets/images/', '')}`)
+    .join(', ');
+  return `[active: ${text}]`;
+}
+
 // Formats one entry's end-action hearts/shield snapshot (see turnEngine.js's
 // heartsSnapshot - {hearts, shield} per living character, or the string
 // 'KO') into a compact "Name:H/S" readout, sorted by character id for a
@@ -1995,7 +2013,8 @@ function renderFullLogWithCopy(log) {
     // instead of requiring a fresh code investigation each time.
     const rawDebugText = debugLogMode ? formatDebugAnnotation(entry) : '';
     const flashDebugText = debugLogMode ? formatFlashDebugAnnotation(i) : '';
-    const debugText = [rawDebugText, flashDebugText].filter(Boolean).join(' ');
+    const flashSnapshotText = debugLogMode ? formatFlashSnapshotAnnotation(i) : '';
+    const debugText = [rawDebugText, flashDebugText, flashSnapshotText].filter(Boolean).join(' ');
     const withHearts = snapshotText ? `${text}  [${snapshotText}]` : text;
     lines.push(debugText ? `${withHearts}  ${debugText}` : withHearts);
   }

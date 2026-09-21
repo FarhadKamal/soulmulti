@@ -232,6 +232,29 @@ function setFlash(characterId, src, durationMs = FLASH_DURATION_MS) {
   activeFlash.set(characterId, { src, timer });
 }
 
+// Debug mode's own render-time snapshot (2026-09-21, follow-up to a live
+// report where the flash-CALL trace above showed nothing wrong for the
+// exact moment/entry the user reported seeing choke.jpg on Illyra despite
+// a confirmed dodge - ruling out "the wrong image was explicitly SET" but
+// NOT ruling out "a STALE image from an earlier setFlash call was still
+// active/showing" or a render-order issue). Snapshots activeFlash's FULL
+// current state (every character with anything active right now, not just
+// the one this entry's own setFlash calls touched) at the exact moment
+// main.js finishes dispatching one log entry's full effect chain - lets
+// the debug annotation show "what was actually live and would have been
+// rendered right after this entry," independent of whether THIS entry's
+// own setFlash calls were the ones that set it.
+const flashSnapshotHistory = [];
+export function snapshotActiveFlashForDebug(logEntryIndex) {
+  const snapshot = {};
+  for (const [characterId, { src }] of activeFlash.entries()) snapshot[characterId] = src;
+  flashSnapshotHistory.push({ logEntryIndex, snapshot });
+  if (flashSnapshotHistory.length > FLASH_CALL_HISTORY_LIMIT) flashSnapshotHistory.shift();
+}
+export function getFlashSnapshotHistory() {
+  return flashSnapshotHistory;
+}
+
 export function getFlashSrc(characterId) {
   const src = activeFlash.get(characterId)?.src ?? null;
   return src ? v(src) : null;
