@@ -404,7 +404,20 @@ export function handleLogEntryForFlash(entry, game) {
   // animation.. but not now."
   if (entry.actionId === 'selfChoke' && entry.characterId === 'melyssa') {
     if (!isKO('melyssa')) setFlash('melyssa', 'assets/images/melyssa/self_choke.jpg');
-    if (entry.targetId && !isKO(entry.targetId)) {
+    // Confirmed real bug, 2026-09-21 (live report): choke.jpg used to fire
+    // UNCONDITIONALLY here, even when the puppet's own dodge passive
+    // (Illyra's unconditional 50%, Akyros's per-attacker dodge, Marin's
+    // Threefold Veil, Grimtal's Grim Ward - dodge legitimately still
+    // applies against Self Choke, confirmed ruling, see project memory
+    // soulclash_melyssa.md) blocked it entirely - the victim's tile showed
+    // "being choked" immediately followed by its own separate 'dodge'
+    // entry's "dodged it" reaction right after, a confusing contradictory
+    // back-to-back sequence for something that never actually landed.
+    // Gated on !entry.dodged (mirrors actionEffects.js's own
+    // amountDealt > 0 gate for the choke-ring/ghost-hand CSS effect) so a
+    // dodged choke shows ONLY Melyssa's own cast/attempt flash plus the
+    // victim's normal dodge reaction - not both a fake hit AND a dodge.
+    if (entry.targetId && !isKO(entry.targetId) && !entry.dodged) {
       setFlash(entry.targetId, `assets/images/${entry.targetId}/choke.jpg`);
     }
     return;
