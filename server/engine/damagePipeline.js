@@ -457,6 +457,22 @@ export function applyDamage(game, log, {
       // site picks it up automatically, no client changes needed.
       result.targetCharacterId = friendId;
       if (redirectedResult.rebirthLogEntry) result.rebirthLogEntry = redirectedResult.rebirthLogEntry;
+      // Melyssa's Friendship - confirmed real bug, 2026-09-21 (live report,
+      // deep-dive reproduction): if this redirected hit is ITSELF what
+      // kills the friend (not the later spillover), Melyssa's own
+      // onAnyDeath cleanup fires INSIDE this nested redirectedResult's own
+      // applyDamage call and correctly clears friendCharacterId, but its
+      // returned friendshipEndLogEntry was never copied up onto the OUTER
+      // `result` here - only rebirthLogEntry got this treatment. The bond
+      // state itself was always cleared correctly; only the log LINE
+      // announcing it was silently dropped, exactly the same symptom as
+      // the earlier Divine Judgment forwarding bug, just in a different
+      // call site. Distinct from friendshipSpilloverLogEntry below, which
+      // covers a DIFFERENT case (the leftover overflow damage itself
+      // hitting Melyssa) - this one covers the friend's death from the
+      // redirect itself, independent of whether any spillover happens at
+      // all.
+      if (redirectedResult.friendshipEndLogEntry) result.friendshipEndLogEntry = redirectedResult.friendshipEndLogEntry;
       // Spillover: only possible if the friend actually KO'd from this
       // redirected hit (if he survived, his hearts - however low -
       // genuinely covered the full amount by definition, since applyDamage
