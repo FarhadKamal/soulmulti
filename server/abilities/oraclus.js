@@ -21,6 +21,17 @@ function resolveProphecyOfDoomStrike(game, log) {
   // meaningfully occur per cast (she has at most one friend at a time).
   let friendshipEndLogEntry = null;
   let friendshipSpilloverLogEntry = null;
+  // Melyssa's Friendship - the "friend protects Melyssa" portrait reaction
+  // (portraitFlash.js's own protects_melyssa.jpg) reads
+  // entry.redirectedToFriendId off the TOP-LEVEL log entry - confirmed
+  // real bug, 2026-09-21 (live report): the redirect/spillover damage math
+  // was always correct, but this flag was never captured, so the
+  // animation silently never fired even on a genuine redirect. Goes
+  // DIRECTLY onto the returned `entry` (unlike friendshipEndLogEntry/
+  // friendshipSpilloverLogEntry, which are separate deferred log lines) -
+  // it's a flag on THIS entry, not a standalone entry of its own. "First
+  // occurrence wins", same reasoning as every other deferred field here.
+  let redirectedToFriendId = null;
   for (const target of Object.values(game.characters)) {
     if (target.id === 'oraclus' || target.isKO) continue;
     // Environmental Attack shape (confirmed rulings): bypasses Dodge
@@ -45,6 +56,7 @@ function resolveProphecyOfDoomStrike(game, log) {
     hits.push({ targetId: result.targetCharacterId, amountDealt: result.amountDealt, koTriggered: result.koTriggered });
     if (result.friendshipEndLogEntry && !friendshipEndLogEntry) friendshipEndLogEntry = result.friendshipEndLogEntry;
     if (result.friendshipSpilloverLogEntry && !friendshipSpilloverLogEntry) friendshipSpilloverLogEntry = result.friendshipSpilloverLogEntry;
+    if (result.redirectedToFriendId && !redirectedToFriendId) redirectedToFriendId = result.redirectedToFriendId;
   }
   if (hits.length === 0) return null;
   // Returned as a wrapper (not mixed directly into the entry object) so
@@ -53,8 +65,13 @@ function resolveProphecyOfDoomStrike(game, log) {
   // as their own deferred entries the same way every other call path in
   // this codebase already does - mixing them into the entry itself would
   // leak these engine-internal fields into the client-visible log line.
+  // redirectedToFriendId IS folded directly into `entry` though (see its
+  // own comment above) - it's meant to be read off this exact log line.
   return {
-    entry: { type: 'prophecy-of-doom-trigger', fromCharacterId: 'oraclus', hits },
+    entry: {
+      type: 'prophecy-of-doom-trigger', fromCharacterId: 'oraclus', hits,
+      ...(redirectedToFriendId ? { redirectedToFriendId } : {}),
+    },
     friendshipEndLogEntry, friendshipSpilloverLogEntry,
   };
 }

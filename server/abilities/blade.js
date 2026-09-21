@@ -112,6 +112,18 @@ export const actions = {
       let prophecyOfDoomTriggerLogEntry = null;
       let friendshipEndLogEntry = null;
       let friendshipSpilloverLogEntry = null;
+      // Melyssa's Friendship - the "friend protects Melyssa" portrait
+      // reaction (portraitFlash.js's own protects_melyssa.jpg) is driven
+      // entirely by entry.redirectedToFriendId on the TOP-LEVEL log entry -
+      // confirmed real bug, 2026-09-21 (live report): unlike a single-
+      // target attack (which gets this for free by spreading ...result
+      // directly into its own entry), this custom `hits` array never
+      // captured it from any individual redirected strike, so the whole
+      // animation silently never fired for Blood Frenzy even when a
+      // redirect genuinely happened (the damage/shield math was always
+      // correct - only the visual was missing). "First occurrence wins",
+      // same reasoning as every other deferred field in this loop.
+      let redirectedToFriendId = null;
       for (let i = 0; i < strikeCount; i++) {
         // Re-queries the living pool fresh before EVERY strike (not once up
         // front) - an earlier strike in this same burst can KO someone,
@@ -154,9 +166,10 @@ export const actions = {
         // friendshipSpilloverLogEntry), same "first occurrence wins"
         // reasoning as every other deferred entry in this loop.
         if (result.friendshipSpilloverLogEntry && !friendshipSpilloverLogEntry) friendshipSpilloverLogEntry = result.friendshipSpilloverLogEntry;
+        if (result.redirectedToFriendId && !redirectedToFriendId) redirectedToFriendId = result.redirectedToFriendId;
         if (character.isKO) break; // a mirrored/reflected counter-hit KO'd Blade himself mid-burst
       }
-      log.push({ type: 'special', characterId: character.id, actionId: 'bloodFrenzy', hits });
+      log.push({ type: 'special', characterId: character.id, actionId: 'bloodFrenzy', hits, ...(redirectedToFriendId ? { redirectedToFriendId } : {}) });
       return { hits, rebirthLogEntry, mirrorLogEntry, mirrorReflectLogEntry, fowlPlayRevertLogEntry, divineJudgmentTriggerLogEntry, prophecyOfDoomTriggerLogEntry, friendshipEndLogEntry, friendshipSpilloverLogEntry };
     },
   },

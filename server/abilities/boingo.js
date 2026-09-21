@@ -71,6 +71,14 @@ registerOnOwnDeath('boingo', (character, game, log) => {
   // Melyssa with no visible cause at all).
   let friendshipEndLogEntry;
   let friendshipSpilloverLogEntry;
+  // Melyssa's Friendship - the "friend protects Melyssa" portrait reaction
+  // (portraitFlash.js's own protects_melyssa.jpg) reads
+  // entry.redirectedToFriendId off the TOP-LEVEL log entry - confirmed
+  // real bug, 2026-09-21 (live report, same gap as oraclus.js's own copy
+  // of this loop). Folded directly into prophecyOfDoomTriggerLogEntry
+  // below (it's a flag on THAT entry, not a standalone deferred entry of
+  // its own, unlike friendshipEndLogEntry/friendshipSpilloverLogEntry).
+  let redirectedToFriendId;
   const oraclusChar = game.characters.oraclus;
   if (oraclusChar?.special?.prophecyOfDoomPendingAfterChicken) {
     oraclusChar.special.prophecyOfDoomPendingAfterChicken = false;
@@ -97,9 +105,13 @@ registerOnOwnDeath('boingo', (character, game, log) => {
       hits.push({ targetId: result.targetCharacterId, amountDealt: result.amountDealt, koTriggered: result.koTriggered });
       if (result.friendshipEndLogEntry && !friendshipEndLogEntry) friendshipEndLogEntry = result.friendshipEndLogEntry;
       if (result.friendshipSpilloverLogEntry && !friendshipSpilloverLogEntry) friendshipSpilloverLogEntry = result.friendshipSpilloverLogEntry;
+      if (result.redirectedToFriendId && !redirectedToFriendId) redirectedToFriendId = result.redirectedToFriendId;
     }
     if (hits.length > 0) {
-      prophecyOfDoomTriggerLogEntry = { type: 'prophecy-of-doom-trigger', fromCharacterId: 'oraclus', hits };
+      prophecyOfDoomTriggerLogEntry = {
+        type: 'prophecy-of-doom-trigger', fromCharacterId: 'oraclus', hits,
+        ...(redirectedToFriendId ? { redirectedToFriendId } : {}),
+      };
     }
   }
   if (revertedIds.length === 0 && !prophecyOfDoomTriggerLogEntry) return undefined;

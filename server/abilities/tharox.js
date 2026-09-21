@@ -167,6 +167,12 @@ export const actions = {
       // onAnyDeath registration for the full reasoning).
       let friendshipEndLogEntry = null;
       let friendshipSpilloverLogEntry = null;
+      // Melyssa's Friendship - the "friend protects Melyssa" portrait
+      // reaction (portraitFlash.js's own protects_melyssa.jpg) reads
+      // entry.redirectedToFriendId off the TOP-LEVEL log entry only -
+      // confirmed real bug, 2026-09-21 (live report). "First occurrence
+      // wins", same reasoning as every other deferred field in this loop.
+      let redirectedToFriendId = null;
       for (let i = 0; i < EARTHSHATTER_TOTAL_DAMAGE; i++) {
         if (others.length === 0) break;
         const target = others[Math.floor(Math.random() * others.length)];
@@ -220,6 +226,7 @@ export const actions = {
         if (result.prophecyOfDoomTriggerLogEntry && !prophecyOfDoomTriggerLogEntry) prophecyOfDoomTriggerLogEntry = result.prophecyOfDoomTriggerLogEntry;
         if (result.friendshipEndLogEntry && !friendshipEndLogEntry) friendshipEndLogEntry = result.friendshipEndLogEntry;
         if (result.friendshipSpilloverLogEntry && !friendshipSpilloverLogEntry) friendshipSpilloverLogEntry = result.friendshipSpilloverLogEntry;
+        if (result.redirectedToFriendId && !redirectedToFriendId) redirectedToFriendId = result.redirectedToFriendId;
         if (result.koTriggered) {
           // Keyed by the same redirect-aware dealtTargetId as dealtByTarget
           // above, so the final hits[] mapping's koTriggered lines up with
@@ -247,7 +254,7 @@ export const actions = {
         amountDealt,
         koTriggered: !!koTriggeredByTarget[tid],
       }));
-      log.push({ type: 'special', characterId: character.id, actionId: 'earthshatter', hits });
+      log.push({ type: 'special', characterId: character.id, actionId: 'earthshatter', hits, ...(redirectedToFriendId ? { redirectedToFriendId } : {}) });
       const mirrorLogEntry = mirrorTargetId
         ? {
           type: 'curse-mirror', fromCharacterId: 'athena', toCharacterId: mirrorTargetId,

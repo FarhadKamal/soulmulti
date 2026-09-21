@@ -110,6 +110,17 @@ export const actions = {
       // 2026-09-20, see melyssa.js's own onAnyDeath registration).
       let friendshipEndLogEntry = null;
       let friendshipSpilloverLogEntry = null;
+      // Melyssa's Friendship - the "friend protects Melyssa" portrait
+      // reaction (portraitFlash.js's own protects_melyssa.jpg) reads
+      // entry.redirectedToFriendId off the TOP-LEVEL log entry only -
+      // confirmed real bug, 2026-09-21 (live report): each individual
+      // burst object DOES already carry its own redirectedToFriendId (via
+      // the ...result spread below), but nothing ever copied it up onto
+      // the top-level `{ type: 'special', ..., bursts }` entry itself, so
+      // the animation silently never fired even on a genuine redirect.
+      // "First occurrence wins", same reasoning as every other deferred
+      // field in this loop.
+      let redirectedToFriendId = null;
       // Snapshot the target list BEFORE clearing anything - iterating and
       // mutating the same Map in one pass is fine here since .set() never
       // adds new keys mid-loop (only zeroes existing ones), but snapshotting
@@ -152,8 +163,9 @@ export const actions = {
         if (result.prophecyOfDoomTriggerLogEntry && !prophecyOfDoomTriggerLogEntry) prophecyOfDoomTriggerLogEntry = result.prophecyOfDoomTriggerLogEntry;
         if (result.friendshipEndLogEntry && !friendshipEndLogEntry) friendshipEndLogEntry = result.friendshipEndLogEntry;
         if (result.friendshipSpilloverLogEntry && !friendshipSpilloverLogEntry) friendshipSpilloverLogEntry = result.friendshipSpilloverLogEntry;
+        if (result.redirectedToFriendId && !redirectedToFriendId) redirectedToFriendId = result.redirectedToFriendId;
       }
-      log.push({ type: 'special', characterId: character.id, actionId: 'mirageBurst', bursts });
+      log.push({ type: 'special', characterId: character.id, actionId: 'mirageBurst', bursts, ...(redirectedToFriendId ? { redirectedToFriendId } : {}) });
       return { bursts, rebirthLogEntry, mirrorLogEntry, mirrorReflectLogEntry, divineJudgmentTriggerLogEntry, prophecyOfDoomTriggerLogEntry, friendshipEndLogEntry, friendshipSpilloverLogEntry };
     },
   },
