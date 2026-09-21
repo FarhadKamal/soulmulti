@@ -2438,7 +2438,14 @@ function describeLogEntry(entry) {
     case 'eclipse-end':
       return `${name(entry.characterId)}'s Lunar Eclipse ends`;
     case 'beast-form-end':
-      return `${name(entry.characterId)} reverts back to normal form`;
+      // reason: 'timeout' - the stalemate safety valve (see grimtal.js's
+      // own BEAST_FORM_MAX_TURNS comment) forcing a revert with no kill
+      // ever happening, distinct from the normal any-kill-anywhere
+      // reversion - worth its own wording so this shows up distinctly if
+      // it's ever seen in a real match log again.
+      return entry.reason === 'timeout'
+        ? `${name(entry.characterId)}'s Beast Form times out and reverts back to normal form`
+        : `${name(entry.characterId)} reverts back to normal form`;
     case 'jester-ball-take':
       return `${name(entry.targetCharacterId)} took the Jester Ball${entry.amountDealt != null ? ` - -${entry.amountDealt} hearts` : ''}`;
     case 'jester-ball-pass':

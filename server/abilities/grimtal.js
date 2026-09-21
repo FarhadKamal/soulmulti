@@ -22,6 +22,28 @@ export const BEAST_ATTACK_LOW_DAMAGE = 2;
 const BEAST_REGEN_HEARTS_THRESHOLD = 4;
 const BEAST_REGEN_HEAL_AMOUNT = 1;
 
+// Confirmed real bug, 2026-09-21 (live report + debug-mode log): Beast
+// Form's ONLY end condition is "any kill anywhere" (Death-Triggered
+// Reversion #36) - it has no independent timer of its own. If the last two
+// survivors end up being a transformed Grimtal (self-untargetable while
+// beastFormActive) and an opponent who is ALSO untargetable for reasons of
+// their own (confirmed reachable: Velorya's Lunar Eclipse, whose OWN end
+// condition - landing 3 real attacks - can never fire if she can never
+// land a hit on him in the first place), neither side can ever kill the
+// other and the match is stuck in a genuine, permanent stalemate - no
+// action ever available to either player, forever ("has no valid targets
+// and skips their turn" looping indefinitely in the real reported match
+// log). A hard turn-count safety valve breaks this (and any other
+// future stalemate shape this same "no independent timer" gap could
+// produce) without touching his normal kill-triggered reversion at all -
+// generous enough that it should essentially never fire in ordinary play
+// (a real match reaching this many of HIS OWN turns while still
+// transformed is already an extreme outlier), but guaranteed to
+// eventually end any genuine deadlock. Counted the same way
+// beastFormTurnCount already is (see onTurnStart below) - his own turn
+// starts, not raw match rounds.
+const BEAST_FORM_MAX_TURNS = 20;
+
 // KO-branch cleanup (see engine/categories/onOwnDeath.js) - his own death
 // ends Skull Crack's pending headache immediately, no one left to have
 // caused it, same "caster's death cancels their own ongoing effects" rule
@@ -180,6 +202,19 @@ export function onTurnStart(character, game, log) {
   // other turn-start passive in the game already behaves.
   if (character.special.beastFormActive) {
     character.special.beastFormTurnCount += 1;
+    // Stalemate safety valve (see BEAST_FORM_MAX_TURNS's own comment for
+    // the full reasoning) - checked BEFORE the regen tick below, so a
+    // forced reversion this same turn-start doesn't also still try to heal
+    // him as a beast in the same breath. Untargetable is cleared the same
+    // way the normal kill-triggered reversion does (turnEngine.js's own
+    // revert sites), so he's immediately a legal target again for whoever
+    // was stuck unable to act.
+    if (character.special.beastFormTurnCount > BEAST_FORM_MAX_TURNS) {
+      character.special.beastFormActive = false;
+      character.untargetable = false;
+      log.push({ type: 'beast-form-end', characterId: character.id, reason: 'timeout', hearts: heartsSnapshot(game) });
+      return;
+    }
     if (character.special.beastFormTurnCount % 2 === 0 && character.hearts <= BEAST_REGEN_HEARTS_THRESHOLD) {
       const healed = applyHeal(game, character.id, BEAST_REGEN_HEAL_AMOUNT);
       if (healed > 0) {
