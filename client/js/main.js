@@ -7,7 +7,7 @@ import {
   startChickenMusic, revertFromChickenMusic,
   playActionSound, playSound, playKO, playVictory, playDodge, playRebirth, playCoin,
 } from './sound.js';
-import { handleLogEntryForFlash, handleDodgeForFlash, checkIdlePortrait, registerFlashRerender, queueGrimtalPowerFlash, registerChickenCheck } from './portraitFlash.js';
+import { handleLogEntryForFlash, handleDodgeForFlash, checkIdlePortrait, registerFlashRerender, queueGrimtalPowerFlash, registerChickenCheck, setDebugLogEntryIndex } from './portraitFlash.js';
 import { handleLogEntryForEffects, registerEffectRerender } from './actionEffects.js';
 import { preloadBattleImages, battleImagesReady } from './imagePreload.js';
 import { preloadBattleAudio } from './audioPreload.js';
@@ -221,14 +221,21 @@ function startGameOverSequence(game) {
 }
 
 function processNewLogEntries(game) {
+  const startIndex = lastLogLength;
   const newEntries = game.log.slice(lastLogLength);
   lastLogLength = game.log.length;
-  for (const entry of newEntries) {
+  newEntries.forEach((entry, i) => {
+    // Debug mode's own flash-call history (portraitFlash.js's
+    // getFlashCallHistory) - tags every setFlash call made while
+    // processing THIS entry with its absolute index in game.log, so
+    // battleScreen.js's debug annotation can show exactly what the client
+    // actually rendered for each line, not just what the server sent.
+    setDebugLogEntryIndex(startIndex + i);
     playLogEntrySound(entry, game);
     handleLogEntryForFlash(entry, game);
     handleDodgeForFlash(entry, game);
     handleLogEntryForEffects(entry, game);
-  }
+  });
 }
 
 // Mirrors the main game's playPostActionSounds/finishJesterBall sound

@@ -1,7 +1,7 @@
 import { CHARACTERS } from './characters.js';
 import { send } from './net.js';
 import { playUiClick } from './sound.js';
-import { getFlashSrc, getPersistentPortrait, isPetrifyActive } from './portraitFlash.js';
+import { getFlashSrc, getPersistentPortrait, isPetrifyActive, getFlashCallHistory } from './portraitFlash.js';
 import { getActiveEffects, getClawCount, getCrackCount, getPowSize, getVortexSize, getAxechopTier, getLightningTier, getWildLightningTier, getDarkslashVariant } from './actionEffects.js';
 import { renderFullscreenButton } from './fullscreen.js';
 import { renderMusicMuteButton } from './musicMute.js';
@@ -1905,6 +1905,25 @@ function formatDebugAnnotation(entry) {
   return parts.length > 0 ? `{${parts.join(' ')}}` : '';
 }
 
+// Debug mode's own client-side rendering trace (2026-09-21, user request:
+// "you can add more options on details logs" - a follow-up to a live
+// report that choke.jpg still visibly played on a dodged Self Choke even
+// though the server's own raw fields, shown via formatDebugAnnotation
+// above, were confirmed correct - static code tracing alone couldn't find
+// the cause). Shows exactly which portrait images the CLIENT actually
+// decided to flash while processing this specific log entry (via
+// portraitFlash.js's setFlash call history, tagged by absolute log
+// index) - answers "did choke.jpg actually get set here at all" directly
+// from real captured behavior, rather than reasoning about what the code
+// SHOULD do. Empty for any entry that triggered no flash calls (most
+// entries - Arcane Study, a stat-only special, etc.).
+function formatFlashDebugAnnotation(logIndex) {
+  const calls = getFlashCallHistory().filter((c) => c.logEntryIndex === logIndex);
+  if (calls.length === 0) return '';
+  const text = calls.map((c) => `${c.characterId}<-${c.src.replace('assets/images/', '')}`).join(', ');
+  return `[flash: ${text}]`;
+}
+
 // Formats one entry's end-action hearts/shield snapshot (see turnEngine.js's
 // heartsSnapshot - {hearts, shield} per living character, or the string
 // 'KO') into a compact "Name:H/S" readout, sorted by character id for a
@@ -1968,9 +1987,15 @@ function renderFullLogWithCopy(log) {
     }
     const snapshotText = formatHeartsSnapshot(hearts);
     // Debug mode (toggle: 'D' key) - appends each line's own raw
-    // animation-trigger fields (see formatDebugAnnotation's own comment)
-    // so the copied/shared full match log carries debugging detail.
-    const debugText = debugLogMode ? formatDebugAnnotation(entry) : '';
+    // animation-trigger fields (see formatDebugAnnotation's own comment),
+    // PLUS the client's own real flash-call trace for that same entry (see
+    // formatFlashDebugAnnotation's own comment) - together, these show both
+    // what the server sent AND what the client actually did with it, so a
+    // discrepancy between the two is now directly visible in one place
+    // instead of requiring a fresh code investigation each time.
+    const rawDebugText = debugLogMode ? formatDebugAnnotation(entry) : '';
+    const flashDebugText = debugLogMode ? formatFlashDebugAnnotation(i) : '';
+    const debugText = [rawDebugText, flashDebugText].filter(Boolean).join(' ');
     const withHearts = snapshotText ? `${text}  [${snapshotText}]` : text;
     lines.push(debugText ? `${withHearts}  ${debugText}` : withHearts);
   }

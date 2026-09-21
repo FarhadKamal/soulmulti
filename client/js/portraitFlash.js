@@ -191,8 +191,38 @@ export function registerChickenCheck(fn) {
   isCurrentlyChicken = fn;
 }
 
+// Debug mode's own call history (2026-09-21, user request: "you can add
+// more options on details logs" - a follow-up to a live report that
+// choke.jpg still visibly played on a dodged Self Choke despite the
+// server data being confirmed correct via debug-mode's raw-field
+// annotations; static code tracing alone couldn't find the cause, and
+// console logging was declined). Records every setFlash call actually
+// made (character, image path, which log entry index it was processing at
+// the time), so battleScreen.js's own debug annotation can show what the
+// CLIENT actually decided to render for each entry, not just what the
+// SERVER sent - if choke.jpg genuinely fires here for a dodge, this proves
+// it's a real portraitFlash.js bug still to find; if it never fires here
+// but still visibly shows, the bug is downstream of setFlash entirely
+// (the render/consumption side, getFlashSrc's own callers in
+// battleScreen.js), a different place to look than anything checked so
+// far. Bounded ring buffer so a long match can't leak memory - sized well
+// above what even a long match's worth of setFlash calls should reach
+// (most log entries trigger 0-2 calls; a match with several hundred real
+// events would still fit comfortably under this).
+const FLASH_CALL_HISTORY_LIMIT = 2000;
+const flashCallHistory = [];
+let currentLogEntryIndex = -1;
+export function setDebugLogEntryIndex(index) {
+  currentLogEntryIndex = index;
+}
+export function getFlashCallHistory() {
+  return flashCallHistory;
+}
+
 function setFlash(characterId, src, durationMs = FLASH_DURATION_MS) {
   if (isCurrentlyChicken(characterId) && !CHICKEN_FLASH_PATHS.has(src)) return;
+  flashCallHistory.push({ characterId, src, logEntryIndex: currentLogEntryIndex });
+  if (flashCallHistory.length > FLASH_CALL_HISTORY_LIMIT) flashCallHistory.shift();
   const existing = activeFlash.get(characterId);
   if (existing) clearTimeout(existing.timer);
   const timer = setTimeout(() => {
