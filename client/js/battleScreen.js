@@ -1882,6 +1882,25 @@ function renderJesterBallPrompt(game, characterId, armedAction, state) {
   return panel;
 }
 
+// Entry types that only ever appear as a DEFERRED follow-up to some earlier
+// triggering line within the same batch (e.g. an attack that kills
+// Melyssa's friend, followed by its own 'friendship-end'/
+// 'friendship-spillover' entry a few lines later) - never an independent
+// player action of their own. Confirmed real bug, 2026-09-21 (deep-dive
+// investigation, live report): the LIVE view's own trailing-N-entry window
+// (see renderLog's own history/reasoning below) could cut cleanly between a
+// trigger and its own follow-up, showing e.g. "Blood Hunt on Tharox - KO!"
+// with the very next entry, "The Friendship bond... has ended," pushed just
+// past the visible cutoff - the server-side log always had it (confirmed
+// via a from-scratch replay through the real executeAction/finalizeAction
+// dispatch, byte-for-byte matching every damage number in the reported
+// match), it just never scrolled into view by the time it was read. Same
+// underlying shape as every other entry type here.
+const DEFERRED_FOLLOWUP_LOG_TYPES = new Set([
+  'friendship-end', 'friendship-spillover', 'rebirth', 'divine-judgment-trigger',
+  'prophecy-of-doom-trigger', 'curse-mirror', 'mirror-reflect', 'fowl-play-revert',
+]);
+
 function renderLog(log) {
   const panel = document.createElement('div');
   panel.className = 'log-panel';
@@ -1891,7 +1910,16 @@ function renderLog(log) {
   // .log-line per entry anyway left visible blank gaps in the panel. Filter
   // to only entries with real text, then take the most recent 20 of those.
   const described = log.map((entry) => ({ entry, text: describeLogEntry(entry) })).filter((e) => e.text);
-  const recent = described.slice(-20).reverse();
+  // Widen the trailing window backward (never forward - still shows the 20
+  // most RECENT real events, just doesn't let the window's own START point
+  // land mid-way through a trigger/follow-up pair) so a deferred entry
+  // never appears without the line that actually caused it still visible
+  // just above it.
+  let startIndex = Math.max(0, described.length - 20);
+  while (startIndex > 0 && DEFERRED_FOLLOWUP_LOG_TYPES.has(described[startIndex].entry.type)) {
+    startIndex -= 1;
+  }
+  const recent = described.slice(startIndex).reverse();
   recent.forEach(({ text }) => {
     const line = document.createElement('div');
     line.className = 'log-line';
