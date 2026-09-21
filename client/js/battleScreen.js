@@ -1,6 +1,5 @@
 import { CHARACTERS } from './characters.js';
 import { send } from './net.js';
-import { renderChatPanel } from './chatPanel.js';
 import { playUiClick } from './sound.js';
 import { getFlashSrc, getPersistentPortrait, isPetrifyActive } from './portraitFlash.js';
 import { getActiveEffects, getClawCount, getCrackCount, getPowSize, getVortexSize, getAxechopTier, getLightningTier, getWildLightningTier, getDarkslashVariant } from './actionEffects.js';
@@ -8,20 +7,12 @@ import { renderFullscreenButton } from './fullscreen.js';
 import { renderMusicMuteButton } from './musicMute.js';
 import { v, hardRefresh } from './assetVersion.js';
 
-// Whether the log/chat drawer is open - module state (not part of `state`
-// in main.js), same reasoning as chatPanel.js's draftText: this whole
-// screen tears down and rebuilds on every server broadcast, so a plain
-// local variable here is what actually survives across those rebuilds.
-// Starts closed - the board/action buttons get first claim on the fixed
-// viewport shell's space (see .battle/.battle-scroll in style.css); the
-// drawer only takes up room once the player deliberately opens it.
-let drawerOpen = false;
-
 // Debug log mode's own rerender hook - captured from `state.rerender` on
 // every renderBattle call (state isn't in module scope, only passed as a
-// parameter), same "module variable survives the full screen teardown/
-// rebuild" reasoning as drawerOpen above. Starts as a no-op so the keydown
-// listener registered below never throws before the first render.
+// parameter). Same "module-level variable survives the full screen
+// teardown/rebuild" reasoning every other module-level UI-state variable in
+// this file relies on. Starts as a no-op so the keydown listener registered
+// below never throws before the first render.
 let triggerRerender = () => {};
 
 // Functional-first battle screen: no portrait art/animation yet (see
@@ -350,48 +341,8 @@ export function renderBattle(root, state) {
   }
 
   wrap.appendChild(scroll);
-  wrap.appendChild(renderLogChatDrawer(game.log, state.rerender));
 
   root.appendChild(wrap);
-}
-
-// Collapsed by default (see module-level `drawerOpen` above) so the log/
-// chat never take space away from the board/action buttons unless the
-// player deliberately asks for them - this is what actually fixes "always
-// have to scroll to reach the action buttons", not just compacting the
-// board itself.
-function renderLogChatDrawer(log, rerender) {
-  const wrap = document.createElement('div');
-  wrap.className = 'log-chat-drawer';
-
-  const toggle = document.createElement('button');
-  toggle.className = 'drawer-toggle' + (drawerOpen ? ' drawer-toggle--open' : '');
-  const label = document.createElement('span');
-  label.textContent = drawerOpen ? 'Hide log & chat' : 'Show log & chat';
-  const caret = document.createElement('span');
-  caret.className = 'drawer-toggle-caret';
-  caret.textContent = '▲'; // up-pointing triangle, flips via CSS rotate when open
-  toggle.appendChild(label);
-  toggle.appendChild(caret);
-  toggle.onclick = () => {
-    drawerOpen = !drawerOpen;
-    playUiClick();
-    // Local re-render only (no server round trip needed) - re-invokes
-    // renderBattle with the current state, which reads the now-flipped
-    // module-level drawerOpen.
-    rerender();
-  };
-  wrap.appendChild(toggle);
-
-  if (drawerOpen) {
-    const panel = document.createElement('div');
-    panel.className = 'drawer-panel';
-    panel.appendChild(renderLog(log));
-    panel.appendChild(renderChatPanel());
-    wrap.appendChild(panel);
-  }
-
-  return wrap;
 }
 
 // Icon-only, same compact square style as the fullscreen button (see
@@ -1890,25 +1841,6 @@ function renderJesterBallPrompt(game, characterId, armedAction, state) {
   return panel;
 }
 
-// Entry types that only ever appear as a DEFERRED follow-up to some earlier
-// triggering line within the same batch (e.g. an attack that kills
-// Melyssa's friend, followed by its own 'friendship-end'/
-// 'friendship-spillover' entry a few lines later) - never an independent
-// player action of their own. Confirmed real bug, 2026-09-21 (deep-dive
-// investigation, live report): the LIVE view's own trailing-N-entry window
-// (see renderLog's own history/reasoning below) could cut cleanly between a
-// trigger and its own follow-up, showing e.g. "Blood Hunt on Tharox - KO!"
-// with the very next entry, "The Friendship bond... has ended," pushed just
-// past the visible cutoff - the server-side log always had it (confirmed
-// via a from-scratch replay through the real executeAction/finalizeAction
-// dispatch, byte-for-byte matching every damage number in the reported
-// match), it just never scrolled into view by the time it was read. Same
-// underlying shape as every other entry type here.
-const DEFERRED_FOLLOWUP_LOG_TYPES = new Set([
-  'friendship-end', 'friendship-spillover', 'rebirth', 'divine-judgment-trigger',
-  'prophecy-of-doom-trigger', 'curse-mirror', 'mirror-reflect', 'fowl-play-revert',
-]);
-
 // Debug mode (2026-09-21, user request: "you can make the logs more
 // details... you can also mention which image ref played") - toggled with
 // the 'D' key, appends each log line's own RAW fields relevant to
@@ -1921,7 +1853,11 @@ const DEFERRED_FOLLOWUP_LOG_TYPES = new Set([
 // could quietly drift out of sync with the real trigger logic in
 // portraitFlash.js/actionEffects.js over time, whereas the raw fields ARE
 // the actual data those files themselves branch on, so they can never lie.
-// Off by default so normal play stays uncluttered.
+// Off by default so normal play stays uncluttered. Only ever rendered on
+// the winner screen's full match log now (renderFullLogWithCopy) - the
+// live in-match log/chat drawer this was originally built for was removed
+// (2026-09-21, user request: "remove the logs and chat on battle screen" -
+// logs are winner-screen-only now, chat is lobby-only).
 let debugLogMode = false;
 window.addEventListener('keydown', (e) => {
   // Ignore while typing in chat/any input - same guard pattern used
@@ -1969,52 +1905,6 @@ function formatDebugAnnotation(entry) {
   return parts.length > 0 ? `{${parts.join(' ')}}` : '';
 }
 
-function renderLog(log) {
-  const panel = document.createElement('div');
-  panel.className = 'log-panel';
-  if (debugLogMode) {
-    const badge = document.createElement('div');
-    badge.className = 'log-debug-badge';
-    badge.textContent = 'DEBUG MODE (D to toggle)';
-    panel.appendChild(badge);
-  }
-  // end-action is a pure bookkeeping marker (round/hearts snapshot pushed
-  // after every single action, always) rather than a human-readable event -
-  // describeLogEntry correctly has no text for it, but rendering an empty
-  // .log-line per entry anyway left visible blank gaps in the panel. Filter
-  // to only entries with real text, then take the most recent 20 of those.
-  const described = log.map((entry) => ({ entry, text: describeLogEntry(entry) })).filter((e) => e.text);
-  // Widen the trailing window backward (never forward - still shows the 20
-  // most RECENT real events, just doesn't let the window's own START point
-  // land mid-way through a trigger/follow-up pair) so a deferred entry
-  // never appears without the line that actually caused it still visible
-  // just above it.
-  let startIndex = Math.max(0, described.length - 20);
-  while (startIndex > 0 && DEFERRED_FOLLOWUP_LOG_TYPES.has(described[startIndex].entry.type)) {
-    startIndex -= 1;
-  }
-  const recent = described.slice(startIndex).reverse();
-  recent.forEach(({ entry, text }) => {
-    const line = document.createElement('div');
-    line.className = 'log-line';
-    line.textContent = text;
-    // Debug mode (toggle: 'D' key) - append the entry's own raw fields
-    // relevant to portraitFlash.js/actionEffects.js's animation triggers,
-    // as a separate styled span, see formatDebugAnnotation's own comment
-    // for why raw fields rather than a derived "which asset played"
-    // conclusion.
-    const debugText = debugLogMode ? formatDebugAnnotation(entry) : '';
-    if (debugText) {
-      const debugSpan = document.createElement('span');
-      debugSpan.className = 'log-debug-annotation';
-      debugSpan.textContent = `  ${debugText}`;
-      line.appendChild(debugSpan);
-    }
-    panel.appendChild(line);
-  });
-  return panel;
-}
-
 // Formats one entry's end-action hearts/shield snapshot (see turnEngine.js's
 // heartsSnapshot - {hearts, shield} per living character, or the string
 // 'KO') into a compact "Name:H/S" readout, sorted by character id for a
@@ -2033,12 +1923,14 @@ function formatHeartsSnapshot(snapshot) {
   return parts.join(' ');
 }
 
-// Full, uncapped match log for the game-over screen (unlike renderLog's
-// live 20-line window during play) - the whole point here is a permanent
-// record of exactly what happened, in the order it happened, that the
-// winner/loser can copy out and keep or share. Each real event line is
-// suffixed with a [Name:H+Ssh ...] readout of every character's hearts/
-// shield right after THAT SPECIFIC entry resolved.
+// Full, uncapped match log, shown ONLY on the game-over screen (2026-09-21,
+// user request: the in-match live log/chat drawer this used to sit
+// alongside was removed - the full log is winner-screen-only now) - the
+// whole point here is a permanent record of exactly what happened, in the
+// order it happened, that the winner/loser can copy out and keep or share.
+// Each real event line is suffixed with a [Name:H+Ssh ...] readout of
+// every character's hearts/shield right after THAT SPECIFIC entry
+// resolved.
 //
 // Server-side (2026-08-30), every log entry that's pushed STANDALONE -
 // outside executeAction/finalizeAction's own batching (gameFlow.js's turn-
@@ -2075,9 +1967,9 @@ function renderFullLogWithCopy(log) {
       }
     }
     const snapshotText = formatHeartsSnapshot(hearts);
-    // Debug mode (toggle: 'D' key) - same raw-field annotation as renderLog's
-    // live view, appended here too so the copied/shared full match log
-    // carries the same debugging detail.
+    // Debug mode (toggle: 'D' key) - appends each line's own raw
+    // animation-trigger fields (see formatDebugAnnotation's own comment)
+    // so the copied/shared full match log carries debugging detail.
     const debugText = debugLogMode ? formatDebugAnnotation(entry) : '';
     const withHearts = snapshotText ? `${text}  [${snapshotText}]` : text;
     lines.push(debugText ? `${withHearts}  ${debugText}` : withHearts);

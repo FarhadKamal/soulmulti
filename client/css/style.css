@@ -150,10 +150,9 @@ input {
 /* Same fixed-height shell as .lobby: round-info/controls/timer are a fixed
    header, .battle-scroll holds the board + action panel (the ONE thing
    that scrolls internally if a 4-player board + full action list is
-   genuinely too tall for a short viewport), and the log/chat move out of
-   normal flow entirely into a collapsible bottom drawer (see
-   .log-chat-drawer below) instead of pushing the action buttons down the
-   page - the actual cause of "always have to scroll to act". */
+   genuinely too tall for a short viewport). The log/chat drawer that used
+   to live here was removed (2026-09-21, user request) - the full match log
+   is winner-screen-only (.final-log-panel), chat is lobby-only. */
 .battle {
   max-width: 720px; margin: 0 auto; padding: 10px 16px;
   height: 100%; display: flex; flex-direction: column; min-height: 0;
@@ -1570,24 +1569,8 @@ input {
 .pass-hint { font-size: 0.85em; opacity: 0.75; margin: 8px 0; }
 .lockout-hint { font-size: 0.85em; opacity: 0.6; margin-top: 8px; text-align: center; }
 
-.log-panel {
-  background: #14141c; border: 1px solid #2a2a3a; border-radius: 10px;
-  padding: 10px 12px; max-height: 240px; overflow-y: auto; font-size: 0.85em;
-}
 .log-line { padding: 3px 0; border-bottom: 1px solid #22222e; }
 .log-line:last-child { border-bottom: none; }
-
-/* Debug log mode (2026-09-21, toggle: 'D' key) - the raw-field annotation
-   appended to each line reads as monospace so aligned {field:value} pairs
-   stay scannable, dimmed relative to the main line text so it doesn't
-   compete with the actual event description. */
-.log-debug-annotation {
-  color: #6a7a8a; font-family: 'Courier New', monospace; font-size: 0.9em;
-}
-.log-debug-badge {
-  color: #f0a020; font-weight: 700; font-size: 0.8em; letter-spacing: 0.04em;
-  padding: 2px 0 6px 0; border-bottom: 1px solid #2a2a3a; margin-bottom: 4px;
-}
 
 .final-log-panel {
   background: #14141c; border: 1px solid #2a2a3a; border-radius: 10px;
@@ -1611,29 +1594,6 @@ input {
 .chat-name { font-weight: 600; opacity: 0.85; }
 .chat-form { display: flex; gap: 8px; }
 .chat-form input { flex: 1; min-width: 0; }
-
-/* Bottom drawer: houses the match log + chat, collapsed by default so they
-   never push the board/action buttons off-screen (that was the actual
-   "always have to scroll" problem - not the board itself, which usually
-   fits, but the log+chat stacked below it always added enough height to
-   force page scrolling on anything shorter than a large monitor). The
-   toggle bar is always visible at the very bottom of the fixed .battle
-   shell (flex: 0 0 auto, outside .battle-scroll); the panel itself only
-   takes up space, sliding up from the bottom, while it's open. */
-.log-chat-drawer { flex: 0 0 auto; }
-.drawer-toggle {
-  width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px;
-  background: #1c1c2c; border: 1px solid #2a2a3a; border-radius: 8px;
-  padding: 8px; font-size: 0.85em; opacity: 0.85; margin-top: 6px;
-}
-.drawer-toggle-caret { transition: transform 0.2s ease; }
-.drawer-toggle--open .drawer-toggle-caret { transform: rotate(180deg); }
-.drawer-panel {
-  max-height: 42vh; overflow-y: auto; margin-top: 8px;
-  display: flex; flex-direction: column; gap: 10px;
-}
-.drawer-panel .log-panel { max-height: none; }
-.drawer-panel .chat-panel { margin-top: 0; }
 
 .game-over {
   text-align: center; padding: 24px 16px; overflow-y: auto;
@@ -1711,7 +1671,6 @@ input {
   .action-panel { padding: 8px; }
   .action-panel-title { font-size: 0.9em; margin-bottom: 6px; }
   .action-btn-row { gap: 6px; }
-  .drawer-panel { max-height: 50vh; }
 }
 
 /* Short viewports (landscape phones, small laptops with the window not
@@ -1723,7 +1682,6 @@ input {
   .board { gap: 6px; margin-bottom: 8px; }
   .char-tile { padding: 6px; }
   .action-panel { padding: 8px; margin-bottom: 8px; }
-  .drawer-panel { max-height: 34vh; }
 }
 
 /* Brief "Preparing battle..." screen shown between entering a match and
