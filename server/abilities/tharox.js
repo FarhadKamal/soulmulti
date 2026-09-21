@@ -190,7 +190,15 @@ export const actions = {
           // still evade.
           ignoresDodge: true,
         });
-        dealtByTarget[target.id] = (dealtByTarget[target.id] || 0) + (result.amountDealt || 0);
+        // Aggregation key uses result.targetCharacterId, not the loop's own
+        // pre-redirect `target.id` - same fix/reasoning as blade.js's Blood
+        // Frenzy, illyra.js's Mirage Burst, oraclus.js/boingo.js's Prophecy
+        // of Doom (confirmed real bug, 2026-09-21, Melyssa's Friendship):
+        // otherwise a point randomly aimed at Melyssa that redirects to her
+        // friend still gets bucketed and displayed under HER id, even
+        // though her hearts never moved and the friend's did.
+        const dealtTargetId = result.targetCharacterId;
+        dealtByTarget[dealtTargetId] = (dealtByTarget[dealtTargetId] || 0) + (result.amountDealt || 0);
         if (result.rebirthLogEntry && !rebirthLogEntry) rebirthLogEntry = result.rebirthLogEntry;
         if (result.mirrorLogEntry) {
           mirrorTotal += result.mirrorLogEntry.amount;
@@ -211,8 +219,21 @@ export const actions = {
         if (result.prophecyOfDoomTriggerLogEntry && !prophecyOfDoomTriggerLogEntry) prophecyOfDoomTriggerLogEntry = result.prophecyOfDoomTriggerLogEntry;
         if (result.friendshipEndLogEntry && !friendshipEndLogEntry) friendshipEndLogEntry = result.friendshipEndLogEntry;
         if (result.koTriggered) {
-          koTriggeredByTarget[target.id] = true;
-          others = others.filter((c) => c.id !== target.id);
+          // Keyed by the same redirect-aware dealtTargetId as dealtByTarget
+          // above, so the final hits[] mapping's koTriggered lines up with
+          // the target that actually went down.
+          koTriggeredByTarget[dealtTargetId] = true;
+          // Pool filter also uses dealtTargetId, not the pre-redirect
+          // target.id - confirmed real gap found alongside the display bug
+          // (2026-09-21): if a point aimed at Melyssa redirects and KOs her
+          // friend instead, she herself is still alive and remains a valid
+          // pick for later points, while her now-dead friend must be the
+          // one removed - the old target.id-keyed filter had this backwards
+          // (would drop the still-living Melyssa from the pool while
+          // leaving her actually-dead friend in it, wasting later points as
+          // pure overkill on someone already KO'd - exactly the bug this
+          // point-by-point rewrite was originally built to avoid).
+          others = others.filter((c) => c.id !== dealtTargetId);
         }
       }
       // Re-aggregated into one entry per target (matching the client's

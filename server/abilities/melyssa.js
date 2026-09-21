@@ -36,6 +36,23 @@ export function isCurrentFriend(game, characterId) {
   return currentFriendId(game) === characterId;
 }
 
+// True only for Melyssa herself, and only while she currently has an active
+// Friendship bond - used by abilities whose harmful effect bypasses
+// applyDamage entirely (direct state mutation, e.g. Velorya's Moonlit
+// Theft stealing shield, same as Marin's Lifebond bypasses it for hearts),
+// so damagePipeline.js's own redirect-to-friend hook never gets a chance to
+// run. Confirmed ruling, 2026-09-21 (Moonlit Theft): rather than try to
+// "redirect" a non-damage effect like a shield steal onto the friend (there
+// is no single destination amount to redirect the way damage has), those
+// abilities should just EXCLUDE her from their target pool entirely while
+// bonded - a flat immunity, not a redirect. Deliberately only ever true for
+// 'melyssa' herself - her friend's own shield/hearts stay completely normal,
+// fully affectable targets for everyone else, same as anyone else's.
+export function isProtectedByFriendship(game, characterId) {
+  if (characterId !== 'melyssa') return false;
+  return currentFriendId(game) !== null;
+}
+
 // Slice 2 (design-locked 2026-09-20, implemented 2026-09-21): the friend
 // cannot freely CHOOSE, on his own independent turn, any action that would
 // also deal damage to or inflict a harmful status on Melyssa - confirmed

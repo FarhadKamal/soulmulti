@@ -1,4 +1,5 @@
 import { applyDamage } from '../engine/damagePipeline.js';
+import { isProtectedByFriendship } from './melyssa.js';
 
 // Lunar Eclipse: flat 3-attack duration, no coin flip. Untargetable covers
 // her next 3 attacks after casting, then ends automatically.
@@ -98,7 +99,7 @@ export const actions = {
     // hiding the button from a human who might want to snipe even 1 shield).
     isLegal: (character, game) => character.hearts <= MOONLIT_THEFT_HEARTS_THRESHOLD
       && !character.special.usedMoonlitTheft
-      && Object.values(game.characters).some((c) => c.id !== character.id && !c.isKO && !(c.id === 'grimtal' && c.special?.beastFormActive) && c.shield > 0),
+      && Object.values(game.characters).some((c) => c.id !== character.id && !c.isKO && !(c.id === 'grimtal' && c.special?.beastFormActive) && !isProtectedByFriendship(game, c.id) && c.shield > 0),
     execute(character, targetId, game, log) {
       character.special.usedMoonlitTheft = true;
       // Grimtal's Beast Form (Death-Triggered Reversion #36) - same
@@ -107,8 +108,21 @@ export const actions = {
       // this one, which never route through applyDamage's own
       // tryBeastFormImmunity check at all). A transformed Grimtal keeps
       // whatever shield he has, untouched.
+      //
+      // Melyssa's Friendship (Redirect Bond #39) - confirmed ruling,
+      // 2026-09-21: her bond protects her shield too, not just hearts/
+      // status damage. Moonlit Theft bypasses applyDamage entirely (a
+      // direct shield mutation, same as Lifebond bypasses it for hearts),
+      // so the redirect hook in damagePipeline.js never gets a chance to
+      // run for this - there's also no clean way to "redirect a shield
+      // steal" the way damage redirects to a specific destination, so this
+      // is a flat EXCLUSION instead (she just can't be drained at all
+      // while the bond holds), not a redirect. Only excludes HER - if a
+      // DIFFERENT character (not her, not currently her friend) casts
+      // this, her friend's own shield is still a completely normal, fully
+      // stealable target, same as anyone else's.
       const others = Object.values(game.characters).filter(
-        (c) => c.id !== character.id && !c.isKO && !(c.id === 'grimtal' && c.special?.beastFormActive)
+        (c) => c.id !== character.id && !c.isKO && !(c.id === 'grimtal' && c.special?.beastFormActive) && !isProtectedByFriendship(game, c.id)
       );
       const changes = [];
       let stolenTotal = 0;

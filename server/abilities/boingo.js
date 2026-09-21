@@ -82,7 +82,10 @@ registerOnOwnDeath('boingo', (character, game, log) => {
         ignoresDodge: true,
         ignoresUntargetable: true,
       });
-      hits.push({ targetId: target.id, amountDealt: result.amountDealt, koTriggered: result.koTriggered });
+      // targetId uses result.targetCharacterId, not the loop's own
+      // pre-redirect target.id - same fix/reasoning as blade.js's Blood
+      // Frenzy (confirmed real bug, 2026-09-21, Melyssa's Friendship).
+      hits.push({ targetId: result.targetCharacterId, amountDealt: result.amountDealt, koTriggered: result.koTriggered });
     }
     if (hits.length > 0) {
       prophecyOfDoomTriggerLogEntry = { type: 'prophecy-of-doom-trigger', fromCharacterId: 'oraclus', hits };

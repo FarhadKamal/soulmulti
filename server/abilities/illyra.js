@@ -135,7 +135,13 @@ export const actions = {
           ignoresDodge: true,
           ignoresUntargetable: true,
         });
-        bursts.push({ targetId: tid, stackCount, ...result });
+        // targetId uses result.targetCharacterId, not the loop's own
+        // pre-redirect `tid` - confirmed real bug, 2026-09-21 (Melyssa's
+        // Friendship can redirect this to her friend; ...result alone
+        // doesn't override targetId here since result's own field is
+        // named targetCharacterId, a different key, so the explicit
+        // targetId: tid above always won regardless of spread order).
+        bursts.push({ targetId: result.targetCharacterId, stackCount, ...result });
         if (result.rebirthLogEntry && !rebirthLogEntry) rebirthLogEntry = result.rebirthLogEntry;
         if (result.mirrorLogEntry && !mirrorLogEntry) mirrorLogEntry = result.mirrorLogEntry;
         if (result.mirrorResult?.rebirthLogEntry && !rebirthLogEntry) rebirthLogEntry = result.mirrorResult.rebirthLogEntry;

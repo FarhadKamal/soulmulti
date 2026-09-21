@@ -131,7 +131,14 @@ export const actions = {
           targetCharacterId: target.id,
           amount,
         });
-        hits.push({ targetId: target.id, streak: amount, amountDealt: result.amountDealt, dodged: result.dodged, koTriggered: result.koTriggered });
+        // targetId uses result.targetCharacterId (the REAL destination),
+        // not the loop's own pre-redirect target.id - confirmed real bug,
+        // 2026-09-21: Melyssa's Friendship can redirect any of these
+        // random hits to her friend, and the damage/hearts already
+        // correctly land there, but this display field still named the
+        // original random pick, showing "Melyssa" even when she was
+        // never actually touched.
+        hits.push({ targetId: result.targetCharacterId, streak: amount, amountDealt: result.amountDealt, dodged: result.dodged, koTriggered: result.koTriggered });
         if (result.rebirthLogEntry && !rebirthLogEntry) rebirthLogEntry = result.rebirthLogEntry;
         if (result.mirrorLogEntry && !mirrorLogEntry) mirrorLogEntry = result.mirrorLogEntry;
         if (result.mirrorResult?.rebirthLogEntry && !rebirthLogEntry) rebirthLogEntry = result.mirrorResult.rebirthLogEntry;
