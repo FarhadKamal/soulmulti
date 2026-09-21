@@ -758,6 +758,23 @@ onMessage((msg) => {
       // to do with this one (see clearChatMessages's own comment for the
       // bug this fixes).
       clearChatMessages();
+      // Confirmed real bug, 2026-09-21 (live report: "i did not see it on
+      // winning screen"): gameOverSequenceStarted is a one-shot guard,
+      // previously only ever reset on returning to lobby (the
+      // 'lobby-update' branch below) - but rejoining a room mid-session
+      // (without a full page reload) also reaches this same 'room-joined'
+      // message, and if the PREVIOUS room's match had already ended and
+      // set this guard true, it silently no-op'd startGameOverSequence on
+      // every subsequent game-state broadcast, permanently stranding
+      // state.gameOverStage at whatever stage it was frozen at (possibly
+      // still null, which falls through renderBattle's own gameOverStage
+      // check to the frozen-board branch, never reaching the actual Match
+      // Over banner where the copyable full log lives). Reset here too,
+      // same reasoning as clearChatMessages just above - a freshly joined
+      // room's own match (if any) deserves its own fresh sequence,
+      // regardless of what the previous room was doing.
+      gameOverSequenceStarted = false;
+      state.gameOverStage = null;
       break;
     case 'lobby-update':
       state.room = msg.room;
