@@ -92,11 +92,32 @@ registerOnAnyDeath((diedCharacterId, sourceCharacterId, isMirror, game, log) => 
   // triggering attack's own line instead of after it. Confirmed live bug,
   // 2026-09-05: "Divine Judgment falls upon Tharox - KO!" appeared before
   // "Blade used Blood Hunt on Athena - 1 damage - KO!" in a real match.
+  //
+  // Melyssa's Friendship - confirmed real bug, 2026-09-21 (live report,
+  // reproduced directly): this INNER applyDamage call (killing the marked
+  // victim) runs its OWN onAnyDeath dispatch for the victim's death, which
+  // correctly clears melyssa.special.friendCharacterId when the victim
+  // happens to be her current friend - but that inner call's own
+  // result.friendshipEndLogEntry was never read here, so it never made it
+  // onto THIS callback's own returned object, and was silently dropped
+  // (Blade genuinely died, the bond genuinely ended, but no "Friendship
+  // bond... has ended" line ever appeared in the log). Forwarded here
+  // alongside every other deferred field this nested applyDamage call
+  // could plausibly produce (Rebirth if the victim hasn't used it yet,
+  // Prophecy of Doom if the victim is Oraclus, etc.), same full set
+  // finalizeAction/tickPoisonIfAny/resolveJesterBall already forward for
+  // every other deferred trigger, same as selfResult's own forwarding
+  // just above in divineSacrifice.
   return {
     divineJudgmentTriggerLogEntry: {
       type: 'divine-judgment-trigger', fromCharacterId: 'athena', toCharacterId: victimId,
       koTriggered: result.koTriggered,
     },
+    rebirthLogEntry: result.rebirthLogEntry,
+    mirrorLogEntry: result.mirrorLogEntry,
+    mirrorReflectLogEntry: result.mirrorReflectLogEntry,
+    friendshipEndLogEntry: result.friendshipEndLogEntry,
+    prophecyOfDoomTriggerLogEntry: result.prophecyOfDoomTriggerLogEntry,
   };
 });
 
