@@ -82,12 +82,12 @@ const FRIENDSHIP_FLASH_DURATION_MS = 4500;
 
 // The protects_melyssa.jpg reaction - shown on MELYSSA's OWN tile whenever
 // a redirect actually happens (an attack meant for her landed on her
-// friend instead). Deliberately shorter than the cast/bond-forming beat
-// above - this can fire on EVERY hit she'd otherwise have taken for the
-// rest of the match while the bond holds, not a one-time dramatic moment,
-// so it uses the same everyday scale as a normal hit-flash rather than a
-// special's own longer multi-beat duration.
-const PROTECTS_MELYSSA_FLASH_DURATION_MS = FLASH_DURATION_MS;
+// friend instead). Still shorter than the cast/bond-forming beat above -
+// this can fire on EVERY hit she'd otherwise have taken for the rest of the
+// match while the bond holds, not a one-time dramatic moment - but bumped
+// past the default hit-flash duration per direct request (2026-09-21) so
+// the reaction has more time to actually read.
+const PROTECTS_MELYSSA_FLASH_DURATION_MS = 2500;
 
 // Marin's Lifebond (Pool & Redistribute #34 + No Threat #12) - every living
 // character's own lifebond.jpg flashes at once, same 4.5s multi-beat scale
