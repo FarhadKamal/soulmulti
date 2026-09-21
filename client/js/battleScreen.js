@@ -1980,7 +1980,15 @@ function renderFullLogWithCopy(log) {
   const header = document.createElement('div');
   header.className = 'final-log-header';
   const title = document.createElement('span');
-  title.textContent = 'Match log';
+  // Debug mode (toggle: 'D' key) - the title itself doubles as the only
+  // visible confirmation debug mode is active on THIS screen (no separate
+  // badge here, unlike the old live-view drawer's .log-debug-badge, which
+  // was removed along with that drawer) - without this, there was no way
+  // to tell whether pressing D actually did anything before scanning every
+  // line for a {...} annotation that might not even be there yet (a plain
+  // entry with nothing debug-worthy correctly shows no annotation at all -
+  // see formatDebugAnnotation's own comment).
+  title.textContent = debugLogMode ? 'Match log (DEBUG MODE - press D to toggle)' : 'Match log';
   header.appendChild(title);
 
   const copyBtn = document.createElement('button');
