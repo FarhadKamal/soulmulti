@@ -1,4 +1,5 @@
 import { applyDamage, applyHeal, tryTriggerCleanSlate, tryIllyraDodgeStatus } from '../engine/damagePipeline.js';
+import { redirectStatusTargetIfProtected } from './melyssa.js';
 import { registerOnOwnDeath } from '../engine/categories/onOwnDeath.js';
 import { registerOnOtherRevived } from '../engine/categories/onOtherRevived.js';
 import { registerOnHitLandedEarly } from '../engine/categories/onHitLandedEarly.js';
@@ -249,6 +250,20 @@ export const actions = {
       && !character.special.usedSpells.has('silenceLock'),
     execute(character, targetId, game, log) {
       character.special.usedSpells.add('silenceLock');
+      // Melyssa's Friendship (Redirect Bond #39) - confirmed real bug,
+      // 2026-09-21 (live report): Silence Lock is a targeted status that
+      // bypasses applyDamage entirely (writes straight into
+      // silenceTargets), so damagePipeline.js's own redirect-to-friend hook
+      // never got a chance to run for it - it just landed directly on a
+      // friended Melyssa instead of redirecting to her friend, same as
+      // every other harmful status rule #3 already covers. Re-targets to
+      // the friend's id (if a redirect is actually due) BEFORE any of the
+      // eligibility checks below, so Clean Slate/Illyra's dodge/the actual
+      // silence application all correctly apply against the FRIEND, not
+      // against Melyssa (matches applyDamage's own redirect, which fully
+      // re-resolves the hit against the friend's own complete defense
+      // stack, not just his raw hearts).
+      targetId = redirectStatusTargetIfProtected(game, targetId, character.id);
       const target = game.characters[targetId];
       // Marin's Clean Slate: consumes/blocks the silence itself - the cast
       // still spends Rowan's one-time use of this spell, it just never

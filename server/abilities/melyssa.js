@@ -53,6 +53,44 @@ export function isProtectedByFriendship(game, characterId) {
   return currentFriendId(game) !== null;
 }
 
+// Redirect helper for TARGETED, single-victim statuses that bypass
+// applyDamage entirely (direct state mutation - e.g. Rowan's Silence Lock
+// writing straight into silenceTargets) so damagePipeline.js's own
+// redirect-to-friend hook never gets a chance to run for them, same
+// structural gap Moonlit Theft/Shadow Seal had for their own AOE effects.
+// Confirmed real bug, 2026-09-21 (live report: Rowan's Silence Lock landed
+// directly on a friended Melyssa instead of redirecting to Velorya) - rule
+// #3 ("any damage or status aimed at Melyssa redirects to the friend
+// instead") was never actually true for ANY status that skips applyDamage,
+// only for damage-shaped hits.
+//
+// Unlike Moonlit Theft/Shadow Seal's AOE-exclusion shape, a single-target
+// status genuinely CAN be redirected the way damage is (there's exactly one
+// destination to redirect to, same as a damage hit) - so this returns the
+// FRIEND's id in place of the original targetId whenever a redirect should
+// happen, for the caller to re-target its own single-victim state write
+// with. Mirrors applyDamage's own redirect gate exactly: only fires when
+// the original target actually IS Melyssa, she isn't KO'd, the source isn't
+// Melyssa herself (her own puppeted casts on the friend are her own
+// informed gamble, same exception damage redirect already has), and her
+// friend is currently alive to receive it (no living friend - e.g. he just
+// died this same cast - means the status simply lands on her directly, same
+// "the bond can't protect her anymore" fallback damage redirect already
+// has). Does NOT itself apply the status - callers still do their own
+// eligibility/immunity checks (Clean Slate, Illyra's dodge, etc.) against
+// whichever id this returns, exactly as they already do against the
+// original targetId.
+export function redirectStatusTargetIfProtected(game, targetId, sourceCharacterId) {
+  if (targetId !== 'melyssa') return targetId;
+  const melyssa = game.characters.melyssa;
+  if (!melyssa || melyssa.isKO || sourceCharacterId === 'melyssa') return targetId;
+  const friendId = melyssa.special.friendCharacterId;
+  if (!friendId || friendId === sourceCharacterId) return targetId;
+  const friend = game.characters[friendId];
+  if (!friend || friend.isKO) return targetId;
+  return friendId;
+}
+
 // Slice 2 (design-locked 2026-09-20, implemented 2026-09-21): the friend
 // cannot freely CHOOSE, on his own independent turn, any action that would
 // also deal damage to or inflict a harmful status on Melyssa - confirmed
