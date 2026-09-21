@@ -65,7 +65,43 @@ export function registerEffectRerender(fn) {
   onEffectExpired = fn;
 }
 
+// Debug mode's own trace for THIS file's effects (2026-09-21, follow-up to
+// a live report that a "choke" visual still showed on a confirmed-dodged
+// Illyra despite portraitFlash.js's own setFlash/activeFlash trace coming
+// back clean on every reproduction so far - a real gap in the earlier
+// tracing: the choke-ring + ghost-hand CSS overlay the user's own
+// screenshot showed lives ENTIRELY in this file's addEffect/activeEffects,
+// a completely separate system from portraitFlash.js's flash-image swap,
+// which was the only thing instrumented until now). Same two-layer shape
+// as portraitFlash.js's own trace: a call history (what got added, when,
+// for which log entry) and a live snapshot (what's actually active right
+// now, catching a stale un-expired effect the call history alone
+// wouldn't show).
+const EFFECT_CALL_HISTORY_LIMIT = 2000;
+const effectCallHistory = [];
+let currentLogEntryIndexForEffects = -1;
+export function setDebugLogEntryIndexForEffects(index) {
+  currentLogEntryIndexForEffects = index;
+}
+export function getEffectCallHistory() {
+  return effectCallHistory;
+}
+const effectSnapshotHistory = [];
+export function snapshotActiveEffectsForDebug(logEntryIndex) {
+  const snapshot = {};
+  for (const [characterId, entry] of activeEffects.entries()) {
+    if (entry.effects.size > 0) snapshot[characterId] = [...entry.effects];
+  }
+  effectSnapshotHistory.push({ logEntryIndex, snapshot });
+  if (effectSnapshotHistory.length > EFFECT_CALL_HISTORY_LIMIT) effectSnapshotHistory.shift();
+}
+export function getEffectSnapshotHistory() {
+  return effectSnapshotHistory;
+}
+
 function addEffect(characterId, effect, durationMs, param) {
+  effectCallHistory.push({ characterId, effect, logEntryIndex: currentLogEntryIndexForEffects });
+  if (effectCallHistory.length > EFFECT_CALL_HISTORY_LIMIT) effectCallHistory.shift();
   let entry = activeEffects.get(characterId);
   if (!entry) {
     entry = { effects: new Set(), clawCount: 3, crackCount: 1, powSize: 'small', vortexSize: 'small', axechopTier: 1, lightningTier: 1, wildlightningTier: 1, darkslashVariant: 'plain', timers: new Map() };

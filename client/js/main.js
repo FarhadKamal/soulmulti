@@ -8,7 +8,7 @@ import {
   playActionSound, playSound, playKO, playVictory, playDodge, playRebirth, playCoin,
 } from './sound.js';
 import { handleLogEntryForFlash, handleDodgeForFlash, checkIdlePortrait, registerFlashRerender, queueGrimtalPowerFlash, registerChickenCheck, setDebugLogEntryIndex, snapshotActiveFlashForDebug } from './portraitFlash.js';
-import { handleLogEntryForEffects, registerEffectRerender } from './actionEffects.js';
+import { handleLogEntryForEffects, registerEffectRerender, setDebugLogEntryIndexForEffects, snapshotActiveEffectsForDebug } from './actionEffects.js';
 import { preloadBattleImages, battleImagesReady } from './imagePreload.js';
 import { preloadBattleAudio } from './audioPreload.js';
 import { hasVoice, playIdleVoice, playInjuredVoice, playKoedVoice, playVictoryVoice, playMoveVoice, playLaughVoice, playRebirthVoice, playDraxusStrikeVoice } from './voice.js';
@@ -231,6 +231,7 @@ function processNewLogEntries(game) {
     // battleScreen.js's debug annotation can show exactly what the client
     // actually rendered for each line, not just what the server sent.
     setDebugLogEntryIndex(startIndex + i);
+    setDebugLogEntryIndexForEffects(startIndex + i);
     playLogEntrySound(entry, game);
     handleLogEntryForFlash(entry, game);
     handleDodgeForFlash(entry, game);
@@ -238,8 +239,13 @@ function processNewLogEntries(game) {
     // Debug mode's own render-time snapshot (see portraitFlash.js's own
     // comment) - captured right after this entry's FULL effect chain has
     // run, so it reflects exactly what would be visible right after this
-    // entry if the page rendered at that instant.
+    // entry if the page rendered at that instant. actionEffects.js's own
+    // CSS overlay effects (choke-ring/ghost-hand etc.) get the SAME
+    // treatment here - a genuine gap in the earlier tracing rounds, which
+    // only ever instrumented portraitFlash.js's separate image-swap
+    // system, never this file's own overlay-effect system.
     snapshotActiveFlashForDebug(startIndex + i);
+    snapshotActiveEffectsForDebug(startIndex + i);
   });
 }
 

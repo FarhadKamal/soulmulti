@@ -2,7 +2,7 @@ import { CHARACTERS } from './characters.js';
 import { send } from './net.js';
 import { playUiClick } from './sound.js';
 import { getFlashSrc, getPersistentPortrait, isPetrifyActive, getFlashCallHistory, getFlashSnapshotHistory } from './portraitFlash.js';
-import { getActiveEffects, getClawCount, getCrackCount, getPowSize, getVortexSize, getAxechopTier, getLightningTier, getWildLightningTier, getDarkslashVariant } from './actionEffects.js';
+import { getActiveEffects, getClawCount, getCrackCount, getPowSize, getVortexSize, getAxechopTier, getLightningTier, getWildLightningTier, getDarkslashVariant, getEffectCallHistory, getEffectSnapshotHistory } from './actionEffects.js';
 import { renderFullscreenButton } from './fullscreen.js';
 import { renderMusicMuteButton } from './musicMute.js';
 import { v, hardRefresh } from './assetVersion.js';
@@ -1942,6 +1942,32 @@ function formatFlashSnapshotAnnotation(logIndex) {
   return `[active: ${text}]`;
 }
 
+// Debug mode's own trace for actionEffects.js's SEPARATE CSS-overlay system
+// (2026-09-21, follow-up to a live report where every earlier trace round -
+// both of portraitFlash.js's own setFlash call history and its
+// activeFlash live snapshot - came back completely clean at the exact
+// moment/entry a "choke" visual was still reported, despite a confirmed
+// dodge). Real gap found: the choke-RING + ghost-hand CSS overlay the
+// user's own earlier screenshot showed lives entirely in THIS file's
+// addEffect/activeEffects, a wholly separate system from
+// portraitFlash.js's portrait-image swap - never instrumented until now.
+// Same two-layer shape: [effect-call: ...] for what got added on this
+// entry, [effect-active: ...] for whatever's still live right after it.
+function formatEffectDebugAnnotation(logIndex) {
+  const calls = getEffectCallHistory().filter((c) => c.logEntryIndex === logIndex);
+  if (calls.length === 0) return '';
+  const text = calls.map((c) => `${c.characterId}<-${c.effect}`).join(', ');
+  return `[effect-call: ${text}]`;
+}
+function formatEffectSnapshotAnnotation(logIndex) {
+  const snap = getEffectSnapshotHistory().find((s) => s.logEntryIndex === logIndex);
+  if (!snap || Object.keys(snap.snapshot).length === 0) return '';
+  const text = Object.entries(snap.snapshot)
+    .map(([id, effects]) => `${id}=[${effects.join(',')}]`)
+    .join(', ');
+  return `[effect-active: ${text}]`;
+}
+
 // Formats one entry's end-action hearts/shield snapshot (see turnEngine.js's
 // heartsSnapshot - {hearts, shield} per living character, or the string
 // 'KO') into a compact "Name:H/S" readout, sorted by character id for a
@@ -2014,7 +2040,9 @@ function renderFullLogWithCopy(log) {
     const rawDebugText = debugLogMode ? formatDebugAnnotation(entry) : '';
     const flashDebugText = debugLogMode ? formatFlashDebugAnnotation(i) : '';
     const flashSnapshotText = debugLogMode ? formatFlashSnapshotAnnotation(i) : '';
-    const debugText = [rawDebugText, flashDebugText, flashSnapshotText].filter(Boolean).join(' ');
+    const effectDebugText = debugLogMode ? formatEffectDebugAnnotation(i) : '';
+    const effectSnapshotText = debugLogMode ? formatEffectSnapshotAnnotation(i) : '';
+    const debugText = [rawDebugText, flashDebugText, flashSnapshotText, effectDebugText, effectSnapshotText].filter(Boolean).join(' ');
     const withHearts = snapshotText ? `${text}  [${snapshotText}]` : text;
     lines.push(debugText ? `${withHearts}  ${debugText}` : withHearts);
   }
