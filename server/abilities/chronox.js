@@ -1,4 +1,5 @@
 import { applyDamage, isSilenced, tryTriggerCleanSlate, tryIllyraDodgeStatus, heartsSnapshot } from '../engine/damagePipeline.js';
+import { redirectStatusTargetIfProtected } from './melyssa.js';
 import { flipCoin } from '../engine/random.js';
 import { registerOnOwnDeath } from '../engine/categories/onOwnDeath.js';
 import { registerOnOtherRevived } from '../engine/categories/onOtherRevived.js';
@@ -204,6 +205,14 @@ export const actions = {
     execute(character, targetId, game, log) {
       character.usedSpecial = true;
       character.special.hasActedOnce = true;
+      // Melyssa's Friendship (Redirect Bond #39) - confirmed real bug,
+      // 2026-09-21, same class as Silence Lock: Time Freeze writes directly
+      // into freezeTargetId/skipNextTurn, bypassing applyDamage entirely,
+      // so the friend-redirect hook never ran for it. Re-targets to the
+      // friend's id (if a redirect is actually due) before any of the
+      // eligibility checks below, so Clean Slate/Illyra's dodge/the actual
+      // freeze all correctly apply against the FRIEND instead.
+      targetId = redirectStatusTargetIfProtected(game, targetId, character.id);
       const target = game.characters[targetId];
       // Marin's Clean Slate: consumes/blocks the freeze itself - the cast
       // still spends his special, it just never actually freezes her.

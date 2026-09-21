@@ -1,4 +1,5 @@
 import { applyDamage, applyHeal, applyShield, tryTriggerCleanSlate, tryIllyraDodgeStatus, heartsSnapshot } from '../engine/damagePipeline.js';
+import { redirectStatusTargetIfProtected } from './melyssa.js';
 import { registerOnOtherRevived } from '../engine/categories/onOtherRevived.js';
 import { registerOnOwnDeath } from '../engine/categories/onOwnDeath.js';
 import { registerOnHitLanded } from '../engine/categories/onHitLanded.js';
@@ -151,6 +152,16 @@ export const actions = {
     needsTarget: true, // target here is a CHARACTER belonging to the player being cursed
     isLegal: () => true,
     execute(character, targetId, game, log) {
+      // Melyssa's Friendship (Redirect Bond #39) - confirmed real bug,
+      // 2026-09-21, same class as Silence Lock/Time Freeze: the curse mark
+      // writes directly into curseTargetCharacterId, bypassing applyDamage
+      // entirely, so the friend-redirect hook never ran for it. Redirecting
+      // here means the mark lands on the FRIEND instead - a later hit that
+      // lands on HIM (not Melyssa) is what mirrors back onto its attacker,
+      // exactly mirroring how a redirected damage hit fully re-resolves
+      // against the friend's own complete defense stack rather than
+      // Melyssa's.
+      targetId = redirectStatusTargetIfProtected(game, targetId, character.id);
       const target = game.characters[targetId];
       // Marin's Clean Slate: consumes/blocks the curse itself rather than
       // letting it land - the cast still happens (this counts as her turn),
