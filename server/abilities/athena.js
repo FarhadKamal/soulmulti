@@ -117,6 +117,7 @@ registerOnAnyDeath((diedCharacterId, sourceCharacterId, isMirror, game, log) => 
     mirrorLogEntry: result.mirrorLogEntry,
     mirrorReflectLogEntry: result.mirrorReflectLogEntry,
     friendshipEndLogEntry: result.friendshipEndLogEntry,
+    friendshipSpilloverLogEntry: result.friendshipSpilloverLogEntry,
     prophecyOfDoomTriggerLogEntry: result.prophecyOfDoomTriggerLogEntry,
   };
 });
@@ -284,6 +285,19 @@ export const actions = {
       // (confirmed real bug, 2026-09-20 - see melyssa.js's own onAnyDeath
       // registration).
       if (selfResult.friendshipEndLogEntry) log.push({ ...selfResult.friendshipEndLogEntry, hearts: heartsSnapshot(game) });
+      // Melyssa's Friendship - the self-cost hit's own redirect spillover
+      // entry (see damagePipeline.js's own comment on
+      // friendshipSpilloverLogEntry) - same forwarding reasoning as
+      // friendshipEndLogEntry directly above (only relevant in the
+      // extremely narrow case where Athena's own self-inflicted sacrifice
+      // damage is somehow itself targeting a friended Melyssa, which can
+      // only happen if she's puppeting Athena into it against her own
+      // friend - blocked by the mutual no-attack rule in the normal case,
+      // but a puppeted AOE-style self-cost isn't one of the puppeted
+      // exceptions either way, so this is effectively unreachable today;
+      // included anyway for the same completeness every other deferred
+      // field here already has).
+      if (selfResult.friendshipSpilloverLogEntry) log.push({ ...selfResult.friendshipSpilloverLogEntry, hearts: heartsSnapshot(game) });
       return result;
     },
   },

@@ -111,6 +111,7 @@ export const actions = {
       let divineJudgmentTriggerLogEntry = null;
       let prophecyOfDoomTriggerLogEntry = null;
       let friendshipEndLogEntry = null;
+      let friendshipSpilloverLogEntry = null;
       for (let i = 0; i < strikeCount; i++) {
         // Re-queries the living pool fresh before EVERY strike (not once up
         // front) - an earlier strike in this same burst can KO someone,
@@ -148,10 +149,15 @@ export const actions = {
         if (result.divineJudgmentTriggerLogEntry && !divineJudgmentTriggerLogEntry) divineJudgmentTriggerLogEntry = result.divineJudgmentTriggerLogEntry;
         if (result.prophecyOfDoomTriggerLogEntry && !prophecyOfDoomTriggerLogEntry) prophecyOfDoomTriggerLogEntry = result.prophecyOfDoomTriggerLogEntry;
         if (result.friendshipEndLogEntry && !friendshipEndLogEntry) friendshipEndLogEntry = result.friendshipEndLogEntry;
+        // Melyssa's Friendship - a redirected strike's own spillover entry
+        // (see damagePipeline.js's own comment on
+        // friendshipSpilloverLogEntry), same "first occurrence wins"
+        // reasoning as every other deferred entry in this loop.
+        if (result.friendshipSpilloverLogEntry && !friendshipSpilloverLogEntry) friendshipSpilloverLogEntry = result.friendshipSpilloverLogEntry;
         if (character.isKO) break; // a mirrored/reflected counter-hit KO'd Blade himself mid-burst
       }
       log.push({ type: 'special', characterId: character.id, actionId: 'bloodFrenzy', hits });
-      return { hits, rebirthLogEntry, mirrorLogEntry, mirrorReflectLogEntry, fowlPlayRevertLogEntry, divineJudgmentTriggerLogEntry, prophecyOfDoomTriggerLogEntry, friendshipEndLogEntry };
+      return { hits, rebirthLogEntry, mirrorLogEntry, mirrorReflectLogEntry, fowlPlayRevertLogEntry, divineJudgmentTriggerLogEntry, prophecyOfDoomTriggerLogEntry, friendshipEndLogEntry, friendshipSpilloverLogEntry };
     },
   },
 };

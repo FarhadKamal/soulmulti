@@ -132,6 +132,10 @@ export function onTurnStart(character, game, log) {
       // (confirmed real bug, 2026-09-20 - see melyssa.js's own onAnyDeath
       // registration).
       if (result.friendshipEndLogEntry) log.push({ ...result.friendshipEndLogEntry, hearts: heartsSnapshot(game) });
+      // Melyssa's Friendship - this strike's own redirect spillover entry
+      // (see damagePipeline.js's own comment on friendshipSpilloverLogEntry),
+      // same reasoning as friendshipEndLogEntry directly above.
+      if (result.friendshipSpilloverLogEntry) log.push({ ...result.friendshipSpilloverLogEntry, hearts: heartsSnapshot(game) });
     }
   }
 }

@@ -62,6 +62,15 @@ registerOnOwnDeath('boingo', (character, game, log) => {
   // resolves the meteor strike directly (applyDamage is already imported
   // at the top of this file) rather than calling into oraclus.js.
   let prophecyOfDoomTriggerLogEntry;
+  // Melyssa's Friendship - if she's alive and bonded when this fires, one
+  // of the meteor hits below can redirect to her friend and (if he can't
+  // fully absorb it) spill back onto her too - same deferred-entry
+  // forwarding oraclus.js's own resolveProphecyOfDoomStrike needs for its
+  // own copy of this same loop (confirmed real bug, 2026-09-21, found via
+  // deep-dive on a live log where a redirected+spilled hit silently KO'd
+  // Melyssa with no visible cause at all).
+  let friendshipEndLogEntry;
+  let friendshipSpilloverLogEntry;
   const oraclusChar = game.characters.oraclus;
   if (oraclusChar?.special?.prophecyOfDoomPendingAfterChicken) {
     oraclusChar.special.prophecyOfDoomPendingAfterChicken = false;
@@ -86,6 +95,8 @@ registerOnOwnDeath('boingo', (character, game, log) => {
       // pre-redirect target.id - same fix/reasoning as blade.js's Blood
       // Frenzy (confirmed real bug, 2026-09-21, Melyssa's Friendship).
       hits.push({ targetId: result.targetCharacterId, amountDealt: result.amountDealt, koTriggered: result.koTriggered });
+      if (result.friendshipEndLogEntry && !friendshipEndLogEntry) friendshipEndLogEntry = result.friendshipEndLogEntry;
+      if (result.friendshipSpilloverLogEntry && !friendshipSpilloverLogEntry) friendshipSpilloverLogEntry = result.friendshipSpilloverLogEntry;
     }
     if (hits.length > 0) {
       prophecyOfDoomTriggerLogEntry = { type: 'prophecy-of-doom-trigger', fromCharacterId: 'oraclus', hits };
@@ -95,6 +106,8 @@ registerOnOwnDeath('boingo', (character, game, log) => {
   return {
     ...(revertedIds.length > 0 ? { fowlPlayRevertLogEntry: { type: 'fowl-play-revert', characterIds: revertedIds } } : {}),
     ...(prophecyOfDoomTriggerLogEntry ? { prophecyOfDoomTriggerLogEntry } : {}),
+    ...(friendshipEndLogEntry ? { friendshipEndLogEntry } : {}),
+    ...(friendshipSpilloverLogEntry ? { friendshipSpilloverLogEntry } : {}),
   };
 });
 

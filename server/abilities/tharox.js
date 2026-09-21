@@ -166,6 +166,7 @@ export const actions = {
       // during design for the puppeted-AOE exception; see melyssa.js's own
       // onAnyDeath registration for the full reasoning).
       let friendshipEndLogEntry = null;
+      let friendshipSpilloverLogEntry = null;
       for (let i = 0; i < EARTHSHATTER_TOTAL_DAMAGE; i++) {
         if (others.length === 0) break;
         const target = others[Math.floor(Math.random() * others.length)];
@@ -218,6 +219,7 @@ export const actions = {
         if (result.divineJudgmentTriggerLogEntry && !divineJudgmentTriggerLogEntry) divineJudgmentTriggerLogEntry = result.divineJudgmentTriggerLogEntry;
         if (result.prophecyOfDoomTriggerLogEntry && !prophecyOfDoomTriggerLogEntry) prophecyOfDoomTriggerLogEntry = result.prophecyOfDoomTriggerLogEntry;
         if (result.friendshipEndLogEntry && !friendshipEndLogEntry) friendshipEndLogEntry = result.friendshipEndLogEntry;
+        if (result.friendshipSpilloverLogEntry && !friendshipSpilloverLogEntry) friendshipSpilloverLogEntry = result.friendshipSpilloverLogEntry;
         if (result.koTriggered) {
           // Keyed by the same redirect-aware dealtTargetId as dealtByTarget
           // above, so the final hits[] mapping's koTriggered lines up with
@@ -252,7 +254,7 @@ export const actions = {
           amount: mirrorTotal, koTriggered: mirrorKoTriggered, revived: mirrorRevived,
         }
         : null;
-      return { hits, rebirthLogEntry, mirrorLogEntry, mirrorReflectLogEntry, divineJudgmentTriggerLogEntry, prophecyOfDoomTriggerLogEntry, friendshipEndLogEntry };
+      return { hits, rebirthLogEntry, mirrorLogEntry, mirrorReflectLogEntry, divineJudgmentTriggerLogEntry, prophecyOfDoomTriggerLogEntry, friendshipEndLogEntry, friendshipSpilloverLogEntry };
     },
   },
 };

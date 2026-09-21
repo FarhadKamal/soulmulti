@@ -451,6 +451,15 @@ function tickPoisonIfAny(character, game, log) {
   // from inside the onAnyDeath callback BEFORE this poison-tick line
   // itself had been pushed.
   if (result.friendshipEndLogEntry) log.push({ ...result.friendshipEndLogEntry, hearts: heartsSnapshot(game) });
+  // Melyssa's Friendship - the redirect's own spillover entry (see
+  // damagePipeline.js's own comment on friendshipSpilloverLogEntry) - same
+  // deferred reasoning as friendshipEndLogEntry directly above. Pushed
+  // BEFORE friendshipEndLogEntry would make no sense here (her own KO from
+  // the spillover suppresses that entry from ever firing at all - see
+  // melyssa.js's onAnyDeath `if (!melyssa || melyssa.isKO) return
+  // undefined`), but kept in the same position/ordering as every other
+  // deferred field on this call path for consistency.
+  if (result.friendshipSpilloverLogEntry) log.push({ ...result.friendshipSpilloverLogEntry, hearts: heartsSnapshot(game) });
   // Grimtal's Beast Form reversion (Death-Triggered Reversion #36) - same
   // before/after countKO comparison as finalizeAction (see that function's
   // own comment for the full three-bugs-deep reasoning this is based on) -
@@ -1173,6 +1182,10 @@ export function finalizeAction(game, log, result, characterId, actionId, targetI
   // divineJudgmentTriggerLogEntry directly above (confirmed real bug,
   // 2026-09-20 - see melyssa.js's own onAnyDeath registration).
   if (result?.friendshipEndLogEntry) log.push(result.friendshipEndLogEntry);
+  // Melyssa's Friendship - the redirect's own spillover entry, same
+  // deferred reasoning as friendshipEndLogEntry directly above (see
+  // damagePipeline.js's own comment on friendshipSpilloverLogEntry).
+  if (result?.friendshipSpilloverLogEntry) log.push(result.friendshipSpilloverLogEntry);
   // Grimtal's Beast Form reversion (Death-Triggered Reversion #36) -
   // checked ONCE here, as the very last thing before this whole action's
   // batch closes out, rather than per-applyDamage-call inside
@@ -1338,6 +1351,10 @@ export function resolveJesterBall(game, holderCharacterId, choice, extra) {
   // same deferred handling as every other call site (confirmed real bug,
   // 2026-09-20 - see melyssa.js's own onAnyDeath registration).
   if (result?.friendshipEndLogEntry) log.push(result.friendshipEndLogEntry);
+  // Melyssa's Friendship - the redirect's own spillover entry, same
+  // deferred reasoning as friendshipEndLogEntry directly above (see
+  // damagePipeline.js's own comment on friendshipSpilloverLogEntry).
+  if (result?.friendshipSpilloverLogEntry) log.push(result.friendshipSpilloverLogEntry);
   // Grimtal's Beast Form reversion (Death-Triggered Reversion #36) - same
   // once-per-whole-action, before/after countKO check as finalizeAction's
   // own (see that function's comment for the full three-bugs-deep

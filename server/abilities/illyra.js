@@ -109,6 +109,7 @@ export const actions = {
       // divineJudgmentTriggerLogEntry above (confirmed real bug,
       // 2026-09-20, see melyssa.js's own onAnyDeath registration).
       let friendshipEndLogEntry = null;
+      let friendshipSpilloverLogEntry = null;
       // Snapshot the target list BEFORE clearing anything - iterating and
       // mutating the same Map in one pass is fine here since .set() never
       // adds new keys mid-loop (only zeroes existing ones), but snapshotting
@@ -150,9 +151,10 @@ export const actions = {
         if (result.divineJudgmentTriggerLogEntry && !divineJudgmentTriggerLogEntry) divineJudgmentTriggerLogEntry = result.divineJudgmentTriggerLogEntry;
         if (result.prophecyOfDoomTriggerLogEntry && !prophecyOfDoomTriggerLogEntry) prophecyOfDoomTriggerLogEntry = result.prophecyOfDoomTriggerLogEntry;
         if (result.friendshipEndLogEntry && !friendshipEndLogEntry) friendshipEndLogEntry = result.friendshipEndLogEntry;
+        if (result.friendshipSpilloverLogEntry && !friendshipSpilloverLogEntry) friendshipSpilloverLogEntry = result.friendshipSpilloverLogEntry;
       }
       log.push({ type: 'special', characterId: character.id, actionId: 'mirageBurst', bursts });
-      return { bursts, rebirthLogEntry, mirrorLogEntry, mirrorReflectLogEntry, divineJudgmentTriggerLogEntry, prophecyOfDoomTriggerLogEntry, friendshipEndLogEntry };
+      return { bursts, rebirthLogEntry, mirrorLogEntry, mirrorReflectLogEntry, divineJudgmentTriggerLogEntry, prophecyOfDoomTriggerLogEntry, friendshipEndLogEntry, friendshipSpilloverLogEntry };
     },
   },
   // Mirage Overload: her desperate last-stand special. No-target, one-time

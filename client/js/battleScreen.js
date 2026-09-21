@@ -2107,6 +2107,17 @@ function describeLogEntry(entry) {
       return entry.cause === 'beastForm'
         ? `${name(entry.friendCharacterId)}'s transformation shatters the Friendship bond!`
         : `The Friendship bond with ${name(entry.friendCharacterId)} has ended.`;
+    case 'friendship-spillover':
+      // Confirmed real bug, 2026-09-21 (live report, deep-dive
+      // reproduction): a redirected hit that KOs the friend and has
+      // leftover damage that ALSO KOs Melyssa used to be completely
+      // invisible - the primary attack line only ever named the friend,
+      // her own death from the overflow was never shown anywhere, and the
+      // Friendship bond's own end-of-bond line never fired either (her
+      // own onAnyDeath cleanup bails out once she's already marked KO'd).
+      // This entry makes the overflow's effect on her explicit and
+      // attributable to the triggering hit, right after it.
+      return `The overflow damage also strikes ${name(entry.characterId)}${entry.amountDealt != null ? ` - ${entry.amountDealt} damage` : ''}${entry.koTriggered ? ' - KO!' : ''}`;
     case 'attack':
       if (entry.actionId === 'divineSacrifice') {
         // Shows both sides of the gamble - the guaranteed 3 dealt to the

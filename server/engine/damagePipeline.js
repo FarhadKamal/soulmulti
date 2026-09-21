@@ -481,9 +481,44 @@ export function applyDamage(game, log, {
             ignoresShield, ignoresUntargetable: true, isMirror, isPoisonTick, isAshkaStrike,
             ignoresDodge: true, ignoresImmortal, ignoresRebirth,
           });
+          // Confirmed real bug, 2026-09-21 (live report, deep-dive
+          // reproduction): the combined amountDealt (e.g. "5 damage" from
+          // 3 to the friend + 2 spillover to her) was folded into ONE
+          // number with no breakdown, and if the overflow was itself
+          // lethal to her, she died completely invisibly - the log line
+          // only ever named the friend ("...on Boingo - 5 damage - KO!"),
+          // her own death was never mentioned anywhere, and the
+          // Friendship bond's own end-of-bond line never fired either
+          // (melyssa.js's onAnyDeath callback bails out via `if (!melyssa
+          // || melyssa.isKO) return undefined` - by the time it would
+          // check "did my friend just die," she's already marked KO'd
+          // herself from this exact spillover, so it silently no-ops).
+          // Deferred (returned, not pushed to `log` here) - same "runs
+          // mid-way through the outer action's own execute(), before its
+          // own log.push()" timing every other deferred entry in this file
+          // already accounts for.
+          if (spilloverResult.amountDealt > 0 || spilloverResult.koTriggered) {
+            result.friendshipSpilloverLogEntry = {
+              type: 'friendship-spillover', characterId: 'melyssa',
+              friendCharacterId: friendId, amountDealt: spilloverResult.amountDealt,
+              koTriggered: spilloverResult.koTriggered,
+            };
+          }
           result.amountDealt += spilloverResult.amountDealt;
           result.absorbed += spilloverResult.absorbed;
-          result.koTriggered = spilloverResult.koTriggered;
+          // Confirmed real bug, found alongside the spillover-visibility
+          // one above: this used to be a flat overwrite
+          // (`result.koTriggered = spilloverResult.koTriggered`), which
+          // incorrectly flipped the top-level KO flag back to FALSE
+          // whenever the friend died but the overflow wasn't ALSO lethal
+          // to Melyssa - hiding the "- KO!" suffix on the friend's own
+          // death in the primary log line even though redirectedResult
+          // (checked just above, at line ~445) already correctly proved
+          // someone genuinely died. The friend's own death and Melyssa's
+          // own spillover death are two independent KO outcomes from one
+          // action - true if EITHER happened, not just whichever happened
+          // to be checked last.
+          result.koTriggered = redirectedResult.koTriggered || spilloverResult.koTriggered;
           result.revived = spilloverResult.revived;
           if (spilloverResult.rebirthLogEntry) result.rebirthLogEntry = spilloverResult.rebirthLogEntry;
         }
@@ -680,9 +715,25 @@ export function applyDamage(game, log, {
       // same deferred-log-entry reasoning as fowlPlayRevertLogEntry right
       // above, pulled out the same special way rather than merged into
       // hitLandedCtxExtra.
-      const { fowlPlayRevertLogEntry, prophecyOfDoomTriggerLogEntry: pendingProphecyEntry, ...rest } = ownDeathExtra;
+      // Melyssa's Friendship - boingo.js's own onOwnDeath callback can now
+      // also surface friendshipEndLogEntry/friendshipSpilloverLogEntry
+      // (from its own inlined Prophecy-of-Doom-pending-after-chicken loop,
+      // confirmed real bug, 2026-09-21) - pulled out the same explicit way
+      // as fowlPlayRevertLogEntry/prophecyOfDoomTriggerLogEntry, NOT left
+      // to fall into `...rest`/hitLandedCtxExtra, since that bag is read as
+      // CONTEXT DATA by other onHitLanded callbacks (e.g. Athena's
+      // preClearCursedId), never automatically forwarded onto `result` the
+      // way every other deferred log entry field needs to be.
+      const {
+        fowlPlayRevertLogEntry, prophecyOfDoomTriggerLogEntry: pendingProphecyEntry,
+        friendshipEndLogEntry: ownDeathFriendshipEndLogEntry,
+        friendshipSpilloverLogEntry: ownDeathFriendshipSpilloverLogEntry,
+        ...rest
+      } = ownDeathExtra;
       if (fowlPlayRevertLogEntry) result.fowlPlayRevertLogEntry = fowlPlayRevertLogEntry;
       if (pendingProphecyEntry) result.prophecyOfDoomTriggerLogEntry = pendingProphecyEntry;
+      if (ownDeathFriendshipEndLogEntry) result.friendshipEndLogEntry = ownDeathFriendshipEndLogEntry;
+      if (ownDeathFriendshipSpilloverLogEntry) result.friendshipSpilloverLogEntry = ownDeathFriendshipSpilloverLogEntry;
       if (Object.keys(rest).length > 0) Object.assign(hitLandedCtxExtra, rest);
     }
     // The Jester Ball is orphaned if its current holder dies from a hit
@@ -729,6 +780,14 @@ export function applyDamage(game, log, {
     // registration for the full reasoning/live symptom).
     if (anyDeathExtra?.friendshipEndLogEntry) {
       result.friendshipEndLogEntry = anyDeathExtra.friendshipEndLogEntry;
+    }
+    // Melyssa's Friendship - a redirected hit's own spillover entry (e.g.
+    // Athena's Divine Judgment or Oraclus's Prophecy of Doom pact-kill
+    // itself landing on a friended Melyssa and spilling over after the
+    // friend can't fully absorb it) - same deferred pattern as
+    // friendshipEndLogEntry directly above.
+    if (anyDeathExtra?.friendshipSpilloverLogEntry) {
+      result.friendshipSpilloverLogEntry = anyDeathExtra.friendshipSpilloverLogEntry;
     }
   }
 

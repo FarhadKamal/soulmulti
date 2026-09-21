@@ -1,4 +1,4 @@
-import { applyDamage } from '../engine/damagePipeline.js';
+import { applyDamage, heartsSnapshot } from '../engine/damagePipeline.js';
 import { registerOnAnyDeath } from '../engine/categories/onAnyDeath.js';
 
 const PROPHECY_OF_DOOM_HEARTS_THRESHOLD = 3;
@@ -12,6 +12,15 @@ const PROPHECY_OF_DOOM_DAMAGE = 3;
 // fire immediately).
 function resolveProphecyOfDoomStrike(game, log) {
   const hits = [];
+  // Melyssa's Friendship - if she's alive and bonded when this fires, the
+  // hit aimed at her can redirect to her friend and (if he can't fully
+  // absorb it) spill back onto her too - same deferred-entry forwarding
+  // every other multi-target loop in the codebase already needs (Blood
+  // Frenzy, Mirage Burst, Earthshatter). "First occurrence wins" for each,
+  // same reasoning as those - only one redirect/spillover/bond-end can
+  // meaningfully occur per cast (she has at most one friend at a time).
+  let friendshipEndLogEntry = null;
+  let friendshipSpilloverLogEntry = null;
   for (const target of Object.values(game.characters)) {
     if (target.id === 'oraclus' || target.isKO) continue;
     // Environmental Attack shape (confirmed rulings): bypasses Dodge
@@ -34,9 +43,20 @@ function resolveProphecyOfDoomStrike(game, log) {
     // pre-redirect target.id - same fix/reasoning as blade.js's Blood
     // Frenzy (confirmed real bug, 2026-09-21, Melyssa's Friendship).
     hits.push({ targetId: result.targetCharacterId, amountDealt: result.amountDealt, koTriggered: result.koTriggered });
+    if (result.friendshipEndLogEntry && !friendshipEndLogEntry) friendshipEndLogEntry = result.friendshipEndLogEntry;
+    if (result.friendshipSpilloverLogEntry && !friendshipSpilloverLogEntry) friendshipSpilloverLogEntry = result.friendshipSpilloverLogEntry;
   }
   if (hits.length === 0) return null;
-  return { type: 'prophecy-of-doom-trigger', fromCharacterId: 'oraclus', hits };
+  // Returned as a wrapper (not mixed directly into the entry object) so
+  // every caller can push `entry` as the actual log line unchanged, while
+  // separately forwarding friendshipEndLogEntry/friendshipSpilloverLogEntry
+  // as their own deferred entries the same way every other call path in
+  // this codebase already does - mixing them into the entry itself would
+  // leak these engine-internal fields into the client-visible log line.
+  return {
+    entry: { type: 'prophecy-of-doom-trigger', fromCharacterId: 'oraclus', hits },
+    friendshipEndLogEntry, friendshipSpilloverLogEntry,
+  };
 }
 
 // Called from turnEngine.js's own 3-turn Fowl Play timer
@@ -52,8 +72,14 @@ export function firePendingProphecyOfDoomIfAny(game, log) {
   const oraclus = game.characters.oraclus;
   if (!oraclus?.special?.prophecyOfDoomPendingAfterChicken) return;
   oraclus.special.prophecyOfDoomPendingAfterChicken = false;
-  const entry = resolveProphecyOfDoomStrike(game, log);
-  if (entry) log.push(entry);
+  const resolved = resolveProphecyOfDoomStrike(game, log);
+  if (!resolved) return;
+  log.push(resolved.entry);
+  // Melyssa's Friendship - safe to push directly here (not deferred) since
+  // this whole call path already pushes straight to game.log itself, same
+  // reasoning as the trigger entry immediately above.
+  if (resolved.friendshipEndLogEntry) log.push({ ...resolved.friendshipEndLogEntry, hearts: heartsSnapshot(game) });
+  if (resolved.friendshipSpilloverLogEntry) log.push({ ...resolved.friendshipSpilloverLogEntry, hearts: heartsSnapshot(game) });
 }
 
 // Called from boingo.js's own registerOnOwnDeath callback - the OTHER way
@@ -67,8 +93,13 @@ export function resolvePendingProphecyOfDoomForBoingoDeath(game, log) {
   const oraclus = game.characters.oraclus;
   if (!oraclus?.special?.prophecyOfDoomPendingAfterChicken) return undefined;
   oraclus.special.prophecyOfDoomPendingAfterChicken = false;
-  const entry = resolveProphecyOfDoomStrike(game, log);
-  return entry ? { prophecyOfDoomTriggerLogEntry: entry } : undefined;
+  const resolved = resolveProphecyOfDoomStrike(game, log);
+  if (!resolved) return undefined;
+  return {
+    prophecyOfDoomTriggerLogEntry: resolved.entry,
+    friendshipEndLogEntry: resolved.friendshipEndLogEntry,
+    friendshipSpilloverLogEntry: resolved.friendshipSpilloverLogEntry,
+  };
 }
 
 // Prophecy of Doom (Death Pact category #31 + Environmental Attack #2, see
@@ -100,8 +131,8 @@ registerOnAnyDeath((diedCharacterId, sourceCharacterId, isMirror, game, log) => 
     oraclus.special.prophecyOfDoomPendingAfterChicken = true;
     return undefined;
   }
-  const entry = resolveProphecyOfDoomStrike(game, log);
-  if (!entry) return undefined;
+  const resolved = resolveProphecyOfDoomStrike(game, log);
+  if (!resolved) return undefined;
   // Deferred (returned, not pushed to `log` here) - same reasoning as
   // Athena's own divineJudgmentTriggerLogEntry: this callback runs
   // mid-way through the OUTER applyDamage call (whatever action actually
@@ -111,8 +142,14 @@ registerOnAnyDeath((diedCharacterId, sourceCharacterId, isMirror, game, log) => 
   // it. Every deferred-push call site that already handles
   // divineJudgmentTriggerLogEntry (finalizeAction, tickPoisonIfAny,
   // resolveJesterBall) needs the same handling added for this new field
-  // too, or it's silently dropped, not just misordered.
-  return { prophecyOfDoomTriggerLogEntry: entry };
+  // too, or it's silently dropped, not just misordered. Same now applies
+  // to friendshipEndLogEntry/friendshipSpilloverLogEntry, forwarded from
+  // resolveProphecyOfDoomStrike's own wrapper return shape.
+  return {
+    prophecyOfDoomTriggerLogEntry: resolved.entry,
+    friendshipEndLogEntry: resolved.friendshipEndLogEntry,
+    friendshipSpilloverLogEntry: resolved.friendshipSpilloverLogEntry,
+  };
 });
 
 export const actions = {
