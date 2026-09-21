@@ -2,6 +2,7 @@ import { applyDamage, tryTriggerCleanSlate, heartsSnapshot } from '../engine/dam
 import { registerDodgeDefense } from '../engine/categories/dodgeDefenseRegistry.js';
 import { registerOnOwnDeath } from '../engine/categories/onOwnDeath.js';
 import { registerOnOtherRevived } from '../engine/categories/onOtherRevived.js';
+import { isProtectedByFriendship } from './melyssa.js';
 
 function anyEnemyIsMarked(game, akyrosId) {
   const akyros = game.characters[akyrosId];
@@ -219,8 +220,23 @@ export const actions = {
       // like this one, which never route through applyDamage's own
       // tryBeastFormImmunity check at all). A transformed Grimtal is left
       // completely untouched.
+      //
+      // Melyssa's Friendship (Redirect Bond #39) - confirmed ruling,
+      // 2026-09-21: although Shadow Seal deals no damage and steals
+      // nothing, splitting a victim's hearts into a smaller active pool IS
+      // a harmful status effect landing on them (a lowered effective KO
+      // threshold), the same shape rule #3 already redirects curse/mark/
+      // freeze/poison away from her for. Unlike Moonlit Theft's shield
+      // steal though, "locked hearts" is intrinsically tied to that one
+      // character's OWN current hearts - there's no sensible way to
+      // redirect the effect onto a different character's completely
+      // different heart count, so same as Moonlit Theft's shield, this is
+      // a flat EXCLUSION while bonded, not a redirect. Only ever excludes
+      // HER specifically - her friend's own hearts are still a completely
+      // normal, fully sealable target for everyone else, same as anyone
+      // else's.
       const others = Object.values(game.characters).filter(
-        (c) => c.id !== character.id && !c.isKO && !(c.id === 'grimtal' && c.special?.beastFormActive)
+        (c) => c.id !== character.id && !c.isKO && !(c.id === 'grimtal' && c.special?.beastFormActive) && !isProtectedByFriendship(game, c.id)
       );
       const changes = [];
       for (const c of others) {
