@@ -1577,6 +1577,18 @@ input {
 .log-line { padding: 3px 0; border-bottom: 1px solid #22222e; }
 .log-line:last-child { border-bottom: none; }
 
+/* Debug log mode (2026-09-21, toggle: 'D' key) - the raw-field annotation
+   appended to each line reads as monospace so aligned {field:value} pairs
+   stay scannable, dimmed relative to the main line text so it doesn't
+   compete with the actual event description. */
+.log-debug-annotation {
+  color: #6a7a8a; font-family: 'Courier New', monospace; font-size: 0.9em;
+}
+.log-debug-badge {
+  color: #f0a020; font-weight: 700; font-size: 0.8em; letter-spacing: 0.04em;
+  padding: 2px 0 6px 0; border-bottom: 1px solid #2a2a3a; margin-bottom: 4px;
+}
+
 .final-log-panel {
   background: #14141c; border: 1px solid #2a2a3a; border-radius: 10px;
   margin: 20px 0; text-align: left; font-size: 0.85em;

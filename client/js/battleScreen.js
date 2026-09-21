@@ -17,6 +17,13 @@ import { v, hardRefresh } from './assetVersion.js';
 // drawer only takes up room once the player deliberately opens it.
 let drawerOpen = false;
 
+// Debug log mode's own rerender hook - captured from `state.rerender` on
+// every renderBattle call (state isn't in module scope, only passed as a
+// parameter), same "module variable survives the full screen teardown/
+// rebuild" reasoning as drawerOpen above. Starts as a no-op so the keydown
+// listener registered below never throws before the first render.
+let triggerRerender = () => {};
+
 // Functional-first battle screen: no portrait art/animation yet (see
 // characterCard.js in the main game for that system) - just hearts,
 // shield, status, and clickable action/target buttons driven entirely by
@@ -24,6 +31,7 @@ let drawerOpen = false;
 // reimplement ability legality rules itself.
 export function renderBattle(root, state) {
   const { game, actingCharacterId, usableActions, awaitingSoulSwapWrath, mySeatCharacterIds, armedAction } = state;
+  triggerRerender = state.rerender;
   root.innerHTML = '';
   const wrap = document.createElement('div');
   wrap.className = 'battle';
@@ -1901,9 +1909,75 @@ const DEFERRED_FOLLOWUP_LOG_TYPES = new Set([
   'prophecy-of-doom-trigger', 'curse-mirror', 'mirror-reflect', 'fowl-play-revert',
 ]);
 
+// Debug mode (2026-09-21, user request: "you can make the logs more
+// details... you can also mention which image ref played") - toggled with
+// the 'D' key, appends each log line's own RAW fields relevant to
+// portraitFlash.js/actionEffects.js's animation-trigger conditions (dodged,
+// amountDealt, redirectedToFriendId, koTriggered, etc.), so a pasted match
+// log carries enough raw data to check "should this animation have played"
+// without needing a fresh code investigation or guessing at hidden state
+// every time. Deliberately shows the RAW fields, not a derived "which
+// asset played" conclusion - a second place computing that conclusion
+// could quietly drift out of sync with the real trigger logic in
+// portraitFlash.js/actionEffects.js over time, whereas the raw fields ARE
+// the actual data those files themselves branch on, so they can never lie.
+// Off by default so normal play stays uncluttered.
+let debugLogMode = false;
+window.addEventListener('keydown', (e) => {
+  // Ignore while typing in chat/any input - same guard pattern used
+  // elsewhere in this file for other single-key shortcuts.
+  if (e.target?.tagName === 'INPUT' || e.target?.tagName === 'TEXTAREA') return;
+  if (e.key === 'd' || e.key === 'D') {
+    debugLogMode = !debugLogMode;
+    triggerRerender();
+  }
+});
+
+// Fields worth showing for debugging animation/display logic - deliberately
+// excludes purely structural fields (type, characterId, actionId, targetId)
+// already implied by the line's own text, and excludes `hearts` (already
+// shown via formatHeartsSnapshot). Nested arrays (hits/bursts/changes) are
+// summarized rather than dumped in full, to stay readable inline.
+const DEBUG_ANNOTATION_FIELDS = [
+  'dodged', 'amountDealt', 'absorbed', 'koTriggered', 'revived',
+  'redirectedToFriendId', 'targetCharacterId', 'streak', 'outcome', 'matched',
+  'blockedBy', 'isHighTier', 'isNewTarget', 'stage', 'success', 'skipped',
+  'wasKO', 'overcharged', 'flip',
+];
+function formatDebugAnnotation(entry) {
+  const parts = [];
+  for (const field of DEBUG_ANNOTATION_FIELDS) {
+    if (entry[field] !== undefined) parts.push(`${field}:${entry[field]}`);
+  }
+  // Nested per-hit arrays (Blood Frenzy, Mirage Burst, Earthshatter,
+  // Prophecy of Doom) - summarized as targetId/dodged/amountDealt/
+  // koTriggered per entry, comma-separated, so a redirect or a dodge
+  // buried inside a multi-hit special is still visible without dumping the
+  // full nested object.
+  const nested = entry.hits || entry.bursts || entry.changes;
+  if (nested && Array.isArray(nested) && nested.length > 0) {
+    const nestedText = nested.map((h) => {
+      const bits = [];
+      if (h.targetId !== undefined) bits.push(h.targetId);
+      if (h.dodged) bits.push('dodged');
+      if (h.amountDealt !== undefined) bits.push(`${h.amountDealt}dmg`);
+      if (h.koTriggered) bits.push('KO');
+      return bits.join(' ');
+    }).join(', ');
+    parts.push(`hits:[${nestedText}]`);
+  }
+  return parts.length > 0 ? `{${parts.join(' ')}}` : '';
+}
+
 function renderLog(log) {
   const panel = document.createElement('div');
   panel.className = 'log-panel';
+  if (debugLogMode) {
+    const badge = document.createElement('div');
+    badge.className = 'log-debug-badge';
+    badge.textContent = 'DEBUG MODE (D to toggle)';
+    panel.appendChild(badge);
+  }
   // end-action is a pure bookkeeping marker (round/hearts snapshot pushed
   // after every single action, always) rather than a human-readable event -
   // describeLogEntry correctly has no text for it, but rendering an empty
@@ -1920,10 +1994,22 @@ function renderLog(log) {
     startIndex -= 1;
   }
   const recent = described.slice(startIndex).reverse();
-  recent.forEach(({ text }) => {
+  recent.forEach(({ entry, text }) => {
     const line = document.createElement('div');
     line.className = 'log-line';
     line.textContent = text;
+    // Debug mode (toggle: 'D' key) - append the entry's own raw fields
+    // relevant to portraitFlash.js/actionEffects.js's animation triggers,
+    // as a separate styled span, see formatDebugAnnotation's own comment
+    // for why raw fields rather than a derived "which asset played"
+    // conclusion.
+    const debugText = debugLogMode ? formatDebugAnnotation(entry) : '';
+    if (debugText) {
+      const debugSpan = document.createElement('span');
+      debugSpan.className = 'log-debug-annotation';
+      debugSpan.textContent = `  ${debugText}`;
+      line.appendChild(debugSpan);
+    }
     panel.appendChild(line);
   });
   return panel;
@@ -1989,7 +2075,12 @@ function renderFullLogWithCopy(log) {
       }
     }
     const snapshotText = formatHeartsSnapshot(hearts);
-    lines.push(snapshotText ? `${text}  [${snapshotText}]` : text);
+    // Debug mode (toggle: 'D' key) - same raw-field annotation as renderLog's
+    // live view, appended here too so the copied/shared full match log
+    // carries the same debugging detail.
+    const debugText = debugLogMode ? formatDebugAnnotation(entry) : '';
+    const withHearts = snapshotText ? `${text}  [${snapshotText}]` : text;
+    lines.push(debugText ? `${withHearts}  ${debugText}` : withHearts);
   }
   const wrap = document.createElement('div');
   wrap.className = 'final-log-panel';
