@@ -333,29 +333,14 @@ export function battleImagesReady() {
 // ASSET_HOST) - an <img>'s src swap to a NOT-YET-CACHED url keeps showing
 // the OLD bitmap on screen until the new fetch actually completes, which
 // is invisible to any JS-side state trace (the src attribute updates
-// immediately; the PAINTED pixels lag behind on a slow connection). The
-// existing preloadBattleImages fetches the FULL ~150-image, all-16-hero
-// set, which the 'preparing' screen only ever waited up to 2.5s for
-// (PREPARING_MAX_WAIT_MS in main.js) before entering battle regardless -
-// nowhere near enough time for that whole batch on a slow/mobile
-// connection, so gameplay could start with plenty of this match's own
-// images still mid-fetch.
+// immediately; the PAINTED pixels lag behind on a slow connection).
 //
-// This targets ONLY the 4 (or fewer) characters actually in THIS match's
-// roster - a much smaller batch that can realistically finish within a
-// short wait, called the moment the roster is known (main.js's
-// 'game-state' handler, first broadcast of a new match) rather than at
-// page load when the roster isn't known yet. Deliberately narrower than
-// FLASH_IMAGES (every hero's every action image) - restricted to the
-// handful of images overwhelmingly likely to be needed in a match's first
-// few seconds (idle/portrait/koed/injured + this hero's own
-// dodge-reaction and Self-Choke-victim art, the exact image class that
-// triggered this investigation), so this stays fast even on a slow
-// connection instead of trying to preload everything up front again.
-const PER_HERO_PRIORITY_SUFFIXES = [
-  'idle.jpg', 'portrait.jpg', 'koed.jpg', 'injured.jpg', 'choke.jpg',
-];
-export function preloadMatchRosterImages(characterIds) {
-  const paths = characterIds.flatMap((id) => PER_HERO_PRIORITY_SUFFIXES.map((suffix) => `assets/images/${id}/${suffix}`));
-  return preloadPaths(paths);
-}
+// First fix attempt (since superseded) added a roster-scoped preload here
+// targeting only the 4 characters in a given match, on a timeout-capped
+// wait - a partial mitigation. Per direct follow-up request ("load every
+// images before battle start... show loading please wait for that"),
+// main.js's enterBattleWhenReady now waits for the COMPLETE
+// preloadBattleImages() batch (all 16 heroes) with NO timeout cap before
+// ever entering battle, which is the actual guarantee this bug needed -
+// making a smaller roster-scoped subset redundant, so it was removed
+// rather than kept as unused dead code.

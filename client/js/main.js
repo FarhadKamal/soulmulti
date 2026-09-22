@@ -9,7 +9,7 @@ import {
 } from './sound.js';
 import { handleLogEntryForFlash, handleDodgeForFlash, checkIdlePortrait, registerFlashRerender, queueGrimtalPowerFlash, registerChickenCheck, setDebugLogEntryIndex, snapshotActiveFlashForDebug, resetFlashDebugHistoryForNewMatch, resetRenderTraceForNewMatch, beginFlashDispatchBatch } from './portraitFlash.js';
 import { handleLogEntryForEffects, registerEffectRerender, setDebugLogEntryIndexForEffects, snapshotActiveEffectsForDebug, resetEffectDebugHistoryForNewMatch } from './actionEffects.js';
-import { preloadBattleImages, battleImagesReady, preloadMatchRosterImages } from './imagePreload.js';
+import { preloadBattleImages, battleImagesReady } from './imagePreload.js';
 import { preloadBattleAudio } from './audioPreload.js';
 import { hasVoice, playIdleVoice, playInjuredVoice, playKoedVoice, playVictoryVoice, playMoveVoice, playLaughVoice, playRebirthVoice, playDraxusStrikeVoice } from './voice.js';
 
@@ -728,29 +728,33 @@ function mySeatCharacterIds() {
 // Confirmed live report: "annoying, when image loading during battle" -
 // entering a match before imagePreload.js's full ~150-image batch has
 // finished meant an early flash/portrait swap could hit a live, visibly-
-// lagging first-time network fetch instead of an instant cache hit. This
-// gives the preload a brief head start by holding the 'preparing' screen
-// (see rerender's own render branch below) until either every image has
-// settled or PREPARING_MAX_WAIT_MS elapses, whichever comes first - a hard
-// cap so a slow/flaky connection can't block the player from ever entering
-// their match. Deliberately does NOT also wait on audio (see
-// audioPreload.js's own comment on why that batch is excluded).
-// Bumped from 2500 to 4000 (2026-09-22) alongside the roster-scoped
-// preload fix above - a small ~20-image batch (5 files x this match's 4
-// characters) should usually settle well under even the old cap on a
-// normal connection, but a slow/mobile connection is exactly the
-// condition this whole fix targets, so a little extra headroom costs
-// nothing on a fast connection (the Promise.race still resolves the
-// instant the batch finishes) while giving a slow one a real chance to
-// actually finish before the hard cutoff.
-const PREPARING_MAX_WAIT_MS = 4000;
-
+// lagging first-time network fetch instead of an instant cache hit. Used
+// to only give the preload a brief head start (a timeout-raced wait, capped
+// at a few seconds) rather than a real guarantee - which turned out to be
+// the root cause of a much worse symptom than "slow to show up": an <img>
+// src swap to a NOT-YET-CACHED url keeps showing the OLD bitmap on screen
+// until the fetch actually finishes (confirmed live bug/investigation,
+// 2026-09-22 - choke.jpg visibly stuck on a character's tile several turns
+// after the flash that set it had already expired, reproduced on both
+// desktop and mobile; a render-event trace proved the JS state was correct
+// throughout, so the gap was purely "screen hasn't caught up to state
+// yet"). Per direct request ("my suggestion load every images before
+// battle start... show loading please wait for that"), this now waits for
+// the COMPLETE battleImagesReady() promise with NO timeout cap - every
+// single battle image is guaranteed cached before the 'preparing' screen
+// (see rerender's own render branch below) ever releases into battle, so a
+// stuck/stale image from an uncached fetch can no longer happen at all,
+// regardless of connection speed. In practice this is rarely a long wait -
+// preloadBattleImages() fires at page load, well before the player even
+// finishes navigating the lobby, so the full batch has often already
+// settled (or is close to it) by the time they actually enter a match.
+// Deliberately does NOT also wait on audio (see audioPreload.js's own
+// comment on why that batch is excluded).
 function enterBattleWhenReady() {
   state.screen = 'preparing';
   rerender();
   const ready = battleImagesReady() || Promise.resolve();
-  const timeout = new Promise((resolve) => setTimeout(resolve, PREPARING_MAX_WAIT_MS));
-  Promise.race([ready, timeout]).then(() => {
+  ready.then(() => {
     // Guard against a late resolution firing after the player already left
     // (e.g. abandoned the match, or a new lobby-update reset the screen
     // back to 'lobby') - only advance if still genuinely waiting.
@@ -768,10 +772,18 @@ function rerender() {
       rerender,
     });
   } else if (state.screen === 'preparing') {
+    // Waits for imagePreload.js's FULL battle-image set (all 16 heroes,
+    // not just this match's roster) to be genuinely cached before ever
+    // releasing into battle - see enterBattleWhenReady's own comment for
+    // why this is now an unconditional wait rather than a timeout-capped
+    // race. Usually near-instant (the preload fires at page load, well
+    // before the player finishes navigating the lobby) but can take a
+    // real few seconds on a slow/mobile connection, so the message says
+    // what it's actually waiting on rather than a generic "preparing".
     root.innerHTML = '';
     const wrap = document.createElement('div');
     wrap.className = 'preparing-battle';
-    wrap.innerHTML = '<div class="preparing-battle-spinner"></div><p>Preparing battle…</p>';
+    wrap.innerHTML = '<div class="preparing-battle-spinner"></div><p>Loading battle images, please wait…</p>';
     root.appendChild(wrap);
   } else {
     // Pass the REAL state object through (not a fresh literal) - battleScreen
@@ -858,36 +870,21 @@ onMessage((msg) => {
       rerender();
       break;
     case 'game-state': {
-      // Confirmed real bug, 2026-09-22 (see imagePreload.js's
-      // preloadMatchRosterImages comment for the full root cause) - this
-      // used to set state.screen = 'battle' unconditionally right here,
-      // which stomped enterBattleWhenReady's own 'preparing' wait the
+      // Confirmed real bug, 2026-09-22 (see enterBattleWhenReady's own
+      // comment for the full root cause/investigation) - this used to set
+      // state.screen = 'battle' unconditionally right here, which stomped
+      // enterBattleWhenReady's 'preparing' wait for the image preload the
       // instant the first game-state message for a new match arrived
       // (always near-immediate after entering), so that wait never
-      // actually held anything back in practice. Now: if still
-      // 'preparing' (the first game-state of a fresh match), kick off a
-      // roster-scoped preload for exactly this match's characters and
-      // hold the screen there until either it settles or the same
-      // PREPARING_MAX_WAIT_MS cap elapses - same bounded-wait shape as
-      // enterBattleWhenReady's own full-batch race, just scoped smaller
-      // and later so it can actually target the right images in time.
-      // Every OTHER game-state message during the match (state.screen
-      // already 'battle') skips straight past this and behaves exactly
-      // as before.
-      const isFirstStateOfMatch = state.screen === 'preparing';
-      if (isFirstStateOfMatch) {
-        const rosterIds = Object.keys(msg.game.characters || {});
-        const ready = preloadMatchRosterImages(rosterIds);
-        const timeout = new Promise((resolve) => setTimeout(resolve, PREPARING_MAX_WAIT_MS));
-        Promise.race([ready, timeout]).then(() => {
-          // Same late-resolution guard as enterBattleWhenReady - only
-          // advance if still genuinely waiting (not already left/reset).
-          if (state.screen === 'preparing') {
-            state.screen = 'battle';
-            rerender();
-          }
-        });
-      } else {
+      // actually held anything back in practice. Now: while still
+      // 'preparing' (the image preload enterBattleWhenReady is awaiting
+      // hasn't resolved yet), leave the screen alone here - its own
+      // battleImagesReady().then(...) callback is the only thing allowed
+      // to flip it to 'battle', once every image is genuinely cached.
+      // Every OTHER game-state message (state.screen already 'battle',
+      // the normal case for the rest of the match) behaves exactly as
+      // before.
+      if (state.screen !== 'preparing') {
         state.screen = 'battle';
       }
       state.game = msg.game;
