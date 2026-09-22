@@ -266,19 +266,7 @@ const MOONLIT_THEFT_REACTION_IMAGES = ['athena', 'boingo', 'tharox', 'chronox', 
   (id) => `assets/images/${id}/shield_stolen.jpg`
 );
 
-let started = false;
-// Resolves once every preloaded image has either loaded or failed - used by
-// main.js to gate the battle screen behind a brief "preparing battle" wait
-// (see waitForBattleAssets there) so a match that starts before preload
-// finishes doesn't show a live, visibly-lagging first-time image fetch
-// mid-fight instead (confirmed live report: "annoying, when image loading
-// during battle"). Never rejects - a failed/missing file just resolves its
-// own entry immediately, same as the existing per-image fallback behavior.
-let readyPromise = null;
-
-export function preloadBattleImages() {
-  if (started) return readyPromise;
-  started = true;
+function allBattleImagePaths() {
   const paths = [...FLASH_IMAGES, ...BADGE_ICONS, ...CHICKEN_IMAGES, ...DIVINE_JUDGMENT_STRUCK_IMAGES, ...PROPHECY_OF_DOOM_STRIKE_IMAGES, ...ASHKAS_VENGEANCE_STRIKE_IMAGES, ...SHADOW_SEAL_STRIKE_IMAGES, ...PETRIFY_STONE_IMAGES, ...SELF_CHOKE_VICTIM_IMAGES, ...LIFEBOND_REACTION_IMAGES, ...MOONLIT_THEFT_REACTION_IMAGES, ...FRIENDSHIP_BOND_IMAGES, ...PROTECTS_MELYSSA_IMAGES];
   // Default battle portrait, KO'd, injured, and victory images - each now
   // lives inside the hero's own images/<id>/ folder with a fixed filename
@@ -291,20 +279,39 @@ export function preloadBattleImages() {
       `assets/images/${id}/injured.jpg`, `assets/images/${id}/victory.jpg`,
     );
   }
+  return paths;
+}
+
+function preloadPaths(paths) {
   // Plain Image() objects, never attached to the DOM - the browser caches
   // the response as soon as it loads regardless, so a later portrait.src =
   // same path is served from cache instantly. No onload/onerror handling
   // needed for the swap itself - a failed/missing file here just means
   // that one swap falls back to its normal (slower) first-use fetch, same
   // as before this file existed. onload/onerror ARE now wired individually
-  // (not required for correctness, only to resolve readyPromise) so
-  // waitForBattleAssets can know when the whole batch has settled.
-  readyPromise = Promise.all(paths.map((path) => new Promise((resolve) => {
+  // (not required for correctness, only to resolve the returned promise) so
+  // callers can know when the whole batch has settled.
+  return Promise.all(paths.map((path) => new Promise((resolve) => {
     const img = new Image();
     img.onload = resolve;
     img.onerror = resolve;
     img.src = v(path);
   })));
+}
+
+let started = false;
+// Resolves once every preloaded image (all 16 heroes' full set, ~150+
+// files) has either loaded or failed. Fire-and-forget from page load - by
+// the time a match actually starts this is USUALLY well underway or done,
+// but on a slow/mobile connection it can still be mid-flight, which is what
+// preloadMatchRosterImages below exists to cover for the 4 characters that
+// actually matter for THIS match.
+let readyPromise = null;
+
+export function preloadBattleImages() {
+  if (started) return readyPromise;
+  started = true;
+  readyPromise = preloadPaths(allBattleImagePaths());
   return readyPromise;
 }
 
@@ -315,4 +322,40 @@ export function preloadBattleImages() {
 // timeout regardless so a null here just resolves that race immediately).
 export function battleImagesReady() {
   return readyPromise;
+}
+
+// Confirmed real bug, 2026-09-22 (live report + screenshot, reproduced on
+// BOTH desktop and mobile: choke.jpg visibly stuck on Illyra's own tile
+// well after the flash that set it had already expired - JS state
+// (activeFlash/getFlashSrc, see portraitFlash.js's render trace) was
+// provably correct throughout, ruling out a logic bug). Root cause: images
+// are served cross-origin from a separate static host (assetVersion.js's
+// ASSET_HOST) - an <img>'s src swap to a NOT-YET-CACHED url keeps showing
+// the OLD bitmap on screen until the new fetch actually completes, which
+// is invisible to any JS-side state trace (the src attribute updates
+// immediately; the PAINTED pixels lag behind on a slow connection). The
+// existing preloadBattleImages fetches the FULL ~150-image, all-16-hero
+// set, which the 'preparing' screen only ever waited up to 2.5s for
+// (PREPARING_MAX_WAIT_MS in main.js) before entering battle regardless -
+// nowhere near enough time for that whole batch on a slow/mobile
+// connection, so gameplay could start with plenty of this match's own
+// images still mid-fetch.
+//
+// This targets ONLY the 4 (or fewer) characters actually in THIS match's
+// roster - a much smaller batch that can realistically finish within a
+// short wait, called the moment the roster is known (main.js's
+// 'game-state' handler, first broadcast of a new match) rather than at
+// page load when the roster isn't known yet. Deliberately narrower than
+// FLASH_IMAGES (every hero's every action image) - restricted to the
+// handful of images overwhelmingly likely to be needed in a match's first
+// few seconds (idle/portrait/koed/injured + this hero's own
+// dodge-reaction and Self-Choke-victim art, the exact image class that
+// triggered this investigation), so this stays fast even on a slow
+// connection instead of trying to preload everything up front again.
+const PER_HERO_PRIORITY_SUFFIXES = [
+  'idle.jpg', 'portrait.jpg', 'koed.jpg', 'injured.jpg', 'choke.jpg',
+];
+export function preloadMatchRosterImages(characterIds) {
+  const paths = characterIds.flatMap((id) => PER_HERO_PRIORITY_SUFFIXES.map((suffix) => `assets/images/${id}/${suffix}`));
+  return preloadPaths(paths);
 }

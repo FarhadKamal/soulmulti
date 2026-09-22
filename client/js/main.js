@@ -9,7 +9,7 @@ import {
 } from './sound.js';
 import { handleLogEntryForFlash, handleDodgeForFlash, checkIdlePortrait, registerFlashRerender, queueGrimtalPowerFlash, registerChickenCheck, setDebugLogEntryIndex, snapshotActiveFlashForDebug, resetFlashDebugHistoryForNewMatch, resetRenderTraceForNewMatch, beginFlashDispatchBatch } from './portraitFlash.js';
 import { handleLogEntryForEffects, registerEffectRerender, setDebugLogEntryIndexForEffects, snapshotActiveEffectsForDebug, resetEffectDebugHistoryForNewMatch } from './actionEffects.js';
-import { preloadBattleImages, battleImagesReady } from './imagePreload.js';
+import { preloadBattleImages, battleImagesReady, preloadMatchRosterImages } from './imagePreload.js';
 import { preloadBattleAudio } from './audioPreload.js';
 import { hasVoice, playIdleVoice, playInjuredVoice, playKoedVoice, playVictoryVoice, playMoveVoice, playLaughVoice, playRebirthVoice, playDraxusStrikeVoice } from './voice.js';
 
@@ -735,7 +735,15 @@ function mySeatCharacterIds() {
 // cap so a slow/flaky connection can't block the player from ever entering
 // their match. Deliberately does NOT also wait on audio (see
 // audioPreload.js's own comment on why that batch is excluded).
-const PREPARING_MAX_WAIT_MS = 2500;
+// Bumped from 2500 to 4000 (2026-09-22) alongside the roster-scoped
+// preload fix above - a small ~20-image batch (5 files x this match's 4
+// characters) should usually settle well under even the old cap on a
+// normal connection, but a slow/mobile connection is exactly the
+// condition this whole fix targets, so a little extra headroom costs
+// nothing on a fast connection (the Promise.race still resolves the
+// instant the batch finishes) while giving a slow one a real chance to
+// actually finish before the hard cutoff.
+const PREPARING_MAX_WAIT_MS = 4000;
 
 function enterBattleWhenReady() {
   state.screen = 'preparing';
@@ -849,8 +857,39 @@ onMessage((msg) => {
       }
       rerender();
       break;
-    case 'game-state':
-      state.screen = 'battle';
+    case 'game-state': {
+      // Confirmed real bug, 2026-09-22 (see imagePreload.js's
+      // preloadMatchRosterImages comment for the full root cause) - this
+      // used to set state.screen = 'battle' unconditionally right here,
+      // which stomped enterBattleWhenReady's own 'preparing' wait the
+      // instant the first game-state message for a new match arrived
+      // (always near-immediate after entering), so that wait never
+      // actually held anything back in practice. Now: if still
+      // 'preparing' (the first game-state of a fresh match), kick off a
+      // roster-scoped preload for exactly this match's characters and
+      // hold the screen there until either it settles or the same
+      // PREPARING_MAX_WAIT_MS cap elapses - same bounded-wait shape as
+      // enterBattleWhenReady's own full-batch race, just scoped smaller
+      // and later so it can actually target the right images in time.
+      // Every OTHER game-state message during the match (state.screen
+      // already 'battle') skips straight past this and behaves exactly
+      // as before.
+      const isFirstStateOfMatch = state.screen === 'preparing';
+      if (isFirstStateOfMatch) {
+        const rosterIds = Object.keys(msg.game.characters || {});
+        const ready = preloadMatchRosterImages(rosterIds);
+        const timeout = new Promise((resolve) => setTimeout(resolve, PREPARING_MAX_WAIT_MS));
+        Promise.race([ready, timeout]).then(() => {
+          // Same late-resolution guard as enterBattleWhenReady - only
+          // advance if still genuinely waiting (not already left/reset).
+          if (state.screen === 'preparing') {
+            state.screen = 'battle';
+            rerender();
+          }
+        });
+      } else {
+        state.screen = 'battle';
+      }
       state.game = msg.game;
       // Boingo's Fowl Play - same single game-level flag pattern as World
       // Stops (game.fowlPlayActive), checked fresh on every broadcast
@@ -893,6 +932,7 @@ onMessage((msg) => {
       if (msg.game.phase === 'game-over') startGameOverSequence(msg.game);
       rerender();
       break;
+    }
     case 'error':
       state.error = msg.message;
       rerender();
