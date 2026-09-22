@@ -612,6 +612,22 @@ input {
   padding: 2px 6px; border-radius: 10px;
   pointer-events: none; z-index: 5;
 }
+/* Melyssa's Friendship (Redirect Bond #39) - same stacking reasoning as
+   .blade-hitcount-badge above, one slot further up the same bottom-
+   center column (could plausibly coexist with both mirage-mark and
+   blade-hitcount on the same tile at once). Shown on BOTH bonded
+   characters' tiles - see battleScreen.js's own isFriendshipTile comment. */
+.friendship-badge {
+  position: absolute; bottom: 50px; left: 50%; translate: -50% 0;
+  background: rgba(142, 45, 196, 0.85);
+  padding: 3px; border-radius: 10px;
+  box-shadow: 0 0 6px rgba(142, 45, 196, 0.6);
+  pointer-events: none; z-index: 5;
+  line-height: 0; /* icon-only badge, no trailing text - collapses the
+    .status-badge-icon's own line-box so the round badge hugs the image
+    tightly instead of matching a full text line's height. */
+}
+.friendship-badge .status-badge-icon { margin-right: 0; }
 @keyframes tile-ball-wobble {
   0%, 100% { transform: rotate(-8deg) scale(1); }
   50% { transform: rotate(8deg) scale(1.08); }

@@ -305,6 +305,30 @@ export function renderBattle(root, state) {
     if (!blade || blade.isKO || blade.id === characterId) return 0;
     return blade.special?.hitCountByTarget?.[characterId] || 0;
   };
+  // Melyssa's Friendship (Redirect Bond #39) - same "at-a-glance badge on
+  // both sides of a per-relationship state" reasoning as every badge
+  // above, added per direct request ("we need friendship badge icon")
+  // after a live report where a Friendship redirect made a Mirage Burst
+  // log line read like a duplicate-victim bug (see illyra.js's own
+  // markedCharacterId fix) - the bond wasn't visible anywhere on the
+  // board itself, only inferable after the fact from log text. Unlike
+  // every other per-relationship badge here (which only ever shows on
+  // the OTHER character's tile, e.g. Kaelis's own grudge never badges
+  // HER tile), Friendship is mutual and shown on BOTH tiles at once -
+  // Melyssa's own and her current friend's - since either side dying or
+  // the bond ending affects both of them identically and either player
+  // benefits from seeing it live, not just the friend being protected.
+  // friendCharacterId isn't stripped by sanitizeGameForBroadcast (plain
+  // string, not hidden information - see that function's own comment for
+  // what IS withheld), so it's already on every broadcast without a
+  // server change needed here.
+  const melyssa = Object.values(game.characters).find((c) => c.id === 'melyssa');
+  const isFriendshipTile = (characterId) => {
+    if (!melyssa || melyssa.isKO) return false;
+    const friendId = melyssa.special?.friendCharacterId;
+    if (!friendId) return false;
+    return characterId === 'melyssa' || characterId === friendId;
+  };
   Object.values(game.characters).forEach((character) => {
     board.appendChild(renderCharacterTile(character, {
       isActing: character.id === actingCharacterId,
@@ -318,6 +342,7 @@ export function renderBattle(root, state) {
       isDazed: isDazedFor(character.id),
       mirageMarkCount: mirageMarksFor(character.id),
       bladeHitCount: bladeHitCountFor(character.id),
+      isFriendshipTile: isFriendshipTile(character.id),
       isCursed: character.id === cursedId,
       isDivineJudgmentMarked: character.id === divineJudgmentTargetId,
       isFrozenVisual: frozenIdsSet.has(character.id),
@@ -587,7 +612,7 @@ function computeFrozenIdsSet(game) {
   return ids;
 }
 
-function renderCharacterTile(character, { isActing, isMine, isTargetable, onTargetClick, isHoldingBall, isCursed, isDivineJudgmentMarked, isFrozenVisual, isVictorious, isPuppet, isHypnotized, grudgeCount, isPoisoned, silencedTurns, isDazed, mirageMarkCount, bladeHitCount, isPetrifiedOther = false }) {
+function renderCharacterTile(character, { isActing, isMine, isTargetable, onTargetClick, isHoldingBall, isCursed, isDivineJudgmentMarked, isFrozenVisual, isVictorious, isPuppet, isHypnotized, grudgeCount, isPoisoned, silencedTurns, isDazed, mirageMarkCount, bladeHitCount, isFriendshipTile, isPetrifiedOther = false }) {
   const def = CHARACTERS[character.id];
   const tile = document.createElement('div');
   tile.className = 'char-tile';
@@ -1133,6 +1158,30 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
     const nextHit = (bladeHitCount % 3) + 1;
     bladeBadge.title = `Blade's hit count on you: ${bladeHitCount} (his next Blood Hunt on you would deal ${nextHit})`;
     tile.appendChild(bladeBadge);
+  }
+
+  if (isFriendshipTile && !character.isKO) {
+    // Melyssa's Friendship (Redirect Bond #39) - mutual, shown on BOTH her
+    // own tile and her current friend's (see renderBattle's own
+    // isFriendshipTile comment for why this one badge differs from every
+    // other per-relationship badge here, which only ever shows on the
+    // OTHER character's tile). Stacks in the same bottom-center column as
+    // Blade's hit-count badge, one slot higher - both are per-relationship
+    // indicators that could plausibly be live on the same tile at once.
+    // Custom icon (assets/badge/friendship.png, added 2026-09-22) - same
+    // image-badge treatment as Blade's own hit-count badge, no count/text
+    // overlay needed here since this is a plain on/off bond indicator.
+    const friendship = document.createElement('div');
+    friendship.className = 'friendship-badge';
+    const friendshipIcon = document.createElement('img');
+    friendshipIcon.src = v('assets/badge/friendship.png');
+    friendshipIcon.className = 'status-badge-icon';
+    friendshipIcon.alt = '';
+    friendship.appendChild(friendshipIcon);
+    friendship.title = character.id === 'melyssa'
+      ? "Melyssa's Friendship bond is active - any damage aimed at her redirects to her friend instead"
+      : "Bonded with Melyssa's Friendship - damage aimed at her redirects to you instead";
+    tile.appendChild(friendship);
   }
 
   if (isPoisoned && !character.isKO) {
