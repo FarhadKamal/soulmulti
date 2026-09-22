@@ -210,7 +210,7 @@ export function registerChickenCheck(fn) {
 // (most log entries trigger 0-2 calls; a match with several hundred real
 // events would still fit comfortably under this).
 const FLASH_CALL_HISTORY_LIMIT = 2000;
-const flashCallHistory = [];
+let flashCallHistory = [];
 let currentLogEntryIndex = -1;
 export function setDebugLogEntryIndex(index) {
   currentLogEntryIndex = index;
@@ -244,7 +244,7 @@ function setFlash(characterId, src, durationMs = FLASH_DURATION_MS) {
 // the debug annotation show "what was actually live and would have been
 // rendered right after this entry," independent of whether THIS entry's
 // own setFlash calls were the ones that set it.
-const flashSnapshotHistory = [];
+let flashSnapshotHistory = [];
 export function snapshotActiveFlashForDebug(logEntryIndex) {
   const snapshot = {};
   for (const [characterId, { src }] of activeFlash.entries()) snapshot[characterId] = src;
@@ -253,6 +253,25 @@ export function snapshotActiveFlashForDebug(logEntryIndex) {
 }
 export function getFlashSnapshotHistory() {
   return flashSnapshotHistory;
+}
+
+// Confirmed real bug, 2026-09-22 (live report + user's own direct catch:
+// "rowan even was not even there on the game" - Rowan appeared in a debug
+// trace annotation for a match that never had him in its roster at all).
+// Root cause: these debug-only history arrays were never cleared between
+// matches - only game.log's own read position (main.js's lastLogLength)
+// reset for a fresh match, so a brand-new match's entry index 5 could
+// still match against a STALE logEntryIndex: 5 record left over from a
+// COMPLETELY DIFFERENT earlier match, showing that earlier match's
+// characters as if they belonged to the current one. This was a bug in
+// the debug TOOLING itself, not the real game/animation logic - every
+// "wrong character" trace result investigated under this bug should be
+// re-examined with fresh eyes once reproduced again post-fix, since the
+// underlying data was never trustworthy across a match boundary. Called
+// from main.js at the exact same two points lastLogLength itself resets.
+export function resetFlashDebugHistoryForNewMatch() {
+  flashCallHistory = [];
+  flashSnapshotHistory = [];
 }
 
 export function getFlashSrc(characterId) {

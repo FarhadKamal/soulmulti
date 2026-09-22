@@ -7,8 +7,8 @@ import {
   startChickenMusic, revertFromChickenMusic,
   playActionSound, playSound, playKO, playVictory, playDodge, playRebirth, playCoin,
 } from './sound.js';
-import { handleLogEntryForFlash, handleDodgeForFlash, checkIdlePortrait, registerFlashRerender, queueGrimtalPowerFlash, registerChickenCheck, setDebugLogEntryIndex, snapshotActiveFlashForDebug } from './portraitFlash.js';
-import { handleLogEntryForEffects, registerEffectRerender, setDebugLogEntryIndexForEffects, snapshotActiveEffectsForDebug } from './actionEffects.js';
+import { handleLogEntryForFlash, handleDodgeForFlash, checkIdlePortrait, registerFlashRerender, queueGrimtalPowerFlash, registerChickenCheck, setDebugLogEntryIndex, snapshotActiveFlashForDebug, resetFlashDebugHistoryForNewMatch } from './portraitFlash.js';
+import { handleLogEntryForEffects, registerEffectRerender, setDebugLogEntryIndexForEffects, snapshotActiveEffectsForDebug, resetEffectDebugHistoryForNewMatch } from './actionEffects.js';
 import { preloadBattleImages, battleImagesReady } from './imagePreload.js';
 import { preloadBattleAudio } from './audioPreload.js';
 import { hasVoice, playIdleVoice, playInjuredVoice, playKoedVoice, playVictoryVoice, playMoveVoice, playLaughVoice, playRebirthVoice, playDraxusStrikeVoice } from './voice.js';
@@ -819,6 +819,14 @@ onMessage((msg) => {
         lastKnownHearts.clear(); // next match's characters start fresh, nothing "already seen" yet
         gameOverSequenceStarted = false; // next match gets its own fresh sequence
         state.gameOverStage = null;
+        // Confirmed real bug, 2026-09-22 (user's own direct catch: "rowan
+        // even was not even there on the game" - a debug-trace annotation
+        // showed a character from a PREVIOUS match, since these debug-only
+        // history arrays were never cleared between matches the way
+        // lastLogLength itself always was). See each function's own
+        // comment for the full reasoning.
+        resetFlashDebugHistoryForNewMatch();
+        resetEffectDebugHistoryForNewMatch();
       } else if (msg.room.phase === 'in-match' && state.screen !== 'battle') {
         // lobbyScreen.js's onEnterMatch flips state.screen to 'battle' the
         // instant it sees room.phase 'in-match' here, BEFORE the first
@@ -897,6 +905,10 @@ onMessage((msg) => {
       lastLogLength = 0;
       previousActingCharacterId = null;
       lastKnownHearts.clear();
+      // Same debug-history reset as the 'lobby-update' branch above - see
+      // its own comment for the full reasoning.
+      resetFlashDebugHistoryForNewMatch();
+      resetEffectDebugHistoryForNewMatch();
       clearChatMessages();
       startMenuMusic();
       rerender();

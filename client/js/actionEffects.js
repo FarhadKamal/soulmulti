@@ -78,7 +78,7 @@ export function registerEffectRerender(fn) {
 // now, catching a stale un-expired effect the call history alone
 // wouldn't show).
 const EFFECT_CALL_HISTORY_LIMIT = 2000;
-const effectCallHistory = [];
+let effectCallHistory = [];
 let currentLogEntryIndexForEffects = -1;
 export function setDebugLogEntryIndexForEffects(index) {
   currentLogEntryIndexForEffects = index;
@@ -86,7 +86,7 @@ export function setDebugLogEntryIndexForEffects(index) {
 export function getEffectCallHistory() {
   return effectCallHistory;
 }
-const effectSnapshotHistory = [];
+let effectSnapshotHistory = [];
 export function snapshotActiveEffectsForDebug(logEntryIndex) {
   const snapshot = {};
   for (const [characterId, entry] of activeEffects.entries()) {
@@ -97,6 +97,16 @@ export function snapshotActiveEffectsForDebug(logEntryIndex) {
 }
 export function getEffectSnapshotHistory() {
   return effectSnapshotHistory;
+}
+
+// Confirmed real bug, 2026-09-22 (see portraitFlash.js's own
+// resetFlashDebugHistoryForNewMatch comment for the full reasoning - same
+// bug, same fix, this file's own copy of the same debug-only history
+// arrays). Called from main.js at the exact same two points
+// lastLogLength itself resets for a fresh match.
+export function resetEffectDebugHistoryForNewMatch() {
+  effectCallHistory = [];
+  effectSnapshotHistory = [];
 }
 
 function addEffect(characterId, effect, durationMs, param) {
