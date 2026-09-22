@@ -617,16 +617,17 @@ input {
    center column (could plausibly coexist with both mirage-mark and
    blade-hitcount on the same tile at once). Shown only on the FRIEND's own
    tile (confirmed ruling, 2026-09-22 - see battleScreen.js's own
-   isFriendshipTile). Background changed from purple to warm gold/amber
-   (confirmed ruling, 2026-09-22: "icon is also purple. you should use
-   differance color") - the friendship.png icon art itself is light
-   purple/pink line art, so the original purple pill made the icon nearly
-   unreadable against its own background. */
+   isFriendshipTile). Background changed from purple -> gold/amber -> dark
+   ash (confirmed ruling, 2026-09-22: "you use gold color bakground for
+   frirendship badge icon. change it to dark ash") - the friendship.png
+   icon art itself is light purple/pink line art, so a dark neutral
+   background gives clean contrast without competing with the icon's own
+   color the way gold did. */
 .friendship-badge {
   position: absolute; bottom: 50px; left: 50%; translate: -50% 0;
-  background: rgba(212, 160, 23, 0.9);
+  background: rgba(54, 54, 58, 0.9);
   padding: 3px; border-radius: 10px;
-  box-shadow: 0 0 6px rgba(212, 160, 23, 0.65);
+  box-shadow: 0 0 6px rgba(54, 54, 58, 0.65);
   pointer-events: none; z-index: 5;
   line-height: 0; /* icon-only badge, no trailing text - collapses the
     .status-badge-icon's own line-box so the round badge hugs the image
