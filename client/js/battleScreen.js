@@ -1,7 +1,7 @@
 import { CHARACTERS } from './characters.js';
 import { send, getWireDiagLog } from './net.js';
 import { playUiClick } from './sound.js';
-import { getFlashSrc, getPersistentPortrait, isPetrifyActive, getFlashCallHistory, getFlashSnapshotHistory } from './portraitFlash.js';
+import { getFlashSrc, getPersistentPortrait, isPetrifyActive, getFlashCallHistory, getFlashSnapshotHistory, getRenderTrace } from './portraitFlash.js';
 import { getActiveEffects, getClawCount, getCrackCount, getPowSize, getVortexSize, getAxechopTier, getLightningTier, getWildLightningTier, getDarkslashVariant, getEffectCallHistory, getEffectSnapshotHistory } from './actionEffects.js';
 import { renderFullscreenButton } from './fullscreen.js';
 import { renderMusicMuteButton } from './musicMute.js';
@@ -2030,6 +2030,39 @@ function renderFullLogWithCopy(log) {
       lines.push('--- wire diagnostic (temporary) ---');
       for (const line of wireDiag) lines.push(line);
       lines.push('--- end wire diagnostic ---');
+    }
+  }
+  // TEMPORARY diagnostic (2026-09-22) - portraitFlash.js's own render-event
+  // trace (getRenderTrace). Every prior debug layer only snapshots ONCE PER
+  // BATCH of log entries (after a whole game-state message's worth of
+  // entries has been processed) - it can't see a separate, independent
+  // rerender triggered by a flash timer expiring on its own setTimeout
+  // schedule (portraitFlash.js's onFlashExpired -> main.js's rerender()),
+  // decoupled from any server message. Since renderBattle rebuilds the
+  // WHOLE board from scratch on every render (root.innerHTML = ''), any
+  // character's timer expiring forces every other character's portrait to
+  // be recomputed too - this trace is the only layer that can show a
+  // flicker faster than any per-batch snapshot could catch (follow-up to a
+  // live report described as "happening faster" than a screenshot could
+  // capture). Grouped by timestamp so a tight burst of renders within the
+  // same millisecond (multiple characters recomputed by one teardown/
+  // rebuild) reads as one line instead of a wall of duplicates.
+  if (debugLogMode) {
+    const renderTrace = getRenderTrace();
+    if (renderTrace.length > 0) {
+      lines.push('--- render trace (temporary) ---');
+      let lastT = null;
+      let group = [];
+      const flushGroup = () => {
+        if (group.length > 0) lines.push(`[render @${lastT}] ${group.join(', ')}`);
+        group = [];
+      };
+      for (const { t, characterId, src } of renderTrace) {
+        if (t !== lastT) { flushGroup(); lastT = t; }
+        group.push(`${characterId}=${src ?? '(none)'}`);
+      }
+      flushGroup();
+      lines.push('--- end render trace ---');
     }
   }
   for (let i = 0; i < log.length; i++) {

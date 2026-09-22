@@ -7,7 +7,7 @@ import {
   startChickenMusic, revertFromChickenMusic,
   playActionSound, playSound, playKO, playVictory, playDodge, playRebirth, playCoin,
 } from './sound.js';
-import { handleLogEntryForFlash, handleDodgeForFlash, checkIdlePortrait, registerFlashRerender, queueGrimtalPowerFlash, registerChickenCheck, setDebugLogEntryIndex, snapshotActiveFlashForDebug, resetFlashDebugHistoryForNewMatch } from './portraitFlash.js';
+import { handleLogEntryForFlash, handleDodgeForFlash, checkIdlePortrait, registerFlashRerender, queueGrimtalPowerFlash, registerChickenCheck, setDebugLogEntryIndex, snapshotActiveFlashForDebug, resetFlashDebugHistoryForNewMatch, resetRenderTraceForNewMatch, beginFlashDispatchBatch } from './portraitFlash.js';
 import { handleLogEntryForEffects, registerEffectRerender, setDebugLogEntryIndexForEffects, snapshotActiveEffectsForDebug, resetEffectDebugHistoryForNewMatch } from './actionEffects.js';
 import { preloadBattleImages, battleImagesReady } from './imagePreload.js';
 import { preloadBattleAudio } from './audioPreload.js';
@@ -229,6 +229,13 @@ function processNewLogEntries(game) {
   // within this function's own logic. Recorded into the same on-page
   // debug log net.js's own diagnostic uses, not the console.
   recordWireDiagFromMain(`processNewLogEntries called, lastLogLength(before)=${lastLogLength} game.log.length=${game.log.length}`);
+  // Marks the start of a new dispatch batch (see portraitFlash.js's
+  // beginFlashDispatchBatch/checkIdlePortrait comments) - every setFlash
+  // call made while processing this batch's entries below is tagged with
+  // this same token, so checkIdlePortrait (called right after this
+  // function returns, still within the same broadcast) can tell "just set
+  // this broadcast" apart from a stale flash left over from an earlier one.
+  beginFlashDispatchBatch();
   const startIndex = lastLogLength;
   const newEntries = game.log.slice(lastLogLength);
   lastLogLength = game.log.length;
@@ -827,6 +834,7 @@ onMessage((msg) => {
         // comment for the full reasoning.
         resetFlashDebugHistoryForNewMatch();
         resetEffectDebugHistoryForNewMatch();
+        resetRenderTraceForNewMatch();
       } else if (msg.room.phase === 'in-match' && state.screen !== 'battle') {
         // lobbyScreen.js's onEnterMatch flips state.screen to 'battle' the
         // instant it sees room.phase 'in-match' here, BEFORE the first
@@ -909,6 +917,7 @@ onMessage((msg) => {
       // its own comment for the full reasoning.
       resetFlashDebugHistoryForNewMatch();
       resetEffectDebugHistoryForNewMatch();
+      resetRenderTraceForNewMatch();
       clearChatMessages();
       startMenuMusic();
       rerender();

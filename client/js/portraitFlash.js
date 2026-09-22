@@ -229,7 +229,24 @@ function setFlash(characterId, src, durationMs = FLASH_DURATION_MS) {
     activeFlash.delete(characterId);
     onFlashExpired();
   }, durationMs);
-  activeFlash.set(characterId, { src, timer });
+  // setAt records which dispatch batch this flash was set in (see
+  // currentBatchToken below) - lets checkIdlePortrait tell "just set this
+  // exact broadcast, don't stomp it" apart from "set several broadcasts
+  // ago and simply hasn't expired yet," which its plain activeFlash.has()
+  // check used to conflate (see checkIdlePortrait's own comment for the
+  // live bug this caused).
+  activeFlash.set(characterId, { src, timer, setAt: currentBatchToken });
+}
+
+// Incremented once per processNewLogEntries call (main.js) via
+// beginFlashDispatchBatch below - a monotonic token identifying "this
+// broadcast's dispatch pass," independent of wall-clock time (which
+// setTimeout delivery can't be trusted against under tab throttling/heavy
+// synchronous work - the exact failure mode that caused the stale-choke-
+// on-Illyra bug this token fixes).
+let currentBatchToken = 0;
+export function beginFlashDispatchBatch() {
+  currentBatchToken += 1;
 }
 
 // Debug mode's own render-time snapshot (2026-09-21, follow-up to a live
@@ -274,8 +291,44 @@ export function resetFlashDebugHistoryForNewMatch() {
   flashSnapshotHistory = [];
 }
 
+// Render-event trace (2026-09-22) - follow-up to a live report the prior
+// 5 trace layers couldn't explain: user confirmed seeing choke.jpg on
+// Akyros immediately around a CONFIRMED-dodged Self Choke (the debug
+// snapshot right after that log entry shows dodge.jpg, not choke.jpg,
+// ruling out the setFlash-call layer), but described it as "happening
+// faster" than a screenshot could catch - too fast for the ~1.6s normal
+// flash duration to explain as a genuinely-set, sustained image. All
+// existing snapshot/call-history tracing only fires once per WHOLE BATCH
+// of log entries (main.js's processNewLogEntries loop, after every entry
+// in one game-state message has been dispatched) - it can't see a
+// separate, INDEPENDENT rerender triggered by a flash timer expiring
+// (portraitFlash.js's own onFlashExpired callback, wired to main.js's
+// rerender() - see registerFlashRerender), which happens on its own
+// setTimeout schedule, decoupled from any server message. Since
+// battleScreen.js's renderBattle does `root.innerHTML = ''` and rebuilds
+// the ENTIRE board from scratch on every single render (message-driven OR
+// timer-driven), any character's flash expiring anywhere forces every
+// OTHER character's portrait to be recomputed too - a render event class
+// this file's debug tooling never separately recorded before. This trace
+// records every actual getFlashSrc() call (i.e. every real render,
+// whichever triggered it) with a wall-clock timestamp and what it
+// returned, so a burst of renders tighter than the eye/screenshot can
+// follow becomes visible as a sequence of real timestamped entries
+// instead of being invisible between the coarser per-batch snapshots.
+const RENDER_TRACE_LIMIT = 4000;
+let renderTrace = [];
+export function getRenderTrace() {
+  return renderTrace;
+}
+export function resetRenderTraceForNewMatch() {
+  renderTrace = [];
+}
+
 export function getFlashSrc(characterId) {
-  const src = activeFlash.get(characterId)?.src ?? null;
+  const entry = activeFlash.get(characterId);
+  const src = entry?.src ?? null;
+  renderTrace.push({ t: Date.now(), characterId, src });
+  if (renderTrace.length > RENDER_TRACE_LIMIT) renderTrace.shift();
   return src ? v(src) : null;
 }
 
@@ -404,7 +457,23 @@ export function checkIdlePortrait(character, round) {
   // using separate boolean flags with dodge checked ahead of idle in its
   // own if/else chain - this activeFlash map has no such built-in
   // priority, so it has to be enforced here instead.
-  if (activeFlash.has(character.id)) {
+  // Confirmed real bug, 2026-09-22 (live report + screenshot: choke.jpg
+  // visibly stuck on Illyra's own tile while she was "ACTING NOW", several
+  // turns after the Self Choke hit that actually set it). This used to
+  // check activeFlash.has(character.id) alone, which can't distinguish "a
+  // flash was JUST set this exact broadcast, don't stomp it" (the only
+  // case this guard is meant for) from "a flash from several broadcasts
+  // ago is still sitting in activeFlash because its setTimeout fired late"
+  // - background-tab timer throttling and bursts of synchronous work
+  // (rapid bot turns) can both delay a timer well past its nominal
+  // duration, so activeFlash.has() staying true is not proof the flash is
+  // still "current." Now only treated as same-broadcast (and thus
+  // protected from being overwritten) if its setAt token matches this
+  // dispatch pass's own currentBatchToken (see setFlash/
+  // beginFlashDispatchBatch) - anything older is stale and safe to
+  // override with idle.jpg here, same as if nothing were active at all.
+  const existingFlash = activeFlash.get(character.id);
+  if (existingFlash && existingFlash.setAt === currentBatchToken) {
     heartsAtLastTurnStart.set(character.id, character.hearts);
     return false;
   }
