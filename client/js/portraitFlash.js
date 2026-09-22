@@ -604,7 +604,21 @@ export function handleLogEntryForFlash(entry, game) {
   // ALONGSIDE the existing CSS skeleton-hand/choke-ring effect for now
   // (not replacing it) - confirmed ruling: "we will remove that css
   // animation.. but not now."
-  if (entry.actionId === 'selfChoke' && entry.characterId === 'melyssa') {
+  // friendshipSelfChoke (the forced 1v1-with-your-own-friend endgame,
+  // turnEngine.js) is a SEPARATE server-side implementation from the
+  // normal puppeted selfChoke (server/index.js's executeSelfChoke) -
+  // confirmed real bug, 2026-09-22 (live report: "melyssa choke cast
+  // animation play. that is correct. supposed to play also rowan choke.jpg
+  // animation also... but that does not play"). This client-side handler
+  // only ever matched actionId === 'selfChoke', so the forced-endgame
+  // variant fell through to the generic switch below (which has no
+  // 'friendshipSelfChoke' case either) and silently played NEITHER
+  // Melyssa's own cast flash NOR the friend's choke.jpg reaction. Folded
+  // into the same branch since both are visually identical (dodge is no
+  // longer even reachable here either, per the 2026-09-22 ignoresDodge fix
+  // applied to both server-side paths - the !entry.dodged gate below is
+  // now belt-and-braces, not load-bearing).
+  if ((entry.actionId === 'selfChoke' || entry.actionId === 'friendshipSelfChoke') && entry.characterId === 'melyssa') {
     if (!isKO('melyssa')) setFlash('melyssa', 'assets/images/melyssa/self_choke.jpg');
     // Confirmed real bug, 2026-09-21 (live report): choke.jpg used to fire
     // UNCONDITIONALLY here, even when the puppet's own dodge passive

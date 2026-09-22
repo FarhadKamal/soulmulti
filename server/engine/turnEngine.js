@@ -1094,7 +1094,14 @@ export function executeAction(game, characterId, actionId, targetId, extra) {
     // choke itself is what ends it.
     const friendId = character.special.friendCharacterId;
     result = applyDamage(game, log, {
-      sourceCharacterId: characterId, targetCharacterId: friendId, amount: 2, ignoresShield: true,
+      sourceCharacterId: characterId, targetCharacterId: friendId, amount: 2,
+      // Same "fully unavoidable" rule as the normal puppeted Self Choke
+      // (server/index.js's executeSelfChoke, confirmed ruling 2026-09-22:
+      // "self choke attack now 100% possible even dodge can't protect it")
+      // - this forced-endgame path had been left with only ignoresShield,
+      // a real gap missed when that fix was made since the two paths are
+      // separate implementations.
+      ignoresShield: true, ignoresDodge: true,
     });
     log.push({ type: 'attack', characterId, actionId: 'friendshipSelfChoke', targetId: friendId, ...result });
     melyssa.endFriendship(character, game, log);
