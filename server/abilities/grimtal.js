@@ -218,7 +218,19 @@ export function onTurnStart(character, game, log) {
     if (character.special.beastFormTurnCount % 2 === 0 && character.hearts <= BEAST_REGEN_HEARTS_THRESHOLD) {
       const healed = applyHeal(game, character.id, BEAST_REGEN_HEAL_AMOUNT);
       if (healed > 0) {
-        log.push({ type: 'beast-regen', characterId: character.id, healed, hearts: game.characters[character.id].hearts });
+        // Confirmed real bug, 2026-09-22 (live report: this entry's own
+        // [Character:N ...] hearts bracket was missing entirely from the
+        // match log, unlike every other passive line). Was stamping a
+        // single raw number (this character's OWN hearts) instead of the
+        // full heartsSnapshot(game) object every other log entry uses -
+        // battleScreen.js's formatHeartsSnapshot expects an object keyed
+        // by character id, and Object.keys(aNumber) is always [], so it
+        // silently rendered an empty string instead of throwing or
+        // showing anything wrong. heartsSnapshot is already imported and
+        // already used two lines above for this SAME function's
+        // beast-form-end entry - this was simply inconsistent with its
+        // own sibling entry, not a deliberate different shape.
+        log.push({ type: 'beast-regen', characterId: character.id, healed, hearts: heartsSnapshot(game) });
       }
     }
   }
