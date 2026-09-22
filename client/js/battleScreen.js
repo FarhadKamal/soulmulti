@@ -321,8 +321,16 @@ export function renderBattle(root, state) {
   // friendCharacterId isn't stripped by sanitizeGameForBroadcast (plain
   // string, not hidden information - see that function's own comment for
   // what IS withheld), so it's already on every broadcast without a
-  // server change needed here.
-  const melyssa = Object.values(game.characters).find((c) => c.id === 'melyssa');
+  // server change needed here. Confirmed real bug, 2026-09-22 (live
+  // report: "black screen showing only"): reuses the SAME `melyssa`
+  // lookup already declared above (for activePuppetId's own hypnotic-
+  // ripple check) rather than re-declaring it - a duplicate `const
+  // melyssa` in this same function scope is a hard SyntaxError
+  // ("Identifier 'melyssa' has already been declared"), which broke the
+  // whole module's script tag and blanked the entire page, not just this
+  // feature. `node --check` only validates syntax per-statement and
+  // doesn't catch a same-scope redeclaration like this - confirmed via a
+  // real headless-browser page load, which is what actually caught it.
   const isFriendshipTile = (characterId) => {
     if (!melyssa || melyssa.isKO) return false;
     const friendId = melyssa.special?.friendCharacterId;
