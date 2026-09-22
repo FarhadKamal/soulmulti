@@ -331,11 +331,15 @@ export function renderBattle(root, state) {
   // feature. `node --check` only validates syntax per-statement and
   // doesn't catch a same-scope redeclaration like this - confirmed via a
   // real headless-browser page load, which is what actually caught it.
+  // Confirmed ruling, 2026-09-22: the badge should only mark the FRIEND's
+  // own tile, not Melyssa's - she already has her own persistent tells
+  // (mind-control-adjacent UI) and the badge is meant to flag who's
+  // currently protected, not to also decorate her.
   const isFriendshipTile = (characterId) => {
     if (!melyssa || melyssa.isKO) return false;
     const friendId = melyssa.special?.friendCharacterId;
     if (!friendId) return false;
-    return characterId === 'melyssa' || characterId === friendId;
+    return characterId === friendId;
   };
   Object.values(game.characters).forEach((character) => {
     board.appendChild(renderCharacterTile(character, {

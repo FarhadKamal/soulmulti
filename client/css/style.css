@@ -615,13 +615,18 @@ input {
 /* Melyssa's Friendship (Redirect Bond #39) - same stacking reasoning as
    .blade-hitcount-badge above, one slot further up the same bottom-
    center column (could plausibly coexist with both mirage-mark and
-   blade-hitcount on the same tile at once). Shown on BOTH bonded
-   characters' tiles - see battleScreen.js's own isFriendshipTile comment. */
+   blade-hitcount on the same tile at once). Shown only on the FRIEND's own
+   tile (confirmed ruling, 2026-09-22 - see battleScreen.js's own
+   isFriendshipTile). Background changed from purple to warm gold/amber
+   (confirmed ruling, 2026-09-22: "icon is also purple. you should use
+   differance color") - the friendship.png icon art itself is light
+   purple/pink line art, so the original purple pill made the icon nearly
+   unreadable against its own background. */
 .friendship-badge {
   position: absolute; bottom: 50px; left: 50%; translate: -50% 0;
-  background: rgba(142, 45, 196, 0.85);
+  background: rgba(212, 160, 23, 0.9);
   padding: 3px; border-radius: 10px;
-  box-shadow: 0 0 6px rgba(142, 45, 196, 0.6);
+  box-shadow: 0 0 6px rgba(212, 160, 23, 0.65);
   pointer-events: none; z-index: 5;
   line-height: 0; /* icon-only badge, no trailing text - collapses the
     .status-badge-icon's own line-box so the round badge hugs the image
