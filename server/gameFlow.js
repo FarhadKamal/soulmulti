@@ -12,7 +12,7 @@ import {
   hasCharacterActedThisTurn, charactersActingThisTurn, resolveJesterBall, endTurn,
   tickChronoxLockoutIfAny,
 } from './engine/turnEngine.js';
-import { heartsSnapshot } from './engine/damagePipeline.js';
+import { heartsSnapshot, isSilenced } from './engine/damagePipeline.js';
 
 // Zeroes out a stalled Draxus bonus turn (see draxus.js's onTurnStart) when
 // getActingCharacterId itself ends his turn via markCharacterActed below,
@@ -158,7 +158,20 @@ export function getActingCharacterId(game) {
       tickChronoxLockoutIfAny(character, game, game.log);
     }
     if (!isBallHolder && getUsableActions(character, game).length === 0) {
-      game.log.push({ type: 'passive', characterId: character.id, text: `${CHARACTERS[character.id].name} has no valid targets and skips their turn.`, hearts: heartsSnapshot(game) });
+      // Confirmed real live report, 2026-09-22: this fired twice in a row
+      // for a silenced Melyssa (Rowan's Silence Lock blocks any `special:
+      // true` action - getUsableActions's own silenced && def.special
+      // filter, see its comment) while Athena/Rowan/Zerathys were all
+      // alive and perfectly valid puppet targets - "no valid targets" was
+      // genuinely misleading, since the real reason was her whole kit
+      // being special-only and that special being locked, not an actual
+      // targeting problem. Generic (not Melyssa-specific) - any future
+      // character whose full kit is special-gated would hit the exact
+      // same misleading message while silenced.
+      const text = isSilenced(character, game)
+        ? `${CHARACTERS[character.id].name} is silenced and has no other action - skips their turn.`
+        : `${CHARACTERS[character.id].name} has no valid targets and skips their turn.`;
+      game.log.push({ type: 'passive', characterId: character.id, text, hearts: heartsSnapshot(game) });
       clearStalledBonusTurn(character);
       markCharacterActed(game, character.id);
       continue;
