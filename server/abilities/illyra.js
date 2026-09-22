@@ -153,7 +153,23 @@ export const actions = {
         // doesn't override targetId here since result's own field is
         // named targetCharacterId, a different key, so the explicit
         // targetId: tid above always won regardless of spread order).
-        bursts.push({ targetId: result.targetCharacterId, stackCount, ...result });
+        //
+        // markedCharacterId (2026-09-22) - confirmed real display bug,
+        // live report: Illyra can have BOTH Velorya AND Melyssa separately
+        // marked at once; if Melyssa's own mark then redirects to Velorya
+        // (her current Friendship bond) via the SAME detonation, this loop
+        // genuinely produces two independent burst results that both land
+        // on Velorya - which is completely correct game behavior, but the
+        // old log only ever showed `targetId` (the final, post-redirect
+        // destination), so both entries displayed as an unexplained
+        // "Velorya (...), Velorya (...)" with no indication one of them
+        // was actually Melyssa's own mark being redirected, reading like a
+        // duplicate-entry bug even though nothing was wrong server-side.
+        // Kept separate from targetId (which every other display/effect
+        // site already depends on meaning "who actually took the hit") -
+        // this is purely who the ORIGINAL mark belonged to, for the
+        // client to describe the redirect explicitly instead of silently.
+        bursts.push({ targetId: result.targetCharacterId, markedCharacterId: tid, stackCount, ...result });
         if (result.rebirthLogEntry && !rebirthLogEntry) rebirthLogEntry = result.rebirthLogEntry;
         if (result.mirrorLogEntry && !mirrorLogEntry) mirrorLogEntry = result.mirrorLogEntry;
         if (result.mirrorResult?.rebirthLogEntry && !rebirthLogEntry) rebirthLogEntry = result.mirrorResult.rebirthLogEntry;

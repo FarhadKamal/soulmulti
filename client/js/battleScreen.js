@@ -2471,9 +2471,26 @@ function describeLogEntry(entry) {
         if (!entry.bursts || entry.bursts.length === 0) {
           return `${name(entry.characterId)} used Mirage Burst - nothing was marked!`;
         }
-        const parts = entry.bursts.map((b) =>
-          `${name(b.targetId)} (${b.stackCount} stack${b.stackCount > 1 ? 's' : ''}${b.amountDealt != null ? `, ${b.amountDealt} dmg` : ''}${b.koTriggered ? ' - KO!' : ''})`
-        );
+        // Confirmed real display bug, 2026-09-22 (live report): Melyssa
+        // can be independently marked from whoever her current Friendship
+        // friend is - if BOTH end up detonated in the same Burst and
+        // Melyssa's own mark redirects to that same friend, this list
+        // shows the friend's name twice with no explanation, reading like
+        // a duplicate-entry bug even though it's two genuinely separate
+        // marks that both happened to land on the same character. Uses
+        // b.markedCharacterId (illyra.js's own detonation loop, the
+        // ORIGINAL mark owner) to say so explicitly whenever it differs
+        // from b.targetId (the actual, post-redirect victim) - falls back
+        // to the plain original wording whenever there's no redirect
+        // (markedCharacterId will always equal targetId in that case).
+        const parts = entry.bursts.map((b) => {
+          const stackText = `${b.stackCount} stack${b.stackCount > 1 ? 's' : ''}`;
+          const dmgText = `${b.amountDealt != null ? `, ${b.amountDealt} dmg` : ''}${b.koTriggered ? ' - KO!' : ''}`;
+          if (b.markedCharacterId && b.markedCharacterId !== b.targetId) {
+            return `${name(b.markedCharacterId)}'s mark (redirected to ${name(b.targetId)}) - ${stackText}${dmgText}`;
+          }
+          return `${name(b.targetId)} (${stackText}${dmgText})`;
+        });
         return `${name(entry.characterId)} used Mirage Burst - detonated ${parts.join(', ')}`;
       }
       if (entry.actionId === 'mirageOverload') {
