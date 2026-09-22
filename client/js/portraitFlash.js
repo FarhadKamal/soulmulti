@@ -320,6 +320,7 @@ export function resetFlashDebugHistoryForNewMatch() {
   flashCallHistory = [];
   flashSnapshotHistory = [];
   logEntryDispatchTime.clear();
+  entrySnapshotHistory.length = 0;
 }
 
 // Render-event trace (2026-09-22) - follow-up to a live report the prior
@@ -553,10 +554,39 @@ export function queueGrimtalPowerFlash(characterId, game) {
   }, GRIMTAL_POWER_DELAY_MS);
 }
 
+// Confirmed real anomaly, 2026-09-22: a stack-trace-level trace proved
+// setFlash('illyra', '.../choke.jpg') fires from THIS function's own
+// selfChoke branch (line ~593) for a log index whose displayed text is a
+// DODGED Self Choke - which the branch's own !entry.dodged gate should
+// have blocked. Records the RAW entry object's own relevant fields
+// (type/actionId/characterId/targetId/dodged) exactly as THIS function
+// sees them at evaluation time, tagged by logEntryIndex - if these ever
+// disagree with what the SAME entry's text/other annotations show, that
+// proves the entry object itself carries different data than expected at
+// the moment this code runs (e.g. two different entries' data aliased
+// together, or a mutation between push and read), not a logic error in
+// the gate itself.
+export function getLastFlashEntrySnapshots() {
+  return entrySnapshotHistory;
+}
+const entrySnapshotHistory = [];
+const ENTRY_SNAPSHOT_LIMIT = 2000;
+
 // Processes one NEW log entry (already known not to have been seen before)
 // and fires whatever flash(es) it implies. Call in log-append order.
 export function handleLogEntryForFlash(entry, game) {
   const isKO = (id) => game.characters[id]?.isKO;
+  entrySnapshotHistory.push({
+    logEntryIndex: currentLogEntryIndex,
+    type: entry.type,
+    actionId: entry.actionId,
+    characterId: entry.characterId,
+    targetId: entry.targetId,
+    targetCharacterId: entry.targetCharacterId,
+    dodged: entry.dodged,
+    t: Date.now(),
+  });
+  if (entrySnapshotHistory.length > ENTRY_SNAPSHOT_LIMIT) entrySnapshotHistory.shift();
 
   // Self Choke gets its own dedicated flash on Melyssa herself - checked
   // first and returns, since its entry's characterId is already 'melyssa'

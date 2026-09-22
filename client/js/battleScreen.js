@@ -1,7 +1,7 @@
 import { CHARACTERS } from './characters.js';
 import { send, getWireDiagLog } from './net.js';
 import { playUiClick } from './sound.js';
-import { getFlashSrc, getPersistentPortrait, isPetrifyActive, getFlashCallHistory, getFlashSnapshotHistory, getRenderTrace, getLogEntryDispatchTime } from './portraitFlash.js';
+import { getFlashSrc, getPersistentPortrait, isPetrifyActive, getFlashCallHistory, getFlashSnapshotHistory, getRenderTrace, getLogEntryDispatchTime, getLastFlashEntrySnapshots } from './portraitFlash.js';
 import { getActiveEffects, getClawCount, getCrackCount, getPowSize, getVortexSize, getAxechopTier, getLightningTier, getWildLightningTier, getDarkslashVariant, getEffectCallHistory, getEffectSnapshotHistory } from './actionEffects.js';
 import { renderFullscreenButton } from './fullscreen.js';
 import { renderMusicMuteButton } from './musicMute.js';
@@ -2128,6 +2128,28 @@ function renderFullLogWithCopy(log) {
         lines.push(`[t@${call.t}] logIndex=${call.logEntryIndex} ${call.characterId}<-${call.src} :: ${stackLines}`);
       }
       lines.push('--- end raw setFlash call dump ---');
+    }
+  }
+  // TEMPORARY diagnostic (2026-09-22) - a raw dump of the entry object's
+  // OWN fields (type/actionId/characterId/targetId/dodged) exactly as
+  // handleLogEntryForFlash saw them at evaluation time, one row per entry
+  // it was ever called with. Added as a direct follow-up to the raw
+  // setFlash dump above: that dump proved setFlash('illyra', choke.jpg)
+  // fires from the selfChoke branch's OWN !entry.dodged-gated line for a
+  // log index whose displayed text is a dodged Self Choke - meaning
+  // either that gate saw a different `dodged` value than the log text
+  // shows, or this function ran for an entry whose text doesn't match
+  // what this dump will show. Either way, comparing this dump's dodged
+  // field against the SAME logIndex's own {dodged:...} annotation further
+  // down in this log will show exactly where the two diverge.
+  if (debugLogMode) {
+    const entrySnapshots = getLastFlashEntrySnapshots();
+    if (entrySnapshots.length > 0) {
+      lines.push('--- handleLogEntryForFlash entry-field dump (temporary) ---');
+      for (const s of entrySnapshots) {
+        lines.push(`[t@${s.t}] logIndex=${s.logEntryIndex} type=${s.type} actionId=${s.actionId} characterId=${s.characterId} targetId=${s.targetId} targetCharacterId=${s.targetCharacterId} dodged=${s.dodged}`);
+      }
+      lines.push('--- end handleLogEntryForFlash entry-field dump ---');
     }
   }
   for (let i = 0; i < log.length; i++) {
