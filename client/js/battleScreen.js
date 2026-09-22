@@ -1,5 +1,5 @@
 import { CHARACTERS } from './characters.js';
-import { send } from './net.js';
+import { send, getWireDiagLog } from './net.js';
 import { playUiClick } from './sound.js';
 import { getFlashSrc, getPersistentPortrait, isPetrifyActive, getFlashCallHistory, getFlashSnapshotHistory } from './portraitFlash.js';
 import { getActiveEffects, getClawCount, getCrackCount, getPowSize, getVortexSize, getAxechopTier, getLightningTier, getWildLightningTier, getDarkslashVariant, getEffectCallHistory, getEffectSnapshotHistory } from './actionEffects.js';
@@ -2017,6 +2017,21 @@ function formatHeartsSnapshot(snapshot) {
 // the forward-scan to that batch's own end-action is legitimate and safe.
 function renderFullLogWithCopy(log) {
   const lines = [];
+  // TEMPORARY diagnostic (2026-09-22) - net.js's own wire-level trace
+  // (every WebSocket connect()/message event, timestamped by a running
+  // counter, not tied to any single game.log entry since it covers the
+  // raw dispatch layer BELOW where game.log entries even exist yet).
+  // Surfaced here (debug mode only) per direct request: no dev-tools/
+  // console needed, just copy it out of this same panel like everything
+  // else. Shown as its own block, before the per-entry lines.
+  if (debugLogMode) {
+    const wireDiag = getWireDiagLog();
+    if (wireDiag.length > 0) {
+      lines.push('--- wire diagnostic (temporary) ---');
+      for (const line of wireDiag) lines.push(line);
+      lines.push('--- end wire diagnostic ---');
+    }
+  }
   for (let i = 0; i < log.length; i++) {
     const entry = log[i];
     if (entry.type === 'end-action') continue;

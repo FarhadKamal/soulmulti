@@ -19,10 +19,27 @@ let sessionId = null;
 let queuedBeforeOpen = [];
 let lastMessageAt = 0;
 let staleCheckInterval = null;
-// TEMPORARY diagnostic counters (2026-09-22, remove once the duplicate-
-// broadcast bug is found) - see their own use inside connect() below.
+// TEMPORARY diagnostic (2026-09-22, remove once the duplicate-broadcast
+// bug is found). Deliberately NOT console.log - user asked for something
+// they can just copy out of the same on-page debug log they already use,
+// no dev-tools/inspect required. Recorded into a small buffer here,
+// exported and surfaced by battleScreen.js's own debug-mode panel as a
+// dedicated block at the top (not tied to any single game.log entry,
+// unlike every other debug annotation, since this covers the raw
+// WebSocket/dispatch layer BELOW where game.log entries even exist yet).
 let connectCallCount = 0;
 let wsMessageCount = 0;
+const wireDiagLog = [];
+function recordWireDiag(text) {
+  wireDiagLog.push(text);
+}
+export function getWireDiagLog() {
+  return wireDiagLog;
+}
+// Exported so main.js can record into this SAME buffer too (its own
+// processNewLogEntries diagnostic) - one shared timeline instead of two
+// separate ones the user would have to manually interleave by eye.
+export { recordWireDiag };
 
 // Deliberately can't be tied to the server's 15s ping interval
 // (HEARTBEAT_INTERVAL_MS in index.js) - raw WebSocket ping/pong control
@@ -66,11 +83,12 @@ function resolveServerUrl() {
 }
 
 export function connect() {
-  // TEMPORARY diagnostic (2026-09-22, remove once the duplicate-broadcast
-  // bug is found) - confirms whether connect() itself is ever invoked more
-  // than once per page session, which would attach a second 'message'
-  // listener to a second WebSocket, double-firing every real broadcast.
-  console.log('[DIAG] connect() called, call count on this ws object:', ++connectCallCount);
+  // TEMPORARY diagnostic (2026-09-22) - confirms whether connect() itself
+  // is ever invoked more than once per page session, which would attach a
+  // second 'message' listener to a second WebSocket, double-firing every
+  // real broadcast.
+  connectCallCount += 1;
+  recordWireDiag(`connect() called (call #${connectCallCount})`);
   ws = new WebSocket(resolveServerUrl());
   lastMessageAt = Date.now();
   ws.addEventListener('open', () => {
@@ -84,11 +102,12 @@ export function connect() {
     if (msg.type === 'session') {
       sessionId = msg.sessionId;
     }
-    // TEMPORARY diagnostic - logs every raw WebSocket message received,
+    // TEMPORARY diagnostic - records every raw WebSocket message received,
     // tagged with a running counter, so a duplicate 'game-state' message
     // arriving twice on the wire (vs. being processed twice client-side
-    // after arriving once) is directly visible.
-    console.log('[DIAG] ws message #' + (++wsMessageCount), msg.type, msg.type === 'game-state' ? `log.length=${msg.game?.log?.length}` : '');
+    // after arriving once) is directly visible in the on-page debug log.
+    wsMessageCount += 1;
+    recordWireDiag(`ws message #${wsMessageCount}: ${msg.type}${msg.type === 'game-state' ? ` (log.length=${msg.game?.log?.length})` : ''}`);
     if (listener) listener(msg);
   });
   ws.addEventListener('close', () => {

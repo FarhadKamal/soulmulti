@@ -1,4 +1,4 @@
-import { connect, onMessage } from './net.js';
+import { connect, onMessage, recordWireDiag as recordWireDiagFromMain } from './net.js';
 import { renderLobby } from './lobbyScreen.js';
 import { renderBattle } from './battleScreen.js';
 import { addChatMessage, clearChatMessages } from './chatPanel.js';
@@ -221,13 +221,14 @@ function startGameOverSequence(game) {
 }
 
 function processNewLogEntries(game) {
-  // TEMPORARY diagnostic (2026-09-22, remove once the duplicate-broadcast
-  // bug is found) - confirms whether this function itself is entered more
-  // than once for what looks like a single server action, independent of
-  // how many raw WebSocket messages actually arrived (net.js's own [DIAG]
-  // log covers that separately) - narrows down whether duplication happens
-  // on the wire/listener side or purely within this function's own logic.
-  console.log('[DIAG] processNewLogEntries called, lastLogLength(before)=' + lastLogLength + ' game.log.length=' + game.log.length);
+  // TEMPORARY diagnostic (2026-09-22) - confirms whether this function
+  // itself is entered more than once for what looks like a single server
+  // action, independent of how many raw WebSocket messages actually
+  // arrived (net.js's own wire diag covers that separately) - narrows
+  // down whether duplication happens on the wire/listener side or purely
+  // within this function's own logic. Recorded into the same on-page
+  // debug log net.js's own diagnostic uses, not the console.
+  recordWireDiagFromMain(`processNewLogEntries called, lastLogLength(before)=${lastLogLength} game.log.length=${game.log.length}`);
   const startIndex = lastLogLength;
   const newEntries = game.log.slice(lastLogLength);
   lastLogLength = game.log.length;
