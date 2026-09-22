@@ -1121,6 +1121,28 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
 
   const portrait = document.createElement('img');
   portrait.className = 'char-portrait';
+  // Confirmed live report, 2026-09-22: choke.jpg genuinely showing stuck
+  // on Illyra's tile despite EVERY JS-state trace built so far (flash-
+  // call history, snapshot history, render-event trace, raw setFlash call
+  // dump with stack traces, raw entry-field dump) consistently proving
+  // activeFlash/setFlash/the Self Choke dodge gate are all behaving
+  // correctly for every reproduction sent - the bug, if real, lives below
+  // the JS-state layer entirely: in the browser's own image decode/paint
+  // pipeline. renderBattle rebuilds the ENTIRE board (root.innerHTML = '')
+  // on every render, including frequent timer-driven ones (a flash
+  // expiring anywhere forces every tile's portrait <img> to be recreated
+  // from scratch) - a fresh <img> element's decode is NOT guaranteed to
+  // be synchronous or prioritized by default (loading="auto", decoding=
+  // "auto"), which under a burst of near-simultaneous full-board rebuilds
+  // could plausibly let a stale frame linger on screen a beat longer than
+  // the DOM's own src attribute (already provably correct per every
+  // trace) would suggest. Forcing eager/synchronous/high-priority decode
+  // removes this specific class of risk - cheap, unlikely to have any
+  // visible downside, and targets the one layer no JS-state trace could
+  // ever observe.
+  portrait.loading = 'eager';
+  portrait.decoding = 'sync';
+  portrait.fetchPriority = 'high';
   // Same priority as the main game's characterCard.js: victory art (once
   // the match has actually ended and this character's side won) beats
   // everything else, including timed action-flash - there's nothing left
