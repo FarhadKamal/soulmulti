@@ -471,6 +471,16 @@ function executeSelfChoke(game, melyssaId, puppetId) {
     // being the strictly worse fallback it was at 1 damage.
     amount: 2,
     ignoresShield: true,
+    // Confirmed ruling, 2026-09-22: "self choke attack now 100% possible
+    // even dodge can't protect it" - supersedes the earlier 2026-09-21
+    // ruling that dodge should still legitimately apply (see the
+    // isProtectedByFriendship/melyssa.js commentary history for that prior
+    // stance). Now genuinely unavoidable end to end - bypasses shield AND
+    // every dodge mechanic in the game (Akyros, Marin's Threefold Veil,
+    // Grimtal's Grim Ward, Illyra's passive) - same reasoning as Jester
+    // Ball's own explosion (it's going off directly, not a fresh attack the
+    // puppet could plausibly evade).
+    ignoresDodge: true,
   });
   if (candidateRecord && candidateRecord !== 'keep-existing') {
     const chronoxChar = game.characters.chronox;
