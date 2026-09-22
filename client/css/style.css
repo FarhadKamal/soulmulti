@@ -163,9 +163,15 @@ input {
    tiles sits flush against this scroll container's top edge and the badge
    gets clipped by its overflow boundary. */
 .battle-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding-top: 14px; }
-.round-info { text-align: center; opacity: 0.7; margin-bottom: 6px; flex: 0 0 auto; }
+/* Left-aligned (2026-09-22, confirmed live bug: on a narrow/mobile screen,
+   the previous centered text ran directly under .top-right-controls's
+   absolutely-positioned icon row - top: 0; right: 0, ~176px reserved width -
+   and got visually hidden behind it. Left-aligning keeps this clear of that
+   zone by construction on any reasonably-sized screen, no measurement/
+   media-query needed. */
+.round-info { text-align: left; opacity: 0.7; margin-bottom: 6px; flex: 0 0 auto; }
 .live-clock {
-  text-align: center; opacity: 0.45; margin-bottom: 6px; flex: 0 0 auto;
+  text-align: left; opacity: 0.45; margin-bottom: 6px; flex: 0 0 auto;
   font-size: 0.75em; font-variant-numeric: tabular-nums; user-select: text;
 }
 .turn-timer {
