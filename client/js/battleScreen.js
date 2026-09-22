@@ -2108,8 +2108,30 @@ function renderFullLogWithCopy(log) {
   // line for a {...} annotation that might not even be there yet (a plain
   // entry with nothing debug-worthy correctly shows no annotation at all -
   // see formatDebugAnnotation's own comment).
-  title.textContent = debugLogMode ? 'Match log (DEBUG MODE - press D to toggle)' : 'Match log';
+  title.textContent = debugLogMode ? 'Match log (DEBUG MODE)' : 'Match log';
   header.appendChild(title);
+
+  const headerBtns = document.createElement('div');
+  headerBtns.className = 'final-log-header-btns';
+
+  // Tappable debug-mode toggle (2026-09-22) - the 'D' keydown toggle above
+  // has no equivalent on mobile (no physical keyboard, so debug mode was
+  // completely unreachable there - confirmed live report: "I can't send
+  // detail logs from mobile. Because of button d"). This button gives
+  // every platform the same on/off switch the key already provided, and
+  // makes it discoverable on desktop too instead of relying on a hidden
+  // shortcut nobody would guess exists. Debug mode's own module-level
+  // debugLogMode/triggerRerender - same variables the keydown handler
+  // already flips, so both toggles fully agree with each other no matter
+  // which one was used last.
+  const debugToggleBtn = document.createElement('button');
+  debugToggleBtn.className = 'final-log-debug-btn';
+  debugToggleBtn.textContent = debugLogMode ? 'Debug: ON' : 'Debug: OFF';
+  debugToggleBtn.onclick = () => {
+    debugLogMode = !debugLogMode;
+    triggerRerender();
+  };
+  headerBtns.appendChild(debugToggleBtn);
 
   const copyBtn = document.createElement('button');
   copyBtn.className = 'final-log-copy-btn';
@@ -2130,7 +2152,8 @@ function renderFullLogWithCopy(log) {
       fallbackCopy(text, done);
     }
   };
-  header.appendChild(copyBtn);
+  headerBtns.appendChild(copyBtn);
+  header.appendChild(headerBtns);
   wrap.appendChild(header);
 
   const body = document.createElement('div');
