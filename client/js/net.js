@@ -19,6 +19,10 @@ let sessionId = null;
 let queuedBeforeOpen = [];
 let lastMessageAt = 0;
 let staleCheckInterval = null;
+// TEMPORARY diagnostic counters (2026-09-22, remove once the duplicate-
+// broadcast bug is found) - see their own use inside connect() below.
+let connectCallCount = 0;
+let wsMessageCount = 0;
 
 // Deliberately can't be tied to the server's 15s ping interval
 // (HEARTBEAT_INTERVAL_MS in index.js) - raw WebSocket ping/pong control
@@ -62,6 +66,11 @@ function resolveServerUrl() {
 }
 
 export function connect() {
+  // TEMPORARY diagnostic (2026-09-22, remove once the duplicate-broadcast
+  // bug is found) - confirms whether connect() itself is ever invoked more
+  // than once per page session, which would attach a second 'message'
+  // listener to a second WebSocket, double-firing every real broadcast.
+  console.log('[DIAG] connect() called, call count on this ws object:', ++connectCallCount);
   ws = new WebSocket(resolveServerUrl());
   lastMessageAt = Date.now();
   ws.addEventListener('open', () => {
@@ -75,6 +84,11 @@ export function connect() {
     if (msg.type === 'session') {
       sessionId = msg.sessionId;
     }
+    // TEMPORARY diagnostic - logs every raw WebSocket message received,
+    // tagged with a running counter, so a duplicate 'game-state' message
+    // arriving twice on the wire (vs. being processed twice client-side
+    // after arriving once) is directly visible.
+    console.log('[DIAG] ws message #' + (++wsMessageCount), msg.type, msg.type === 'game-state' ? `log.length=${msg.game?.log?.length}` : '');
     if (listener) listener(msg);
   });
   ws.addEventListener('close', () => {

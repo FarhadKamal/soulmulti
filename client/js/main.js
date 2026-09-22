@@ -221,6 +221,13 @@ function startGameOverSequence(game) {
 }
 
 function processNewLogEntries(game) {
+  // TEMPORARY diagnostic (2026-09-22, remove once the duplicate-broadcast
+  // bug is found) - confirms whether this function itself is entered more
+  // than once for what looks like a single server action, independent of
+  // how many raw WebSocket messages actually arrived (net.js's own [DIAG]
+  // log covers that separately) - narrows down whether duplication happens
+  // on the wire/listener side or purely within this function's own logic.
+  console.log('[DIAG] processNewLogEntries called, lastLogLength(before)=' + lastLogLength + ' game.log.length=' + game.log.length);
   const startIndex = lastLogLength;
   const newEntries = game.log.slice(lastLogLength);
   lastLogLength = game.log.length;
