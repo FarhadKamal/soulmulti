@@ -212,8 +212,24 @@ export function registerChickenCheck(fn) {
 const FLASH_CALL_HISTORY_LIMIT = 2000;
 let flashCallHistory = [];
 let currentLogEntryIndex = -1;
+// Confirmed real gap, 2026-09-22 (see net.js's own recordWireDiag comment
+// for the full reasoning) - the log-entry-index-keyed traces in this file
+// (flashCallHistory/flashSnapshotHistory) had no wall-clock timestamp at
+// all, only which entry index they belonged to. That made them
+// impossible to cross-reference against getRenderTrace (wall-clock only)
+// or the live on-screen clock without GUESSING at message arrival timing,
+// which caused a real mis-attributed correlation in a stuck-portrait
+// investigation. Records Date.now() the moment each log entry index is
+// first dispatched, so battleScreen.js can print it directly alongside
+// that entry's own debug annotation - one shared timeline, no inference
+// needed.
+const logEntryDispatchTime = new Map();
 export function setDebugLogEntryIndex(index) {
   currentLogEntryIndex = index;
+  if (!logEntryDispatchTime.has(index)) logEntryDispatchTime.set(index, Date.now());
+}
+export function getLogEntryDispatchTime(index) {
+  return logEntryDispatchTime.get(index) ?? null;
 }
 export function getFlashCallHistory() {
   return flashCallHistory;
@@ -289,6 +305,7 @@ export function getFlashSnapshotHistory() {
 export function resetFlashDebugHistoryForNewMatch() {
   flashCallHistory = [];
   flashSnapshotHistory = [];
+  logEntryDispatchTime.clear();
 }
 
 // Render-event trace (2026-09-22) - follow-up to a live report the prior

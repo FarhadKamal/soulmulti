@@ -1,7 +1,7 @@
 import { CHARACTERS } from './characters.js';
 import { send, getWireDiagLog } from './net.js';
 import { playUiClick } from './sound.js';
-import { getFlashSrc, getPersistentPortrait, isPetrifyActive, getFlashCallHistory, getFlashSnapshotHistory, getRenderTrace } from './portraitFlash.js';
+import { getFlashSrc, getPersistentPortrait, isPetrifyActive, getFlashCallHistory, getFlashSnapshotHistory, getRenderTrace, getLogEntryDispatchTime } from './portraitFlash.js';
 import { getActiveEffects, getClawCount, getCrackCount, getPowSize, getVortexSize, getAxechopTier, getLightningTier, getWildLightningTier, getDarkslashVariant, getEffectCallHistory, getEffectSnapshotHistory } from './actionEffects.js';
 import { renderFullscreenButton } from './fullscreen.js';
 import { renderMusicMuteButton } from './musicMute.js';
@@ -2122,12 +2122,24 @@ function renderFullLogWithCopy(log) {
     // what the server sent AND what the client actually did with it, so a
     // discrepancy between the two is now directly visible in one place
     // instead of requiring a fresh code investigation each time.
+    // Confirmed real gap, 2026-09-22: this per-entry trace was only ever
+    // keyed by log entry INDEX, with no wall-clock timestamp - impossible
+    // to cross-reference against the render trace or live on-screen clock
+    // (both wall-clock-only) without guessing at message arrival timing,
+    // which caused a real mis-attributed correlation in a stuck-portrait
+    // investigation. getLogEntryDispatchTime records the exact Date.now()
+    // this entry index was first dispatched at - printed here as
+    // [t@<epoch-ms>], same format the render trace/live clock already use,
+    // so a screenshot's visible timestamp can now be matched to the
+    // EXACT log line, not just an estimated neighborhood of lines.
+    const dispatchTime = debugLogMode ? getLogEntryDispatchTime(i) : null;
+    const dispatchTimeText = dispatchTime ? `[t@${dispatchTime}]` : '';
     const rawDebugText = debugLogMode ? formatDebugAnnotation(entry) : '';
     const flashDebugText = debugLogMode ? formatFlashDebugAnnotation(i) : '';
     const flashSnapshotText = debugLogMode ? formatFlashSnapshotAnnotation(i) : '';
     const effectDebugText = debugLogMode ? formatEffectDebugAnnotation(i) : '';
     const effectSnapshotText = debugLogMode ? formatEffectSnapshotAnnotation(i) : '';
-    const debugText = [rawDebugText, flashDebugText, flashSnapshotText, effectDebugText, effectSnapshotText].filter(Boolean).join(' ');
+    const debugText = [dispatchTimeText, rawDebugText, flashDebugText, flashSnapshotText, effectDebugText, effectSnapshotText].filter(Boolean).join(' ');
     const withHearts = snapshotText ? `${text}  [${snapshotText}]` : text;
     lines.push(debugText ? `${withHearts}  ${debugText}` : withHearts);
   }

@@ -30,8 +30,23 @@ let staleCheckInterval = null;
 let connectCallCount = 0;
 let wsMessageCount = 0;
 const wireDiagLog = [];
+// Confirmed real gap, 2026-09-22: every other debug-trace layer
+// (portraitFlash.js's getRenderTrace, battleScreen.js's live on-screen
+// clock) is keyed to Date.now() epoch-milliseconds specifically so a
+// screenshot's visible timestamp can be searched for directly in a
+// debug-mode log - but this wire diagnostic never recorded a timestamp at
+// all, only message ARRIVAL ORDER. That made it impossible to reliably
+// tell which real-time moment a given game-state message (and the log
+// entries it carried) actually corresponded to - an investigation into a
+// stuck-portrait report tried to infer this by assuming messages arrive
+// at a roughly constant rate, which turned out to be a wrong assumption
+// (bot turns have large multi-second gaps for "thinking" time, then tight
+// sub-second bursts for chain reactions), leading to a mis-attributed
+// correlation. Prefixing every line with the same epoch-ms format now
+// makes this trace directly cross-referenceable against the render trace
+// and the live clock, closing that gap for good.
 function recordWireDiag(text) {
-  wireDiagLog.push(text);
+  wireDiagLog.push(`[${Date.now()}] ${text}`);
 }
 export function getWireDiagLog() {
   return wireDiagLog;
