@@ -728,33 +728,36 @@ function mySeatCharacterIds() {
 // Confirmed live report: "annoying, when image loading during battle" -
 // entering a match before imagePreload.js's full ~150-image batch has
 // finished meant an early flash/portrait swap could hit a live, visibly-
-// lagging first-time network fetch instead of an instant cache hit. Used
-// to only give the preload a brief head start (a timeout-raced wait, capped
-// at a few seconds) rather than a real guarantee - which turned out to be
-// the root cause of a much worse symptom than "slow to show up": an <img>
-// src swap to a NOT-YET-CACHED url keeps showing the OLD bitmap on screen
-// until the fetch actually finishes (confirmed live bug/investigation,
-// 2026-09-22 - choke.jpg visibly stuck on a character's tile several turns
-// after the flash that set it had already expired, reproduced on both
-// desktop and mobile; a render-event trace proved the JS state was correct
-// throughout, so the gap was purely "screen hasn't caught up to state
-// yet"). Per direct request ("my suggestion load every images before
-// battle start... show loading please wait for that"), this now waits for
-// the COMPLETE battleImagesReady() promise with NO timeout cap - every
-// single battle image is guaranteed cached before the 'preparing' screen
-// (see rerender's own render branch below) ever releases into battle, so a
-// stuck/stale image from an uncached fetch can no longer happen at all,
-// regardless of connection speed. In practice this is rarely a long wait -
-// preloadBattleImages() fires at page load, well before the player even
-// finishes navigating the lobby, so the full batch has often already
-// settled (or is close to it) by the time they actually enter a match.
-// Deliberately does NOT also wait on audio (see audioPreload.js's own
-// comment on why that batch is excluded).
+// lagging first-time network fetch instead of an instant cache hit. This
+// gives the preload a brief head start by holding the 'preparing' screen
+// (see rerender's own render branch below) until either every image has
+// settled or PREPARING_MAX_WAIT_MS elapses, whichever comes first.
+//
+// Briefly removed this cap entirely (2026-09-22, in response to a
+// separate stuck-portrait investigation - see portraitFlash.js's
+// getRenderTrace comment) - but that traded one bug for a worse one:
+// bots run on the SERVER's own turn timer, not per-viewer, so an
+// uncapped wait doesn't pause the match, it just means a slow
+// connection's player arrives having silently missed however many bot
+// turns happened while their images were still loading (confirmed live
+// report: "during loading image time battle auto started and bot started
+// playing"). Restored the cap per direct follow-up - a short wait is the
+// right tradeoff: the ORIGINAL stuck-image bug (an <img> src swap to an
+// uncached url keeps showing the OLD bitmap until the fetch finishes) was
+// never actually fixed BY this wait in the first place - it only ever
+// covered the opening moment of a match, not any later mid-match image
+// swap, which is unprotected either way. Removing the cap only reduced
+// how often the opening moment specifically could show a late-loading
+// image; it never touched the real bug, so restoring the cap gives up
+// nothing that was actually fixed.
+const PREPARING_MAX_WAIT_MS = 1500;
+
 function enterBattleWhenReady() {
   state.screen = 'preparing';
   rerender();
   const ready = battleImagesReady() || Promise.resolve();
-  ready.then(() => {
+  const timeout = new Promise((resolve) => setTimeout(resolve, PREPARING_MAX_WAIT_MS));
+  Promise.race([ready, timeout]).then(() => {
     // Guard against a late resolution firing after the player already left
     // (e.g. abandoned the match, or a new lobby-update reset the screen
     // back to 'lobby') - only advance if still genuinely waiting.
@@ -772,18 +775,18 @@ function rerender() {
       rerender,
     });
   } else if (state.screen === 'preparing') {
-    // Waits for imagePreload.js's FULL battle-image set (all 16 heroes,
-    // not just this match's roster) to be genuinely cached before ever
-    // releasing into battle - see enterBattleWhenReady's own comment for
-    // why this is now an unconditional wait rather than a timeout-capped
-    // race. Usually near-instant (the preload fires at page load, well
-    // before the player finishes navigating the lobby) but can take a
-    // real few seconds on a slow/mobile connection, so the message says
-    // what it's actually waiting on rather than a generic "preparing".
+    // Brief, CAPPED head start for imagePreload.js's battle-image preload
+    // (see enterBattleWhenReady's own comment for why this is capped
+    // rather than an unconditional wait - bots run on the server's own
+    // turn timer regardless of what any client is showing, so waiting too
+    // long here just means arriving having silently missed turns, a worse
+    // problem than a rare late-loading image). Usually resolves almost
+    // instantly (the preload fires at page load, well before the player
+    // finishes navigating the lobby).
     root.innerHTML = '';
     const wrap = document.createElement('div');
     wrap.className = 'preparing-battle';
-    wrap.innerHTML = '<div class="preparing-battle-spinner"></div><p>Loading battle images, please wait…</p>';
+    wrap.innerHTML = '<div class="preparing-battle-spinner"></div><p>Preparing battle…</p>';
     root.appendChild(wrap);
   } else {
     // Pass the REAL state object through (not a fresh literal) - battleScreen
