@@ -490,7 +490,23 @@ export function applyDamage(game, log, {
       // still applies normally though (confirmed ruling), since
       // ignoresShield is passed through from the original call unchanged.
       if (redirectedResult.koTriggered) {
-        const overflow = amount - result.absorbed - beforeHearts;
+        // Confirmed real bug, 2026-09-22 (live report: "The overflow damage
+        // also strikes Melyssa - 992 damage - KO!"): this formula assumes
+        // `amount` is genuine, human-scale damage - true for every normal
+        // attack, but Athena's Divine Judgment trigger (athena.js) uses a
+        // deliberately huge flat `amount: 999` as a "guarantee a kill
+        // regardless of hearts/shield" trick, never meant to represent a
+        // real damage NUMBER anyone should ever see. When Divine Judgment's
+        // marked victim happens to be protected by Friendship, that 999
+        // flows straight through this same overflow math and produces a
+        // nonsense "992 damage" spillover line. Capped to the friend's own
+        // maxHearts - the largest overflow could ever legitimately be (he
+        // can never have more than maxHearts to fail to absorb), so this
+        // stays correct for every genuine attack (which was already well
+        // under maxHearts in practice) while making it impossible for any
+        // current or future flat-huge-number "guaranteed kill" trigger to
+        // produce a fake giant number here again.
+        const overflow = Math.min(amount - result.absorbed - beforeHearts, friend.maxHearts);
         if (overflow > 0) {
           const spilloverResult = applyDamage(game, log, {
             sourceCharacterId, targetCharacterId: 'melyssa', amount: overflow,
