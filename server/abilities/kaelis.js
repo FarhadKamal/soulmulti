@@ -1,6 +1,7 @@
 import { applyDamage, applyHeal, heartsSnapshot } from '../engine/damagePipeline.js';
 import { registerOnOtherRevived } from '../engine/categories/onOtherRevived.js';
 import { registerOnHitLanded } from '../engine/categories/onHitLanded.js';
+import { isCurrentFriend } from './melyssa.js';
 
 // Grudge accumulation (see engine/categories/onHitLanded.js): whenever a
 // REAL (non-mirrored) hit lands on her, that attacker's per-attacker hit
@@ -66,7 +67,27 @@ export function onTurnStart(character, game, log) {
     log.push({ type: 'ashkas-vengeance-activate', characterId: character.id, hearts: heartsSnapshot(game) });
   }
   if (character.special.ashkasVengeanceActive) {
-    const others = Object.values(game.characters).filter((c) => c.id !== 'kaelis' && !c.isKO);
+    // Melyssa's Friendship (Redirect Bond #39) - confirmed real bug,
+    // 2026-09-22 (live report: "if melyssa becom friend with kaelis. ashka
+    // will not attack melyssa also, during friendship"). Ashka's random
+    // target pool never went through isValidTarget/isValidPuppetTarget at
+    // all (it's a fully automatic passive, not a player-chosen attack), so
+    // the mutual no-attack rule those enforce (turnEngine.js's own
+    // isCurrentFriend checks) never applied here - Ashka could randomly
+    // strike Melyssa directly even while she and Kaelis are bonded. Unlike
+    // a normal attack aimed AT Melyssa (which redirects to her friend via
+    // damagePipeline.js's own hook), this case is different: Kaelis HERSELF
+    // is the friend, and the redirect hook already correctly skips
+    // redirecting a hit back onto its own source (friendId === sourceId
+    // would be a self-redirect, nonsensical) - so without this exclusion
+    // the hit would have landed on Melyssa directly instead of being
+    // properly blocked by the bond. Simplest fix: exclude Melyssa from
+    // Ashka's own random pool entirely whenever Kaelis is currently her
+    // friend, same "flat exclusion, not a redirect" shape already used for
+    // Shadow Seal/Moonlit Theft's own Melyssa-as-friend gaps.
+    const others = Object.values(game.characters).filter(
+      (c) => c.id !== 'kaelis' && !c.isKO && !(c.id === 'melyssa' && isCurrentFriend(game, 'kaelis'))
+    );
     if (others.length > 0) {
       const target = others[Math.floor(Math.random() * others.length)];
       // True Pure Attack (confirmed ruling: "bypasses shield too") -
