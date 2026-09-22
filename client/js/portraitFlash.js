@@ -237,7 +237,21 @@ export function getFlashCallHistory() {
 
 function setFlash(characterId, src, durationMs = FLASH_DURATION_MS) {
   if (isCurrentlyChicken(characterId) && !CHICKEN_FLASH_PATHS.has(src)) return;
-  flashCallHistory.push({ characterId, src, logEntryIndex: currentLogEntryIndex });
+  // Confirmed real anomaly, 2026-09-22: a fully-timestamped, cross-
+  // referenced trace (getRenderTrace + getLogEntryDispatchTime) proved
+  // illyra/choke.jpg gets set in exact sync with a DODGED Self Choke
+  // entry, even though every code path that could plausibly do this
+  // (this file's own selfChoke branch, handleDodgeForFlash, the generic
+  // switch) was individually re-checked and should not fire under these
+  // conditions - the entry's own flash-call-history/snapshot annotations
+  // even show illusion.jpg as the correct result immediately after
+  // processing, yet the render trace shows choke.jpg was genuinely
+  // active moments later. Capturing a real JS stack trace on every
+  // setFlash call is the one thing that can name the ACTUAL call site
+  // unambiguously, however well-hidden - a stack trace can't be wrong
+  // about which function called it, unlike inferring from code reading.
+  const stack = new Error().stack;
+  flashCallHistory.push({ characterId, src, logEntryIndex: currentLogEntryIndex, stack, t: Date.now() });
   if (flashCallHistory.length > FLASH_CALL_HISTORY_LIMIT) flashCallHistory.shift();
   const existing = activeFlash.get(characterId);
   if (existing) clearTimeout(existing.timer);

@@ -2102,6 +2102,34 @@ function renderFullLogWithCopy(log) {
       lines.push('--- end render trace ---');
     }
   }
+  // TEMPORARY diagnostic (2026-09-22) - a raw, UNFILTERED dump of every
+  // setFlash call ever made this match, each with its own wall-clock
+  // timestamp and a captured JS stack trace. Added specifically because a
+  // fully cross-referenced investigation (comparing this file's own
+  // per-entry flash-call/snapshot annotations against getRenderTrace,
+  // both keyed to the same wall-clock timeline) found an unexplained
+  // anomaly: illyra/choke.jpg was shown as genuinely active in the render
+  // trace, in exact sync with a DODGED Self Choke entry, even though
+  // every per-entry annotation for that specific entry (and every
+  // surrounding entry in the same batch) correctly showed illusion.jpg,
+  // not choke.jpg - meaning some setFlash('illyra', '.../choke.jpg') call
+  // happened that the per-entry (logEntryIndex-keyed) trace didn't
+  // attribute to any entry. This raw dump - unlike
+  // formatFlashDebugAnnotation, which only ever shows calls already
+  // matched to a specific log entry index - cannot miss or misattribute
+  // any call, and the stack trace pinpoints exactly which function made
+  // it, however unexpected the call site turns out to be.
+  if (debugLogMode) {
+    const allCalls = getFlashCallHistory();
+    if (allCalls.length > 0) {
+      lines.push('--- raw setFlash call dump (temporary) ---');
+      for (const call of allCalls) {
+        const stackLines = (call.stack || '').split('\n').slice(1, 4).map((l) => l.trim()).join(' | ');
+        lines.push(`[t@${call.t}] logIndex=${call.logEntryIndex} ${call.characterId}<-${call.src} :: ${stackLines}`);
+      }
+      lines.push('--- end raw setFlash call dump ---');
+    }
+  }
   for (let i = 0; i < log.length; i++) {
     const entry = log[i];
     if (entry.type === 'end-action') continue;
