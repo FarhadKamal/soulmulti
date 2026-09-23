@@ -432,7 +432,17 @@ export function applyDamage(game, log, {
   if (target.id === 'melyssa' && !target.isKO && sourceCharacterId !== 'melyssa') {
     const friendId = target.special.friendCharacterId;
     const friend = (friendId && friendId !== sourceCharacterId) ? game.characters[friendId] : null;
-    if (friend && !friend.isKO) {
+    // Confirmed ruling, 2026-09-23: "if friend is frozen he cannot help
+    // melyssa... until their frozen status end" - a frozen friend (Chronox's
+    // Time Freeze or World Stops, isFrozenByChronox covers both) can't step
+    // in to redirect a hit for her, same "incapacitated, nothing left to
+    // redirect to" reasoning already used for World Stops catching the
+    // friend himself (see the standing "world stop means everything stop -
+    // even boingo can't save melyssa" ruling in project memory). Distinct
+    // from that case though: HERE Melyssa herself isn't frozen, only her
+    // friend is - the hit simply falls through to land on her directly, same
+    // as the friend being dead or not yet chosen at all.
+    if (friend && !friend.isKO && !isFrozenByChronox(friend, game)) {
       const beforeHearts = friend.hearts;
       const redirectedResult = applyDamage(game, log, {
         sourceCharacterId, targetCharacterId: friendId, amount,

@@ -4,6 +4,7 @@ import {
 } from './turnEngine.js';
 import { isFrozenByChronox } from './damagePipeline.js';
 import { BEAST_ATTACK_HIGH_DAMAGE, BEAST_ATTACK_LOW_DAMAGE } from '../abilities/grimtal.js';
+import { isCurrentFriend } from '../abilities/melyssa.js';
 
 // Pure decision logic for PC-controlled characters - no DOM, no side
 // effects. Given a character whose turn it is, returns the action+target
@@ -1877,7 +1878,23 @@ export function chooseBotMelyssaPuppetAction(puppetCharacter, game, melyssaId) {
   // kept puppeting Velorya's Moonstep onto herself). Only relevant for an
   // ENEMY puppet - Self Choke isn't offered at all for an ally puppet.
   // (melyssa itself is already declared above, for the Soul Swap check.)
-  const isEnemyPuppet = melyssa && puppetCharacter.ownerId !== melyssa.ownerId;
+  // Confirmed ruling, 2026-09-23 (live report: "i have seen she self choked
+  // on her friend. but still other hero alives") - none of this block's own
+  // preference conditions (hitsMelyssaSide, dealsNoDamageThisTurn, etc.)
+  // had any awareness that the puppet might be her CURRENT Friendship bond
+  // partner. Self Choke against her own friend permanently breaks the bond
+  // (server/index.js's executeSelfChoke), so choosing it here just to force
+  // a slightly-better-than-nothing puppeted turn is a bad trade while other
+  // players are still alive to threaten her - "yes melyssa bot still can
+  // attack her friend if is literally needed. but should be logical
+  // decision." The genuine forced-endgame case (only her and this exact
+  // friend left alive) is a completely separate code path
+  // (turnEngine.js's `friendshipSelfChoke`, gated by isFriendshipForcedChoke)
+  // that never reaches chooseBotMelyssaPuppetAction at all - this function
+  // is only ever called for a NORMAL Mind Control puppet turn, so excluding
+  // the friend here can never block that legitimate forced case.
+  const isEnemyPuppet = melyssa && puppetCharacter.ownerId !== melyssa.ownerId
+    && !isCurrentFriend(game, puppetCharacter.id);
   if (isEnemyPuppet) {
     const chosenTarget = move.targetId ? game.characters[move.targetId] : null;
     const hitsMelyssaSide = chosenTarget && chosenTarget.ownerId === melyssa.ownerId;

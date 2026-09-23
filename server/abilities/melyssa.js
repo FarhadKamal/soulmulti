@@ -1,4 +1,4 @@
-import { isSilenced, clearStatusesFromOneSource, heartsSnapshot } from '../engine/damagePipeline.js';
+import { isSilenced, clearStatusesFromOneSource, heartsSnapshot, isFrozenByChronox } from '../engine/damagePipeline.js';
 import { registerOnHitLanded } from '../engine/categories/onHitLanded.js';
 import { registerOnOwnDeath } from '../engine/categories/onOwnDeath.js';
 import { registerOnOtherRevived } from '../engine/categories/onOtherRevived.js';
@@ -88,6 +88,13 @@ export function redirectStatusTargetIfProtected(game, targetId, sourceCharacterI
   if (!friendId || friendId === sourceCharacterId) return targetId;
   const friend = game.characters[friendId];
   if (!friend || friend.isKO) return targetId;
+  // Confirmed ruling, 2026-09-23: a frozen friend (Time Freeze/World Stops)
+  // can't step in to redirect a status onto himself either - same reasoning
+  // and same isFrozenByChronox check as applyDamage's own redirect gate in
+  // damagePipeline.js. Imported lazily-by-reference is unnecessary here
+  // since damagePipeline.js already exports it and melyssa.js already
+  // imports several other named exports from that module.
+  if (isFrozenByChronox(friend, game)) return targetId;
   return friendId;
 }
 
