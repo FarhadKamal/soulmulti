@@ -612,6 +612,15 @@ input {
   padding: 2px 6px; border-radius: 10px;
   pointer-events: none; z-index: 5;
 }
+/* Blood Drain (added 2026-09-23) - highlights the badge when Blade's NEXT
+   hit on this target will be the primed 3rd tick (deals 3 damage AND heals
+   him), see battleScreen.js's own nextHit===3 check for why this is keyed
+   off the badge showing 2, not 3. Red/blood glow distinct from the default
+   dark-grey pill, same visual language as his blood_drain.jpg art. */
+.blade-hitcount-badge--primed {
+  background: rgba(120, 12, 12, 0.92); border-color: #d43a3a;
+  box-shadow: 0 0 6px rgba(217, 40, 40, 0.7);
+}
 /* Melyssa's Friendship (Redirect Bond #39) - same stacking reasoning as
    .blade-hitcount-badge above, one slot further up the same bottom-
    center column (could plausibly coexist with both mirage-mark and

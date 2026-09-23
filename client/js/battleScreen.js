@@ -1158,7 +1158,18 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
     // RECENT Blood Hunt against this specific character dealt (1-3,
     // cycling); the badge previews what his NEXT hit on them would deal.
     const bladeBadge = document.createElement('div');
-    bladeBadge.className = 'blade-hitcount-badge';
+    const nextHit = (bladeHitCount % 3) + 1;
+    // Blood Drain (added 2026-09-23) - his NEXT hit on this target is the
+    // one that will actually trigger Blood Drain (deals 3 AND heals him)
+    // exactly when nextHit === 3, i.e. when the CURRENT badge count is 2 -
+    // confirmed ruling: "is necessay to show blade_hit with count when it
+    // s equal to 3" then corrected during design (the raw count showing
+    // "3" means his LAST hit already happened and his NEXT one only deals
+    // 1 - the badge state that's actually a meaningful warning is count===2,
+    // since that's when his upcoming hit is the primed 3rd tick). A
+    // modifier class rather than a new badge - same icon/position, just a
+    // distinct highlighted look while primed.
+    bladeBadge.className = nextHit === 3 ? 'blade-hitcount-badge blade-hitcount-badge--primed' : 'blade-hitcount-badge';
     // Custom icon (confirmed 2026-09-15, matches Grimtal's own badge-icon
     // treatment) instead of the plain 🗡️ emoji.
     const bladeIcon = document.createElement('img');
@@ -1167,8 +1178,9 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
     bladeIcon.alt = '';
     bladeBadge.appendChild(bladeIcon);
     bladeBadge.appendChild(document.createTextNode(`${bladeHitCount}`));
-    const nextHit = (bladeHitCount % 3) + 1;
-    bladeBadge.title = `Blade's hit count on you: ${bladeHitCount} (his next Blood Hunt on you would deal ${nextHit})`;
+    bladeBadge.title = nextHit === 3
+      ? `Blade's hit count on you: ${bladeHitCount} (his next Blood Hunt on you would deal 3 - and drain your blood to heal him)`
+      : `Blade's hit count on you: ${bladeHitCount} (his next Blood Hunt on you would deal ${nextHit})`;
     tile.appendChild(bladeBadge);
   }
 
