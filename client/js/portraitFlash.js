@@ -788,7 +788,27 @@ export function handleLogEntryForFlash(entry, game) {
     // own attack flash already played from its own separate log entry
     // (pushed just before this one), so this is purely the follow-up
     // "feeding" beat right after.
-    if (!isKO(entry.characterId)) setFlash(entry.characterId, 'assets/images/blade/blood_drain.jpg');
+    if (isKO(entry.characterId)) return;
+    // Confirmed real bug, 2026-09-23 (live report: "blood drain animation
+    // work but.. blood_frenzy image miss"). setFlash() has no queueing - it
+    // synchronously overwrites whatever's currently showing on that tile
+    // and clears its timer. When this entry follows a Blood Frenzy burst
+    // (blade.js's own afterBloodFrenzy flag), the cast flash
+    // (blood_frenzy.jpg) is still supposed to be showing for its own full
+    // 4500ms (BLOOD_FRENZY_FLASH_DURATION_MS) - calling setFlash for the
+    // drain immediately in the same dispatch batch cut that cast flash's
+    // display time down to almost nothing. Delaying this call until the
+    // cast flash's own duration has elapsed lets each one get its full,
+    // separate moment instead of racing for the same tile. A normal single
+    // Blood Hunt hit has no such competing flash, so it fires immediately
+    // as before.
+    if (entry.afterBloodFrenzy) {
+      setTimeout(() => {
+        if (!isKO(entry.characterId)) setFlash(entry.characterId, 'assets/images/blade/blood_drain.jpg');
+      }, BLOOD_FRENZY_FLASH_DURATION_MS);
+      return;
+    }
+    setFlash(entry.characterId, 'assets/images/blade/blood_drain.jpg');
     return;
   }
   if (entry.type === 'beast-regen') {

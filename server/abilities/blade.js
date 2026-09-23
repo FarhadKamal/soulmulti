@@ -240,7 +240,23 @@ export const actions = {
       if (bloodDrainTotal > 0) {
         const bloodDrainHealed = applyHeal(game, character.id, bloodDrainTotal);
         if (bloodDrainHealed > 0) {
-          log.push({ type: 'blood-drain', characterId: character.id, healed: bloodDrainHealed, hearts: heartsSnapshot(game) });
+          // afterBloodFrenzy: true - confirmed real bug, 2026-09-23 (live
+          // report: "blood drain animation work but.. blood_frenzy image
+          // miss"). Pushing this entry after the summary line fixed the
+          // FIRST bug (drain flash never showing at all - see the earlier
+          // fix's own comment above), but immediately introduced a SECOND
+          // one: portraitFlash.js's own setFlash() has no queueing - it
+          // synchronously overwrites whatever flash is currently showing on
+          // that character's tile, and clears its timer. The cast flash
+          // (blood_frenzy.jpg) is set for a full 4500ms
+          // (BLOOD_FRENZY_FLASH_DURATION_MS), but this entry's own
+          // blood_drain.jpg flash fires moments later in the SAME dispatch
+          // batch, immediately cutting the cast flash's display time down
+          // to almost nothing. This flag tells the client to delay its own
+          // flash call until the cast flash's full duration has actually
+          // elapsed, rather than racing it - see portraitFlash.js's own
+          // 'blood-drain' case for the matching client-side fix.
+          log.push({ type: 'blood-drain', characterId: character.id, healed: bloodDrainHealed, hearts: heartsSnapshot(game), afterBloodFrenzy: true });
         }
       }
       return { hits, rebirthLogEntry, mirrorLogEntry, mirrorReflectLogEntry, fowlPlayRevertLogEntry, divineJudgmentTriggerLogEntry, prophecyOfDoomTriggerLogEntry, friendshipEndLogEntry, friendshipSpilloverLogEntry };
