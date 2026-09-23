@@ -33,7 +33,7 @@ const SOUND_EFFECT_FILES = [
   'shadowexecution.mp3', 'smash.mp3', 'soulswap.mp3',
   'sword.mp3', 'thunder.mp3', 'toss.mp3', 'victory.mp3',
   'mind_control.mp3', 'self_choke.mp3',
-  'grudge_hit.mp3', 'bird_heal.mp3',
+  'grudge_hit.mp3', 'bird_heal.mp3', 'blood_lick.mp3',
   'axe_strike.mp3', 'deathless_fury.mp3',
   'wand_strike.mp3', 'study.mp3', 'cloud.mp3', 'healing.mp3', 'lightning.mp3', 'mirror.mp3', 'lock.mp3',
   'everbloom.wav', 'magic_dodge.wav', 'silent_study.wav', 'cleanSlate.mp3', 'wand_discover.mp3',

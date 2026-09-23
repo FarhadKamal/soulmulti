@@ -780,6 +780,17 @@ export function handleLogEntryForFlash(entry, game) {
     if (!isKO(entry.characterId)) setFlash(entry.characterId, 'assets/images/kaelis/bird.jpg');
     return;
   }
+  if (entry.type === 'blood-drain') {
+    // Blade's Blood Drain (design-locked 2026-09-23) - always-on passive,
+    // fires whenever a 3rd-tick Blood Hunt/Blood Frenzy hit actually lands.
+    // Own dedicated type, same "not player-triggered, no actionId"
+    // reasoning as ashka-heal/beast-regen above - the triggering strike's
+    // own attack flash already played from its own separate log entry
+    // (pushed just before this one), so this is purely the follow-up
+    // "feeding" beat right after.
+    if (!isKO(entry.characterId)) setFlash(entry.characterId, 'assets/images/blade/blood_drain.jpg');
+    return;
+  }
   if (entry.type === 'beast-regen') {
     // Grimtal's Beast Form passive regeneration (own dedicated type, same
     // "not player-triggered, no actionId" reasoning as ashka-heal above) -

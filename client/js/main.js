@@ -540,6 +540,18 @@ function playLogEntrySound(entry, game) {
     playMoveVoice('kaelis', 'callAshka');
     return;
   }
+  if (entry.type === 'blood-drain') {
+    // Blade's Blood Drain - not a player-picked action (no actionId on
+    // this entry type), same reasoning as ashka-heal above. Dedicated
+    // sound (assets/sounds/blood_lick.mp3, a short wet lick/smack) rather
+    // than the generic shared healing.mp3 - a clean magical chime clashed
+    // with the dark, visceral "feeding off the blade" visual. Voice line:
+    // assets/voice/blade/blood_drain.mp3 (looked up via
+    // ACTION_VOICE_LINES.blade.bloodDrain in voice.js).
+    playSound('blood_lick');
+    playMoveVoice('blade', 'bloodDrain');
+    return;
+  }
   if (entry.type === 'beast-regen') {
     // Grimtal's Beast Form passive regeneration - not a player-picked
     // action (no actionId on this entry type), same reasoning as

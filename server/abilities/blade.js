@@ -1,4 +1,4 @@
-import { applyDamage, registerRebirth } from '../engine/damagePipeline.js';
+import { applyDamage, applyHeal, heartsSnapshot, registerRebirth } from '../engine/damagePipeline.js';
 
 // Blood Hunt's per-target hit counter (confirmed redesign, 2026-09-14 -
 // see state.js's own hitCountByTarget comment for the full "why"). Cycles
@@ -11,6 +11,38 @@ function nextBladeHitCount(character, targetId) {
   const next = (current % 3) + 1;
   character.special.hitCountByTarget[targetId] = next;
   return next;
+}
+
+// Blood Drain (design-locked 2026-09-23): always-on from turn one, no
+// hearts<=3 gate, no cast, no toggle - not a separate action at all, just a
+// standing rule layered onto Blood Hunt's own existing 1->2->3 cycle.
+// Confirmed rulings: "it does not require hearts<=3", "yes it apply to
+// blood frenzy burst strike too. base on condition", "heal amount 1 life".
+// Whenever a hit lands as the 3RD tick of a target's own cycle (the peak
+// 3-damage hit) AND it actually connects for real damage (amountDealt > 0 -
+// a fully dodged/shield-absorbed 3rd hit drains no blood, there's nothing
+// to drain), Blade heals 1 flat heart - confirmed to fire even if that same
+// hit is the killing blow (the trigger is "did a 3rd-tick hit land", not
+// "did the target survive"). Deliberately NOT gated on `amount === 3`
+// checked in isolation - reads `result.amountDealt` instead, so a 3rd-tick
+// hit that only PARTIALLY got through (some absorbed by shield, rest
+// landed) still heals, while a FULLY absorbed/dodged one (amountDealt 0)
+// does not. Shared by both bloodHunt.execute (single chosen-target hit) and
+// bloodFrenzy's own burst loop (each randomly-targeted strike checks its
+// own target's cycle the same way, no separate math) - same "no separate
+// burst-only logic" pattern nextBladeHitCount itself already follows.
+// Returns the healed amount (0 if it didn't trigger or Blade was already at
+// max) and pushes its own dedicated 'blood-drain' log entry (same "own
+// type, no actionId" shape as Kaelis's ashka-heal/Grimtal's beast-regen)
+// only when it actually healed something, matching every other passive
+// heal tick in the codebase.
+function applyBloodDrainIfEligible(character, game, log, amount, result) {
+  if (amount !== 3 || result.amountDealt <= 0) return 0;
+  const healed = applyHeal(game, character.id, 1);
+  if (healed > 0) {
+    log.push({ type: 'blood-drain', characterId: character.id, healed, hearts: heartsSnapshot(game) });
+  }
+  return healed;
 }
 
 // Blood Frenzy: hearts<=3 one-time special. Immediately unleashes a burst
@@ -87,6 +119,11 @@ export const actions = {
         amount,
       });
       log.push({ type: 'attack', characterId: character.id, actionId: 'bloodHunt', targetId, streak: amount, ...result });
+      // Blood Drain - pushed AFTER the attack's own line, same ordering
+      // every other passive-heal-triggered-by-an-attack tick in this
+      // codebase already uses (see Kaelis's Ashka's Vengeance, which pushes
+      // its own strike line before any deferred heal-adjacent entry).
+      applyBloodDrainIfEligible(character, game, log, amount, result);
       return result;
     },
   },
@@ -167,6 +204,15 @@ export const actions = {
         // reasoning as every other deferred entry in this loop.
         if (result.friendshipSpilloverLogEntry && !friendshipSpilloverLogEntry) friendshipSpilloverLogEntry = result.friendshipSpilloverLogEntry;
         if (result.redirectedToFriendId && !redirectedToFriendId) redirectedToFriendId = result.redirectedToFriendId;
+        // Blood Drain - checked per-strike, same rule as a normal Blood
+        // Hunt hit (confirmed ruling: "yes it apply to blood frenzy burst
+        // strike too. base on condition"). Pushed here, inside the loop,
+        // right after the strike that triggered it - not bunched at the
+        // very end after the burst's own summary line - so a heal reads in
+        // the log immediately next to the specific strike that caused it,
+        // consistent with how every other per-strike deferred check in this
+        // same loop is already positioned.
+        applyBloodDrainIfEligible(character, game, log, amount, result);
         if (character.isKO) break; // a mirrored/reflected counter-hit KO'd Blade himself mid-burst
       }
       log.push({ type: 'special', characterId: character.id, actionId: 'bloodFrenzy', hits, ...(redirectedToFriendId ? { redirectedToFriendId } : {}) });

@@ -2761,6 +2761,8 @@ function describeLogEntry(entry) {
       return `${name(entry.characterId)}'s Ashka heals +${entry.healed}`;
     case 'beast-regen':
       return `${name(entry.characterId)}'s wounds knit shut - +${entry.healed}`;
+    case 'blood-drain':
+      return `${name(entry.characterId)} drains the blood - +${entry.healed}`;
     case 'ashkas-vengeance-activate':
       return `${name(entry.characterId)}'s Ashka awakens - vengeance stirs!`;
     case 'ashkas-vengeance-strike':

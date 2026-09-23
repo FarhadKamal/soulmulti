@@ -177,7 +177,12 @@ const ACTION_VOICE_LINES = {
   // quiet/whispered tone, deliberately mirrors shadowSeal's own line
   // structure (design-locked 2026-09-20, Threshold Shift #38).
   akyros: { hiddenMark: 'hidden_mark', shadowExecution: 'shadow', shadowSeal: 'shadow_seal', shadowToll: 'shadow_toll' },
-  blade: { bloodFrenzy: 'blood_frenzy' },
+  // bloodDrain: not a player-picked actionId (the 'blood-drain' log entry
+  // has no actionId at all, same as Kaelis's ashka-heal) - looked up
+  // directly by playMoveVoice('blade', 'bloodDrain') from main.js's own
+  // dedicated 'blood-drain' branch, same pattern ashka-heal's reuse of
+  // 'callAshka' already establishes for a passive-triggered voice line.
+  blade: { bloodFrenzy: 'blood_frenzy', bloodDrain: 'blood_drain' },
   // mindControl's line fires from main.js's dedicated 'mind-control-select'
   // sound branch (via playMoveVoice(entry.characterId, 'mindControl')), not
   // the generic bottom-of-switch call every other actionId uses - selection
