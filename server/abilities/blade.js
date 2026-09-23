@@ -27,22 +27,15 @@ function nextBladeHitCount(character, targetId) {
 // checked in isolation - reads `result.amountDealt` instead, so a 3rd-tick
 // hit that only PARTIALLY got through (some absorbed by shield, rest
 // landed) still heals, while a FULLY absorbed/dodged one (amountDealt 0)
-// does not. Shared by both bloodHunt.execute (single chosen-target hit) and
-// bloodFrenzy's own burst loop (each randomly-targeted strike checks its
-// own target's cycle the same way, no separate math) - same "no separate
-// burst-only logic" pattern nextBladeHitCount itself already follows.
-// Returns the healed amount (0 if it didn't trigger or Blade was already at
-// max) and pushes its own dedicated 'blood-drain' log entry (same "own
-// type, no actionId" shape as Kaelis's ashka-heal/Grimtal's beast-regen)
-// only when it actually healed something, matching every other passive
-// heal tick in the codebase.
-function applyBloodDrainIfEligible(character, game, log, amount, result) {
-  if (amount !== 3 || result.amountDealt <= 0) return 0;
-  const healed = applyHeal(game, character.id, 1);
-  if (healed > 0) {
-    log.push({ type: 'blood-drain', characterId: character.id, healed, hearts: heartsSnapshot(game) });
-  }
-  return healed;
+// does not. Only computes/applies the heal here - does NOT push its own
+// log entry (see the two call sites' own comments for why: bloodHunt can
+// push immediately, but bloodFrenzy's burst loop must defer, since its own
+// per-strike detail lives inside a `hits` array, not as separate top-level
+// log entries, and its own cast flash - a single long-duration
+// blood_frenzy.jpg covering the whole burst - would otherwise immediately
+// stomp over any mid-loop flash before a client could ever render it).
+function bloodDrainHealAmount(amount, result) {
+  return (amount === 3 && result.amountDealt > 0) ? 1 : 0;
 }
 
 // Blood Frenzy: hearts<=3 one-time special. Immediately unleashes a burst
@@ -122,8 +115,16 @@ export const actions = {
       // Blood Drain - pushed AFTER the attack's own line, same ordering
       // every other passive-heal-triggered-by-an-attack tick in this
       // codebase already uses (see Kaelis's Ashka's Vengeance, which pushes
-      // its own strike line before any deferred heal-adjacent entry).
-      applyBloodDrainIfEligible(character, game, log, amount, result);
+      // its own strike line before any deferred heal-adjacent entry). Safe
+      // to push directly here (unlike bloodFrenzy's own burst below) since
+      // this is a single strike with no later same-turn flash competing
+      // for Blade's own tile.
+      if (bloodDrainHealAmount(amount, result) > 0) {
+        const bloodDrainHealed = applyHeal(game, character.id, 1);
+        if (bloodDrainHealed > 0) {
+          log.push({ type: 'blood-drain', characterId: character.id, healed: bloodDrainHealed, hearts: heartsSnapshot(game) });
+        }
+      }
       return result;
     },
   },
@@ -161,6 +162,10 @@ export const actions = {
       // correct - only the visual was missing). "First occurrence wins",
       // same reasoning as every other deferred field in this loop.
       let redirectedToFriendId = null;
+      // Blood Drain's running total for this whole burst - see the in-loop
+      // comment further down for why this is accumulated rather than
+      // applied/logged per-strike.
+      let bloodDrainTotal = 0;
       for (let i = 0; i < strikeCount; i++) {
         // Re-queries the living pool fresh before EVERY strike (not once up
         // front) - an earlier strike in this same burst can KO someone,
@@ -206,16 +211,38 @@ export const actions = {
         if (result.redirectedToFriendId && !redirectedToFriendId) redirectedToFriendId = result.redirectedToFriendId;
         // Blood Drain - checked per-strike, same rule as a normal Blood
         // Hunt hit (confirmed ruling: "yes it apply to blood frenzy burst
-        // strike too. base on condition"). Pushed here, inside the loop,
-        // right after the strike that triggered it - not bunched at the
-        // very end after the burst's own summary line - so a heal reads in
-        // the log immediately next to the specific strike that caused it,
-        // consistent with how every other per-strike deferred check in this
-        // same loop is already positioned.
-        applyBloodDrainIfEligible(character, game, log, amount, result);
+        // strike too. base on condition"), but the actual heal/log entry is
+        // DEFERRED until after the loop (see bloodDrainTotal below) -
+        // confirmed real bug, 2026-09-23 (live report: "animation played.
+        // but during blood frenzy end. not seen"). Pushing a 'blood-drain'
+        // entry HERE, mid-loop, meant it landed in the log BEFORE this
+        // burst's own 'special'/bloodFrenzy summary entry (pushed after the
+        // loop ends) - and that summary entry's own cast flash
+        // (blood_frenzy.jpg, portraitFlash.js) sets a long-duration flash
+        // on Blade's SAME tile, immediately stomping over the drain flash
+        // before a client ever had a chance to render it (multiple setFlash
+        // calls to the same character within one synchronous dispatch pass
+        // just leave the LAST one visible). Only the healed AMOUNT is
+        // accumulated per-strike here; the actual applyHeal + log entry
+        // happen once, after the summary line, so the drain flash shows
+        // AFTER the cast flash finishes instead of underneath it.
+        bloodDrainTotal += bloodDrainHealAmount(amount, result);
         if (character.isKO) break; // a mirrored/reflected counter-hit KO'd Blade himself mid-burst
       }
       log.push({ type: 'special', characterId: character.id, actionId: 'bloodFrenzy', hits, ...(redirectedToFriendId ? { redirectedToFriendId } : {}) });
+      // Blood Drain's own entry, pushed AFTER the burst's summary line (see
+      // the in-loop comment above for why) - one combined heal for the
+      // whole burst rather than one entry per triggering strike, since
+      // multiple back-to-back drain flashes within the same instant would
+      // just overwrite each other the same way the original bug did; a
+      // single combined tick reads cleanly regardless of how many 3rd-tick
+      // hits actually landed in this one cast.
+      if (bloodDrainTotal > 0) {
+        const bloodDrainHealed = applyHeal(game, character.id, bloodDrainTotal);
+        if (bloodDrainHealed > 0) {
+          log.push({ type: 'blood-drain', characterId: character.id, healed: bloodDrainHealed, hearts: heartsSnapshot(game) });
+        }
+      }
       return { hits, rebirthLogEntry, mirrorLogEntry, mirrorReflectLogEntry, fowlPlayRevertLogEntry, divineJudgmentTriggerLogEntry, prophecyOfDoomTriggerLogEntry, friendshipEndLogEntry, friendshipSpilloverLogEntry };
     },
   },
