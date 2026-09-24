@@ -370,13 +370,14 @@ function playLogEntrySound(entry, game) {
     // damagePipeline.js), so checking it here at the moment this 'dodge'
     // entry is dispatched correctly distinguishes "this was Frog Curse's
     // own dodge" from every other hero's own dodge mechanic. One shared
-    // generic sound/voice line for every victim (confirmed ruling) - no
-    // per-hero frog-dodge audio needed, unlike the per-hero frog_dodge.jpg
-    // flash (see portraitFlash.js's own 'dodge' handling).
+    // generic sound for every victim (confirmed ruling) - no per-hero
+    // frog-dodge audio needed, unlike the per-hero frog_dodge.jpg flash
+    // (see portraitFlash.js's own 'dodge' handling). No separate voice
+    // line - the sound effect IS the frog's own wordless "ribbit" reaction,
+    // a spoken line on top would be redundant.
     const dodgeTarget = game.characters[entry.targetCharacterId];
     if (dodgeTarget?.isFrog && !dodgeTarget.isKO) {
       playSound('frog_dodge_hop.mp3');
-      playMoveVoice('rowan', 'frogDodge');
     }
     return;
   }
