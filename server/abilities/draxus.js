@@ -165,6 +165,10 @@ export function executeCheatDeath(character, game, log) {
   character.lockedHearts = 0;
   character.skipNextTurn = false;
   character.skipHeadacheTurn = false;
+  // Rowan's Frog Curse - confirmed ruling, 2026-09-24: a frogged character
+  // who dies and revives comes back as a normal hero, curse cleared, same
+  // "fresh copy" reasoning as lockedHearts above.
+  character.isFrog = false;
   // Every OTHER character's stale reference to him (a pending headache
   // roll aimed at him, a banked grudge count, poison tracking, a stale
   // Rewind snapshot, Grimtal's own kill-credit bookkeeping) is handled

@@ -10,7 +10,7 @@ import { CHARACTERS } from '../client/js/characters.js';
 import {
   getUsableActions, beginCharacterTurn, consumeSkipIfFrozen, consumeSkipIfHeadache, markCharacterActed,
   hasCharacterActedThisTurn, charactersActingThisTurn, resolveJesterBall, endTurn,
-  tickChronoxLockoutIfAny,
+  tickChronoxLockoutIfAny, isFrogged,
 } from './engine/turnEngine.js';
 import { heartsSnapshot, isSilenced } from './engine/damagePipeline.js';
 
@@ -168,9 +168,15 @@ export function getActingCharacterId(game) {
       // targeting problem. Generic (not Melyssa-specific) - any future
       // character whose full kit is special-gated would hit the exact
       // same misleading message while silenced.
-      const text = isSilenced(character, game)
-        ? `${CHARACTERS[character.id].name} is silenced and has no other action - skips their turn.`
-        : `${CHARACTERS[character.id].name} has no valid targets and skips their turn.`;
+      // Rowan's Frog Curse - checked first, so a frogged character gets its
+      // own dedicated message instead of falling into the generic "has no
+      // valid targets" line (same reasoning as the isSilenced branch below,
+      // added 2026-09-22 for the identical class of misleading-message bug).
+      const text = isFrogged(character)
+        ? `${CHARACTERS[character.id].name} is a frog and can't act - skips their turn!`
+        : isSilenced(character, game)
+          ? `${CHARACTERS[character.id].name} is silenced and has no other action - skips their turn.`
+          : `${CHARACTERS[character.id].name} has no valid targets and skips their turn.`;
       game.log.push({ type: 'passive', characterId: character.id, text, hearts: heartsSnapshot(game) });
       clearStalledBonusTurn(character);
       markCharacterActed(game, character.id);

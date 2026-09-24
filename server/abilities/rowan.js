@@ -1,4 +1,4 @@
-import { applyDamage, applyHeal, tryTriggerCleanSlate, tryIllyraDodgeStatus } from '../engine/damagePipeline.js';
+import { applyDamage, applyHeal, tryTriggerCleanSlate, tryIllyraDodgeStatus, heartsSnapshot } from '../engine/damagePipeline.js';
 import { redirectStatusTargetIfProtected } from './melyssa.js';
 import { registerOnOwnDeath } from '../engine/categories/onOwnDeath.js';
 import { registerOnOtherRevived } from '../engine/categories/onOtherRevived.js';
@@ -118,6 +118,24 @@ export function onTurnStart(character, game, log) {
 // undiscovered - if he already knows all 5 by the time he crosses the
 // threshold, this is simply never offered.
 const PETRIFY_HEARTS_THRESHOLD = 3;
+
+// Frog Curse (hearts<=3 one-time Special Action, design-locked 2026-09-24):
+// a genuinely new mechanic shape for the roster - single-target, no
+// substitute action (unlike Boingo's Fowl Play, which replaces the
+// chickenified kit with a weak Chicken Attack; a frog has ZERO actions,
+// every one of their own turns is fully skipped). While frogged, the
+// victim gets a passive 50% dodge chance against ANY incoming attack
+// (checked in damagePipeline.js, not through the per-character
+// dodgeDefenseRegistry.js - the frog can be any of the 15 non-Rowan
+// heroes dynamically, not a fixed registered id). Confirmed rulings:
+// mirror/counter-attack hits (Rowan's own Mirror Reflect, Athena's
+// curse-mirror) DO end the curse - they bypass the dodge roll like every
+// other dodge mechanic, but still count as "a hit connected." Rowan's own
+// death does NOT end the curse - it persists independently until a hit
+// actually connects, unlike Akyros's Shadow Seal (whose only unlock
+// trigger IS the caster's death). Costs his own turn, unlike Petrify's
+// bonus-action shape.
+const FROG_CURSE_HEARTS_THRESHOLD = 3;
 
 export const actions = {
   wandStrike: {
@@ -344,6 +362,77 @@ export const actions = {
       // (confirmed ruling: "he can use any action he want... not
       // restricted purify or mirror").
       return { isBonusAction: true };
+    },
+  },
+  frogCurse: {
+    label: 'Frog Curse',
+    needsTarget: true,
+    special: true,
+    isLegal: (character) => character.hearts <= FROG_CURSE_HEARTS_THRESHOLD
+      && !character.special.usedFrogCurse,
+    execute(character, targetId, game, log) {
+      character.special.usedFrogCurse = true;
+      // Melyssa's Friendship (Redirect Bond #39) - same redirect-before-
+      // eligibility-checks pattern as Silence Lock above.
+      targetId = redirectStatusTargetIfProtected(game, targetId, character.id);
+      const target = game.characters[targetId];
+      // Marin's Clean Slate / Illyra's passive - same interception order as
+      // every other targeted status-application site in this file.
+      if (tryTriggerCleanSlate(target, game, log)) {
+        log.push({ type: 'special', characterId: character.id, actionId: 'frogCurse', targetId, blockedBy: 'cleanSlate' });
+        return {};
+      }
+      if (tryIllyraDodgeStatus(target, game, log, character.id)) {
+        log.push({ type: 'special', characterId: character.id, actionId: 'frogCurse', targetId, blockedBy: 'illyra' });
+        return {};
+      }
+      target.isFrog = true;
+      log.push({ type: 'special', characterId: character.id, actionId: 'frogCurse', targetId });
+      return {};
+    },
+  },
+  // Snake Strike (design-locked 2026-09-24): a guaranteed follow-up finisher
+  // against any currently-frogged victim - confirmed rulings: NOT a
+  // one-time-use gate (repeatable any turn a frog exists), an EXTRA option
+  // alongside his normal kit (not a forced replacement), costs his turn
+  // like any normal action pick, and unlike a normal attack the frog's own
+  // passive 50% dodge does NOT apply here at all - "frog cannot avoid
+  // snake strike," so this bypasses both shield and dodge entirely (a true
+  // Pure Attack, same damage-type rules as Akyros's Shadow Execution).
+  // Landing it ends the curse immediately, same "any hit connecting ends
+  // it" rule Frog Curse's own passive-dodge path already follows - it just
+  // never rolls a dodge check to get there.
+  // Damage: FIXED 5 (confirmed ruling, 2026-09-24, superseding the
+  // original random 1-7 design: "for the snake bite i have changed my
+  // decision. it is fixed damage 5 life").
+  snakeStrike: {
+    label: 'Snake Strike',
+    needsTarget: true,
+    isLegal: (character, game) => Object.values(game.characters).some((c) => c.isFrog && !c.isKO),
+    execute(character, targetId, game, log) {
+      const amount = 5;
+      const result = applyDamage(game, log, {
+        sourceCharacterId: character.id,
+        targetCharacterId: targetId,
+        amount,
+        ignoresShield: true,
+        ignoresDodge: true,
+      });
+      // The curse ends here explicitly rather than relying on
+      // damagePipeline.js's own frog-dodge block to clear isFrog - that
+      // block is gated on actually rolling (and failing) a dodge check,
+      // which this attack deliberately never does (ignoresDodge: true
+      // means damagePipeline.js's own dodge-resolution code, including the
+      // frog-specific block, is skipped entirely). Confirmed ruling: still
+      // ends the curse, it just never goes through that specific code path
+      // to get there.
+      const target = game.characters[targetId];
+      if (target?.isFrog) {
+        target.isFrog = false;
+        log.push({ type: 'frog-curse-end', characterId: targetId, hearts: heartsSnapshot(game) });
+      }
+      log.push({ type: 'attack', characterId: character.id, actionId: 'snakeStrike', targetId, ...result });
+      return result;
     },
   },
 };

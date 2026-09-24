@@ -95,6 +95,10 @@ export function redirectStatusTargetIfProtected(game, targetId, sourceCharacterI
   // since damagePipeline.js already exports it and melyssa.js already
   // imports several other named exports from that module.
   if (isFrozenByChronox(friend, game)) return targetId;
+  // Rowan's Frog Curse - same reasoning as the frozen-friend check above
+  // (confirmed ruling, 2026-09-24: "frog cannot help melyssa even they had
+  // friendship").
+  if (friend.isFrog) return targetId;
   return friendId;
 }
 
@@ -387,5 +391,10 @@ export function isValidFriendshipTarget(game, targetId) {
   const target = game.characters[targetId];
   if (!target || target.id === 'melyssa') return false;
   if (target.isKO || target.untargetable || target.skipNextTurn) return false;
+  // Rowan's Frog Curse - a frog has zero agency/actions, so picking one as
+  // a "bodyguard" friend would be a guaranteed-useless choice (confirmed
+  // ruling) - same reasoning as isValidMindControlTarget's own exclusion in
+  // turnEngine.js.
+  if (target.isFrog) return false;
   return true;
 }

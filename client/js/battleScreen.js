@@ -1295,6 +1295,15 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
   } else if (persistentSrc) {
     // Already wrapped with v() at its source in portraitFlash.js.
     portrait.src = persistentSrc;
+  } else if (character.isKO && character.isFrog) {
+    // Rowan's Frog Curse - confirmed ruling, 2026-09-24: a frogged
+    // character who dies and revives comes back normal (curse cleared by
+    // the revival's own "fresh copy" reset), so isFrog staying true through
+    // a KO can only mean they died WHILE frogged and have not yet revived -
+    // same "isChicken staying true through a KO" precedent just below,
+    // shown here as their normal koed.jpg (no dedicated frog-KO art per the
+    // locked "no per-victim hit/attack art" visual-scope ruling).
+    portrait.src = v(`assets/images/${character.id}/koed.jpg`);
   } else if (character.isKO && character.isChicken) {
     // Boingo's Fowl Play - a chicken that gets KO'd shows THIS character's
     // own fried-chicken gag art instead of their normal koed.jpg. Checked
@@ -1310,6 +1319,15 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
     portrait.src = v(`assets/images/${character.id}/chicken_roast.jpg`);
   } else if (character.isKO) {
     portrait.src = v(`assets/images/${character.id}/koed.jpg`);
+  } else if (character.isFrog) {
+    // Rowan's Frog Curse - THIS character's own frog art overrides their
+    // own idle/injured portrait for as long as isFrog is true, same
+    // "everything hidden" reasoning as isChicken just below (their entire
+    // kit is also hidden - see turnEngine.js's getLegalActions returning
+    // []). Checked ahead of isChicken since the two are mutually exclusive
+    // by design (confirmed ruling) - ordering between them doesn't matter
+    // in practice, but placed first to mirror the server-side check order.
+    portrait.src = v(`assets/images/${character.id}/frog.jpg`);
   } else if (character.isChicken) {
     // Boingo's Fowl Play - THIS character's own hero-specific chicken art
     // overrides their own idle/injured portrait for as long as they're
@@ -2467,6 +2485,7 @@ const ACTION_LABELS = {
   wandStrike: 'Wand Strike', arcaneStudy: 'Arcane Study',
   poisonCloud: 'Poison Cloud', purify: 'Purify', wildLightning: 'Wild Lightning',
   mirrorReflect: 'Mirror Reflect', silenceLock: 'Silence Lock', petrify: 'Petrify',
+  frogCurse: 'Frog Curse', snakeStrike: 'Snake Strike',
   everbloom: 'Everbloom', threefoldVeil: 'Threefold Veil', cleanSlate: 'Clean Slate',
   piercingWand: 'Piercing Wand', wandMastery: 'Wand Mastery', lifebond: 'Lifebond',
   grimStrike: 'Grim Strike', skullCrack: 'Skull Crack', claimKill: 'Claim the Kill', beastForm: 'Beast Form', beastAttack: 'Beast Attack',
@@ -2810,6 +2829,8 @@ function describeLogEntry(entry) {
     }
     case 'eclipse-end':
       return `${name(entry.characterId)}'s Lunar Eclipse ends`;
+    case 'frog-curse-end':
+      return `${name(entry.characterId)} turns back into a hero!`;
     case 'beast-form-end':
       // reason: 'timeout' - the stalemate safety valve (see grimtal.js's
       // own BEAST_FORM_MAX_TURNS comment) forcing a revert with no kill

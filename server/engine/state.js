@@ -258,6 +258,11 @@ function baseSpecialFor(id) {
       // state so the client's "everyone else shows stone.jpg" visual reads
       // directly off broadcast game state, same pattern as isChicken/
       // deathproofActive/controlling, not a client-inferred flag.
+      // usedFrogCurse: hearts<=3 one-time special (Frog Curse, see
+      // rowan.js) - this is Rowan's OWN caster-side one-time-use gate,
+      // correctly nested here unlike the victim-side isFrog flag itself
+      // (top-level on the target's own character object, see createCharacter's
+      // own comment for why).
       return {
         discoveredSpells: new Set(),
         arcaneStudyPending: false,
@@ -268,6 +273,7 @@ function baseSpecialFor(id) {
         usedSpells: new Set(),
         usedPetrify: false,
         petrifyPending: false,
+        usedFrogCurse: false,
       };
     case 'marin':
       // discoveredSpells/arcaneStudyPending/arcaneStudyOnCooldown: identical
@@ -526,6 +532,17 @@ export function createCharacter(defId, ownerId) {
     // ONLY unlock trigger - no turn-based expiry) - see akyros.js's own
     // registerOnOwnDeath.
     lockedHearts: 0,
+    // Rowan's Frog Curse (hearts<=3 special) - true means currently frogged.
+    // Lives directly on the character (not nested in `special`) for the same
+    // reason isChicken/lockedHearts do - generic engine code
+    // (turnEngine.js's getLegalActions, damagePipeline.js's dodge
+    // resolution) needs to see it for ANY character, not just Rowan's own
+    // bookkeeping. Unlike isChicken (global, reverted all-at-once by a
+    // timer or Boingo's own death), this is SINGLE-VICTIM and cleared by a
+    // reactive per-hit trigger the instant a hit actually connects (the
+    // passive 50% dodge roll fails) - do not reuse Fowl Play's "revert
+    // everyone at once" shape for this.
+    isFrog: false,
   };
 }
 

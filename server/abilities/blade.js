@@ -93,6 +93,10 @@ registerRebirth('blade', (character) => {
   character.lockedHearts = 0;
   character.skipNextTurn = false;
   character.skipHeadacheTurn = false;
+  // Rowan's Frog Curse - confirmed ruling, 2026-09-24: a frogged character
+  // who dies and revives comes back as a normal hero, curse cleared, same
+  // "fresh copy" reasoning as lockedHearts above.
+  character.isFrog = false;
   // hitCountByTarget deliberately NOT cleared here - confirmed ruling,
   // 2026-09-14: "counter will not reset on rebirth". Every per-target
   // count he's built up survives his own death/revival, same as it

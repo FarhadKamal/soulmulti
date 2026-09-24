@@ -36,6 +36,7 @@ const SOUND_EFFECT_FILES = [
   'grudge_hit.mp3', 'bird_heal.mp3', 'blood_lick.mp3',
   'axe_strike.mp3', 'deathless_fury.mp3',
   'wand_strike.mp3', 'study.mp3', 'cloud.mp3', 'healing.mp3', 'lightning.mp3', 'mirror.mp3', 'lock.mp3',
+  'frog_curse_cast.mp3', 'frog_dodge_hop.mp3', 'snake_bite.mp3',
   'everbloom.wav', 'magic_dodge.wav', 'silent_study.wav', 'cleanSlate.mp3', 'wand_discover.mp3',
   'sword_thud.mp3', 'bullet_hit.mp3', 'head_spin.mp3',
   'illusion.mp3', 'mirage_mark.mp3', 'mirage_burst.mp3', 'mirage_overload.mp3', 'rewind.mp3',

@@ -237,8 +237,14 @@ export const actions = {
       // try-style call) - he's simply never chickenified at all while
       // transformed, same "excluded entirely, not chickenified-then-
       // reverted" shape as a blocked Marin.
+      // Rowan's Frog Curse - mutually exclusive with Fowl Play (confirmed
+      // ruling): an already-frogged character is excluded from the chicken
+      // pool entirely, same reasoning/shape as the beastFormActive
+      // exclusion just above. Symmetric exclusion (Frog Curse cannot target
+      // an already-chickenified character) lives in turnEngine.js's own
+      // isValidTarget.
       const candidates = Object.values(game.characters).filter(
-        (c) => c.id !== character.id && !c.isKO && !c.special?.beastFormActive
+        (c) => c.id !== character.id && !c.isKO && !c.special?.beastFormActive && !c.isFrog
       );
       // Marin's Clean Slate - confirmed ruling: "only marin clean slate
       // can protect her from chicken status" - the one exception in the

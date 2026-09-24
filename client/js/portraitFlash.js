@@ -191,6 +191,25 @@ export function registerChickenCheck(fn) {
   isCurrentlyChicken = fn;
 }
 
+// Rowan's Frog Curse - same defense-in-depth reasoning as CHICKEN_FLASH_PATHS/
+// isCurrentlyChicken above, scoped down since a frog has NO substitute
+// action at all (unlike a chicken, which still gets chickenAttack) - only
+// the persistent frog.jpg portrait (rendered via battleScreen.js's own
+// isFrog branch, not through setFlash), Rowan's own cast flash, and the
+// victim's own frog_dodge.jpg (fired from handleDodgeForFlash below, one
+// per possible victim hero since a frog's jump-away pose stays consistent
+// with their own design) are ever legitimate while a character is frogged.
+// A stale/indirect hero-specific flash attempt should never reach a
+// frogged character's tile at all.
+const FROG_FLASH_PATHS = new Set([
+  'assets/images/rowan/frog_curse.jpg',
+  ...CHARACTER_IDS.filter((id) => id !== 'rowan').map((id) => `assets/images/${id}/frog_dodge.jpg`),
+]);
+let isCurrentlyFrog = () => false;
+export function registerFrogCheck(fn) {
+  isCurrentlyFrog = fn;
+}
+
 // Debug mode's own call history (2026-09-21, user request: "you can add
 // more options on details logs" - a follow-up to a live report that
 // choke.jpg still visibly played on a dodged Self Choke despite the
@@ -237,6 +256,7 @@ export function getFlashCallHistory() {
 
 function setFlash(characterId, src, durationMs = FLASH_DURATION_MS) {
   if (isCurrentlyChicken(characterId) && !CHICKEN_FLASH_PATHS.has(src)) return;
+  if (isCurrentlyFrog(characterId) && !FROG_FLASH_PATHS.has(src)) return;
   // Confirmed real anomaly, 2026-09-22: a fully-timestamped, cross-
   // referenced trace (getRenderTrace + getLogEntryDispatchTime) proved
   // illyra/choke.jpg gets set in exact sync with a DODGED Self Choke
@@ -476,6 +496,10 @@ export function checkIdlePortrait(character, round) {
   // missing, so a chicken who went untouched for a turn briefly flashed
   // back to their own normal hero idle art mid-transformation.
   if (character.isChicken) return false;
+  // Rowan's Frog Curse - same reasoning as the isChicken guard just above:
+  // a frogged character's own hero-specific idle image must never flash
+  // over the frog.jpg portrait override for as long as isFrog is true.
+  if (character.isFrog) return false;
   const lastHearts = heartsAtLastTurnStart.has(character.id) ? heartsAtLastTurnStart.get(character.id) : null;
   const wasUntouched = lastHearts === null || character.hearts >= lastHearts;
   const isIdle = wasUntouched && character.hearts > character.maxHearts / 2;
@@ -1228,6 +1252,37 @@ export function handleLogEntryForFlash(entry, game) {
       setFlash(characterId, 'assets/images/rowan/mirror_reflect.jpg'); break;
     case 'silenceLock':
       setFlash(characterId, 'assets/images/rowan/silence_lock.jpg'); break;
+    case 'frogCurse':
+      setFlash(characterId, 'assets/images/rowan/frog_curse.jpg'); break;
+    case 'snakeStrike':
+      // Rowan's own attack flash, plus a dedicated per-victim reaction
+      // (assets/images/<id>/snake_bite.jpg, 15 new images - distinct from
+      // both frog.jpg's idle pose and frog_dodge.jpg's evasion pose).
+      // Unlike a normal attack (which only gets the generic 'hit'/'claw'
+      // shake effect on the victim, no dedicated portrait swap - see
+      // Skull Crack's own identical case just above for the precedent this
+      // diverges from), Snake Strike always connects (ignoresDodge: true
+      // server-side, so `dodged` here is always false in practice) and the
+      // curse always ends as a direct result - a genuinely distinctive
+      // enough moment to warrant its own per-hero art, same reasoning as
+      // Ashka's Vengeance/Divine Judgment's own per-victim trigger art.
+      setFlash(characterId, 'assets/images/rowan/snake_strike.jpg');
+      // Deliberately NOT gated on !isKO(targetCharacterId), unlike most
+      // other victim flashes in this file - confirmed real bug, 2026-09-24
+      // (live report: "snake bite animation will not stop if suddenly
+      // koed. don't show koed image quickly"). By the time this entry
+      // dispatches, the broadcast state already reflects the post-hit
+      // isKO=true if the strike was lethal, so the original !isKO guard
+      // suppressed the snake_bite.jpg reaction entirely on a killing blow -
+      // the exact case where the reaction matters most. Same "deliberately
+      // NOT gated on the usual !isKO guard" shape as Divine Judgment's own
+      // per-victim trigger art (portraitFlash.js's judgement_strike.jpg
+      // case) - the victim genuinely IS KO'd by the time this fires, that's
+      // expected, not a reason to skip the reaction.
+      if (targetCharacterId) {
+        setFlash(targetCharacterId, `assets/images/${targetCharacterId}/snake_bite.jpg`);
+      }
+      break;
     case 'petrify':
       // The "everyone else turns to stone" effect itself is handled by
       // petrifyActive above (persistent state, not a timed flash) - this
@@ -1292,6 +1347,21 @@ export function handleDodgeForFlash(entry, game) {
   if (entry.type !== 'dodge') return;
   const target = game.characters[entry.targetCharacterId];
   if (!target || target.isKO) return;
+  // Rowan's Frog Curse - checked via isFrog directly, not a fixed
+  // target.id like Marin/Grimtal/Illyra below, since the frog can be any
+  // of the 15 non-Rowan heroes dynamically. isFrog stays true through a
+  // SUCCESSFUL dodge (only a connecting hit clears it in
+  // damagePipeline.js), so this correctly distinguishes "this was Frog
+  // Curse's own dodge" from every other hero's own dodge mechanic. Unlike
+  // the shared generic dodge sound/voice (main.js), the FLASH is per-victim
+  // hero (assets/images/<id>/frog_dodge.jpg, 15 new images) so each
+  // character's own jump-away pose stays visually consistent with their
+  // design, same "per-hero art, shared audio" split already used
+  // elsewhere (e.g. chicken art vs. its shared sound set).
+  if (target.isFrog) {
+    setFlash(target.id, `assets/images/${target.id}/frog_dodge.jpg`);
+    return;
+  }
   // Shared log entry type/shape (damagePipeline.js's applyDamage pushes the
   // same 'dodge' entry for Akyros's per-attacker dodge, Marin's Threefold
   // Veil flat 3-charge pool, Grimtal's Grim Ward, AND Illyra's passive) -

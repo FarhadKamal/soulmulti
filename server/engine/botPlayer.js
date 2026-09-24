@@ -1216,6 +1216,18 @@ function rowanFacingHealthyKaelis(game, character) {
 
 function chooseRowanMove(character, game, usable) {
   const byId = Object.fromEntries(usable.map((a) => [a.actionId, a]));
+  // Snake Strike: a guaranteed, unavoidable finisher against a currently-
+  // frogged victim (bypasses shield AND dodge entirely) - always take it
+  // the instant it's legal, before even Petrify, since there's no downside
+  // to cashing in a free-damage guarantee immediately rather than risking
+  // the frog getting hit (and the curse ending) by someone else first.
+  if (byId.snakeStrike) {
+    const targets = validTargetsFor(game, character, 'snakeStrike');
+    if (targets.length > 0) {
+      const targetId = biggestThreatTarget(game, character, targets) || pickRandom(targets);
+      return { actionId: 'snakeStrike', targetId };
+    }
+  }
   // Petrify (hearts<=3 one-time bonus action): a free bonus - doesn't cost
   // his turn (see index.js's own handling, mirroring Draxus's Deathless
   // Fury bonus strikes), and instantly unlocks every remaining spell with
@@ -1281,6 +1293,17 @@ function chooseRowanMove(character, game, usable) {
     } else if (targets.length > 0) {
       const targetId = biggestThreatTarget(game, character, targets) || pickRandom(targets);
       return { actionId: 'silenceLock', targetId };
+    }
+  }
+  // Frog Curse (hearts<=3 one-time special): same target-priority shape as
+  // Silence Lock above (both are one-time, hearts-gated, targeted status
+  // casts) - biggest current threat, since locking down whoever's most
+  // dangerous is the whole point of a desperation move like this.
+  if (byId.frogCurse) {
+    const targets = validTargetsFor(game, character, 'frogCurse');
+    if (targets.length > 0) {
+      const targetId = biggestThreatTarget(game, character, targets) || pickRandom(targets);
+      return { actionId: 'frogCurse', targetId };
     }
   }
   // Wild Lightning next - highest damage ceiling of anything in the kit.

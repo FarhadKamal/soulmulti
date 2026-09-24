@@ -232,6 +232,18 @@ const ACTION_VOICE_LINES = {
     mirrorReflect: 'mirror',
     silenceLock: 'silence_lock',
     petrify: 'petrify',
+    frogCurse: 'frog_curse',
+    // frogDodge: not played through the generic playMoveVoice(characterId,
+    // actionId) dispatch - triggered directly from main.js's own 'dodge'
+    // log-entry handler (see its own comment there), same pattern as
+    // Marin's threefoldDodge/Grimtal's grimWard. Deliberately keyed under
+    // 'rowan' rather than the frogged victim's own id (confirmed ruling:
+    // one shared generic line for every victim, since the frog can be any
+    // of the 15 non-Rowan heroes dynamically) - this is the curse's own
+    // magic "ribbit" effect layered over whoever is frogged, not that
+    // character's own real voice.
+    frogDodge: 'frog_dodge',
+    snakeStrike: 'snake_strike',
   },
   marin: {
     wandStrike: 'wand_strike',

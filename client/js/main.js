@@ -7,7 +7,7 @@ import {
   startChickenMusic, revertFromChickenMusic,
   playActionSound, playSound, playKO, playVictory, playDodge, playRebirth, playCoin,
 } from './sound.js';
-import { handleLogEntryForFlash, handleDodgeForFlash, checkIdlePortrait, registerFlashRerender, queueGrimtalPowerFlash, registerChickenCheck, setDebugLogEntryIndex, snapshotActiveFlashForDebug, resetFlashDebugHistoryForNewMatch, resetRenderTraceForNewMatch, beginFlashDispatchBatch } from './portraitFlash.js';
+import { handleLogEntryForFlash, handleDodgeForFlash, checkIdlePortrait, registerFlashRerender, queueGrimtalPowerFlash, registerChickenCheck, registerFrogCheck, setDebugLogEntryIndex, snapshotActiveFlashForDebug, resetFlashDebugHistoryForNewMatch, resetRenderTraceForNewMatch, beginFlashDispatchBatch } from './portraitFlash.js';
 import { handleLogEntryForEffects, registerEffectRerender, setDebugLogEntryIndexForEffects, snapshotActiveEffectsForDebug, resetEffectDebugHistoryForNewMatch } from './actionEffects.js';
 import { preloadBattleImages, battleImagesReady } from './imagePreload.js';
 import { preloadBattleAudio } from './audioPreload.js';
@@ -361,6 +361,22 @@ function playLogEntrySound(entry, game) {
     // line on top of her own dedicated dodge sound.
     if (entry.targetCharacterId === 'illyra' && !game.characters.illyra?.isKO) {
       playMoveVoice('illyra', 'dodge');
+    }
+    // Rowan's Frog Curse - the frog's passive 50% dodge is checked via
+    // isFrog directly (not entry.targetCharacterId being a fixed hero id
+    // like Marin/Grimtal/Illyra above), since the frog can be any of the
+    // 15 non-Rowan heroes dynamically. isFrog stays true through a
+    // SUCCESSFUL dodge (only a connecting hit clears it in
+    // damagePipeline.js), so checking it here at the moment this 'dodge'
+    // entry is dispatched correctly distinguishes "this was Frog Curse's
+    // own dodge" from every other hero's own dodge mechanic. One shared
+    // generic sound/voice line for every victim (confirmed ruling) - no
+    // per-hero frog-dodge audio needed, unlike the per-hero frog_dodge.jpg
+    // flash (see portraitFlash.js's own 'dodge' handling).
+    const dodgeTarget = game.characters[entry.targetCharacterId];
+    if (dodgeTarget?.isFrog && !dodgeTarget.isKO) {
+      playSound('frog_dodge_hop.mp3');
+      playMoveVoice('rowan', 'frogDodge');
     }
     return;
   }
@@ -1003,6 +1019,8 @@ registerEffectRerender(() => { if (state.screen === 'battle') rerender(); });
 // so it's always correct even for a flash queued moments before a
 // game-state broadcast flips someone's isChicken flag.
 registerChickenCheck((characterId) => !!state.game?.characters[characterId]?.isChicken);
+// Rowan's Frog Curse - same reasoning as registerChickenCheck above.
+registerFrogCheck((characterId) => !!state.game?.characters[characterId]?.isFrog);
 // Keeps the fullscreen button's icon/title correct even when fullscreen is
 // exited via Escape (or any OS-level gesture) rather than the button
 // itself - document.fullscreenElement changes without any click of ours.

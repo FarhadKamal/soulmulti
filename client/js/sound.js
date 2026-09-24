@@ -290,6 +290,10 @@ const ACTION_SOUND = {
   // sound effect, confirmed ruling: "use common sound magic.mp3", no
   // dedicated sound needed.
   petrify: 'magic',
+  // Frog Curse - dedicated one-shot cast SFX (assets/sounds/frog_curse_cast.mp3).
+  frogCurse: 'frog_curse_cast',
+  // Snake Strike - dedicated one-shot attack SFX (assets/sounds/snake_bite.mp3).
+  snakeStrike: 'snake_bite',
   // Marin: all 5 fire once, at the moment each is discovered (see
   // main.js's 'spell-discovered' handler) - none of them are cast
   // separately later, unlike Rowan's kit. Piercing Wand and Wand Mastery

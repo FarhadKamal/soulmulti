@@ -126,6 +126,8 @@ const FLASH_IMAGES = [
   'assets/images/rowan/mirror_reflect.jpg',
   'assets/images/rowan/silence_lock.jpg',
   'assets/images/rowan/petrify.jpg',
+  'assets/images/rowan/frog_curse.jpg',
+  'assets/images/rowan/snake_strike.jpg',
   'assets/images/marin/idle.jpg',
   'assets/images/marin/wand_strike.jpg',
   'assets/images/marin/arcane_study.jpg',
@@ -218,6 +220,19 @@ const PETRIFY_STONE_IMAGES = CHARACTER_IDS.filter((id) => id !== 'rowan').map(
   (id) => `assets/images/${id}/stone.jpg`
 );
 
+// Rowan's Frog Curse - same per-victim-hero pattern as PETRIFY_STONE_IMAGES
+// above. frog.jpg is the persistent idle portrait (shown for as long as
+// isFrog is true); frog_dodge.jpg is a one-shot flash for the moment the
+// passive 50% dodge actually succeeds (see portraitFlash.js's own
+// handleDodgeForFlash); snake_bite.jpg (added 2026-09-24, Snake Strike -
+// design-locked follow-up finisher) is a third one-shot flash for the
+// moment Rowan's own guaranteed, unavoidable attack lands on the frog -
+// distinct from both, since it's a genuine hit-reaction, not an idle pose
+// or an evasion.
+const FROG_IMAGES = CHARACTER_IDS.filter((id) => id !== 'rowan').flatMap(
+  (id) => [`assets/images/${id}/frog.jpg`, `assets/images/${id}/frog_dodge.jpg`, `assets/images/${id}/snake_bite.jpg`]
+);
+
 // Melyssa's Friendship (Redirect Bond, design-locked 2026-09-20, replaces
 // Full Control) - TWO separate 15-hero sets (everyone except Melyssa
 // herself, who can never be her own friend): friendship_bond.jpg (the
@@ -268,7 +283,7 @@ const MOONLIT_THEFT_REACTION_IMAGES = ['athena', 'boingo', 'tharox', 'chronox', 
 );
 
 function allBattleImagePaths() {
-  const paths = [...FLASH_IMAGES, ...BADGE_ICONS, ...CHICKEN_IMAGES, ...DIVINE_JUDGMENT_STRUCK_IMAGES, ...PROPHECY_OF_DOOM_STRIKE_IMAGES, ...ASHKAS_VENGEANCE_STRIKE_IMAGES, ...SHADOW_SEAL_STRIKE_IMAGES, ...PETRIFY_STONE_IMAGES, ...SELF_CHOKE_VICTIM_IMAGES, ...LIFEBOND_REACTION_IMAGES, ...MOONLIT_THEFT_REACTION_IMAGES, ...FRIENDSHIP_BOND_IMAGES, ...PROTECTS_MELYSSA_IMAGES];
+  const paths = [...FLASH_IMAGES, ...BADGE_ICONS, ...CHICKEN_IMAGES, ...DIVINE_JUDGMENT_STRUCK_IMAGES, ...PROPHECY_OF_DOOM_STRIKE_IMAGES, ...ASHKAS_VENGEANCE_STRIKE_IMAGES, ...SHADOW_SEAL_STRIKE_IMAGES, ...PETRIFY_STONE_IMAGES, ...FROG_IMAGES, ...SELF_CHOKE_VICTIM_IMAGES, ...LIFEBOND_REACTION_IMAGES, ...MOONLIT_THEFT_REACTION_IMAGES, ...FRIENDSHIP_BOND_IMAGES, ...PROTECTS_MELYSSA_IMAGES];
   // Default battle portrait, KO'd, injured, and victory images - each now
   // lives inside the hero's own images/<id>/ folder with a fixed filename
   // (confirmed rename, 2026-09-15; previously 4 separate top-level folders

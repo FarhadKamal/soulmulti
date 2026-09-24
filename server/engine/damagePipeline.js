@@ -442,7 +442,13 @@ export function applyDamage(game, log, {
     // from that case though: HERE Melyssa herself isn't frozen, only her
     // friend is - the hit simply falls through to land on her directly, same
     // as the friend being dead or not yet chosen at all.
-    if (friend && !friend.isKO && !isFrozenByChronox(friend, game)) {
+    // Confirmed ruling, 2026-09-24: "frog cannot help melyssa even they had
+    // friendship" - same "incapacitated, nothing left to redirect to"
+    // reasoning as the frozen-friend exclusion just above (Rowan's Frog
+    // Curse leaves the friend with zero agency/actions). Does NOT end the
+    // bond itself, same as freezing doesn't - protection just resumes
+    // automatically once isFrog clears.
+    if (friend && !friend.isKO && !isFrozenByChronox(friend, game) && !friend.isFrog) {
       const beforeHearts = friend.hearts;
       const redirectedResult = applyDamage(game, log, {
         sourceCharacterId, targetCharacterId: friendId, amount,
@@ -602,6 +608,31 @@ export function applyDamage(game, log, {
   // her own frozen status is lifted (no separate flag needed - this check
   // is always live against her CURRENT frozen state).
   const isFrozen = isFrozenByChronox(target, game);
+
+  // Rowan's Frog Curse - passive 50% dodge, NOT registered through
+  // dodgeDefenseRegistry.js (that's keyed by a FIXED character id per
+  // provider - the frog can be any of the 15 non-Rowan heroes dynamically,
+  // not a fixed registered id). Special-cased here directly, same as
+  // isChicken's own bypass block above (which does the opposite - forces
+  // zero defense - frog needs a REAL, checked dodge instead). Confirmed
+  // ruling: mirror hits (isMirror) do NOT get a dodge roll (bypasses the
+  // roll like every other dodge mechanic already does), but still count as
+  // "a hit connected" for ending the curse - so isMirror gates the ROLL
+  // itself but not whether isFrog gets cleared afterward. The curse ends
+  // the instant a hit connects at all, even if shield fully absorbs the
+  // resulting damage (0 hearts damage still ends it) - clearing isFrog
+  // right here, before shield/hearts logic runs unconditionally right
+  // after, naturally satisfies that with no need to inspect amountDealt
+  // later.
+  if (target.isFrog && !ignoresDodge && !isFrozen) {
+    if (!isMirror && Math.random() < 0.5) {
+      log.push({ type: 'dodge', attackerId: sourceCharacterId, targetCharacterId: target.id, hearts: heartsSnapshot(game) });
+      result.dodged = true;
+      return result;
+    }
+    target.isFrog = false;
+    log.push({ type: 'frog-curse-end', characterId: target.id, hearts: heartsSnapshot(game) });
+  }
 
   // Dodge Defense (category-driven, see engine/categories/dodgeDefense.js):
   // dispatches to whichever of Akyros/Marin/Grimtal/Illyra's own registered

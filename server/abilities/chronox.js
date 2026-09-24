@@ -372,6 +372,15 @@ export const actions = {
         // other field protected in this file, see soulclash_feedback_
         // rewind_new_ability_checklist project memory.
         const lockedHeartsNoCaster = character.lockedHearts;
+        // Rowan's Frog Curse - isFrog needs the identical "survive the
+        // restore" treatment as isChicken/lockedHearts just above, same
+        // reasoning: a top-level field, unrelated to the recorded hit
+        // against Chronox, that a stale snapshot would otherwise silently
+        // stomp - WORSE than isChicken's own equivalent bug, since a
+        // stale-resurrected frog has zero fallback action at all (unlike a
+        // chicken, which at least keeps chickenAttack), permanently
+        // soft-locking that character's turns for the rest of the match.
+        const isFrogNoCaster = character.isFrog;
         Object.assign(character, structuredClone(record.chronoxSnapshot));
         character.special.rewindUsesRemaining = rewindUsesRemaining;
         character.usedSpecial = usedSpecialNoCaster;
@@ -379,6 +388,7 @@ export const actions = {
         Object.assign(character.special, freezeStateNoCaster);
         character.isChicken = isChickenNoCaster;
         character.lockedHearts = lockedHeartsNoCaster;
+        character.isFrog = isFrogNoCaster;
         if (record.jesterBallSnapshot !== undefined) {
           game.jesterBall = structuredClone(record.jesterBallSnapshot);
         }
@@ -449,6 +459,13 @@ export const actions = {
       // chickenAttack's own target pool ran out).
       const casterIsChicken = caster.isChicken;
       const chronoxIsChicken = character.isChicken;
+      // Rowan's Frog Curse - isFrog needs the identical "survive the
+      // restore" treatment as isChicken just above, for BOTH the caster and
+      // Chronox himself (either one could be the current frog at snapshot
+      // time) - see the null-caster branch's own comment for the full
+      // "why this is worse than the isChicken bug" reasoning.
+      const casterIsFrog = caster.isFrog;
+      const chronoxIsFrog = character.isFrog;
       // Akyros's Shadow Seal - same "survive the restore" treatment as
       // isChicken just above, for BOTH the caster and Chronox himself
       // (either one could be carrying locked hearts at snapshot time). See
@@ -547,6 +564,8 @@ export const actions = {
       }
       caster.isChicken = casterIsChicken;
       character.isChicken = chronoxIsChicken;
+      caster.isFrog = casterIsFrog;
+      character.isFrog = chronoxIsFrog;
       caster.lockedHearts = casterLockedHearts;
       character.lockedHearts = chronoxLockedHearts;
       // Only reapply if this snapshot could actually carry the field at

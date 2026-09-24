@@ -53,6 +53,15 @@ export function isChickenified(character) {
   return !!character && character.isChicken;
 }
 
+// True while this character is frogged by Rowan's Frog Curse - same plain
+// top-level boolean flag shape as isChickenified above (see state.js's own
+// isFrog comment). Unlike chicken, a frog has NO substitute action - see
+// getLegalActions below, which returns a genuinely empty list rather than a
+// synthetic replacement action.
+export function isFrogged(character) {
+  return !!character && character.isFrog;
+}
+
 // Boingo's Fowl Play - while chickenified, EVERY one of a character's own
 // actions (Normal/Special/Neutral/Passive, whatever their hero kit
 // normally offers) is replaced by this single synthetic action. Not
@@ -133,6 +142,15 @@ export function getLegalActions(character, game, isPuppeted = false) {
   if (isChickenified(character)) {
     return [{ actionId: 'chickenAttack', ...CHICKEN_ATTACK_ACTION }];
   }
+  // Rowan's Frog Curse - unlike chicken status, a frog has NO substitute
+  // action at all (confirmed design: "zero actions, not even a weak
+  // substitute attack"). A genuinely empty list here is safe - gameFlow.js's
+  // own zero-usable-actions auto-skip path (already exercised by isSilenced
+  // with no other action) already handles this correctly with no new
+  // turn-advancement plumbing needed.
+  if (isFrogged(character)) {
+    return [];
+  }
   if (character.id === 'melyssa' && isFriendshipForcedChoke(game, character.id)) {
     return [{ actionId: 'friendshipSelfChoke', ...FRIENDSHIP_SELF_CHOKE_ACTION }];
   }
@@ -191,6 +209,15 @@ export function isValidTarget(game, characterId, actionId, targetId) {
   if (targetId === 'melyssa' && melyssa.isCurrentFriend(game, characterId)) return false;
   if (actionId === 'shadowExecution') return character.special.marks.has(targetId);
   if (actionId === 'hiddenMark') return !character.special.everMarkedIds.has(targetId);
+  // Rowan's Frog Curse - mutually exclusive with Boingo's Fowl Play
+  // (confirmed ruling): cannot target an already-chickenified character.
+  // Symmetric exclusion (Fowl Play cannot chickenify an already-frogged
+  // character) lives in boingo.js's own candidate-pool filter.
+  if (actionId === 'frogCurse' && isChickenified(target)) return false;
+  // Rowan's Snake Strike - can only ever target an actual frog (confirmed
+  // design: a guaranteed finisher specifically against a Frog Curse
+  // victim, not a general-purpose attack).
+  if (actionId === 'snakeStrike') return isFrogged(target);
   // Chronox's Rewind lockout: the caster it was cast against cannot use
   // that EXACT SAME action against Chronox specifically, for their own
   // next turn only (see tickChronoxLockoutIfAny for the timing). Every
@@ -233,6 +260,11 @@ export function isValidMindControlTarget(game, targetId) {
   if (!target || target.id === 'melyssa') return false;
   if (target.isKO || target.untargetable || target.skipNextTurn) return false;
   if (isCurrentlyFrozen(game, targetId)) return false;
+  // Rowan's Frog Curse - a frog has zero legal actions (getLegalActions
+  // returns []), so puppeting one would be a guaranteed-useless button,
+  // same "zero legal actions, exclude entirely" reasoning as the isKO/
+  // frozen checks above (confirmed ruling).
+  if (isFrogged(target)) return false;
   return true; // deliberately no ownerId check - ally or enemy both legal
 }
 
@@ -650,13 +682,16 @@ export function beginCharacterTurn(character, game, log) {
   // is deliberately NOT gated here - it's the mechanism that ends chicken
   // status itself (only ever fires on Boingo, who's never chickenified),
   // not a piece of the chickenified character's own state.
-  if (!character.isChicken) {
+  // Rowan's Frog Curse gets the identical "entire kit frozen, not just
+  // hidden" treatment as isChicken above, same reasoning - see state.js's
+  // own isFrog comment.
+  if (!character.isChicken && !character.isFrog) {
     tickPoisonIfAny(character, game, log);
     tickSilenceIfAny(character, game, log);
     resolveHeadacheIfDue(character, game, log);
   }
   tickFowlPlayIfBoingoTurn(character, game, log);
-  if (!character.isChicken) {
+  if (!character.isChicken && !character.isFrog) {
     const mod = ABILITY_MODULES[character.id];
     if (mod?.onTurnStart) mod.onTurnStart(character, game, log);
   }
