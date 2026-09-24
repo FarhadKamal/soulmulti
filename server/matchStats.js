@@ -15,7 +15,10 @@ let collection = null;
 // crash the whole server on startup. Reused across every subsequent write.
 async function getCollection() {
   if (collection) return collection;
-  if (!uri) return null; // stats logging silently disabled if unconfigured
+  if (!uri) {
+    console.error('recordMatchResult: MONGODB_URI not set - stats logging disabled');
+    return null;
+  }
   if (!client) {
     client = new MongoClient(uri);
     await client.connect();
@@ -31,14 +34,20 @@ async function getCollection() {
 // character, so it's useless for the "which character wins most" question
 // this data exists to answer.
 export async function recordMatchResult(game, roomType) {
-  if (!game.winnerPlayerId) return;
+  if (!game.winnerPlayerId) {
+    console.log('recordMatchResult: draw, skipping (winnerPlayerId is null)');
+    return;
+  }
   const winner = game.players.find((p) => p.id === game.winnerPlayerId);
-  if (!winner) return;
+  if (!winner) {
+    console.error('recordMatchResult: winnerPlayerId set but no matching player found:', game.winnerPlayerId);
+    return;
+  }
   const participants = game.players.flatMap((p) => p.characterIds);
   try {
     const col = await getCollection();
     if (!col) return;
-    await col.insertOne({
+    const result = await col.insertOne({
       roomType,
       winningCharacterIds: winner.characterIds,
       participantCharacterIds: participants,
@@ -46,6 +55,7 @@ export async function recordMatchResult(game, roomType) {
       round: game.round,
       recordedAt: new Date(),
     });
+    console.log('recordMatchResult: wrote match result, insertedId:', result.insertedId.toString(), 'winner:', winner.characterIds);
   } catch (err) {
     // Never let a stats-write failure affect the actual match/broadcast -
     // this is purely observational logging, not gameplay-critical.
