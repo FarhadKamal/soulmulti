@@ -403,6 +403,17 @@ export function getPersistentPortrait(character) {
   // status, same class of gap as checkIdlePortrait's own missing guard
   // (fixed separately).
   if (character.isChicken) return null;
+  // Rowan's Frog Curse - same reasoning as the isChicken guard just above.
+  // Confirmed real bug, 2026-09-25 (live report: "i did not see blade turn
+  // into frog animation" - Blade had already used Rebirth earlier in the
+  // match, so `special.rebirthUsed` was true, and the alive.jpg branch
+  // further down unconditionally won over frog.jpg for the entire duration
+  // of the curse, since this function sits ABOVE battleScreen.js's own
+  // isFrog check in the render priority chain - the exact same class of
+  // gap the isChicken guard above was already fixed for once (see its own
+  // comment: "a persistent hero portrait always won regardless of chicken
+  // status"), just never extended to isFrog when Frog Curse was added.
+  if (character.isFrog) return null;
   // Held for the entire duration of a Mind Control sequence (from puppet
   // selection through the puppeted action and any nested follow-up) -
   // character.special.controlling is real, serialized character state, set
