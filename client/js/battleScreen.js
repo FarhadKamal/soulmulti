@@ -609,9 +609,10 @@ function renderVictoryPortraits(game) {
 // still conceptually active until Chronox's own next turn resolves it.
 // Time Freeze (freezeActive/freezeTargetId) is a single target;
 // World Stops (worldStopsActive/worldStopsFrozenIds) can be several at
-// once - both feed the same shared .ice-frozen visual, just from
-// different underlying state shapes.
-function computeFrozenIdsSet(game) {
+// once - both feed the same shared time_frozen.jpg persistent portrait
+// (see portraitFlash.js's getPersistentPortrait), just from different
+// underlying state shapes.
+export function computeFrozenIdsSet(game) {
   const chronox = Object.values(game.characters).find((c) => c.id === 'chronox');
   const ids = new Set();
   if (!chronox) return ids;
@@ -649,7 +650,11 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
   // different character or the same one - both classes can apply
   // together).
   if (isDivineJudgmentMarked && !character.isKO) tile.classList.add('divine-judgment-mark');
-  if (isFrozenVisual && !character.isKO) tile.classList.add('ice-frozen');
+  // Time Freeze/World Stops' old persistent .ice-frozen glow was removed
+  // 2026-09-25, replaced by the dedicated time_frozen.jpg persistent
+  // portrait (getPersistentPortrait, gated on isFrozenVisual passed
+  // through above) - isFrozenVisual itself is still needed for that call,
+  // just no longer also drives this CSS class.
   // Grimtal's Beast Form (Death-Triggered Reversion #36) - real serialized
   // state, not a timed flash, same pattern as .ice-frozen above: a
   // continuous low-key red pulse for as long as he's transformed, distinct
@@ -848,20 +853,6 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
     crescent.className = 'moon-crescent';
     crescent.innerHTML = '<svg viewBox="0 0 60 60"><path d="M 44,6 A 26,26 0 1 0 44,54 A 20,20 0 1 1 44,6 Z" /></svg>';
     tile.appendChild(crescent);
-  }
-  if (effects.has('icecrash') && !character.isKO) {
-    // Chronox's Time Freeze: crystalline ice shards crash in from multiple
-    // angles and snap into place around the target the instant the freeze
-    // lands - a one-shot landing moment, distinct from the persistent
-    // .ice-frozen shimmer/snowflake (isFrozenVisual) that continues for the
-    // rest of the freeze duration.
-    const ice = document.createElement('div');
-    ice.className = 'ice-crash';
-    ice.innerHTML = '<span class="ice-shard ice-shard--1"></span>' +
-      '<span class="ice-shard ice-shard--2"></span>' +
-      '<span class="ice-shard ice-shard--3"></span>' +
-      '<span class="ice-shard ice-shard--4"></span>';
-    tile.appendChild(ice);
   }
   if (effects.has('shockmark') && !character.isKO) {
     // Chronox's Rewind: a bold "!" pops up over the attacker's tile whose
@@ -1265,7 +1256,7 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
   // unconditionally rather than getting preempted by e.g. a flash still
   // mid-animation from the winning hit.
   const flashSrc = getFlashSrc(character.id);
-  const persistentSrc = getPersistentPortrait(character);
+  const persistentSrc = getPersistentPortrait(character, isFrozenVisual && !character.isKO);
   // Rowan's Petrify - while active, every OTHER character shows ONLY
   // stone.jpg, overriding literally everything below (flash, persistent
   // portrait, idle) - confirmed ruling: "during stone image of other .. no

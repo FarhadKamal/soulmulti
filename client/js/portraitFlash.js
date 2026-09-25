@@ -216,6 +216,25 @@ export function registerFrogCheck(fn) {
   isCurrentlyFrog = fn;
 }
 
+// Chronox's Time Freeze/World Stops (added 2026-09-25) - same defense-in-
+// depth reasoning as CHICKEN_FLASH_PATHS/FROG_FLASH_PATHS above. Unlike a
+// frog (which still gets a dodge-reaction flash) or a chicken (which still
+// acts), a frozen character has NOTHING legitimate to show while frozen
+// except the one persistent time_frozen.jpg portrait (rendered via
+// getPersistentPortrait below, not through setFlash) and Chronox's own two
+// cast flashes - confirmed ruling: "this frozen image only show during
+// frozen status. no other image will play." A stale/indirect hero-specific
+// flash attempt (their own idle check, another ability's own flash, etc.)
+// should never reach a frozen character's tile at all.
+const FROZEN_FLASH_PATHS = new Set([
+  'assets/images/chronox/time.jpg',
+  'assets/images/chronox/world_stop.jpg',
+]);
+let isCurrentlyFrozenVictim = () => false;
+export function registerFrozenCheck(fn) {
+  isCurrentlyFrozenVictim = fn;
+}
+
 // Debug mode's own call history (2026-09-21, user request: "you can add
 // more options on details logs" - a follow-up to a live report that
 // choke.jpg still visibly played on a dodged Self Choke despite the
@@ -263,6 +282,7 @@ export function getFlashCallHistory() {
 function setFlash(characterId, src, durationMs = FLASH_DURATION_MS) {
   if (isCurrentlyChicken(characterId) && !CHICKEN_FLASH_PATHS.has(src)) return;
   if (isCurrentlyFrog(characterId) && !FROG_FLASH_PATHS.has(src)) return;
+  if (isCurrentlyFrozenVictim(characterId) && !FROZEN_FLASH_PATHS.has(src)) return;
   // Confirmed real anomaly, 2026-09-22: a fully-timestamped, cross-
   // referenced trace (getRenderTrace + getLogEntryDispatchTime) proved
   // illyra/choke.jpg gets set in exact sync with a DODGED Self Choke
@@ -396,8 +416,23 @@ export function getFlashSrc(characterId) {
 // the KO/injured/default fallback): Velorya's hidden/eclipsed look while
 // untargetable, and Blade's "back from the dead" look for the rest of the
 // match once Rebirth has triggered.
-export function getPersistentPortrait(character) {
+// isFrozenVisual: whether THIS character is currently the target of an
+// active Time Freeze or World Stops (battleScreen.js's own
+// computeFrozenIdsSet, the same real-state check that drives the .ice-
+// frozen CSS glow) - passed in rather than derived here, since the frozen
+// state lives entirely on CHRONOX's own special object (freezeTargetId/
+// worldStopsFrozenIds), never mirrored onto the victim character the way
+// isFrog/isChicken are, so this function (which only ever receives the
+// victim's own character object, no `game`) can't look it up itself.
+export function getPersistentPortrait(character, isFrozenVisual = false) {
   if (character.isKO) return null;
+  // Chronox's Time Freeze/World Stops (added 2026-09-25) - confirmed
+  // ruling: "this frozen image only show during frozen status. no other
+  // image will play" - checked FIRST, above every other persistent
+  // portrait branch below, so a frozen character's own alive.jpg/hided.jpg/
+  // mind-control-selection art etc. never wins over it, same "nothing else
+  // leaks through" precedent as isChicken/isFrog's own placement.
+  if (isFrozenVisual) return v(`assets/images/${character.id}/time_frozen.jpg`);
   // Boingo's Fowl Play - no hero-specific persistent portrait (Blade's
   // post-Rebirth alive.jpg, Velorya's hided.jpg, Melyssa's mind-control
   // selection art, Draxus's immortality.jpg) may ever override the
@@ -517,6 +552,14 @@ export function checkIdlePortrait(character, round) {
   // a frogged character's own hero-specific idle image must never flash
   // over the frog.jpg portrait override for as long as isFrog is true.
   if (character.isFrog) return false;
+  // Chronox's Time Freeze/World Stops - same reasoning as the isChicken/
+  // isFrog guards just above. Reuses the same isCurrentlyFrozenVictim
+  // predicate setFlash's own choke point relies on (registered via
+  // registerFrozenCheck in main.js) rather than threading a frozen
+  // parameter through this function's own signature - character alone
+  // can't answer this (see getPersistentPortrait's own comment for why the
+  // frozen state lives on Chronox's special object, never the victim).
+  if (isCurrentlyFrozenVictim(character.id)) return false;
   const lastHearts = heartsAtLastTurnStart.has(character.id) ? heartsAtLastTurnStart.get(character.id) : null;
   const wasUntouched = lastHearts === null || character.hearts >= lastHearts;
   const isIdle = wasUntouched && character.hearts > character.maxHearts / 2;

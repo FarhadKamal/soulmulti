@@ -455,31 +455,6 @@ input {
   100% { opacity: 0; transform: translate(-50%, -50%) scale(2) rotate(0deg); }
 }
 
-.char-tile.ice-frozen {
-  border-color: #6fd3ff !important;
-  box-shadow: 0 0 16px rgba(111, 211, 255, 0.55), inset 0 0 24px rgba(111, 211, 255, 0.18);
-  filter: saturate(0.75) brightness(0.95);
-}
-.char-tile.ice-frozen::before {
-  content: ''; position: absolute; inset: 0;
-  background: linear-gradient(160deg, rgba(140, 220, 255, 0.16), rgba(140, 220, 255, 0) 55%);
-  border-radius: inherit; pointer-events: none;
-  animation: tile-ice-shimmer 2.4s ease-in-out infinite;
-}
-.char-tile.ice-frozen::after {
-  content: '❄'; position: absolute; top: 6px; right: 8px; font-size: 18px;
-  color: #cdefff; text-shadow: 0 0 8px rgba(111, 211, 255, 0.9);
-  animation: tile-ice-spin 3s linear infinite;
-}
-@keyframes tile-ice-shimmer {
-  0%, 100% { opacity: 0.7; }
-  50% { opacity: 1; }
-}
-@keyframes tile-ice-spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
 .char-tile.cursed-mark {
   border-color: #9b4dff !important;
   box-shadow: 0 0 16px rgba(155, 77, 255, 0.5), inset 0 0 26px rgba(107, 20, 160, 0.25);
@@ -525,7 +500,7 @@ input {
 }
 
 /* Grimtal's Beast Form - persistent while transformed, same "border glow
-   via ::before" shape as .cursed-mark/.ice-frozen above. First pass
+   via ::before" shape as .cursed-mark above. First pass
    (2026-09-13) was too subtle to actually read during play (confirmed
    live feedback) - strengthened border/glow intensity and widened the
    pulse's opacity swing so it's clearly visible at a glance, while keeping
@@ -1185,35 +1160,6 @@ input {
   30% { opacity: 1; scale: 1.4; }
   55% { scale: 0.9; }
   75% { scale: 1.05; }
-  100% { opacity: 0; scale: 1; }
-}
-
-/* Chronox's Time Freeze: crystalline ice shards crash in from the corners
-   and snap into place around the target the instant the freeze lands - a
-   one-shot landing moment (crash-and-lock motion, distinct from every
-   other effect), separate from the persistent .ice-frozen shimmer that
-   continues for the rest of the freeze duration. */
-.ice-crash {
-  position: absolute; inset: 0; pointer-events: none; z-index: 5;
-  overflow: hidden; border-radius: inherit;
-}
-.ice-shard {
-  position: absolute; width: 0; height: 0;
-  border-left: 14px solid transparent;
-  border-right: 14px solid transparent;
-  border-bottom: 34px solid rgba(180, 230, 255, 0.85);
-  filter: drop-shadow(0 0 6px rgba(111, 211, 255, 0.9));
-  opacity: 0;
-  animation: tile-iceshard-crash 0.55s cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
-}
-.ice-shard--1 { top: -10%; left: 15%; rotate: 200deg; animation-delay: 0s; }
-.ice-shard--2 { top: -10%; right: 15%; rotate: 160deg; animation-delay: 0.05s; }
-.ice-shard--3 { bottom: -10%; left: 20%; rotate: 20deg; animation-delay: 0.1s; }
-.ice-shard--4 { bottom: -10%; right: 20%; rotate: -20deg; animation-delay: 0.08s; }
-@keyframes tile-iceshard-crash {
-  0% { opacity: 0; scale: 0.4; translate: 0 -20%; }
-  40% { opacity: 1; scale: 1.1; translate: 0 0; }
-  60% { opacity: 1; scale: 1; }
   100% { opacity: 0; scale: 1; }
 }
 

@@ -24,7 +24,6 @@ const EFFECT_DURATION_MS = {
   moonstreak: 400,
   shadowstrike: 650,
   darkslash: 350,
-  icecrash: 550,
   poisoncloud: 1200,
   mirrorshard: 600,
   silencelock: 750,
@@ -505,16 +504,13 @@ export function handleLogEntryForEffects(entry, game) {
   // remove the current animation of souls swap effect. becasue image is
   // engouh."
 
-  // Time Freeze: a one-shot crystalline ice-encasement burst on the VICTIM
-  // the instant it lands - crashing shards that snap into place, then
-  // settle into the existing persistent ice-frozen glow (battleScreen.js's
-  // isFrozenVisual/.ice-frozen, driven off real ongoing state) for the rest
-  // of the freeze duration. This is just the landing MOMENT; no damage is
-  // dealt so amountDealt is irrelevant here, unlike every other effect on
-  // this switch.
-  if (actionId === 'timeFreeze' && targetId && !isKO(targetId)) {
-    addEffect(targetId, 'icecrash', EFFECT_DURATION_MS.icecrash);
-  }
+  // Time Freeze's old ice-encasement burst + persistent .ice-frozen glow
+  // were removed 2026-09-25 - replaced by a dedicated per-victim
+  // time_frozen.jpg persistent portrait (see portraitFlash.js's own
+  // getPersistentPortrait, gated on isFrozenVisual), confirmed ruling:
+  // "this frozen image only show during frozen status. no other image
+  // will play" + "we will remove the current frozen status animation
+  // effect."
 
   // Thunder Wrath (and Soul Swap Wrath, which delegates straight into this
   // same execute() and logs the identical actionId - one trigger covers

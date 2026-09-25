@@ -1,13 +1,13 @@
 import { connect, onMessage, recordWireDiag as recordWireDiagFromMain } from './net.js';
 import { renderLobby } from './lobbyScreen.js';
-import { renderBattle } from './battleScreen.js';
+import { renderBattle, computeFrozenIdsSet } from './battleScreen.js';
 import { addChatMessage, clearChatMessages } from './chatPanel.js';
 import {
   startMenuMusic, startBattleMusic, stopMusic, startFrozenMusic, revertFromFrozenMusic,
   startChickenMusic, revertFromChickenMusic,
   playActionSound, playSound, playKO, playVictory, playDodge, playRebirth, playCoin,
 } from './sound.js';
-import { handleLogEntryForFlash, handleDodgeForFlash, checkIdlePortrait, registerFlashRerender, queueGrimtalPowerFlash, registerChickenCheck, registerFrogCheck, setDebugLogEntryIndex, snapshotActiveFlashForDebug, resetFlashDebugHistoryForNewMatch, resetRenderTraceForNewMatch, beginFlashDispatchBatch } from './portraitFlash.js';
+import { handleLogEntryForFlash, handleDodgeForFlash, checkIdlePortrait, registerFlashRerender, queueGrimtalPowerFlash, registerChickenCheck, registerFrogCheck, registerFrozenCheck, setDebugLogEntryIndex, snapshotActiveFlashForDebug, resetFlashDebugHistoryForNewMatch, resetRenderTraceForNewMatch, beginFlashDispatchBatch } from './portraitFlash.js';
 import { handleLogEntryForEffects, registerEffectRerender, setDebugLogEntryIndexForEffects, snapshotActiveEffectsForDebug, resetEffectDebugHistoryForNewMatch } from './actionEffects.js';
 import { preloadBattleImages, battleImagesReady } from './imagePreload.js';
 import { preloadBattleAudio } from './audioPreload.js';
@@ -1022,6 +1022,15 @@ registerEffectRerender(() => { if (state.screen === 'battle') rerender(); });
 registerChickenCheck((characterId) => !!state.game?.characters[characterId]?.isChicken);
 // Rowan's Frog Curse - same reasoning as registerChickenCheck above.
 registerFrogCheck((characterId) => !!state.game?.characters[characterId]?.isFrog);
+// Chronox's Time Freeze/World Stops - same reasoning as registerChickenCheck
+// above, reusing battleScreen.js's own computeFrozenIdsSet (the real-state
+// check that also drives the .ice-frozen CSS glow / hearts-row frozen
+// badge) rather than duplicating the freezeTargetId/worldStopsFrozenIds
+// lookup logic a second time here.
+registerFrozenCheck((characterId) => {
+  if (!state.game) return false;
+  return computeFrozenIdsSet(state.game).has(characterId);
+});
 // Keeps the fullscreen button's icon/title correct even when fullscreen is
 // exited via Escape (or any OS-level gesture) rather than the button
 // itself - document.fullscreenElement changes without any click of ours.
