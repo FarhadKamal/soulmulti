@@ -4,6 +4,7 @@ import { renderChatPanel } from './chatPanel.js';
 import { renderFullscreenButton } from './fullscreen.js';
 import { renderMusicMuteButton } from './musicMute.js';
 import { hardRefresh } from './assetVersion.js';
+import { renderHowToPlayButton, renderHowToPlayPanel, isHowToPlayOpen } from './howToPlay.js';
 
 // Whether the About panel is open - module state (not part of the shared
 // `state` object in main.js), same reasoning as battleScreen.js's
@@ -51,6 +52,7 @@ export function renderLobby(root, { room, error, connectionLost }, { onEnterMatc
   // Only on the entry screen (no room yet) - a landing-page credit, not
   // something needed once you're already in a room or mid-match.
   if (!room) topControls.appendChild(renderAboutButton(rerender));
+  if (!room) topControls.appendChild(renderHowToPlayButton(rerender));
   topControls.appendChild(renderHardRefreshButton());
   topControls.appendChild(renderMusicMuteButton());
   topControls.appendChild(renderFullscreenButton());
@@ -85,6 +87,7 @@ export function renderLobby(root, { room, error, connectionLost }, { onEnterMatc
   }
 
   if (!room && aboutOpen) wrap.appendChild(renderAboutPanel());
+  if (!room && isHowToPlayOpen()) wrap.appendChild(renderHowToPlayPanel(rerender));
 
   // Everything below (entry form or room lobby, including the character
   // grids and chat panel) lives inside its own scroll region, not the page

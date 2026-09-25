@@ -1774,6 +1774,11 @@ function renderActionPanel(characterId, usableActions, armedAction, state) {
     // character has one (Blade has just his one repeatable Blood Hunt), so
     // this is a no-op for those.
     if (action.special) btn.classList.add('special-action-btn');
+    // Snake Strike: a distinct green highlight so its guaranteed,
+    // unavoidable finisher against a currently-frogged target stands out
+    // from Rowan's other normal-tier options (confirmed request, 2026-09-25:
+    // "make the snake bust button to green").
+    if (action.actionId === 'snakeStrike') btn.classList.add('snake-strike-action-btn');
     btn.disabled = lockoutActive;
     lockableButtons.push(btn);
     btn.onclick = () => {
@@ -1905,6 +1910,7 @@ function renderMindControlActionPanel(game, melyssaId, state) {
     const btn = document.createElement('button');
     btn.textContent = action.label;
     if (action.special) btn.classList.add('special-action-btn');
+    if (action.actionId === 'snakeStrike') btn.classList.add('snake-strike-action-btn');
     if (action.actionId === '__mcSelfChoke') {
       btn.classList.add('self-choke-btn');
       // Detail lives in a tooltip, not the button label itself - a short
