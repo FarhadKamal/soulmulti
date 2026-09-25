@@ -233,6 +233,14 @@ const FROG_IMAGES = CHARACTER_IDS.filter((id) => id !== 'rowan').flatMap(
   (id) => [`assets/images/${id}/frog.jpg`, `assets/images/${id}/frog_dodge.jpg`, `assets/images/${id}/snake_bite.jpg`]
 );
 
+// Grimtal's Beast Attack victim reaction (added 2026-09-25) - one-shot
+// flash for the moment a landed (non-dodged) Beast Attack hits a target,
+// same per-victim-hero pattern as the sets above. Excludes Grimtal himself,
+// who can never be his own Beast Attack target.
+const BEAST_MAULED_IMAGES = CHARACTER_IDS.filter((id) => id !== 'grimtal').map(
+  (id) => `assets/images/${id}/beast_mauled.jpg`
+);
+
 // Melyssa's Friendship (Redirect Bond, design-locked 2026-09-20, replaces
 // Full Control) - TWO separate 15-hero sets (everyone except Melyssa
 // herself, who can never be her own friend): friendship_bond.jpg (the
@@ -283,7 +291,7 @@ const MOONLIT_THEFT_REACTION_IMAGES = ['athena', 'boingo', 'tharox', 'chronox', 
 );
 
 function allBattleImagePaths() {
-  const paths = [...FLASH_IMAGES, ...BADGE_ICONS, ...CHICKEN_IMAGES, ...DIVINE_JUDGMENT_STRUCK_IMAGES, ...PROPHECY_OF_DOOM_STRIKE_IMAGES, ...ASHKAS_VENGEANCE_STRIKE_IMAGES, ...SHADOW_SEAL_STRIKE_IMAGES, ...PETRIFY_STONE_IMAGES, ...FROG_IMAGES, ...SELF_CHOKE_VICTIM_IMAGES, ...LIFEBOND_REACTION_IMAGES, ...MOONLIT_THEFT_REACTION_IMAGES, ...FRIENDSHIP_BOND_IMAGES, ...PROTECTS_MELYSSA_IMAGES];
+  const paths = [...FLASH_IMAGES, ...BADGE_ICONS, ...CHICKEN_IMAGES, ...DIVINE_JUDGMENT_STRUCK_IMAGES, ...PROPHECY_OF_DOOM_STRIKE_IMAGES, ...ASHKAS_VENGEANCE_STRIKE_IMAGES, ...SHADOW_SEAL_STRIKE_IMAGES, ...PETRIFY_STONE_IMAGES, ...FROG_IMAGES, ...SELF_CHOKE_VICTIM_IMAGES, ...LIFEBOND_REACTION_IMAGES, ...MOONLIT_THEFT_REACTION_IMAGES, ...FRIENDSHIP_BOND_IMAGES, ...PROTECTS_MELYSSA_IMAGES, ...BEAST_MAULED_IMAGES];
   // Default battle portrait, KO'd, injured, and victory images - each now
   // lives inside the hero's own images/<id>/ folder with a fixed filename
   // (confirmed rename, 2026-09-15; previously 4 separate top-level folders

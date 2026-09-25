@@ -1319,7 +1319,19 @@ export function handleLogEntryForFlash(entry, game) {
       // transformed beast.jpg, mirroring beast_end.jpg's reversion flash.
       setFlash(characterId, 'assets/images/grimtal/beast_start.jpg'); break;
     case 'beastAttack':
-      if (!dodged) setFlash(characterId, 'assets/images/grimtal/beast_attack.jpg');
+      if (!dodged) {
+        setFlash(characterId, 'assets/images/grimtal/beast_attack.jpg');
+        // Per-victim reaction (assets/images/<id>/beast_mauled.jpg, 15 new
+        // images) - only on an actual landed hit, unlike Snake Strike which
+        // always connects; a dodge already shows the victim's own normal
+        // dodge reaction via handleDodgeForFlash, so this only needs the
+        // positive "hit landed" case. Deliberately NOT gated on !isKO,
+        // same reasoning as snakeStrike's own victim flash just above -
+        // the reaction should still show even on a killing blow.
+        if (targetCharacterId) {
+          setFlash(targetCharacterId, `assets/images/${targetCharacterId}/beast_mauled.jpg`);
+        }
+      }
       break;
     case 'mirageMark':
       setFlash(characterId, 'assets/images/illyra/mirage_mark.jpg'); break;
