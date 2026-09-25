@@ -4,6 +4,7 @@
 // Soul_Clash_Hero_Abilities.pdf reference doc, kept in sync with it -
 // update both together whenever a hero's kit changes.
 import { CHARACTERS, CHARACTER_IDS } from './characters.js';
+import { v } from './assetVersion.js';
 
 const HERO_ABILITIES = {
   akyros: [
@@ -188,7 +189,7 @@ export function renderHowToPlayPanel(rerender) {
 
     const portrait = document.createElement('img');
     portrait.className = 'how-to-play-hero-portrait';
-    portrait.src = `assets/images/${id}/idle.jpg`;
+    portrait.src = v(`assets/images/${id}/idle.jpg`);
     portrait.alt = hero.name;
     portrait.loading = 'lazy';
     header.appendChild(portrait);

@@ -86,9 +86,6 @@ export function renderLobby(root, { room, error, connectionLost }, { onEnterMatc
     return;
   }
 
-  if (!room && aboutOpen) wrap.appendChild(renderAboutPanel());
-  if (!room && isHowToPlayOpen()) wrap.appendChild(renderHowToPlayPanel(rerender));
-
   // Everything below (entry form or room lobby, including the character
   // grids and chat panel) lives inside its own scroll region, not the page
   // itself - the title/top-controls above stay a fixed header, matching
@@ -97,6 +94,16 @@ export function renderLobby(root, { room, error, connectionLost }, { onEnterMatc
   // grid) routinely ran taller than a phone screen.
   const scroll = document.createElement('div');
   scroll.className = 'lobby-scroll';
+
+  // About/How to Play panels moved INSIDE the scroll region (confirmed
+  // real bug, 2026-09-25: How to Play's 16-hero accordion is far taller
+  // than a phone viewport, but .lobby itself has no overflow of its own -
+  // only .lobby-scroll scrolls - so a panel appended directly to `wrap`
+  // outside this region got clipped with no way to scroll to the rest of
+  // it. About's own text happened to usually fit on screen, masking the
+  // same structural issue, but it has the identical bug - moved here too.
+  if (!room && aboutOpen) scroll.appendChild(renderAboutPanel());
+  if (!room && isHowToPlayOpen()) scroll.appendChild(renderHowToPlayPanel(rerender));
 
   if (!room) {
     scroll.appendChild(renderEntryForm());
