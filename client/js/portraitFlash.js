@@ -79,6 +79,11 @@ const SOUL_DRAIN_FLASH_DURATION_MS = 3000;
 // affected character's tile than the default 1.6s.
 const REWOUND_FLASH_DURATION_MS = 3000;
 
+// Boingo's Jester Ball explosion victim reaction (bomb_hit.jpg) - held to
+// at least 3s per the same standing request as every other victim flash
+// added this session, so the reaction has time to read before reverting.
+const BOMB_HIT_FLASH_DURATION_MS = 3000;
+
 // Akyros's Shadow Seal (replaces Shadow Army) - both the cast
 // (shadow_seal.jpg) and every affected victim's own shadow_seal_strike.jpg
 // use the same 4.5s multi-beat scale as Earthshatter/Grim Barrage above,
@@ -781,6 +786,16 @@ export function handleLogEntryForFlash(entry, game) {
     // Explodes on someone OTHER than Boingo - flash the thrower laughing,
     // per the main game's reasoning ("his mischief paid off either way").
     if (entry.targetCharacterId !== lastJesterBallThrowerId) handleLaughing(entry, game);
+    // Per-victim reaction art (assets/images/<id>/bomb_hit.jpg, 15 new
+    // images, added 2026-09-25) - the comedic "just got blown up" look
+    // (soot, frizzled hair, scorched clothes) balanced with genuine upset/
+    // dismayed emotion since this can be a lethal hit. Skipped when
+    // entry.revived is true, same guard actionEffects.js's own shake/smoke
+    // effects already use for this exact entry type - a revived Blade
+    // shows his own dedicated 'revive' art instead, not the bomb reaction.
+    if (entry.targetCharacterId && !entry.revived) {
+      setFlash(entry.targetCharacterId, `assets/images/${entry.targetCharacterId}/bomb_hit.jpg`, BOMB_HIT_FLASH_DURATION_MS);
+    }
     return;
   }
   if (entry.type === 'hidden-mark') {
