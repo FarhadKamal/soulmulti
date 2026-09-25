@@ -1373,6 +1373,17 @@ export function handleLogEntryForFlash(entry, game) {
       // voice already do (see main.js).
       if (!dodged) {
         setFlash(characterId, amountDealt >= 3 ? 'assets/images/oraclus/rune_strong_strike.jpg' : 'assets/images/oraclus/rune_strike.jpg');
+        // Per-victim reaction art (assets/images/<id>/rune_strike_hit.jpg,
+        // 15 new images, added 2026-09-25) - one shared image for both the
+        // normal and empowered tier (confirmed scope: single 15-hero set,
+        // not two). Uses targetCharacterId (correctly present here since
+        // runeStrike's own log entry spreads applyDamage's result object,
+        // unlike Soul Swap's own bypass-applyDamage shape which only ever
+        // sets targetId - see that earlier confirmed bug's fix for the
+        // contrast).
+        if (targetCharacterId) {
+          setFlash(targetCharacterId, `assets/images/${targetCharacterId}/rune_strike_hit.jpg`);
+        }
       }
       break;
     case 'runeVision':
