@@ -1122,7 +1122,18 @@ export function handleLogEntryForFlash(entry, game) {
       }
       break;
     case 'soulSwap':
-      setFlash(characterId, 'assets/images/zerathys/soul.jpg'); break;
+      setFlash(characterId, 'assets/images/zerathys/soul.jpg');
+      // Per-victim reaction art (assets/images/<id>/soul_drain.jpg, 15 new
+      // images, added 2026-09-25) - always fires, Soul Swap has no dodge
+      // mechanic of its own (it directly exchanges hearts, not routed
+      // through applyDamage at all). Replaces the old generic
+      // 'invertflash' client-side effect (actionEffects.js), removed in
+      // the same pass - confirmed ruling: "we will remove the current
+      // animation of souls swap effect. becasue image is engouh."
+      if (targetCharacterId) {
+        setFlash(targetCharacterId, `assets/images/${targetCharacterId}/soul_drain.jpg`);
+      }
+      break;
     case 'chargeUp':
       setFlash(characterId, 'assets/images/zerathys/charge.jpg'); break;
     case 'thunderWrath': case 'soulSwapWrath':

@@ -1357,14 +1357,6 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
     portrait.src = v(`assets/images/${character.id}/portrait.jpg`);
   }
   portrait.alt = def.name;
-  // Soul Swap: a quick color-invert flash directly on the victim's own
-  // portrait (photo-negative look, snapping back to normal) - reads as
-  // "something was yanked out of you," matching that Soul Swap trades
-  // heart values rather than dealing damage. Applied as a class on the
-  // real portrait element itself, no cloned ghost image needed.
-  if (effects.has('invertflash') && !character.isKO) {
-    portrait.classList.add('portrait-invert-flash');
-  }
   tile.appendChild(portrait);
 
   // Melyssa's own face, faded in via CSS opacity (the source image is a

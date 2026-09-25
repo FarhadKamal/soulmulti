@@ -16,7 +16,6 @@ const EFFECT_DURATION_MS = {
   axechop: 550,
   eyeburst: 750,
   tendrils: 1000,
-  invertflash: 350,
   lightning: 500,
   wildlightning: 500,
   choke: 700,
@@ -500,16 +499,11 @@ export function handleLogEntryForEffects(entry, game) {
     addEffect(targetId, 'silencelock', EFFECT_DURATION_MS.silencelock);
   }
 
-  // Soul Swap: a quick color-invert flash directly on the VICTIM's own
-  // portrait (photo-negative look, snapping back to normal) - reads as
-  // "something was yanked out of you," matching the swap mechanic (their
-  // hearts literally trade places with Zerathys's) rather than reusing any
-  // damage/heal impact language, since this isn't damage at all. No isKO
-  // guard needed beyond the usual - a swap can leave either side at very
-  // low hearts but never KOs on its own.
-  if (actionId === 'soulSwap' && targetId && !isKO(targetId)) {
-    addEffect(targetId, 'invertflash', EFFECT_DURATION_MS.invertflash);
-  }
+  // Soul Swap's old color-invert flash was removed 2026-09-25 - replaced
+  // by a dedicated per-victim soul_drain.jpg reaction image (see
+  // portraitFlash.js's own soulSwap case), confirmed ruling: "we will
+  // remove the current animation of souls swap effect. becasue image is
+  // engouh."
 
   // Time Freeze: a one-shot crystalline ice-encasement burst on the VICTIM
   // the instant it lands - crashing shards that snap into place, then

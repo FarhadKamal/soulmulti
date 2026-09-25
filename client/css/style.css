@@ -700,22 +700,6 @@ input {
   100% { opacity: 0; scale: 1.05; }
 }
 
-/* Zerathys's Soul Swap, victim side: a quick color-invert flash directly on
-   the victim's own portrait (photo-negative look, snapping back to normal)
-   - reads as "something was yanked out of you," matching that the ability
-   trades heart values rather than dealing damage (no impact-mark language
-   fits here at all). Applied as a class on the real portrait element,
-   no cloned ghost image. */
-.portrait-invert-flash {
-  animation: tile-portrait-invert 0.35s ease-out forwards;
-}
-@keyframes tile-portrait-invert {
-  0% { filter: invert(0); }
-  35% { filter: invert(1) hue-rotate(15deg); }
-  70% { filter: invert(1) hue-rotate(15deg); }
-  100% { filter: invert(0); }
-}
-
 /* Athena's Curse Strike (part 2): curling tendrils that snake in from the
    tile edges right after the eye-burst flash - drawn as SVG paths with a
    dash-offset "draw-in" animation for a genuine organic curl, since plain

@@ -241,6 +241,14 @@ const BEAST_MAULED_IMAGES = CHARACTER_IDS.filter((id) => id !== 'grimtal').map(
   (id) => `assets/images/${id}/beast_mauled.jpg`
 );
 
+// Zerathys's Soul Swap victim reaction (added 2026-09-25) - replaces the
+// old client-side 'invertflash' color-invert effect (removed in the same
+// pass) with dedicated per-hero art. Excludes Zerathys himself, who can
+// never be his own Soul Swap target.
+const SOUL_DRAIN_IMAGES = CHARACTER_IDS.filter((id) => id !== 'zerathys').map(
+  (id) => `assets/images/${id}/soul_drain.jpg`
+);
+
 // Melyssa's Friendship (Redirect Bond, design-locked 2026-09-20, replaces
 // Full Control) - TWO separate 15-hero sets (everyone except Melyssa
 // herself, who can never be her own friend): friendship_bond.jpg (the
@@ -291,7 +299,7 @@ const MOONLIT_THEFT_REACTION_IMAGES = ['athena', 'boingo', 'tharox', 'chronox', 
 );
 
 function allBattleImagePaths() {
-  const paths = [...FLASH_IMAGES, ...BADGE_ICONS, ...CHICKEN_IMAGES, ...DIVINE_JUDGMENT_STRUCK_IMAGES, ...PROPHECY_OF_DOOM_STRIKE_IMAGES, ...ASHKAS_VENGEANCE_STRIKE_IMAGES, ...SHADOW_SEAL_STRIKE_IMAGES, ...PETRIFY_STONE_IMAGES, ...FROG_IMAGES, ...SELF_CHOKE_VICTIM_IMAGES, ...LIFEBOND_REACTION_IMAGES, ...MOONLIT_THEFT_REACTION_IMAGES, ...FRIENDSHIP_BOND_IMAGES, ...PROTECTS_MELYSSA_IMAGES, ...BEAST_MAULED_IMAGES];
+  const paths = [...FLASH_IMAGES, ...BADGE_ICONS, ...CHICKEN_IMAGES, ...DIVINE_JUDGMENT_STRUCK_IMAGES, ...PROPHECY_OF_DOOM_STRIKE_IMAGES, ...ASHKAS_VENGEANCE_STRIKE_IMAGES, ...SHADOW_SEAL_STRIKE_IMAGES, ...PETRIFY_STONE_IMAGES, ...FROG_IMAGES, ...SELF_CHOKE_VICTIM_IMAGES, ...LIFEBOND_REACTION_IMAGES, ...MOONLIT_THEFT_REACTION_IMAGES, ...FRIENDSHIP_BOND_IMAGES, ...PROTECTS_MELYSSA_IMAGES, ...BEAST_MAULED_IMAGES, ...SOUL_DRAIN_IMAGES];
   // Default battle portrait, KO'd, injured, and victory images - each now
   // lives inside the hero's own images/<id>/ folder with a fixed filename
   // (confirmed rename, 2026-09-15; previously 4 separate top-level folders
