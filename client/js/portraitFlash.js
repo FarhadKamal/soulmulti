@@ -73,6 +73,12 @@ const ASHKAS_VENGEANCE_STRIKE_FLASH_DURATION_MS = 3000;
 // than the default 1.6s.
 const SOUL_DRAIN_FLASH_DURATION_MS = 3000;
 
+// Chronox's Rewind victim reaction (rewound.jpg) - held to at least 3s per
+// direct request (2026-09-25), same duration as Ashka's Vengeance/Soul
+// Swap's own victim flashes, so the reaction has more time to read on the
+// affected character's tile than the default 1.6s.
+const REWOUND_FLASH_DURATION_MS = 3000;
+
 // Akyros's Shadow Seal (replaces Shadow Army) - both the cast
 // (shadow_seal.jpg) and every affected victim's own shadow_seal_strike.jpg
 // use the same 4.5s multi-beat scale as Earthshatter/Grim Barrage above,
@@ -1211,7 +1217,21 @@ export function handleLogEntryForFlash(entry, game) {
     case 'worldStops':
       setFlash(characterId, 'assets/images/chronox/world_stop.jpg', WORLD_STOPS_FLASH_DURATION_MS); break;
     case 'rewind':
-      setFlash(characterId, 'assets/images/chronox/rewind.jpg'); break;
+      setFlash(characterId, 'assets/images/chronox/rewind.jpg');
+      // Per-victim reaction art (assets/images/<id>/rewound.jpg, 15 new
+      // images, added 2026-09-25) - the character whose action just got
+      // undone shown being visibly pulled backward through the rewind,
+      // replacing the old generic '!' shockmark effect (actionEffects.js)
+      // for Rewind specifically. Marin's Lifebond still reuses shockmark
+      // unchanged (confirmed scope: this request was Rewind-only) - not
+      // touched here. entry.rewoundCasterId (not a destructured field at
+      // the top of this function) is null for a Jester Ball explosion (no
+      // single attacker to react to), same guard the old effect already
+      // had.
+      if (entry.rewoundCasterId) {
+        setFlash(entry.rewoundCasterId, `assets/images/${entry.rewoundCasterId}/rewound.jpg`, REWOUND_FLASH_DURATION_MS);
+      }
+      break;
     case 'cyclonePunch':
       if (!dodged) setFlash(characterId, 'assets/images/chronox/cyclone.jpg');
       break;

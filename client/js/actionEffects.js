@@ -361,15 +361,12 @@ export function handleLogEntryForEffects(entry, game) {
     }
     return;
   }
-  if (entry.type === 'special' && entry.actionId === 'rewind') {
-    // rewoundCasterId is null for a Jester Ball explosion (no single
-    // attacker to react - see server's resolveJesterBall) - nothing to
-    // flash in that case.
-    if (entry.rewoundCasterId && !isKO(entry.rewoundCasterId)) {
-      addEffect(entry.rewoundCasterId, 'shockmark', EFFECT_DURATION_MS.shockmark);
-    }
-    return;
-  }
+  // Rewind's old generic '!' shockmark was removed 2026-09-25 - replaced
+  // by a dedicated per-victim rewound.jpg reaction image (see
+  // portraitFlash.js's own 'rewind' case), confirmed request: "we will
+  // also create 15 rewind image." Lifebond below still reuses shockmark
+  // unchanged - this was a Rewind-specific replacement, not a removal of
+  // the shared effect itself.
   if (entry.type === 'special' && entry.actionId === 'lifebond') {
     // Marin's Lifebond (taxonomy #34 Pool & Redistribute + #12 No Threat) -
     // reuses Rewind's own "!" shock-mark pop (confirmed ruling: "animation

@@ -268,6 +268,16 @@ const TIME_FROZEN_IMAGES = CHARACTER_IDS.filter((id) => id !== 'chronox').map(
   (id) => `assets/images/${id}/time_frozen.jpg`
 );
 
+// Chronox's Rewind victim reaction (added 2026-09-25) - the character
+// whose action just got undone, shown for the moment Rewind resolves,
+// replacing the old generic '!' shockmark effect for this specific case
+// (Lifebond still reuses shockmark unchanged). Excludes Chronox himself,
+// who can never be his own Rewind target (rewoundCasterId is always the
+// OTHER caster whose action is undone).
+const REWOUND_IMAGES = CHARACTER_IDS.filter((id) => id !== 'chronox').map(
+  (id) => `assets/images/${id}/rewound.jpg`
+);
+
 // Melyssa's Friendship (Redirect Bond, design-locked 2026-09-20, replaces
 // Full Control) - TWO separate 15-hero sets (everyone except Melyssa
 // herself, who can never be her own friend): friendship_bond.jpg (the
@@ -318,7 +328,7 @@ const MOONLIT_THEFT_REACTION_IMAGES = ['athena', 'boingo', 'tharox', 'chronox', 
 );
 
 function allBattleImagePaths() {
-  const paths = [...FLASH_IMAGES, ...BADGE_ICONS, ...CHICKEN_IMAGES, ...DIVINE_JUDGMENT_STRUCK_IMAGES, ...PROPHECY_OF_DOOM_STRIKE_IMAGES, ...ASHKAS_VENGEANCE_STRIKE_IMAGES, ...SHADOW_SEAL_STRIKE_IMAGES, ...PETRIFY_STONE_IMAGES, ...FROG_IMAGES, ...SELF_CHOKE_VICTIM_IMAGES, ...LIFEBOND_REACTION_IMAGES, ...MOONLIT_THEFT_REACTION_IMAGES, ...FRIENDSHIP_BOND_IMAGES, ...PROTECTS_MELYSSA_IMAGES, ...BEAST_MAULED_IMAGES, ...SOUL_DRAIN_IMAGES, ...RUNE_STRIKE_HIT_IMAGES, ...TIME_FROZEN_IMAGES];
+  const paths = [...FLASH_IMAGES, ...BADGE_ICONS, ...CHICKEN_IMAGES, ...DIVINE_JUDGMENT_STRUCK_IMAGES, ...PROPHECY_OF_DOOM_STRIKE_IMAGES, ...ASHKAS_VENGEANCE_STRIKE_IMAGES, ...SHADOW_SEAL_STRIKE_IMAGES, ...PETRIFY_STONE_IMAGES, ...FROG_IMAGES, ...SELF_CHOKE_VICTIM_IMAGES, ...LIFEBOND_REACTION_IMAGES, ...MOONLIT_THEFT_REACTION_IMAGES, ...FRIENDSHIP_BOND_IMAGES, ...PROTECTS_MELYSSA_IMAGES, ...BEAST_MAULED_IMAGES, ...SOUL_DRAIN_IMAGES, ...RUNE_STRIKE_HIT_IMAGES, ...TIME_FROZEN_IMAGES, ...REWOUND_IMAGES];
   // Default battle portrait, KO'd, injured, and victory images - each now
   // lives inside the hero's own images/<id>/ folder with a fixed filename
   // (confirmed rename, 2026-09-15; previously 4 separate top-level folders
