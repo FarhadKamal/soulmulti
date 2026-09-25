@@ -67,6 +67,12 @@ const PROPHECY_OF_DOOM_TRIGGER_FLASH_DURATION_MS = 4500;
 // the bird-strike image has more time to read on the victim's tile.
 const ASHKAS_VENGEANCE_STRIKE_FLASH_DURATION_MS = 3000;
 
+// Zerathys's Soul Swap victim reaction (soul_drain.jpg) - bumped to 3s per
+// direct request (2026-09-25), same duration as Ashka's Vengeance's own
+// victim flash, so the reaction has more time to read on the target's tile
+// than the default 1.6s.
+const SOUL_DRAIN_FLASH_DURATION_MS = 3000;
+
 // Akyros's Shadow Seal (replaces Shadow Army) - both the cast
 // (shadow_seal.jpg) and every affected victim's own shadow_seal_strike.jpg
 // use the same 4.5s multi-beat scale as Earthshatter/Grim Barrage above,
@@ -1130,8 +1136,15 @@ export function handleLogEntryForFlash(entry, game) {
       // 'invertflash' client-side effect (actionEffects.js), removed in
       // the same pass - confirmed ruling: "we will remove the current
       // animation of souls swap effect. becasue image is engouh."
-      if (targetCharacterId) {
-        setFlash(targetCharacterId, `assets/images/${targetCharacterId}/soul_drain.jpg`);
+      // Confirmed real bug, 2026-09-25 (live report: "soul drain animation
+      // not playing"): this used targetCharacterId (the destructured field
+      // at the top of this function), but Soul Swap's own log entry
+      // (zerathys.js) only ever sets targetId, never targetCharacterId -
+      // so the guard always failed silently. Fixed to read entry.targetId
+      // directly, same pattern Self Choke/Friendship/Ashka's Vengeance's
+      // own victim flashes already use for this exact log-entry shape.
+      if (entry.targetId) {
+        setFlash(entry.targetId, `assets/images/${entry.targetId}/soul_drain.jpg`, SOUL_DRAIN_FLASH_DURATION_MS);
       }
       break;
     case 'chargeUp':

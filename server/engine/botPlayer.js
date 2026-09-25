@@ -193,6 +193,27 @@ function athenaDoubleDipTarget(game, character, targets) {
   return 'athena';
 }
 
+// Shared Mirror Reflect avoidance, extracted 2026-09-25 so every hero's bot
+// targeting can apply it, not just callers routed through pickDefaultTarget
+// below - confirmed gap via user question ("do all bot respect it?"): 6
+// heroes (Athena, Kaelis, Draxus, Marin, Grimtal, Oraclus) picked their own
+// targets directly via biggestThreatTarget/lowestHeartsTarget/pickRandom,
+// bypassing this check entirely. Same "avoid unless he's the only option or
+// the hit would kill him outright" reasoning as isMirrorReflectActive's own
+// comment above. minDamage follows pickDefaultTarget's own convention -
+// omit it when the caller's damage is unpredictable (coin flips, moderator
+// outcomes), in which case the kill-exception just never applies and Rowan
+// is avoided whenever a safe alternative exists.
+function avoidMirrorReflectRowan(game, pool, minDamage = null) {
+  if (!isMirrorReflectActive(game) || !pool.includes('rowan')) return pool;
+  const rowanTarget = game.characters['rowan'];
+  const wouldKillRowan = minDamage !== null
+    && activeHearts(rowanTarget) <= Math.max(0, minDamage - rowanTarget.shield);
+  if (wouldKillRowan) return pool;
+  const nonRowanSafe = pool.filter((tid) => tid !== 'rowan');
+  return nonRowanSafe.length > 0 ? nonRowanSafe : pool;
+}
+
 // minDamage: when the caller knows the exact (or minimum) damage the chosen
 // action will deal and the hit isn't shield-ignoring, a target whose shield
 // would fully absorb it nets zero effect - avoid wasting the action on them
@@ -214,18 +235,7 @@ function pickDefaultTarget(game, character, actionId, minDamage = null) {
     const unarmored = pool.filter((tid) => game.characters[tid].shield < minDamage);
     if (unarmored.length > 0) pool = unarmored;
   }
-  // Avoid hitting a Mirror-Reflect-active Rowan with a non-lethal hit -
-  // unless he's the only option left, or the hit would kill him outright
-  // (see isMirrorReflectActive above for the reasoning).
-  if (isMirrorReflectActive(game) && pool.includes('rowan')) {
-    const rowanTarget = game.characters['rowan'];
-    const wouldKillRowan = minDamage !== null
-      && activeHearts(rowanTarget) <= Math.max(0, minDamage - rowanTarget.shield);
-    if (!wouldKillRowan) {
-      const nonRowanSafe = pool.filter((tid) => tid !== 'rowan');
-      if (nonRowanSafe.length > 0) pool = nonRowanSafe;
-    }
-  }
+  pool = avoidMirrorReflectRowan(game, pool, minDamage);
   // Hitting Athena while she's cursing someone else lands damage on both of
   // them for the price of one action - take that free value over any other
   // priority whenever it's available and safe.
@@ -809,7 +819,8 @@ function chooseAthenaMove(character, game, usable) {
       }
     }
     if (character.hearts >= ATHENA_SACRIFICE_SAFE_HEARTS && allTargets.length > 0) {
-      const targetId = biggestThreatTarget(game, character, allTargets) || lowestHeartsTarget(game, allTargets) || pickRandom(allTargets);
+      const safePool = avoidMirrorReflectRowan(game, allTargets);
+      const targetId = biggestThreatTarget(game, character, safePool) || lowestHeartsTarget(game, safePool) || pickRandom(safePool);
       return { actionId: 'divineSacrifice', targetId };
     }
   }
@@ -1042,10 +1053,11 @@ function chooseKaelisMove(character, game, usable) {
   // threat/lowest-hearts chain, same "specific check before generic
   // fallback" ordering bladeStreakThreatAgainstMelyssa/
   // zerathysSoulSwapRescueTarget already establish.
+  const safeTargets = avoidMirrorReflectRowan(game, targets);
   const targetId = grudgedTarget(game, character, targets)
-    || biggestThreatTarget(game, character, targets)
-    || lowestHeartsTarget(game, targets)
-    || pickRandom(targets);
+    || biggestThreatTarget(game, character, safeTargets)
+    || lowestHeartsTarget(game, safeTargets)
+    || pickRandom(safeTargets);
   return { actionId: 'grudgeStrike', targetId };
 }
 
@@ -1066,9 +1078,10 @@ function chooseDraxusMove(character, game, usable) {
     return { actionId: 'deathlessFury', targetId: null };
   }
   const targets = validTargetsFor(game, character, 'dyingBlow');
-  const targetId = biggestThreatTarget(game, character, targets)
-    || lowestHeartsTarget(game, targets)
-    || pickRandom(targets);
+  const safeTargets = avoidMirrorReflectRowan(game, targets);
+  const targetId = biggestThreatTarget(game, character, safeTargets)
+    || lowestHeartsTarget(game, safeTargets)
+    || pickRandom(safeTargets);
   return { actionId: 'dyingBlow', targetId };
 }
 
@@ -1432,8 +1445,9 @@ function chooseMarinMove(character, game, usable) {
     return { actionId: 'arcaneStudy', targetId: null };
   }
   const targets = validTargetsFor(game, character, 'wandStrike');
-  const targetId = biggestThreatTarget(game, character, targets)
-    || lowestHeartsTarget(game, targets) || pickRandom(targets);
+  const safeTargets = avoidMirrorReflectRowan(game, targets);
+  const targetId = biggestThreatTarget(game, character, safeTargets)
+    || lowestHeartsTarget(game, safeTargets) || pickRandom(safeTargets);
   return { actionId: 'wandStrike', targetId };
 }
 
@@ -1522,11 +1536,11 @@ function chooseGrimtalMove(character, game, usable) {
     return { actionId: 'claimKill', targetId: null };
   }
   if (byId.skullCrack) {
-    const targets = validTargetsFor(game, character, 'skullCrack');
+    const targets = avoidMirrorReflectRowan(game, validTargetsFor(game, character, 'skullCrack'));
     const targetId = biggestThreatTarget(game, character, targets) || lowestHeartsTarget(game, targets) || pickRandom(targets);
     return { actionId: 'skullCrack', targetId };
   }
-  const targets = validTargetsFor(game, character, 'grimStrike');
+  const targets = avoidMirrorReflectRowan(game, validTargetsFor(game, character, 'grimStrike'));
   const targetId = biggestThreatTarget(game, character, targets) || lowestHeartsTarget(game, targets) || pickRandom(targets);
   return { actionId: 'grimStrike', targetId };
 }
@@ -1663,7 +1677,7 @@ function chooseOraclusMove(character, game, usable) {
     const attackerId = chooseRuneVisionAttackerPick(character, game);
     if (attackerId) return { actionId: 'runeVision', targetId: attackerId };
   }
-  const targets = validTargetsFor(game, character, 'runeStrike');
+  const targets = avoidMirrorReflectRowan(game, validTargetsFor(game, character, 'runeStrike'));
   const targetId = lowestHeartsTarget(game, targets) || pickRandom(targets);
   return { actionId: 'runeStrike', targetId };
 }
