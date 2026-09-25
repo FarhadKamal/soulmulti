@@ -376,14 +376,16 @@ export const actions = {
       // eligibility-checks pattern as Silence Lock above.
       targetId = redirectStatusTargetIfProtected(game, targetId, character.id);
       const target = game.characters[targetId];
-      // Marin's Clean Slate / Illyra's passive - same interception order as
-      // every other targeted status-application site in this file.
+      // Marin's Clean Slate can still block the cast (confirmed ruling,
+      // 2026-09-25). Illyra's passive dodge deliberately does NOT get a
+      // chance here anymore - confirmed ruling, 2026-09-25: "i want frog
+      // cast to bypass dodge. so illyra should not get chance to block it
+      // even of 50% chance illusion." Frog Curse's cast is now unblockable
+      // by Illyra specifically, same as it already always was for every
+      // other hero (her passive only ever checked target.id === 'illyra'
+      // in the first place, so this only changes her own case).
       if (tryTriggerCleanSlate(target, game, log)) {
         log.push({ type: 'special', characterId: character.id, actionId: 'frogCurse', targetId, blockedBy: 'cleanSlate' });
-        return {};
-      }
-      if (tryIllyraDodgeStatus(target, game, log, character.id)) {
-        log.push({ type: 'special', characterId: character.id, actionId: 'frogCurse', targetId, blockedBy: 'illyra' });
         return {};
       }
       target.isFrog = true;
