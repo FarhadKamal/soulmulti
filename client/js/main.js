@@ -581,7 +581,15 @@ function playLogEntrySound(entry, game) {
     // assets/voice/blade/blood_drain.mp3 (looked up via
     // ACTION_VOICE_LINES.blade.bloodDrain in voice.js).
     playSound('blood_lick');
-    playMoveVoice('blade', 'bloodDrain');
+    // A heal landed via Shark Strike (viaSharkStrike, see blade.js) keeps
+    // the same blood_lick.mp3 sound (generic enough - still a heal off a
+    // landed hit) but stays voice-silent - confirmed ruling: the normal
+    // "blood_drain.mp3" line doesn't fit the deep-sea/shark-form moment,
+    // reported as a real bug ("oops in deep sea voice was playing that we
+    // use for blade blood drink").
+    if (!entry.viaSharkStrike) {
+      playMoveVoice('blade', 'bloodDrain');
+    }
     return;
   }
   if (entry.type === 'beast-regen') {
