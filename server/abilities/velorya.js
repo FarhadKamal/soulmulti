@@ -99,7 +99,10 @@ export const actions = {
     // hiding the button from a human who might want to snipe even 1 shield).
     isLegal: (character, game) => character.hearts <= MOONLIT_THEFT_HEARTS_THRESHOLD
       && !character.special.usedMoonlitTheft
-      && Object.values(game.characters).some((c) => c.id !== character.id && !c.isKO && !(c.id === 'grimtal' && c.special?.beastFormActive) && !isProtectedByFriendship(game, c.id) && c.shield > 0),
+      // Blade's Shark Hunt (taxonomy #41, Mutual Seal) - a sealed
+      // character's shield cannot be drained by this fresh sweep,
+      // confirmed ruling (same reasoning as Beast Form/Friendship above).
+      && Object.values(game.characters).some((c) => c.id !== character.id && !c.isKO && !(c.id === 'grimtal' && c.special?.beastFormActive) && !isProtectedByFriendship(game, c.id) && !c.deepSeaSealed && c.shield > 0),
     execute(character, targetId, game, log) {
       character.special.usedMoonlitTheft = true;
       // Grimtal's Beast Form (Death-Triggered Reversion #36) - same
@@ -121,8 +124,12 @@ export const actions = {
       // DIFFERENT character (not her, not currently her friend) casts
       // this, her friend's own shield is still a completely normal, fully
       // stealable target, same as anyone else's.
+      // Blade's Shark Hunt (taxonomy #41, Mutual Seal) - same exclusion as
+      // the isLegal check above, kept in sync here so the execute-time
+      // loop can never drain a sealed character's shield even if a
+      // DIFFERENT, unsealed target made the overall cast legal.
       const others = Object.values(game.characters).filter(
-        (c) => c.id !== character.id && !c.isKO && !(c.id === 'grimtal' && c.special?.beastFormActive) && !isProtectedByFriendship(game, c.id)
+        (c) => c.id !== character.id && !c.isKO && !(c.id === 'grimtal' && c.special?.beastFormActive) && !isProtectedByFriendship(game, c.id) && !c.deepSeaSealed
       );
       const changes = [];
       let stolenTotal = 0;

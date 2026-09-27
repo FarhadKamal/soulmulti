@@ -356,6 +356,14 @@ export function applyDamage(game, log, {
   // time he'd otherwise die to a real attack. Only chickenAttack sets
   // this true.
   ignoresRebirth = false,
+  // Blade's Shark Hunt (taxonomy #41, Mutual Seal) - narrow, opt-in bypass
+  // for the seal's own defensive re-check below, mirroring
+  // ignoresUntargetable's own shape. Passed true from exactly 3 call
+  // sites: Athena's Curse Strike mirror, her Divine Judgment trigger, and
+  // the active-poison-tick call (tickPoisonIfAny) - the confirmed
+  // "reach-through" mechanics allowed to land on a sealed character. No
+  // other call site should ever pass this.
+  ignoresDeepSeaSeal = false,
 }) {
   const target = game.characters[targetCharacterId];
   const result = {
@@ -448,7 +456,10 @@ export function applyDamage(game, log, {
     // Curse leaves the friend with zero agency/actions). Does NOT end the
     // bond itself, same as freezing doesn't - protection just resumes
     // automatically once isFrog clears.
-    if (friend && !friend.isKO && !isFrozenByChronox(friend, game) && !friend.isFrog) {
+    // Blade's Shark Hunt (taxonomy #41, Mutual Seal) - same "incapacitated,
+    // nothing left to redirect to" reasoning as the frozen/frogged-friend
+    // exclusions above.
+    if (friend && !friend.isKO && !isFrozenByChronox(friend, game) && !friend.isFrog && !friend.deepSeaSealed) {
       const beforeHearts = friend.hearts;
       const redirectedResult = applyDamage(game, log, {
         sourceCharacterId, targetCharacterId: friendId, amount,
@@ -578,6 +589,21 @@ export function applyDamage(game, log, {
   // Untargetable is enforced primarily at the targeting UI layer; this is a
   // defensive re-check so a bug upstream can't sneak damage through.
   if (target.untargetable && !ignoresUntargetable) {
+    return result;
+  }
+
+  // Blade's Shark Hunt (taxonomy #41, Mutual Seal) - defensive re-check
+  // mirroring untargetable's own "enforced primarily at the targeting UI
+  // layer, this is a re-check" shape immediately above. Needs its own
+  // narrow ignores-flag (unlike a fully unconditional check) because the
+  // two confirmed reach-through mechanics - Athena's Curse Strike mirror
+  // and her Divine Judgment trigger - call applyDamage directly against a
+  // sealed character (bypassing isValidTarget entirely, same as they
+  // already bypass untargetable via ignoresUntargetable) and must still
+  // land. ignoresDeepSeaSeal is passed ONLY from those two call sites plus
+  // the active-poison-tick call site (tickPoisonIfAny) - see each site's
+  // own comment for why.
+  if (target.deepSeaSealed && sourceCharacterId !== target.deepSeaSealPartnerId && !ignoresDeepSeaSeal) {
     return result;
   }
 
@@ -845,6 +871,13 @@ export function applyDamage(game, log, {
     // registration).
     if (anyDeathExtra?.prophecyOfDoomTriggerLogEntry) {
       result.prophecyOfDoomTriggerLogEntry = anyDeathExtra.prophecyOfDoomTriggerLogEntry;
+    }
+    // Blade's Shark Hunt (taxonomy #41, Mutual Seal) - fires when EITHER
+    // sealed party dies (see blade.js's own registerOnAnyDeath
+    // registration). Same deferred pattern as divineJudgmentTriggerLogEntry
+    // just above.
+    if (anyDeathExtra?.deepSeaSealEndLogEntry) {
+      result.deepSeaSealEndLogEntry = anyDeathExtra.deepSeaSealEndLogEntry;
     }
     // Melyssa's Friendship - the bond quietly ending because the FRIEND
     // (not Melyssa) just died to this hit. Same deferred pattern as

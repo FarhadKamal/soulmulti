@@ -2464,7 +2464,7 @@ const ACTION_LABELS = {
   smash: 'Smash', titanToss: 'Titan Toss', titanSmash: 'Titan Smash', glorySmash: 'Glory Smash', earthshatter: 'Earthshatter',
   chargeUp: 'Charge Up', thunderWrath: 'Thunder Wrath', soulSwap: 'Soul Swap', soulSwapWrath: 'Thunder Wrath (free)',
   hiddenMark: 'Hidden Mark', fatalSlash: 'Fatal Slash', shadowExecution: 'Shadow Execution', shadowSeal: 'Shadow Seal', shadowToll: 'Shadow Toll',
-  bloodFrenzy: 'Blood Frenzy',
+  sharkHunt: 'Shark Hunt', sharkStrike: 'Shark Strike', escapeSeal: 'Escape',
   lunarStrike: 'Lunar Strike', moonstep: 'Moonstep', lunarEclipse: 'Lunar Eclipse', moonlitTheft: 'Moonlit Theft',
   chaosGamble: 'Chaos Gamble', jesterBall: 'Jester Ball', fowlPlay: 'Fowl Play', chickenAttack: 'Chicken Attack', bloodHunt: 'Blood Hunt',
   curseStrike: 'Curse Strike', divineRestore: 'Divine Restore', divineSacrifice: 'Divine Sacrifice', divineJudgment: 'Divine Judgment',
@@ -2820,6 +2820,18 @@ function describeLogEntry(entry) {
       return `${name(entry.characterId)}'s Lunar Eclipse ends`;
     case 'frog-curse-end':
       return `${name(entry.characterId)} turns back into a hero!`;
+    case 'deep-sea-escape-attempt': {
+      const pct = Math.round((entry.chance ?? 0) * 100);
+      return entry.succeeded
+        ? `${name(entry.characterId)} breaks free of the deep sea! (${pct}% chance)`
+        : `${name(entry.characterId)} tries to escape the deep sea (${pct}%)... and fails.`;
+    }
+    case 'deep-sea-seal-end': {
+      const names = (entry.characterIds || []).map(name);
+      return entry.reason === 'ko'
+        ? `The deep sea releases its hold - ${names.join(' and ')} return to the surface.`
+        : `${names.join(' and ')} surface once more.`;
+    }
     case 'beast-form-end':
       // reason: 'timeout' - the stalemate safety valve (see grimtal.js's
       // own BEAST_FORM_MAX_TURNS comment) forcing a revert with no kill

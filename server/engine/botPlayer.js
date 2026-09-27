@@ -735,6 +735,26 @@ function bladeNextHitCount(character, targetId) {
 }
 
 function chooseBladeMove(character, game, usable) {
+  const byId = Object.fromEntries(usable.map((a) => [a.actionId, a]));
+  // Shark Strike (taxonomy #41, Mutual Seal): his ONLY legal action while
+  // sealed anyway (see turnEngine.js's getLegalActions override) - always
+  // take it against his own sealed partner, same "no downside to cashing
+  // in immediately" reasoning as Rowan's own snakeStrike-always-first
+  // pattern.
+  if (byId.sharkStrike) {
+    return { actionId: 'sharkStrike', targetId: character.deepSeaSealPartnerId };
+  }
+  // Shark Hunt: hearts<=3 one-time cast - take it against the biggest
+  // threat once available, same target-priority shape as chooseRowanMove's
+  // own frogCurse branch. No reason to delay a desperation move once
+  // legal, matching every other hearts<=3 special's own bot priority.
+  if (byId.sharkHunt) {
+    const huntTargets = validTargetsFor(game, character, 'sharkHunt');
+    if (huntTargets.length > 0) {
+      const targetId = biggestThreatTarget(game, character, huntTargets) || pickRandom(huntTargets);
+      return { actionId: 'sharkHunt', targetId };
+    }
+  }
   // Redesigned 2026-09-14: no more single locked streak target to stay on
   // - every living target has their OWN independent hit-count, so the
   // decision each turn is genuinely "who's sitting at the best count right
@@ -1737,6 +1757,21 @@ function chooseChickenMove(character, game, usable) {
 export function chooseBotMove(character, game) {
   const usable = getUsableActions(character, game);
   if (usable.length === 0) return null;
+  // Blade's Shark Hunt (taxonomy #41, Mutual Seal) - a sealed VICTIM's
+  // only usable action is the synthetic escapeSeal (self-targeted, no
+  // decision to make), same "generic mechanism, not tied to any one
+  // hero's own chooser" reasoning as chickenAttack's own interception
+  // just below. Intercepted here rather than left to fall through to
+  // MOVE_CHOOSERS[character.id], since a hero's own chooser (e.g.
+  // chooseIllyraMove) has no idea what escapeSeal is and would misbehave
+  // trying to find its own hero-specific targets in `usable`. Blade
+  // himself is never routed here - his own sealed-turn-only action,
+  // sharkStrike, is handled inside chooseBladeMove instead, since it DOES
+  // need a real decision (which sealed partner, though in practice
+  // there's only ever one).
+  if (usable.length === 1 && usable[0].actionId === 'escapeSeal') {
+    return { actionId: 'escapeSeal', targetId: null };
+  }
   const chooser = isChickenified(character) ? chooseChickenMove : (MOVE_CHOOSERS[character.id] || chooseFallbackMove);
   const move = chooser(character, game, usable);
   if (!move) return chooseFallbackMove(character, game, usable);

@@ -74,6 +74,13 @@ let preFrozenTrack = null; // 'menu' | 'battle' | null - remembers what to resto
 const CHICKEN_TRACK = 'bgm-chicken.mp3';
 let preChickenTrack = null;
 
+// Blade's Shark Hunt (Mutual Seal #41): same swap-and-restore pattern,
+// checked fresh on every broadcast against game.characters.blade?.deepSeaSealed
+// (no separate game-level flag needed - only Blade can ever hold this
+// seal, unlike Fowl Play which can apply to any character).
+const DEEPSEA_TRACK = 'bgm-deepsea.mp3';
+let preDeepSeaTrack = null;
+
 // Browsers block audio autoplay until the user has interacted with the
 // page. Two distinct failure modes seen in practice: (1) a play() call
 // made asynchronously (e.g. from a WebSocket message handler, not
@@ -178,6 +185,24 @@ export function revertFromChickenMusic() {
   }
 }
 
+export function startDeepSeaMusic() {
+  if (musicTrack === 'deepsea') return;
+  preDeepSeaTrack = musicTrack;
+  startMusic('deepsea', DEEPSEA_TRACK, 0.28);
+}
+
+export function revertFromDeepSeaMusic() {
+  if (musicTrack !== 'deepsea') return;
+  const restoreTo = preDeepSeaTrack;
+  preDeepSeaTrack = null;
+  musicTrack = null;
+  if (restoreTo === 'menu') {
+    startMenuMusic();
+  } else {
+    startBattleMusic();
+  }
+}
+
 export function stopMusic() {
   if (musicAudio) {
     musicAudio.pause();
@@ -257,7 +282,13 @@ const ACTION_SOUND = {
   fowlPlay: 'chicken_cast',
   chickenAttack: 'chicken_attack',
   bloodHunt: 'sword',
-  bloodFrenzy: 'sword',
+  // Shark Hunt (Mutual Seal #41, replaces Blood Frenzy) - dedicated cast
+  // and strike SFX. sharkStrike's own dodge/escape sounds are NOT routed
+  // through this table (see 'deep-sea-escape-attempt'/'dodge' handling in
+  // main.js/portraitFlash.js instead) since they need per-outcome branching
+  // this static actionId->sound lookup can't express.
+  sharkHunt: 'deepsea_cast',
+  sharkStrike: 'deepsea_strike',
   curseStrike: 'curse',
   divineRestore: 'divinerestore',
   selfChoke: 'self_choke',
@@ -356,4 +387,23 @@ export function playRebirth() {
 
 export function playDodge() {
   playSound('dodge');
+}
+
+// Shark Strike's own "underwater dodge" (flat 50% roll inside blade.js's
+// own execute(), not the shared damagePipeline dodge stack) gets its own
+// dedicated splash-dodge SFX rather than the generic playDodge() - a
+// distinct, thematic sound for this one attacker/victim pair, same
+// reasoning as Frog Curse's own frog_dodge_hop.mp3.
+export function playDeepSeaDodge() {
+  playSound('deepsea_dodge');
+}
+
+// Escape Seal's own success/fail stingers - main.js's 'deep-sea-escape-
+// attempt' handler picks one based on entry.succeeded.
+export function playDeepSeaEscapeSuccess() {
+  playSound('deepsea_escape_success');
+}
+
+export function playDeepSeaEscapeFail() {
+  playSound('deepsea_escape_fail');
 }

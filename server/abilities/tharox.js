@@ -94,7 +94,11 @@ export const actions = {
     isLegal: (character) => character.hearts <= 3 && !character.special.usedEarthshatter,
     execute(character, targetId, game, log) {
       character.special.usedEarthshatter = true;
-      let others = Object.values(game.characters).filter((c) => c.id !== character.id && !c.isKO);
+      // Blade's Shark Hunt (taxonomy #41, Mutual Seal) - a sealed character
+      // is unreachable by this indiscriminate sweep, confirmed ruling: "any
+      // mechanism that involves selecting a target - whether player-chosen
+      // or automatic/random - cannot reach a sealed pair."
+      let others = Object.values(game.characters).filter((c) => c.id !== character.id && !c.isKO && !c.deepSeaSealed);
       // Fully independent random target per point, same reasoning as
       // Mirage Overload - deliberately NOT an even/balanced split, a
       // lopsided or single-target result is normal, not a bug. Applied ONE

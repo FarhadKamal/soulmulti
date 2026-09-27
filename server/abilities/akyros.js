@@ -235,8 +235,12 @@ export const actions = {
       // HER specifically - her friend's own hearts are still a completely
       // normal, fully sealable target for everyone else, same as anyone
       // else's.
+      // Blade's Shark Hunt (taxonomy #41, Mutual Seal) - a sealed
+      // character's hearts cannot be locked by this fresh sweep, confirmed
+      // ruling (same reasoning as the Beast Form/Friendship exclusions
+      // above).
       const others = Object.values(game.characters).filter(
-        (c) => c.id !== character.id && !c.isKO && !(c.id === 'grimtal' && c.special?.beastFormActive) && !isProtectedByFriendship(game, c.id)
+        (c) => c.id !== character.id && !c.isKO && !(c.id === 'grimtal' && c.special?.beastFormActive) && !isProtectedByFriendship(game, c.id) && !c.deepSeaSealed
       );
       const changes = [];
       for (const c of others) {

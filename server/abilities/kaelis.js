@@ -85,8 +85,12 @@ export function onTurnStart(character, game, log) {
     // Ashka's own random pool entirely whenever Kaelis is currently her
     // friend, same "flat exclusion, not a redirect" shape already used for
     // Shadow Seal/Moonlit Theft's own Melyssa-as-friend gaps.
+    // Blade's Shark Hunt (taxonomy #41, Mutual Seal) - a sealed character
+    // is excluded from this automatic random pick too, confirmed ruling:
+    // "any mechanism that involves selecting a target - whether player-
+    // chosen or automatic/random - cannot reach a sealed pair."
     const others = Object.values(game.characters).filter(
-      (c) => c.id !== 'kaelis' && !c.isKO && !(c.id === 'melyssa' && isCurrentFriend(game, 'kaelis'))
+      (c) => c.id !== 'kaelis' && !c.isKO && !(c.id === 'melyssa' && isCurrentFriend(game, 'kaelis')) && !c.deepSeaSealed
     );
     if (others.length > 0) {
       const target = others[Math.floor(Math.random() * others.length)];

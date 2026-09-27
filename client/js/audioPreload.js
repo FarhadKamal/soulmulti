@@ -44,6 +44,9 @@ const SOUND_EFFECT_FILES = [
   'earthshatter.mp3', 'world_stop.mp3', 'divine_judgment.mp3', 'divine_judgment_strike.mp3',
   'chicken_cast.mp3', 'chicken_attack.mp3', 'chicken_hit.mp3', 'chicken_koed.mp3',
   'stabbing.mp3', 'beast_form.mp3', 'beast_attack.mp3',
+  // Shark Hunt (Mutual Seal #41, replaces Blood Frenzy).
+  'deepsea_cast.mp3', 'deepsea_strike.mp3', 'deepsea_dodge.mp3',
+  'deepsea_escape_success.mp3', 'deepsea_escape_fail.mp3',
 ];
 
 let started = false;

@@ -243,8 +243,13 @@ export const actions = {
       // exclusion just above. Symmetric exclusion (Frog Curse cannot target
       // an already-chickenified character) lives in turnEngine.js's own
       // isValidTarget.
+      // Blade's Shark Hunt (taxonomy #41, Mutual Seal) - same full mutual
+      // exclusion as Frog Curse just above (confirmed ruling): a sealed
+      // character cannot be chickenified. Symmetric exclusion (Shark Hunt
+      // cannot target an already-chickenified character) lives in
+      // turnEngine.js's own isValidTarget.
       const candidates = Object.values(game.characters).filter(
-        (c) => c.id !== character.id && !c.isKO && !c.special?.beastFormActive && !c.isFrog
+        (c) => c.id !== character.id && !c.isKO && !c.special?.beastFormActive && !c.isFrog && !c.deepSeaSealed
       );
       // Marin's Clean Slate - confirmed ruling: "only marin clean slate
       // can protect her from chicken status" - the one exception in the

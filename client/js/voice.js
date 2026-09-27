@@ -182,7 +182,11 @@ const ACTION_VOICE_LINES = {
   // directly by playMoveVoice('blade', 'bloodDrain') from main.js's own
   // dedicated 'blood-drain' branch, same pattern ashka-heal's reuse of
   // 'callAshka' already establishes for a passive-triggered voice line.
-  blade: { bloodFrenzy: 'blood_frenzy', bloodDrain: 'blood_drain' },
+  // bloodFrenzy retired along with the ability itself (2026-09-25) -
+  // replaced by sharkHunt/sharkStrike below. bloodDrain's own line still
+  // plays on a landed sharkStrike heal too (viaSharkStrike doesn't change
+  // which voice line fires, only which portrait art shows).
+  blade: { sharkHunt: 'shark_hunt', sharkStrike: 'shark_strike', bloodDrain: 'blood_drain' },
   // mindControl's line fires from main.js's dedicated 'mind-control-select'
   // sound branch (via playMoveVoice(entry.characterId, 'mindControl')), not
   // the generic bottom-of-switch call every other actionId uses - selection

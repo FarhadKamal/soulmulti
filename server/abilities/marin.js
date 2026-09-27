@@ -166,8 +166,13 @@ export const actions = {
       // divisor - not just "untouched but still counted," which would
       // silently skew the shared value for everyone else based on a
       // number he never actually contributed while immune.
+      // Blade's Shark Hunt (taxonomy #41, Mutual Seal) - a sealed
+      // character's hearts should not be pooled/redistributed by an
+      // outside Lifebond cast, same reasoning as the Beast Form exclusion
+      // just above (confirmed ruling: fresh sweeps cannot reach a sealed
+      // pair).
       const living = Object.values(game.characters).filter(
-        (c) => !c.isKO && !(c.id === 'grimtal' && c.special?.beastFormActive)
+        (c) => !c.isKO && !(c.id === 'grimtal' && c.special?.beastFormActive) && !c.deepSeaSealed
       );
       const total = living.reduce((sum, c) => sum + c.hearts, 0);
       const shared = Math.floor(total / living.length);

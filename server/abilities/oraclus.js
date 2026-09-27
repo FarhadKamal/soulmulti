@@ -34,6 +34,11 @@ function resolveProphecyOfDoomStrike(game, log) {
   let redirectedToFriendId = null;
   for (const target of Object.values(game.characters)) {
     if (target.id === 'oraclus' || target.isKO) continue;
+    // Blade's Shark Hunt (taxonomy #41, Mutual Seal) - a sealed character
+    // is unreachable by this indiscriminate sweep, same reasoning as
+    // Tharox's Earthshatter (confirmed ruling, both explicitly named as
+    // examples of mechanics that cannot reach a sealed pair).
+    if (target.deepSeaSealed) continue;
     // Environmental Attack shape (confirmed rulings): bypasses Dodge
     // Defense and Untargetable entirely (nobody can evade a falling
     // meteor), but Shield Defense still applies normally ("it respects

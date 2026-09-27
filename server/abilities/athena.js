@@ -81,6 +81,10 @@ registerOnAnyDeath((diedCharacterId, sourceCharacterId, isMirror, game, log) => 
     ignoresShield: true,
     ignoresDodge: true,
     ignoresUntargetable: true,
+    // Blade's Shark Hunt (taxonomy #41, Mutual Seal) - a confirmed
+    // reach-through mechanic: Divine Judgment's death-pact trigger must
+    // still land even if the marked victim is currently sealed.
+    ignoresDeepSeaSeal: true,
     ignoresImmortal: true,
     ignoresRebirth: true,
   });
@@ -153,6 +157,10 @@ registerOnHitLanded('athena', (character, game, log, ctx) => {
     amount: ctx.amountDealt,
     ignoresShield: false,
     ignoresUntargetable: true,
+    // Blade's Shark Hunt (taxonomy #41, Mutual Seal) - a confirmed
+    // reach-through mechanic: curse-mirror damage must still land on a
+    // cursed character even if they're currently sealed.
+    ignoresDeepSeaSeal: true,
     isMirror: true,
   });
   return {

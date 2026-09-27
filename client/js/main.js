@@ -5,9 +5,11 @@ import { addChatMessage, clearChatMessages } from './chatPanel.js';
 import {
   startMenuMusic, startBattleMusic, stopMusic, startFrozenMusic, revertFromFrozenMusic,
   startChickenMusic, revertFromChickenMusic,
+  startDeepSeaMusic, revertFromDeepSeaMusic,
   playActionSound, playSound, playKO, playVictory, playDodge, playRebirth, playCoin,
+  playDeepSeaDodge, playDeepSeaEscapeSuccess, playDeepSeaEscapeFail,
 } from './sound.js';
-import { handleLogEntryForFlash, handleDodgeForFlash, checkIdlePortrait, registerFlashRerender, queueGrimtalPowerFlash, registerChickenCheck, registerFrogCheck, registerFrozenCheck, setDebugLogEntryIndex, snapshotActiveFlashForDebug, resetFlashDebugHistoryForNewMatch, resetRenderTraceForNewMatch, beginFlashDispatchBatch } from './portraitFlash.js';
+import { handleLogEntryForFlash, handleDodgeForFlash, checkIdlePortrait, registerFlashRerender, queueGrimtalPowerFlash, registerChickenCheck, registerFrogCheck, registerFrozenCheck, registerDeepSeaCheck, setDebugLogEntryIndex, snapshotActiveFlashForDebug, resetFlashDebugHistoryForNewMatch, resetRenderTraceForNewMatch, beginFlashDispatchBatch } from './portraitFlash.js';
 import { handleLogEntryForEffects, registerEffectRerender, setDebugLogEntryIndexForEffects, snapshotActiveEffectsForDebug, resetEffectDebugHistoryForNewMatch } from './actionEffects.js';
 import { preloadBattleImages, battleImagesReady } from './imagePreload.js';
 import { preloadBattleAudio } from './audioPreload.js';
@@ -91,6 +93,13 @@ function playInjuredVoiceIfNewlyHurt(game) {
     // all, same class of gap as checkIdlePortrait's own missing guard
     // (fixed separately, see portraitFlash.js).
     if (character.isChicken) continue;
+    // Blade's Shark Hunt (Mutual Seal #41) - same reasoning as the chicken
+    // guard just above: both sealed parties' own hero identity is hidden
+    // (Blade shows deepsea_form.jpg, the victim deepsea_trapped.jpg) for
+    // the duration, so neither should play their normal injured voice line
+    // while sealed - a landed Shark Strike drops the victim below half
+    // routinely.
+    if (character.deepSeaSealed) continue;
     const isInjuredNow = character.hearts <= character.maxHearts / 2;
     const wasInjuredBefore = prev <= character.maxHearts / 2;
     if (isInjuredNow && !wasInjuredBefore) playInjuredVoice(character.id);
@@ -341,6 +350,12 @@ function playLogEntrySound(entry, game) {
     // explicit request - distinct from both the plain generic dodge and
     // Grimtal's magic_dodge.wav.
     else if (entry.targetCharacterId === 'illyra') playSound('illusion.mp3');
+    // Shark Strike's own "underwater dodge" (blade.js's own execute(),
+    // attackerId always 'blade') - dedicated splash-dodge sound rather than
+    // the generic one, same distinct-cue reasoning as Grimtal/Illyra above.
+    else if (entry.attackerId === 'blade' && game.characters[entry.targetCharacterId]?.deepSeaSealed) {
+      playDeepSeaDodge();
+    }
     else playDodge();
     // Marin's Threefold Veil dodge gets its own spoken line on top of the
     // generic dodge sound - a no-op for Akyros's own dodge (same shared
@@ -628,6 +643,25 @@ function playLogEntrySound(entry, game) {
   if (entry.type === 'clean-slate-trigger') {
     playActionSound('cleanSlate');
     playMoveVoice('marin', 'cleanSlate');
+    return;
+  }
+  if (entry.type === 'deep-sea-escape-attempt') {
+    // Escape Seal's own success/fail stingers - no voice line (the victim
+    // could be any of 15 heroes with no recorded escape-specific line),
+    // sound only, same "sfx carries the moment" shape as
+    // ashkas-vengeance-strike above.
+    if (entry.succeeded) playDeepSeaEscapeSuccess();
+    else playDeepSeaEscapeFail();
+    return;
+  }
+  if (entry.type === 'deep-sea-seal-end' && entry.reason === 'ko') {
+    // The escape-flavored seal-end already got its sound via the
+    // 'deep-sea-escape-attempt' entry just above (both are pushed for a
+    // successful escape) - only the KO-flavored ending needs its own cue
+    // here, and only if it doesn't already coincide with a KO/game-over
+    // sound about to play from the triggering hit itself (that hit's own
+    // 'attack'/'special' entry, or the koed handler, already covers the
+    // moment) - no dedicated sound needed, silent by design.
     return;
   }
   if (entry.type === 'cheat-death') {
@@ -930,6 +964,16 @@ onMessage((msg) => {
       } else {
         revertFromChickenMusic();
       }
+      // Blade's Shark Hunt (Mutual Seal #41) - same fresh-check-every-
+      // broadcast pattern as Fowl Play above, keyed off Blade's own
+      // deepSeaSealed flag directly (no separate game-level flag needed -
+      // he's the only possible source of this seal, unlike Fowl Play which
+      // any character can be the victim of).
+      if (msg.game.characters?.blade?.deepSeaSealed) {
+        startDeepSeaMusic();
+      } else {
+        revertFromDeepSeaMusic();
+      }
       state.actingCharacterId = msg.actingCharacterId;
       state.usableActions = msg.usableActions || [];
       state.awaitingSoulSwapWrath = !!msg.awaitingSoulSwapWrath;
@@ -1031,6 +1075,12 @@ registerFrozenCheck((characterId) => {
   if (!state.game) return false;
   return computeFrozenIdsSet(state.game).has(characterId);
 });
+// Blade's Shark Hunt (taxonomy #41, Mutual Seal) - same reasoning as
+// registerChickenCheck/registerFrogCheck above. deepSeaSealed is a plain
+// top-level boolean mirrored onto both sealed parties, so no derived
+// lookup is needed here (unlike registerFrozenCheck's own
+// computeFrozenIdsSet).
+registerDeepSeaCheck((characterId) => !!state.game?.characters[characterId]?.deepSeaSealed);
 // Keeps the fullscreen button's icon/title correct even when fullscreen is
 // exited via Escape (or any OS-level gesture) rather than the button
 // itself - document.fullscreenElement changes without any click of ours.

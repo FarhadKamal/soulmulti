@@ -246,6 +246,33 @@ export function registerFrozenCheck(fn) {
   isCurrentlyFrozenVictim = fn;
 }
 
+// Blade's Shark Hunt (taxonomy #41, Mutual Seal, added 2026-09-25) - same
+// defense-in-depth reasoning as CHICKEN_FLASH_PATHS/FROG_FLASH_PATHS/
+// FROZEN_FLASH_PATHS above. Two separate allow-lists since BOTH parties
+// are sealed simultaneously and each needs their OWN legitimate flash set
+// permitted - Blade's own 5 transformation/action images, and each
+// possible victim hero's own 5 reaction images (persistent trapped.jpg is
+// rendered via getPersistentPortrait below, not through setFlash, same as
+// frog.jpg/time_frozen.jpg).
+const DEEP_SEA_BLADE_FLASH_PATHS = new Set([
+  'assets/images/blade/deepsea_cast.jpg',
+  'assets/images/blade/deepsea_strike.jpg',
+  'assets/images/blade/deepsea_heal.jpg',
+  'assets/images/blade/deepsea_revert.jpg',
+]);
+const DEEP_SEA_VICTIM_FLASH_PATHS = new Set(
+  CHARACTER_IDS.filter((id) => id !== 'blade').flatMap((id) => [
+    `assets/images/${id}/deepsea_pulled.jpg`,
+    `assets/images/${id}/deepsea_hit.jpg`,
+    `assets/images/${id}/deepsea_dodge.jpg`,
+    `assets/images/${id}/deepsea_released.jpg`,
+  ])
+);
+let isCurrentlyDeepSeaSealed = () => false;
+export function registerDeepSeaCheck(fn) {
+  isCurrentlyDeepSeaSealed = fn;
+}
+
 // Debug mode's own call history (2026-09-21, user request: "you can add
 // more options on details logs" - a follow-up to a live report that
 // choke.jpg still visibly played on a dodged Self Choke despite the
@@ -294,6 +321,13 @@ function setFlash(characterId, src, durationMs = FLASH_DURATION_MS) {
   if (isCurrentlyChicken(characterId) && !CHICKEN_FLASH_PATHS.has(src)) return;
   if (isCurrentlyFrog(characterId) && !FROG_FLASH_PATHS.has(src)) return;
   if (isCurrentlyFrozenVictim(characterId) && !FROZEN_FLASH_PATHS.has(src)) return;
+  // Blade's Shark Hunt (taxonomy #41, Mutual Seal) - both Blade's own
+  // paths AND victim paths must pass, since BOTH parties are sealed
+  // simultaneously and each needs their OWN flash set permitted (a
+  // sealed Blade's tile only ever legitimately shows one of his 4
+  // DEEP_SEA_BLADE_FLASH_PATHS; a sealed victim's tile only ever
+  // legitimately shows one of their own 4 DEEP_SEA_VICTIM_FLASH_PATHS).
+  if (isCurrentlyDeepSeaSealed(characterId) && !DEEP_SEA_BLADE_FLASH_PATHS.has(src) && !DEEP_SEA_VICTIM_FLASH_PATHS.has(src)) return;
   // Confirmed real anomaly, 2026-09-22: a fully-timestamped, cross-
   // referenced trace (getRenderTrace + getLogEntryDispatchTime) proved
   // illyra/choke.jpg gets set in exact sync with a DODGED Self Choke
@@ -444,6 +478,19 @@ export function getPersistentPortrait(character, isFrozenVisual = false) {
   // mind-control-selection art etc. never wins over it, same "nothing else
   // leaks through" precedent as isChicken/isFrog's own placement.
   if (isFrozenVisual) return v(`assets/images/${character.id}/time_frozen.jpg`);
+  // Blade's Shark Hunt (taxonomy #41, Mutual Seal, added 2026-09-25) -
+  // same "nothing else leaks through" placement as the frozen check just
+  // above, checked ahead of isChicken/isFrog too. Unlike isFrozenVisual,
+  // deepSeaSealed is a genuine top-level boolean on the character itself
+  // (mirrored onto BOTH sealed parties, see state.js), so no separate
+  // parameter is needed - this function already receives the right
+  // character object directly. Blade shows his own persistent shark-form
+  // portrait; the victim shows their own persistent trapped portrait.
+  if (character.deepSeaSealed) {
+    return v(character.id === 'blade'
+      ? 'assets/images/blade/deepsea_form.jpg'
+      : `assets/images/${character.id}/deepsea_trapped.jpg`);
+  }
   // Boingo's Fowl Play - no hero-specific persistent portrait (Blade's
   // post-Rebirth alive.jpg, Velorya's hided.jpg, Melyssa's mind-control
   // selection art, Draxus's immortality.jpg) may ever override the
@@ -571,6 +618,10 @@ export function checkIdlePortrait(character, round) {
   // can't answer this (see getPersistentPortrait's own comment for why the
   // frozen state lives on Chronox's special object, never the victim).
   if (isCurrentlyFrozenVictim(character.id)) return false;
+  // Blade's Shark Hunt (taxonomy #41, Mutual Seal) - same isChicken/isFrog
+  // reasoning as above. Unlike frozen, deepSeaSealed is directly readable
+  // off the character object here (no separate registered check needed).
+  if (character.deepSeaSealed) return false;
   const lastHearts = heartsAtLastTurnStart.has(character.id) ? heartsAtLastTurnStart.get(character.id) : null;
   const wasUntouched = lastHearts === null || character.hearts >= lastHearts;
   const isIdle = wasUntouched && character.hearts > character.maxHearts / 2;
@@ -913,6 +964,19 @@ export function handleLogEntryForFlash(entry, game) {
       }, BLOOD_FRENZY_FLASH_DURATION_MS);
       return;
     }
+    // Blade's Shark Hunt (taxonomy #41, Mutual Seal, added 2026-09-25) -
+    // when this heal fires from a landed Shark Strike 3rd-tick hit
+    // (blade.js sets viaSharkStrike: true), show the shark-form heal art
+    // instead of his normal human-form blood_drain.jpg - he's still
+    // transformed at this moment, so the human-form image would look
+    // wrong. No BLOOD_FRENZY_FLASH_DURATION_MS-style delay needed here -
+    // sharkStrike's own attack flash (deepsea_strike.jpg) uses the default
+    // duration, not a long one, so there's no competing-flash race to
+    // avoid the way Blood Frenzy's burst had.
+    if (entry.viaSharkStrike) {
+      setFlash(entry.characterId, 'assets/images/blade/deepsea_heal.jpg');
+      return;
+    }
     setFlash(entry.characterId, 'assets/images/blade/blood_drain.jpg');
     return;
   }
@@ -938,6 +1002,26 @@ export function handleLogEntryForFlash(entry, game) {
     // won't fight this flash - the persistent portrait naturally takes
     // over again once this flash's own timer expires.
     if (!isKO(entry.characterId)) setFlash(entry.characterId, 'assets/images/grimtal/beast_end.jpg');
+    return;
+  }
+  if (entry.type === 'deep-sea-seal-end') {
+    // Blade's Shark Hunt (taxonomy #41, Mutual Seal, added 2026-09-25) -
+    // same "persistent portrait just silently snaps back with no
+    // transition moment" gap as beast-form-end above. Fires on BOTH
+    // confirmed end conditions (reason: 'escape' from executeEscapeSeal,
+    // reason: 'ko' from blade.js's own registerOnAnyDeath hook) -
+    // characterIds carries whoever was actually sealed (both, unless one
+    // side is the one who just died, in which case only the survivor
+    // needs a revert flash; the dead character's own koed.jpg already
+    // covers them, per the "universal replacement" design note).
+    for (const id of entry.characterIds || []) {
+      if (isKO(id)) continue; // koed.jpg already covers a dead party, no revert flash needed
+      if (id === 'blade') {
+        setFlash('blade', 'assets/images/blade/deepsea_revert.jpg');
+      } else {
+        setFlash(id, `assets/images/${id}/deepsea_released.jpg`);
+      }
+    }
     return;
   }
   if (entry.type === 'rebirth') {
@@ -1274,8 +1358,34 @@ export function handleLogEntryForFlash(entry, game) {
     case 'bloodHunt':
       if (!dodged) setFlash(characterId, 'assets/images/blade/strike.jpg');
       break;
-    case 'bloodFrenzy':
-      setFlash(characterId, 'assets/images/blade/blood_frenzy.jpg', BLOOD_FRENZY_FLASH_DURATION_MS); break;
+    case 'sharkHunt':
+      // Blade's own transformation cast flash, plus the victim's own
+      // "dragged under" reaction (assets/images/<id>/deepsea_pulled.jpg,
+      // 15 new images) - same "cast flash on both tiles from one log
+      // entry" shape as other two-sided casts in this file. The
+      // PERSISTENT trapped/form portraits themselves are handled by
+      // getPersistentPortrait's own deepSeaSealed check above (real
+      // state, not a timed flash) - this case only fires the brief
+      // cast-moment flashes.
+      setFlash(characterId, 'assets/images/blade/deepsea_cast.jpg');
+      if (targetCharacterId) {
+        setFlash(targetCharacterId, `assets/images/${targetCharacterId}/deepsea_pulled.jpg`);
+      }
+      break;
+    case 'sharkStrike':
+      // Blade's own attack flash, plus the victim's own deepsea_hit.jpg
+      // reaction - this case only ever fires on a LANDED hit (the log
+      // entry is type: 'attack', actionId: 'sharkStrike'). A DODGED
+      // underwater strike never reaches this switch at all - blade.js's
+      // own execute() pushes a plain { type: 'dodge', ... } entry instead
+      // and returns early, same shape every other dodge source in the
+      // game uses - see handleDodgeForFlash's own deepSeaSealed check
+      // below for the dodge-reaction art.
+      setFlash(characterId, 'assets/images/blade/deepsea_strike.jpg');
+      if (targetCharacterId) {
+        setFlash(targetCharacterId, `assets/images/${targetCharacterId}/deepsea_hit.jpg`);
+      }
+      break;
     case 'grudgeStrike':
       if (!dodged) setFlash(characterId, 'assets/images/kaelis/grudge.jpg');
       break;
@@ -1496,6 +1606,18 @@ export function handleDodgeForFlash(entry, game) {
   // elsewhere (e.g. chicken art vs. its shared sound set).
   if (target.isFrog) {
     setFlash(target.id, `assets/images/${target.id}/frog_dodge.jpg`);
+    return;
+  }
+  // Blade's Shark Hunt (taxonomy #41, Mutual Seal) - same "checked via the
+  // flag directly, not a fixed target.id" reasoning as isFrog above, since
+  // the sealed victim can be any of the 15 non-Blade heroes. deepSeaSealed
+  // stays true through a successful dodge (only a landed hit's own KO/end
+  // logic in blade.js's registerOnAnyDeath/executeEscapeSeal clears it),
+  // so this correctly identifies "this was Shark Strike's own underwater
+  // dodge" - the ONLY dodge source reachable while sealed, since every
+  // other attacker is blocked from targeting a sealed character at all.
+  if (target.deepSeaSealed) {
+    setFlash(target.id, `assets/images/${target.id}/deepsea_dodge.jpg`);
     return;
   }
   // Shared log entry type/shape (damagePipeline.js's applyDamage pushes the

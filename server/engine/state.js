@@ -123,11 +123,19 @@ function baseSpecialFor(id) {
       // single running streak rewarded only "keep hitting the same person
       // forever" with no real targeting decision, since switching reset
       // the counter and was therefore almost always mathematically wrong.
-      // usedBloodFrenzy: same one-time gate shape as every other hearts<=3
+      // usedSharkHunt: same one-time gate shape as every other hearts<=3
       // special's own dedicated flag (e.g. Tharox's usedEarthshatter) -
-      // usedSpecial stays reserved for Rebirth.
+      // usedSpecial stays reserved for Rebirth. Replaces the old
+      // usedBloodFrenzy flag (Blood Frenzy fully retired, same treatment
+      // Akyros's Shadow Army/Melyssa's Full Control got when replaced).
+      // No separate "who is currently sealed" field needed here - the
+      // top-level deepSeaSealPartnerId on Blade's own character object
+      // (state.js's createCharacter) already answers that, since he's one
+      // of the two sealed parties himself (unlike e.g. Athena's own
+      // caster-side curseTargetCharacterId, needed because a curse is
+      // one-directional).
       return {
-        hitCountByTarget: {}, rebirthUsed: false, usedBloodFrenzy: false,
+        hitCountByTarget: {}, rebirthUsed: false, usedSharkHunt: false,
       };
     case 'athena':
       // divineJudgmentTargetId: her hearts<=3 one-time special's marked
@@ -543,6 +551,34 @@ export function createCharacter(defId, ownerId) {
     // passive 50% dodge roll fails) - do not reuse Fowl Play's "revert
     // everyone at once" shape for this.
     isFrog: false,
+    // Blade's Shark Hunt (hearts<=3 special, replaces Blood Frenzy;
+    // taxonomy #41, Mutual Seal). Set TRUE on BOTH Blade and the victim
+    // simultaneously while active - a genuinely different shape from
+    // isChicken/isFrog's single-victim isolation: this makes BOTH parties
+    // unreachable by any THIRD party (stronger than plain `untargetable` -
+    // several existing ignoresUntargetable call sites, e.g. chicken
+    // attacks and Grimtal's Earthshatter, need to keep bypassing
+    // `untargetable` but must NOT bypass this), while leaving the two
+    // sealed characters fully interactive with each other. Lives directly
+    // on the character (not nested in `special`) for the same "generic
+    // engine code needs to see this for ANY character" reason as
+    // isChicken/isFrog/lockedHearts. Cleared reactively on exactly 3
+    // triggers: the victim's own successful Escape roll, the victim's KO,
+    // or Blade's own KO (only reachable via Athena's Curse Strike mirror
+    // or Divine Judgment - the two mechanics allowed to "reach through"
+    // the seal) - see blade.js's registerOnAnyDeath hook.
+    deepSeaSealed: false,
+    // Points at the OTHER sealed character - set on BOTH parties pointing
+    // at each other (mutual/symmetric, unlike Chronox's one-directional
+    // freezeTargetId caster->target pointer), so no call site needs to know
+    // "am I Blade or the victim" before it can find the partner.
+    deepSeaSealPartnerId: null,
+    // Failed-Escape-attempt counter for the victim's own climbing-odds
+    // roll (starts 20%, +5% per failed attempt, uncapped - same escalating
+    // shape as Draxus's Cheat Death). Reset to 0 when the seal is first
+    // cast and again whenever it ends, so a character sealed a second time
+    // later in the match starts fresh.
+    deepSeaEscapeAttempts: 0,
   };
 }
 

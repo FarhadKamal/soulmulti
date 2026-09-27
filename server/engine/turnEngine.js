@@ -62,6 +62,13 @@ export function isFrogged(character) {
   return !!character && character.isFrog;
 }
 
+// True while this character is one of the two parties in an active Shark
+// Hunt seal (Blade's hearts<=3 special, taxonomy #41 Mutual Seal) - same
+// plain top-level boolean flag shape as isChickenified/isFrogged above.
+export function isDeepSeaSealed(character) {
+  return !!character && character.deepSeaSealed;
+}
+
 // Boingo's Fowl Play - while chickenified, EVERY one of a character's own
 // actions (Normal/Special/Neutral/Passive, whatever their hero kit
 // normally offers) is replaced by this single synthetic action. Not
@@ -85,6 +92,16 @@ const CHICKEN_ATTACK_ACTION = {
 // fate, not another character.
 const CHEAT_DEATH_ACTION = {
   label: 'Cheat Death',
+  needsTarget: false,
+  isLegal: () => true,
+};
+
+// Blade's Shark Hunt (taxonomy #41, Mutual Seal) - the sealed VICTIM's
+// only legal action, a synthetic, character-agnostic-shaped override same
+// as CHICKEN_ATTACK_ACTION/CHEAT_DEATH_ACTION above (lives here, not in
+// blade.js, since the victim can be any of the 15 non-Blade heroes).
+const ESCAPE_SEAL_ACTION = {
+  label: 'Escape',
   needsTarget: false,
   isLegal: () => true,
 };
@@ -151,6 +168,24 @@ export function getLegalActions(character, game, isPuppeted = false) {
   if (isFrogged(character)) {
     return [];
   }
+  // Blade's Shark Hunt (taxonomy #41, Mutual Seal). Checked BEFORE the
+  // generic victim-side branch just below, since Blade himself ALSO has
+  // deepSeaSealed: true while the seal is active - his own kit is hidden
+  // except the repeatable sharkStrike (declared hidden: true in blade.js,
+  // same "real actions-map entry, only ever surfaced through an explicit
+  // override" convention as Grimtal's beastAttack just above).
+  if (character.id === 'blade' && isDeepSeaSealed(character)) {
+    const mod = ABILITY_MODULES.blade;
+    return [{ actionId: 'sharkStrike', ...mod.actions.sharkStrike }];
+  }
+  // The SEALED VICTIM's own turn (any of the 15 non-Blade heroes) - kit
+  // fully hidden except one synthetic action, escapeSeal (climbing-odds
+  // roll, see executeEscapeSeal below). A real, always-legal, always-
+  // usable action (unlike Frog Curse's genuinely empty list) - the
+  // victim's turn is never auto-skipped while sealed.
+  if (isDeepSeaSealed(character)) {
+    return [{ actionId: 'escapeSeal', ...ESCAPE_SEAL_ACTION }];
+  }
   if (character.id === 'melyssa' && isFriendshipForcedChoke(game, character.id)) {
     return [{ actionId: 'friendshipSelfChoke', ...FRIENDSHIP_SELF_CHOKE_ACTION }];
   }
@@ -200,6 +235,20 @@ export function isValidTarget(game, characterId, actionId, targetId) {
   }
   if (target.ownerId === character.ownerId) return false;
   if (target.untargetable) return false;
+  // Blade's Shark Hunt (taxonomy #41, Mutual Seal) - nobody outside the
+  // sealed pair can target EITHER sealed character with ANYTHING, not just
+  // Blade's own sharkStrike/sharkHunt targeting (those two have their own
+  // dedicated rules below; this is the catch-all for every OTHER action in
+  // the game). Stronger than plain untargetable above - deliberately a
+  // SEPARATE flag, not layered onto untargetable itself, since several
+  // existing ignoresUntargetable call sites (chicken attacks, Grimtal's
+  // Earthshatter) must keep bypassing untargetable but must NOT bypass
+  // this. The two confirmed reach-through mechanics (Athena's Curse Strike
+  // mirror, her Divine Judgment trigger) never route through isValidTarget
+  // at all - they call applyDamage directly against a stored id - so a
+  // block placed only here can never accidentally catch them; no
+  // ignores-style flag needed on this particular check.
+  if (isDeepSeaSealed(target) && characterId !== target.deepSeaSealPartnerId) return false;
   // Melyssa's Friendship - mutual no-attack, fully enforced both
   // directions (confirmed ruling): she can never target her friend with
   // anything, and her friend can never target her either, for as long as
@@ -218,6 +267,17 @@ export function isValidTarget(game, characterId, actionId, targetId) {
   // design: a guaranteed finisher specifically against a Frog Curse
   // victim, not a general-purpose attack).
   if (actionId === 'snakeStrike') return isFrogged(target);
+  // Blade's Shark Hunt - mutually exclusive with Boingo's Fowl Play AND
+  // Rowan's Frog Curse, same shape as frogCurse's own exclusion above
+  // (confirmed ruling: full mutual exclusion, symmetric filters live in
+  // boingo.js's Fowl Play candidate pool and this same isValidTarget's own
+  // isDeepSeaSealed check further up covers the Frog Curse direction).
+  if (actionId === 'sharkHunt' && (isChickenified(target) || isFrogged(target))) return false;
+  // Blade's Shark Strike - can only ever target his own currently-sealed
+  // partner (confirmed design: a repeatable finisher specifically against
+  // whoever he dragged into the seal, not a general-purpose attack), same
+  // shape as snakeStrike's own isFrogged(target) check above.
+  if (actionId === 'sharkStrike') return character.deepSeaSealPartnerId === targetId;
   // Chronox's Rewind lockout: the caster it was cast against cannot use
   // that EXACT SAME action against Chronox specifically, for their own
   // next turn only (see tickChronoxLockoutIfAny for the timing). Every
@@ -265,6 +325,13 @@ export function isValidMindControlTarget(game, targetId) {
   // same "zero legal actions, exclude entirely" reasoning as the isKO/
   // frozen checks above (confirmed ruling).
   if (isFrogged(target)) return false;
+  // Blade's Shark Hunt - same "zero meaningfully-controllable actions"
+  // reasoning as isFrogged above, covers BOTH directions: a sealed Blade
+  // has only sharkStrike against his own partner (an odd puppet scenario
+  // the design implicitly rules out), and a sealed victim has only the
+  // self-targeted escapeSeal (genuinely useless to force via Mind
+  // Control).
+  if (isDeepSeaSealed(target)) return false;
   return true; // deliberately no ownerId check - ally or enemy both legal
 }
 
@@ -342,6 +409,12 @@ export function isValidPuppetTarget(game, puppetId, actionId, targetId) {
   if (!target || target.isKO) return false;
   const puppet = game.characters[puppetId];
   if (target.untargetable) return false;
+  // Blade's Shark Hunt - no puppet from OUTSIDE the seal can reach INTO
+  // it, same reasoning as isValidTarget's own catch-all above. A puppeted
+  // Blade with sharkStrike legal can still target his OWN partner (that
+  // specific case is validated by isValidTarget's own sharkStrike rule,
+  // not this generic puppet check).
+  if (isDeepSeaSealed(target) && puppetId !== target.deepSeaSealPartnerId) return false;
   // Melyssa's Friendship - mutual no-attack is ABSOLUTE for a direct
   // single-target choice, even when SHE is the one puppeting (confirmed
   // ruling: "still blocked - never a valid puppet target choice") -
@@ -441,11 +514,15 @@ function tickPoisonIfAny(character, game, log) {
   // cancel it" situation. Confirmed bug report: poison silently stopped
   // ticking (not cured, just permanently no-op) the moment the victim went
   // untargetable, with no way to ever resume even after Eclipse ended.
+  // ignoresDeepSeaSeal: true - same reach-through reasoning, confirmed
+  // ruling for Blade's Shark Hunt (taxonomy #41): an already-active poison
+  // tick keeps ticking through the seal, only FRESH targeting is blocked.
   const result = applyDamage(game, log, {
     sourceCharacterId: caster.id,
     targetCharacterId: character.id,
     amount: 1,
     ignoresUntargetable: true,
+    ignoresDeepSeaSeal: true,
     isPoisonTick: true,
   });
   log.push({ type: 'poison-tick', casterId: caster.id, targetCharacterId: character.id, ...result, hearts: heartsSnapshot(game) });
@@ -472,6 +549,12 @@ function tickPoisonIfAny(character, game, log) {
   // Oraclus's Prophecy of Doom trigger - same deferred handling as
   // divineJudgmentTriggerLogEntry directly above.
   if (result.prophecyOfDoomTriggerLogEntry) log.push({ ...result.prophecyOfDoomTriggerLogEntry, hearts: heartsSnapshot(game) });
+  // Blade's Shark Hunt (taxonomy #41, Mutual Seal) - a poison tick that
+  // kills either sealed party needs this path too, same deferred
+  // reasoning as every other entry on this call path (see blade.js's own
+  // registerOnAnyDeath registration for why this can't be pushed directly
+  // inside the callback).
+  if (result.deepSeaSealEndLogEntry) log.push({ ...result.deepSeaSealEndLogEntry, hearts: heartsSnapshot(game) });
   // Melyssa's Friendship - a poison tick that kills her current friend
   // needs this path too, same deferred reasoning as every other entry on
   // this call path. Confirmed real bug, 2026-09-20: a poison tick landing
@@ -685,13 +768,25 @@ export function beginCharacterTurn(character, game, log) {
   // Rowan's Frog Curse gets the identical "entire kit frozen, not just
   // hidden" treatment as isChicken above, same reasoning - see state.js's
   // own isFrog comment.
+  //
+  // Blade's Shark Hunt (taxonomy #41, Mutual Seal) is DELIBERATELY NOT
+  // included in this first guard - confirmed ruling: any already-active
+  // status (poison, silence, headache alike) keeps resolving normally
+  // through the seal; only FRESH targeting/actions are blocked by it. This
+  // is a genuine difference from isChicken/isFrog, whose entire kit
+  // (including already-active ticks) freezes solid.
   if (!character.isChicken && !character.isFrog) {
     tickPoisonIfAny(character, game, log);
     tickSilenceIfAny(character, game, log);
     resolveHeadacheIfDue(character, game, log);
   }
   tickFowlPlayIfBoingoTurn(character, game, log);
-  if (!character.isChicken && !character.isFrog) {
+  // deepSeaSealed DOES gate onTurnStart here, unlike the ticks above - the
+  // character's own hero-specific passive hook is genuinely suppressed
+  // while sealed (their kit is hidden/frozen), same "in-progress state
+  // preserved, not reset" treatment as isChicken/isFrog - resumes once the
+  // seal ends.
+  if (!character.isChicken && !character.isFrog && !character.deepSeaSealed) {
     const mod = ABILITY_MODULES[character.id];
     if (mod?.onTurnStart) mod.onTurnStart(character, game, log);
   }
@@ -1094,6 +1189,39 @@ function executeChickenAttack(character, targetId, game, log) {
   return result;
 }
 
+// Blade's Shark Hunt (taxonomy #41, Mutual Seal) - the sealed victim's own
+// climbing-odds escape roll, same escalating shape as Draxus's Cheat Death
+// (25% base, +5%/failed attempt, uncapped) but starting at 20% per design.
+const DEEP_SEA_ESCAPE_CHANCE = 0.20;
+const DEEP_SEA_ESCAPE_CHANCE_STEP = 0.05;
+
+function deepSeaEscapeChance(character) {
+  return DEEP_SEA_ESCAPE_CHANCE + character.deepSeaEscapeAttempts * DEEP_SEA_ESCAPE_CHANCE_STEP;
+}
+
+function executeEscapeSeal(character, game, log) {
+  const chance = deepSeaEscapeChance(character);
+  const succeeded = Math.random() < chance;
+  if (!succeeded) {
+    character.deepSeaEscapeAttempts += 1;
+    log.push({ type: 'deep-sea-escape-attempt', characterId: character.id, succeeded: false, chance, hearts: heartsSnapshot(game) });
+    return {};
+  }
+  const partnerId = character.deepSeaSealPartnerId;
+  const partner = game.characters[partnerId];
+  character.deepSeaSealed = false;
+  character.deepSeaSealPartnerId = null;
+  character.deepSeaEscapeAttempts = 0;
+  if (partner) {
+    partner.deepSeaSealed = false;
+    partner.deepSeaSealPartnerId = null;
+    partner.deepSeaEscapeAttempts = 0;
+  }
+  log.push({ type: 'deep-sea-escape-attempt', characterId: character.id, succeeded: true, chance, hearts: heartsSnapshot(game) });
+  log.push({ type: 'deep-sea-seal-end', characterIds: [character.id, partnerId].filter(Boolean), reason: 'escape', hearts: heartsSnapshot(game) });
+  return {};
+}
+
 export function executeAction(game, characterId, actionId, targetId, extra) {
   // Snapshot BEFORE this action runs, for Grimtal's Beast Form reversion
   // check in finalizeAction below - confirmed real bug, 2026-09-12: without
@@ -1119,6 +1247,14 @@ export function executeAction(game, characterId, actionId, targetId, extra) {
     // split as chickenAttack above; draxus.js's own executeCheatDeath does
     // the actual roll/revive/fresh-copy-reset logic.
     result = draxus.executeCheatDeath(character, game, log);
+  } else if (actionId === 'escapeSeal') {
+    // Blade's Shark Hunt (taxonomy #41, Mutual Seal) - same "mechanism
+    // lives in the engine, trigger lives in the ability file" split as
+    // chickenAttack/cheatDeath above, except this mechanism has no
+    // hero-specific counterpart at all (the escaping character can be any
+    // of the 15 non-Blade heroes) - executeEscapeSeal is fully
+    // character-agnostic, defined below.
+    result = executeEscapeSeal(character, game, log);
   } else if (actionId === 'friendshipSelfChoke') {
     // Melyssa's Friendship forced-break endgame (see
     // isFriendshipForcedChoke's own comment above) - the ONLY legal action
@@ -1220,6 +1356,10 @@ export function finalizeAction(game, log, result, characterId, actionId, targetI
   // Oraclus's Prophecy of Doom trigger - same deferred reasoning as
   // divineJudgmentTriggerLogEntry directly above.
   if (result?.prophecyOfDoomTriggerLogEntry) log.push(result.prophecyOfDoomTriggerLogEntry);
+  // Blade's Shark Hunt (taxonomy #41, Mutual Seal) - same deferred
+  // reasoning as divineJudgmentTriggerLogEntry directly above (see
+  // blade.js's own registerOnAnyDeath registration).
+  if (result?.deepSeaSealEndLogEntry) log.push(result.deepSeaSealEndLogEntry);
   // Melyssa's Friendship - same deferred reasoning as
   // divineJudgmentTriggerLogEntry directly above (confirmed real bug,
   // 2026-09-20 - see melyssa.js's own onAnyDeath registration).
@@ -1389,6 +1529,11 @@ export function resolveJesterBall(game, holderCharacterId, choice, extra) {
   // Oraclus's Prophecy of Doom trigger - same deferred handling as
   // divineJudgmentTriggerLogEntry directly above.
   if (result?.prophecyOfDoomTriggerLogEntry) log.push(result.prophecyOfDoomTriggerLogEntry);
+  // Blade's Shark Hunt (taxonomy #41, Mutual Seal) - a Jester Ball
+  // explosion can KO either sealed party too, same deferred handling as
+  // every other call site (see blade.js's own registerOnAnyDeath
+  // registration).
+  if (result?.deepSeaSealEndLogEntry) log.push(result.deepSeaSealEndLogEntry);
   // Melyssa's Friendship - a Jester Ball explosion can KO her friend too,
   // same deferred handling as every other call site (confirmed real bug,
   // 2026-09-20 - see melyssa.js's own onAnyDeath registration).

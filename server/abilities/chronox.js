@@ -381,6 +381,17 @@ export const actions = {
         // chicken, which at least keeps chickenAttack), permanently
         // soft-locking that character's turns for the rest of the match.
         const isFrogNoCaster = character.isFrog;
+        // Blade's Shark Hunt (taxonomy #41, Mutual Seal) - same "survive
+        // the restore" treatment, same reasoning as isFrog above.
+        // deepSeaSealPartnerId is a pointer to a THIRD character (not
+        // necessarily the caster or Chronox) - this snapshot/restore only
+        // ever touches Chronox's OWN object, so as long as it always
+        // restores the CURRENT LIVE value (not the stale snapshot's), any
+        // unrelated seal elsewhere on the board is simply never touched by
+        // Rewind at all, exactly as intended.
+        const deepSeaSealedNoCaster = character.deepSeaSealed;
+        const deepSeaSealPartnerIdNoCaster = character.deepSeaSealPartnerId;
+        const deepSeaEscapeAttemptsNoCaster = character.deepSeaEscapeAttempts;
         Object.assign(character, structuredClone(record.chronoxSnapshot));
         character.special.rewindUsesRemaining = rewindUsesRemaining;
         character.usedSpecial = usedSpecialNoCaster;
@@ -389,6 +400,9 @@ export const actions = {
         character.isChicken = isChickenNoCaster;
         character.lockedHearts = lockedHeartsNoCaster;
         character.isFrog = isFrogNoCaster;
+        character.deepSeaSealed = deepSeaSealedNoCaster;
+        character.deepSeaSealPartnerId = deepSeaSealPartnerIdNoCaster;
+        character.deepSeaEscapeAttempts = deepSeaEscapeAttemptsNoCaster;
         if (record.jesterBallSnapshot !== undefined) {
           game.jesterBall = structuredClone(record.jesterBallSnapshot);
         }
@@ -466,6 +480,20 @@ export const actions = {
       // "why this is worse than the isChicken bug" reasoning.
       const casterIsFrog = caster.isFrog;
       const chronoxIsFrog = character.isFrog;
+      // Blade's Shark Hunt (taxonomy #41, Mutual Seal) - same "survive the
+      // restore" treatment as isFrog just above, for BOTH the caster and
+      // Chronox himself (either one could be one of the two sealed parties
+      // at snapshot time). deepSeaSealPartnerId is a pointer to a THIRD
+      // character in general - the snapshot/restore only ever touches
+      // caster's/Chronox's own objects, so as long as the CURRENT LIVE
+      // value is always restored (not the stale snapshot's), an unrelated
+      // seal elsewhere on the board is simply never touched.
+      const casterDeepSeaSealed = caster.deepSeaSealed;
+      const casterDeepSeaSealPartnerId = caster.deepSeaSealPartnerId;
+      const casterDeepSeaEscapeAttempts = caster.deepSeaEscapeAttempts;
+      const chronoxDeepSeaSealed = character.deepSeaSealed;
+      const chronoxDeepSeaSealPartnerId = character.deepSeaSealPartnerId;
+      const chronoxDeepSeaEscapeAttempts = character.deepSeaEscapeAttempts;
       // Akyros's Shadow Seal - same "survive the restore" treatment as
       // isChicken just above, for BOTH the caster and Chronox himself
       // (either one could be carrying locked hearts at snapshot time). See
@@ -566,6 +594,12 @@ export const actions = {
       character.isChicken = chronoxIsChicken;
       caster.isFrog = casterIsFrog;
       character.isFrog = chronoxIsFrog;
+      caster.deepSeaSealed = casterDeepSeaSealed;
+      caster.deepSeaSealPartnerId = casterDeepSeaSealPartnerId;
+      caster.deepSeaEscapeAttempts = casterDeepSeaEscapeAttempts;
+      character.deepSeaSealed = chronoxDeepSeaSealed;
+      character.deepSeaSealPartnerId = chronoxDeepSeaSealPartnerId;
+      character.deepSeaEscapeAttempts = chronoxDeepSeaEscapeAttempts;
       caster.lockedHearts = casterLockedHearts;
       character.lockedHearts = chronoxLockedHearts;
       // Only reapply if this snapshot could actually carry the field at

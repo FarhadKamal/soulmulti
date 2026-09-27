@@ -288,6 +288,28 @@ const BOMB_HIT_IMAGES = CHARACTER_IDS.filter((id) => id !== 'boingo').map(
   (id) => `assets/images/${id}/bomb_hit.jpg`
 );
 
+// Blade's Shark Hunt (taxonomy #41, Mutual Seal, added 2026-09-25) -
+// replaces Blood Frenzy entirely. Blade's own 5 transformation/action
+// images, plus a 15-hero x 5-image victim set (same per-victim-hero
+// pattern as FROG_IMAGES/PETRIFY_STONE_IMAGES above). Excludes Blade from
+// the victim set (he's never his own Shark Hunt target).
+const DEEP_SEA_BLADE_IMAGES = [
+  'assets/images/blade/deepsea_cast.jpg',
+  'assets/images/blade/deepsea_form.jpg',
+  'assets/images/blade/deepsea_revert.jpg',
+  'assets/images/blade/deepsea_strike.jpg',
+  'assets/images/blade/deepsea_heal.jpg',
+];
+const DEEP_SEA_VICTIM_IMAGES = CHARACTER_IDS.filter((id) => id !== 'blade').flatMap(
+  (id) => [
+    `assets/images/${id}/deepsea_pulled.jpg`,
+    `assets/images/${id}/deepsea_trapped.jpg`,
+    `assets/images/${id}/deepsea_released.jpg`,
+    `assets/images/${id}/deepsea_hit.jpg`,
+    `assets/images/${id}/deepsea_dodge.jpg`,
+  ]
+);
+
 // Melyssa's Friendship (Redirect Bond, design-locked 2026-09-20, replaces
 // Full Control) - TWO separate 15-hero sets (everyone except Melyssa
 // herself, who can never be her own friend): friendship_bond.jpg (the
@@ -338,7 +360,7 @@ const MOONLIT_THEFT_REACTION_IMAGES = ['athena', 'boingo', 'tharox', 'chronox', 
 );
 
 function allBattleImagePaths() {
-  const paths = [...FLASH_IMAGES, ...BADGE_ICONS, ...CHICKEN_IMAGES, ...DIVINE_JUDGMENT_STRUCK_IMAGES, ...PROPHECY_OF_DOOM_STRIKE_IMAGES, ...ASHKAS_VENGEANCE_STRIKE_IMAGES, ...SHADOW_SEAL_STRIKE_IMAGES, ...PETRIFY_STONE_IMAGES, ...FROG_IMAGES, ...SELF_CHOKE_VICTIM_IMAGES, ...LIFEBOND_REACTION_IMAGES, ...MOONLIT_THEFT_REACTION_IMAGES, ...FRIENDSHIP_BOND_IMAGES, ...PROTECTS_MELYSSA_IMAGES, ...BEAST_MAULED_IMAGES, ...SOUL_DRAIN_IMAGES, ...RUNE_STRIKE_HIT_IMAGES, ...TIME_FROZEN_IMAGES, ...REWOUND_IMAGES, ...BOMB_HIT_IMAGES];
+  const paths = [...FLASH_IMAGES, ...BADGE_ICONS, ...CHICKEN_IMAGES, ...DIVINE_JUDGMENT_STRUCK_IMAGES, ...PROPHECY_OF_DOOM_STRIKE_IMAGES, ...ASHKAS_VENGEANCE_STRIKE_IMAGES, ...SHADOW_SEAL_STRIKE_IMAGES, ...PETRIFY_STONE_IMAGES, ...FROG_IMAGES, ...SELF_CHOKE_VICTIM_IMAGES, ...LIFEBOND_REACTION_IMAGES, ...MOONLIT_THEFT_REACTION_IMAGES, ...FRIENDSHIP_BOND_IMAGES, ...PROTECTS_MELYSSA_IMAGES, ...BEAST_MAULED_IMAGES, ...SOUL_DRAIN_IMAGES, ...RUNE_STRIKE_HIT_IMAGES, ...TIME_FROZEN_IMAGES, ...REWOUND_IMAGES, ...BOMB_HIT_IMAGES, ...DEEP_SEA_BLADE_IMAGES, ...DEEP_SEA_VICTIM_IMAGES];
   // Default battle portrait, KO'd, injured, and victory images - each now
   // lives inside the hero's own images/<id>/ folder with a fixed filename
   // (confirmed rename, 2026-09-15; previously 4 separate top-level folders

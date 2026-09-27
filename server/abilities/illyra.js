@@ -127,6 +127,16 @@ export const actions = {
       // makes the intent explicit and survives any future refactor safely.
       for (const [tid, stackCount] of [...marks.entries()]) {
         if (stackCount <= 0) continue;
+        // Blade's Shark Hunt (taxonomy #41, Mutual Seal) - blocked even for
+        // a mark placed BEFORE the seal (confirmed ruling: "pulling the
+        // trigger is a fresh action" - detonating is Illyra choosing, on
+        // HER turn, to act right now, unlike a poison tick's own timer-
+        // independent continuation). Deliberately skips the WHOLE
+        // iteration (including marks.set below) rather than just the
+        // applyDamage call, so the stack is NOT cleared/consumed - same
+        // "in-progress state preserved" precedent as everywhere else - it
+        // stays detonatable normally once the seal ends.
+        if (game.characters[tid]?.deepSeaSealed) continue;
         marks.set(tid, 0);
         // Confirmed ruling: bypasses EVERY dodge mechanic in the game
         // (Akyros, Marin, Grimtal, and her own passive too) - detonating an

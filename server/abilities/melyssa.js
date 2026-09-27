@@ -99,6 +99,10 @@ export function redirectStatusTargetIfProtected(game, targetId, sourceCharacterI
   // (confirmed ruling, 2026-09-24: "frog cannot help melyssa even they had
   // friendship").
   if (friend.isFrog) return targetId;
+  // Blade's Shark Hunt (taxonomy #41, Mutual Seal) - same "incapacitated,
+  // nothing left to redirect to" reasoning as the frozen/frogged-friend
+  // checks above.
+  if (friend.deepSeaSealed) return targetId;
   return friendId;
 }
 
@@ -396,5 +400,8 @@ export function isValidFriendshipTarget(game, targetId) {
   // ruling) - same reasoning as isValidMindControlTarget's own exclusion in
   // turnEngine.js.
   if (target.isFrog) return false;
+  // Blade's Shark Hunt (taxonomy #41, Mutual Seal) - same "zero agency"
+  // reasoning as isFrog above (confirmed ruling).
+  if (target.deepSeaSealed) return false;
   return true;
 }

@@ -1,4 +1,8 @@
-import { applyDamage, applyHeal, heartsSnapshot, registerRebirth } from '../engine/damagePipeline.js';
+import { applyDamage, applyHeal, tryTriggerCleanSlate, heartsSnapshot, registerRebirth } from '../engine/damagePipeline.js';
+import { registerOnAnyDeath } from '../engine/categories/onAnyDeath.js';
+import { redirectStatusTargetIfProtected } from './melyssa.js';
+
+const SHARK_HUNT_HEARTS_THRESHOLD = 3;
 
 // Blood Hunt's per-target hit counter (confirmed redesign, 2026-09-14 -
 // see state.js's own hitCountByTarget comment for the full "why"). Cycles
@@ -38,34 +42,6 @@ function bloodDrainHealAmount(amount, result) {
   return (amount === 3 && result.amountDealt > 0) ? 1 : 0;
 }
 
-// Blood Frenzy: hearts<=3 one-time special. Immediately unleashes a burst
-// of consecutive random strikes against LIVING ENEMIES (never himself,
-// never an ally in a team mode) - each strike is a full, normal Blood Hunt
-// hit in every respect (shield/dodge/untargetable all apply exactly as
-// they would to a normal chosen-target Blood Hunt), just with the target
-// picked at random each time (fully independent per strike - the same
-// enemy CAN be hit more than once in one burst) instead of player-chosen.
-// Confirmed ruling, 2026-09-14: purely random, no rebalancing against the
-// new per-target counters - "someone can get big damage, someone even can
-// get 0 damage" is the intended chaotic spread, not a bug to smooth out.
-// Each strike reads/advances whichever target it randomly lands on's own
-// existing counter via nextBladeHitCount - no separate burst-only math.
-// Strike count scales with TOTAL alive characters (Blade included),
-// confirmed ruling: 4 alive -> 5 strikes, 3 alive -> 3 strikes, 2 alive ->
-// 2 strikes. Once he's the last two standing, only Blade and one opponent
-// can be alive together, so 2-strike is this ability's floor.
-const BLOOD_FRENZY_HEARTS_THRESHOLD = 3;
-function bloodFrenzyStrikeCount(aliveCount) {
-  if (aliveCount >= 4) return 5;
-  if (aliveCount === 3) return 3;
-  return 2;
-}
-function livingEnemiesFor(character, game) {
-  return Object.values(game.characters).filter(
-    (c) => c.id !== character.id && c.ownerId !== character.ownerId && !c.isKO && !c.untargetable
-  );
-}
-
 // Rebirth: automatic, intercepts the KO the instant it would happen (see
 // damagePipeline.js's KO branch, which calls this registered reset instead
 // of hand-rolling Blade's own state reset inline). Only his OWN state is
@@ -75,7 +51,7 @@ function livingEnemiesFor(character, game) {
 // affected character's own ability module (see
 // engine/categories/onOtherRevived.js and each of those files' own
 // registration).
-registerRebirth('blade', (character) => {
+registerRebirth('blade', (character, game, log) => {
   character.hearts = 2;
   character.special.rebirthUsed = true;
   character.usedSpecial = true;
@@ -97,10 +73,70 @@ registerRebirth('blade', (character) => {
   // who dies and revives comes back as a normal hero, curse cleared, same
   // "fresh copy" reasoning as lockedHearts above.
   character.isFrog = false;
+  // Blade's own Shark Hunt (taxonomy #41, Mutual Seal) - Rebirth
+  // intercepts the KO BEFORE applyDamage's normal KO branch ever flips
+  // target.isKO true, so registerOnAnyDeath's own seal-clearing hook
+  // (below) never fires for a Rebirth save - this is the ONLY place a
+  // Rebirth-saved Blade's own seal (and the mirrored fields on whoever he
+  // sealed) gets released. Releases the victim back to normal
+  // targetability immediately, same "fresh copy" reasoning as isFrog
+  // above.
+  if (character.deepSeaSealPartnerId) {
+    const partner = game?.characters?.[character.deepSeaSealPartnerId];
+    if (partner) {
+      partner.deepSeaSealed = false;
+      partner.deepSeaSealPartnerId = null;
+      partner.deepSeaEscapeAttempts = 0;
+    }
+  }
+  character.deepSeaSealed = false;
+  character.deepSeaSealPartnerId = null;
+  character.deepSeaEscapeAttempts = 0;
   // hitCountByTarget deliberately NOT cleared here - confirmed ruling,
   // 2026-09-14: "counter will not reset on rebirth". Every per-target
   // count he's built up survives his own death/revival, same as it
   // survives a target switch.
+});
+
+// Blade's Shark Hunt (Mutual Seal, taxonomy #41) - fires the instant
+// EITHER sealed party dies, from ANY source. Covers both end condition
+// (b) (victim KO'd by sharkStrike) and (c) (Blade's own KO, only
+// reachable via Athena's Curse Strike mirror or Divine Judgment - the two
+// mechanics allowed to "reach through" the seal) symmetrically: whichever
+// of the two dies, both flags clear on both sides. Registered in blade.js
+// (not a shared module) since Blade is the only current source of
+// deepSeaSealPartnerId, matching how Athena's own Divine Judgment cleanup
+// lives in athena.js despite touching another character's state.
+//
+// Deferred, NOT pushed directly to `log` here - runOnAnyDeath fires from
+// INSIDE applyDamage's own KO branch, before the caller's own log.push()
+// for the triggering attack/special line, so a direct push here would
+// land the seal-end entry BEFORE the hit that caused it (same class of
+// bug this codebase already fixed once for Divine Judgment/Fowl
+// Play/Friendship-end - see damagePipeline.js's runOnAnyDeath call site
+// and turnEngine.js's own deferred-push comments for the full paper
+// trail). Returned as deepSeaSealEndLogEntry instead, threaded through
+// applyDamage's result the same way divineJudgmentTriggerLogEntry is.
+registerOnAnyDeath((diedCharacterId, sourceCharacterId, isMirror, game, log) => {
+  const died = game.characters[diedCharacterId];
+  if (!died?.deepSeaSealPartnerId) return undefined;
+  const partnerId = died.deepSeaSealPartnerId;
+  const partner = game.characters[partnerId];
+  died.deepSeaSealed = false;
+  died.deepSeaSealPartnerId = null;
+  died.deepSeaEscapeAttempts = 0;
+  if (partner) {
+    partner.deepSeaSealed = false;
+    partner.deepSeaSealPartnerId = null;
+    partner.deepSeaEscapeAttempts = 0;
+  }
+  return {
+    deepSeaSealEndLogEntry: {
+      type: 'deep-sea-seal-end',
+      characterIds: [diedCharacterId, partnerId].filter(Boolean),
+      reason: 'ko',
+    },
+  };
 });
 
 export const actions = {
@@ -132,138 +168,89 @@ export const actions = {
       return result;
     },
   },
-  bloodFrenzy: {
-    label: 'Blood Frenzy',
-    needsTarget: false,
+  // Shark Hunt (replaces Blood Frenzy entirely, same treatment Akyros's
+  // Shadow Army/Melyssa's Full Control got when retired): hearts<=3
+  // one-time special. Transforms Blade into a shark and drags one chosen
+  // living enemy into a shared "deep sea" mutual seal (taxonomy #41) -
+  // both become unreachable by any third party until the seal ends. Modeled
+  // directly on Frog Curse's own targeted-status-cast shape (rowan.js),
+  // the closest existing precedent.
+  sharkHunt: {
+    label: 'Shark Hunt',
+    needsTarget: true,
     special: true,
-    isLegal: (character) => character.hearts <= BLOOD_FRENZY_HEARTS_THRESHOLD && !character.special.usedBloodFrenzy,
+    isLegal: (character) => character.hearts <= SHARK_HUNT_HEARTS_THRESHOLD
+      && !character.special.usedSharkHunt,
     execute(character, targetId, game, log) {
-      character.special.usedBloodFrenzy = true;
-      const aliveCount = Object.values(game.characters).filter((c) => !c.isKO).length;
-      const strikeCount = bloodFrenzyStrikeCount(aliveCount);
-      const hits = [];
-      // Same "first occurrence wins" deferred-field capture as Shadow
-      // Army/Earthshatter/Grim Barrage/Mirage Burst - finalizeAction only
-      // ever reads these off the top-level return value, never off entries
-      // buried inside `hits`.
-      let rebirthLogEntry = null;
-      let mirrorLogEntry = null;
-      let mirrorReflectLogEntry = null;
-      let fowlPlayRevertLogEntry = null;
-      let divineJudgmentTriggerLogEntry = null;
-      let prophecyOfDoomTriggerLogEntry = null;
-      let friendshipEndLogEntry = null;
-      let friendshipSpilloverLogEntry = null;
-      // Melyssa's Friendship - the "friend protects Melyssa" portrait
-      // reaction (portraitFlash.js's own protects_melyssa.jpg) is driven
-      // entirely by entry.redirectedToFriendId on the TOP-LEVEL log entry -
-      // confirmed real bug, 2026-09-21 (live report): unlike a single-
-      // target attack (which gets this for free by spreading ...result
-      // directly into its own entry), this custom `hits` array never
-      // captured it from any individual redirected strike, so the whole
-      // animation silently never fired for Blood Frenzy even when a
-      // redirect genuinely happened (the damage/shield math was always
-      // correct - only the visual was missing). "First occurrence wins",
-      // same reasoning as every other deferred field in this loop.
-      let redirectedToFriendId = null;
-      // Blood Drain's running total for this whole burst - see the in-loop
-      // comment further down for why this is accumulated rather than
-      // applied/logged per-strike.
-      let bloodDrainTotal = 0;
-      for (let i = 0; i < strikeCount; i++) {
-        // Re-queries the living pool fresh before EVERY strike (not once up
-        // front) - an earlier strike in this same burst can KO someone,
-        // shrinking who's left to randomly hit for the remaining strikes.
-        const pool = livingEnemiesFor(character, game);
-        if (pool.length === 0) break; // everyone's already down - burst ends early
-        const target = pool[Math.floor(Math.random() * pool.length)];
-        // Reads/advances THIS target's own independent counter, same rule
-        // as a normal chosen-target Blood Hunt - a random burst hit landing
-        // on someone at their 3rd-hit peak deals 3, the very next strike
-        // landing on them again (or anyone else already partway through
-        // their own cycle) deals whatever THEIR count is at, entirely
-        // independent of every other target's own progress. Confirmed
-        // ruling: purely random spread, no burst-only rebalancing.
-        const amount = nextBladeHitCount(character, target.id);
-        const result = applyDamage(game, log, {
-          sourceCharacterId: character.id,
-          targetCharacterId: target.id,
-          amount,
-        });
-        // targetId uses result.targetCharacterId (the REAL destination),
-        // not the loop's own pre-redirect target.id - confirmed real bug,
-        // 2026-09-21: Melyssa's Friendship can redirect any of these
-        // random hits to her friend, and the damage/hearts already
-        // correctly land there, but this display field still named the
-        // original random pick, showing "Melyssa" even when she was
-        // never actually touched.
-        hits.push({ targetId: result.targetCharacterId, streak: amount, amountDealt: result.amountDealt, dodged: result.dodged, koTriggered: result.koTriggered });
-        if (result.rebirthLogEntry && !rebirthLogEntry) rebirthLogEntry = result.rebirthLogEntry;
-        if (result.mirrorLogEntry && !mirrorLogEntry) mirrorLogEntry = result.mirrorLogEntry;
-        if (result.mirrorResult?.rebirthLogEntry && !rebirthLogEntry) rebirthLogEntry = result.mirrorResult.rebirthLogEntry;
-        if (result.mirrorReflectLogEntry && !mirrorReflectLogEntry) mirrorReflectLogEntry = result.mirrorReflectLogEntry;
-        if (result.mirrorReflectResult?.rebirthLogEntry && !rebirthLogEntry) rebirthLogEntry = result.mirrorReflectResult.rebirthLogEntry;
-        if (result.fowlPlayRevertLogEntry && !fowlPlayRevertLogEntry) fowlPlayRevertLogEntry = result.fowlPlayRevertLogEntry;
-        if (result.divineJudgmentTriggerLogEntry && !divineJudgmentTriggerLogEntry) divineJudgmentTriggerLogEntry = result.divineJudgmentTriggerLogEntry;
-        if (result.prophecyOfDoomTriggerLogEntry && !prophecyOfDoomTriggerLogEntry) prophecyOfDoomTriggerLogEntry = result.prophecyOfDoomTriggerLogEntry;
-        if (result.friendshipEndLogEntry && !friendshipEndLogEntry) friendshipEndLogEntry = result.friendshipEndLogEntry;
-        // Melyssa's Friendship - a redirected strike's own spillover entry
-        // (see damagePipeline.js's own comment on
-        // friendshipSpilloverLogEntry), same "first occurrence wins"
-        // reasoning as every other deferred entry in this loop.
-        if (result.friendshipSpilloverLogEntry && !friendshipSpilloverLogEntry) friendshipSpilloverLogEntry = result.friendshipSpilloverLogEntry;
-        if (result.redirectedToFriendId && !redirectedToFriendId) redirectedToFriendId = result.redirectedToFriendId;
-        // Blood Drain - checked per-strike, same rule as a normal Blood
-        // Hunt hit (confirmed ruling: "yes it apply to blood frenzy burst
-        // strike too. base on condition"), but the actual heal/log entry is
-        // DEFERRED until after the loop (see bloodDrainTotal below) -
-        // confirmed real bug, 2026-09-23 (live report: "animation played.
-        // but during blood frenzy end. not seen"). Pushing a 'blood-drain'
-        // entry HERE, mid-loop, meant it landed in the log BEFORE this
-        // burst's own 'special'/bloodFrenzy summary entry (pushed after the
-        // loop ends) - and that summary entry's own cast flash
-        // (blood_frenzy.jpg, portraitFlash.js) sets a long-duration flash
-        // on Blade's SAME tile, immediately stomping over the drain flash
-        // before a client ever had a chance to render it (multiple setFlash
-        // calls to the same character within one synchronous dispatch pass
-        // just leave the LAST one visible). Only the healed AMOUNT is
-        // accumulated per-strike here; the actual applyHeal + log entry
-        // happen once, after the summary line, so the drain flash shows
-        // AFTER the cast flash finishes instead of underneath it.
-        bloodDrainTotal += bloodDrainHealAmount(amount, result);
-        if (character.isKO) break; // a mirrored/reflected counter-hit KO'd Blade himself mid-burst
+      character.special.usedSharkHunt = true;
+      targetId = redirectStatusTargetIfProtected(game, targetId, character.id);
+      const target = game.characters[targetId];
+      if (tryTriggerCleanSlate(target, game, log)) {
+        log.push({ type: 'special', characterId: character.id, actionId: 'sharkHunt', targetId, blockedBy: 'cleanSlate' });
+        return {};
       }
-      log.push({ type: 'special', characterId: character.id, actionId: 'bloodFrenzy', hits, ...(redirectedToFriendId ? { redirectedToFriendId } : {}) });
-      // Blood Drain's own entry, pushed AFTER the burst's summary line (see
-      // the in-loop comment above for why) - one combined heal for the
-      // whole burst rather than one entry per triggering strike, since
-      // multiple back-to-back drain flashes within the same instant would
-      // just overwrite each other the same way the original bug did; a
-      // single combined tick reads cleanly regardless of how many 3rd-tick
-      // hits actually landed in this one cast.
-      if (bloodDrainTotal > 0) {
-        const bloodDrainHealed = applyHeal(game, character.id, bloodDrainTotal);
+      // Deliberately NO tryIllyraDodgeStatus call - confirmed ruling: the
+      // cast bypasses Illyra's passive entirely, same final behavior Frog
+      // Curse's own cast was revised to (2026-09-25).
+      character.deepSeaSealed = true;
+      character.deepSeaSealPartnerId = targetId;
+      target.deepSeaSealed = true;
+      target.deepSeaSealPartnerId = character.id;
+      target.deepSeaEscapeAttempts = 0;
+      log.push({ type: 'special', characterId: character.id, actionId: 'sharkHunt', targetId });
+      return {};
+    },
+  },
+  // Shark Strike: repeatable, gated purely on "the seal is currently
+  // active" (not one-time-use) - Blade's ONLY legal action while sealed
+  // (see turnEngine.js's getLegalActions override), same "hidden, only
+  // reachable via an explicit override" shape as Grimtal's beastAttack.
+  // Reuses Blood Hunt's own per-target hit-count cycle and Blood Drain
+  // heal verbatim - this is explicitly NOT a new damage-scaling mechanic,
+  // just Blood Hunt continuing against a target Blade can currently ONLY
+  // ever reach via the seal.
+  sharkStrike: {
+    label: 'Shark Strike',
+    needsTarget: true,
+    hidden: true,
+    isLegal: (character) => character.deepSeaSealed && !!character.deepSeaSealPartnerId,
+    execute(character, targetId, game, log) {
+      // targetId is always the partner in practice (turnEngine.js's
+      // isValidTarget enforces this), but read the partner id directly
+      // rather than trusting the passed value blindly, same defensive
+      // shape snakeStrike takes with isFrog.
+      const victim = game.characters[character.deepSeaSealPartnerId];
+      // "Underwater dodge" - flat 50%, checked HERE (attacker-specific),
+      // not in damagePipeline.js's generic dodge block, since this dodge
+      // only ever applies to ONE attacker (Blade) against ONE victim,
+      // unlike Frog Curse's dodge (applies to ANY attacker). The victim's
+      // own normal dodge sources (Illyra's Illusion, Marin's Threefold
+      // Veil, Akyros's passive, etc.) are suspended while sealed by
+      // design - this flat 50% fully replaces them, not stacks with them.
+      if (Math.random() < 0.5) {
+        log.push({ type: 'dodge', attackerId: character.id, targetCharacterId: victim.id, hearts: heartsSnapshot(game) });
+        return { dodged: true };
+      }
+      const amount = nextBladeHitCount(character, victim.id);
+      const result = applyDamage(game, log, {
+        sourceCharacterId: character.id,
+        targetCharacterId: victim.id,
+        amount,
+        ignoresShield: true, // Pure Attack, confirmed ruling
+        ignoresDodge: true, // the 50% roll above IS the dodge - applyDamage's own dodge stack must not ALSO run
+      });
+      log.push({ type: 'attack', characterId: character.id, actionId: 'sharkStrike', targetId: victim.id, streak: amount, ...result });
+      if (bloodDrainHealAmount(amount, result) > 0) {
+        const bloodDrainHealed = applyHeal(game, character.id, 1);
         if (bloodDrainHealed > 0) {
-          // afterBloodFrenzy: true - confirmed real bug, 2026-09-23 (live
-          // report: "blood drain animation work but.. blood_frenzy image
-          // miss"). Pushing this entry after the summary line fixed the
-          // FIRST bug (drain flash never showing at all - see the earlier
-          // fix's own comment above), but immediately introduced a SECOND
-          // one: portraitFlash.js's own setFlash() has no queueing - it
-          // synchronously overwrites whatever flash is currently showing on
-          // that character's tile, and clears its timer. The cast flash
-          // (blood_frenzy.jpg) is set for a full 4500ms
-          // (BLOOD_FRENZY_FLASH_DURATION_MS), but this entry's own
-          // blood_drain.jpg flash fires moments later in the SAME dispatch
-          // batch, immediately cutting the cast flash's display time down
-          // to almost nothing. This flag tells the client to delay its own
-          // flash call until the cast flash's full duration has actually
-          // elapsed, rather than racing it - see portraitFlash.js's own
-          // 'blood-drain' case for the matching client-side fix.
-          log.push({ type: 'blood-drain', characterId: character.id, healed: bloodDrainHealed, hearts: heartsSnapshot(game), afterBloodFrenzy: true });
+          // viaSharkStrike: true disambiguates the healing source for the
+          // client (shark-form deepsea_heal.jpg instead of Blade's normal
+          // blood_drain.jpg), matching the existing afterBloodFrenzy-style
+          // "which source triggered this heal" flag precedent.
+          log.push({ type: 'blood-drain', characterId: character.id, healed: bloodDrainHealed, hearts: heartsSnapshot(game), viaSharkStrike: true });
         }
       }
-      return { hits, rebirthLogEntry, mirrorLogEntry, mirrorReflectLogEntry, fowlPlayRevertLogEntry, divineJudgmentTriggerLogEntry, prophecyOfDoomTriggerLogEntry, friendshipEndLogEntry, friendshipSpilloverLogEntry };
+      return result;
     },
   },
 };
