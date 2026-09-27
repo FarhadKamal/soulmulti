@@ -2634,24 +2634,6 @@ function describeLogEntry(entry) {
         // the pierce damage itself still lands regardless of that.
         return `${name(entry.characterId)} used their SPECIAL: Skull Crack on ${name(actualAttackTargetId(entry))}${entry.amountDealt != null ? ` - ${entry.amountDealt} damage` : ''}${entry.koTriggered ? ' - KO!' : ''}${entry.blockedBy ? `, headache blocked by ${entry.blockedBy === 'cleanSlate' ? 'Clean Slate' : 'Illusion'}` : ''}`;
       }
-      if (entry.actionId === 'bloodFrenzy') {
-        // Blade's Blood Frenzy (hearts<=3 one-time special) - 2-5 random-
-        // target strikes, each a full normal Blood Hunt hit (shield/dodge
-        // apply, unlike Shadow Seal's own bypass-defense-entirely shape),
-        // streak climbing WITHIN the burst itself (entry.hits[i].streak,
-        // see blade.js's own execute()). Empty hits only if every enemy was
-        // already KO'd/untargetable the instant this resolved - shouldn't
-        // be reachable in real play (isLegal only gates on hearts/one-time-
-        // use, not on a live target existing), but guarded the same way as
-        // every other multi-hit special's own empty-hits edge case.
-        if (!entry.hits || entry.hits.length === 0) {
-          return `${name(entry.characterId)} unleashed Blood Frenzy, but no one was left to strike!`;
-        }
-        const parts = entry.hits.map((h) =>
-          `${name(h.targetId)} (streak ${h.streak}${h.dodged ? ' - dodged!' : h.amountDealt != null ? `, ${h.amountDealt} dmg` : ''}${h.koTriggered ? ' - KO!' : ''})`
-        );
-        return `${name(entry.characterId)} unleashed Blood Frenzy - ${parts.join(', ')}`;
-      }
       if (entry.actionId === 'petrify') {
         // Petrify (Rowan's hearts<=3 one-time bonus action) - its own
         // 'spell-discovered' entries (pushed separately, one per newly
