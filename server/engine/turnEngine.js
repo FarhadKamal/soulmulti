@@ -1192,7 +1192,7 @@ function executeChickenAttack(character, targetId, game, log) {
 // Blade's Shark Hunt (taxonomy #41, Mutual Seal) - the sealed victim's own
 // climbing-odds escape roll, same escalating shape as Draxus's Cheat Death
 // (25% base, +5%/failed attempt, uncapped) but starting at 20% per design.
-const DEEP_SEA_ESCAPE_CHANCE = 0.20;
+const DEEP_SEA_ESCAPE_CHANCE = 0.05;
 const DEEP_SEA_ESCAPE_CHANCE_STEP = 0.05;
 
 function deepSeaEscapeChance(character) {
