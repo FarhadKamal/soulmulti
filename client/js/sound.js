@@ -188,7 +188,11 @@ export function revertFromChickenMusic() {
 export function startDeepSeaMusic() {
   if (musicTrack === 'deepsea') return;
   preDeepSeaTrack = musicTrack;
-  startMusic('deepsea', DEEPSEA_TRACK, 0.28);
+  // Reported live as too quiet to hear at the standard 0.28 level the
+  // other swapped-in tracks use (chicken/frozen) - the raw bgm-deepsea.mp3
+  // file itself was mastered quieter than those, so it gets a noticeably
+  // higher gain here to compensate.
+  startMusic('deepsea', DEEPSEA_TRACK, 0.55);
 }
 
 export function revertFromDeepSeaMusic() {
