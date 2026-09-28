@@ -11,6 +11,7 @@
 // whatever generic sound already played for that moment (see main.js's
 // call sites), rather than erroring on a missing file.
 import { v } from './assetVersion.js';
+import { duckDeepSeaMusic } from './sound.js';
 
 const cache = {};
 
@@ -29,6 +30,19 @@ function get(characterId, line) {
 // fire ~200ms after a move-voice from the same broadcast already started
 // playing).
 let currentClip = null;
+
+// Live report: "shark_strike voice of blade. i did not hear. probably for
+// background music?" - confirmed cause: Shark Hunt's two deep-sea BGM
+// layers both run at full gain while voice lines play at only 0.85,
+// masking a spoken line under the combined ambient bed. Ducks the deep-sea
+// music for a fixed window rather than the clip's own exact duration
+// (querying node.duration synchronously isn't reliable before metadata
+// loads, and a fixed ~3s window comfortably covers every recorded line in
+// this game without needing to listen for 'loadedmetadata' first) -
+// harmless no-op via duckDeepSeaMusic's own musicTrack check whenever
+// music isn't actually the deep-sea track (every other voice moment in the
+// game).
+const VOICE_DUCK_MS = 3000;
 
 function playRawVoiceFile(characterId, line) {
   try {
@@ -49,6 +63,7 @@ function playRawVoiceFile(characterId, line) {
     // already finished.
     currentClip = node;
     node.play().catch(() => {});
+    duckDeepSeaMusic(VOICE_DUCK_MS);
   } catch {
     // ignore - missing/blocked file, same silent-fallback policy as
     // sound.js's playSound

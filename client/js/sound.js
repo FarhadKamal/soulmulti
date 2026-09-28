@@ -217,6 +217,10 @@ export function revertFromChickenMusic() {
   }
 }
 
+const DEEPSEA_FULL_VOLUME = 1.0;
+const DEEPSEA_DUCKED_VOLUME = 0.35;
+let deepSeaDuckTimeout = null;
+
 export function startDeepSeaMusic() {
   if (musicTrack === 'deepsea') return;
   preDeepSeaTrack = musicTrack;
@@ -224,17 +228,42 @@ export function startDeepSeaMusic() {
   // file itself was mastered much quieter than the other swapped-in tracks
   // (chicken/frozen), so this runs at full gain (1.0) to compensate,
   // confirmed explicit request ("it should be full volume").
-  startMusic('deepsea', DEEPSEA_TRACK, 1.0);
+  startMusic('deepsea', DEEPSEA_TRACK, DEEPSEA_FULL_VOLUME);
   try {
     const node = new Audio(v(`assets/sounds/${DEEPSEA_TRACK_2}`));
     node.loop = true;
-    node.volume = 1.0;
+    node.volume = DEEPSEA_FULL_VOLUME;
     node.muted = musicMuted;
     node.play().catch(() => {});
     deepSeaAudio2 = node;
   } catch {
     // ignore
   }
+}
+
+// Live report: "shark_strike voice of blade. i did not hear. probably for
+// background music?" - confirmed cause: the two deep-sea tracks both run at
+// full gain (1.0 each, layered) while voice.js's own spoken lines play at
+// only 0.85, so a voice line could genuinely get masked under the combined
+// ambient bed. Called from voice.js whenever ANY line actually starts
+// playing while sealed (not just sharkStrike specifically) - briefly ducks
+// both deep-sea layers down, restoring full volume after durationMs. A
+// no-op when the deep-sea track isn't actually the one playing (musicAudio
+// is the shared single-slot node - only touch it when musicTrack is
+// genuinely 'deepsea', never menu/battle/frozen/chicken).
+export function duckDeepSeaMusic(durationMs) {
+  if (musicTrack !== 'deepsea') return;
+  if (deepSeaDuckTimeout) clearTimeout(deepSeaDuckTimeout);
+  if (musicAudio) musicAudio.volume = DEEPSEA_DUCKED_VOLUME;
+  if (deepSeaAudio2) deepSeaAudio2.volume = DEEPSEA_DUCKED_VOLUME;
+  deepSeaDuckTimeout = setTimeout(() => {
+    deepSeaDuckTimeout = null;
+    // Re-check musicTrack at restore time too - the seal (and thus the
+    // track) could have ended during the duck window.
+    if (musicTrack !== 'deepsea') return;
+    if (musicAudio) musicAudio.volume = DEEPSEA_FULL_VOLUME;
+    if (deepSeaAudio2) deepSeaAudio2.volume = DEEPSEA_FULL_VOLUME;
+  }, durationMs);
 }
 
 export function revertFromDeepSeaMusic() {
