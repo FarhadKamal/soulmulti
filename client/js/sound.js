@@ -313,6 +313,15 @@ const EARTHSHATTER_SOUND_LOCK_MS = 5200;
 const SOUND_LOCK_EXEMPT = new Set(['earthshatter', 'game-over', 'rebirth']);
 let soundLockUntil = 0;
 
+// Live report: "also deepsea_dodge.mp3" - same masking issue already fixed
+// for voice lines (duckDeepSeaMusic, see playRawVoiceFile's own call in
+// voice.js) applies equally to every sound effect: the two deep-sea BGM
+// layers run at full gain while a one-shot effect here plays at only 0.6.
+// Ducks on EVERY playSound() call, not just the deepsea_*.mp3 ones - a
+// no-op via duckDeepSeaMusic's own musicTrack check whenever the deep-sea
+// track isn't actually playing (every sound effect outside the seal).
+const SOUND_DUCK_MS = 1200;
+
 export function playSound(name) {
   const now = Date.now();
   if (now < soundLockUntil && !SOUND_LOCK_EXEMPT.has(name)) return;
@@ -322,6 +331,7 @@ export function playSound(name) {
     node.volume = 0.6;
     node.play().catch(() => {});
     if (name === 'earthshatter') soundLockUntil = now + EARTHSHATTER_SOUND_LOCK_MS;
+    duckDeepSeaMusic(SOUND_DUCK_MS);
   } catch {
     // ignore
   }
