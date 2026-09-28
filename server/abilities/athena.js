@@ -123,6 +123,25 @@ registerOnAnyDeath((diedCharacterId, sourceCharacterId, isMirror, game, log) => 
     friendshipEndLogEntry: result.friendshipEndLogEntry,
     friendshipSpilloverLogEntry: result.friendshipSpilloverLogEntry,
     prophecyOfDoomTriggerLogEntry: result.prophecyOfDoomTriggerLogEntry,
+    // Blade's Shark Hunt (Mutual Seal #41) - confirmed real bug found via a
+    // traced scenario (2026-09-28): when Athena herself dies while sealed
+    // with Blade, THIS callback (registerOnAnyDeath, keyed off Athena's own
+    // death) can fire alongside blade.js's OWN registerOnAnyDeath callback
+    // on that SAME outer dispatch (blade.js's hook checks "did the DIED
+    // character carry a seal partner" - true here, since Athena herself is
+    // one of the sealed pair, independent of Divine Judgment entirely).
+    // Both callbacks' return values get merged by runOnAnyDeath, with LATER
+    // keys winning collisions - so if blade.js's hook already produced the
+    // correct deepSeaSealEndLogEntry (Athena's own death ending the seal)
+    // and this callback then unconditionally spreads
+    // `result.deepSeaSealEndLogEntry` (undefined, since by the time this
+    // INNER applyDamage call kills Blade via the judgment, blade.js's own
+    // hook already cleared deepSeaSealPartnerId on the earlier dispatch, so
+    // the NESTED dispatch for Blade's own death finds nothing left to
+    // clear), it silently overwrites the correct entry with undefined.
+    // Fixed by only including the key when this callback's own inner call
+    // actually produced one - never overwriting with undefined.
+    ...(result.deepSeaSealEndLogEntry ? { deepSeaSealEndLogEntry: result.deepSeaSealEndLogEntry } : {}),
   };
 });
 
