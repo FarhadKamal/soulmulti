@@ -1278,10 +1278,17 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
   // everything" design (same shape as the isKO exclusion right above)
   // predates Shark Hunt and was never audited against it - Rowan's Petrify
   // stomped a sealed Blade/Akyros's own persistent seal portrait with
-  // stone.jpg. Same fix shape as the isKO gap: excluded here alongside it.
+  // stone.jpg. Confirmed follow-up design (2026-09-28): rather than a flat
+  // exemption, a sealed+petrified character now gets its own dedicated
+  // underwater-stone variant (deepsea_trapped_stone.jpg, both Blade's own
+  // and one per victim hero - Rowan excluded, he's exempt from his own
+  // Petrify and can never be sealed while also self-petrified) so the two
+  // effects visually combine instead of one silently overriding the other.
   if (isVictorious) {
     portrait.src = v(`assets/images/${character.id}/victory.jpg`);
-  } else if (isPetrifiedOther && !character.isKO && !character.deepSeaSealed) {
+  } else if (isPetrifiedOther && !character.isKO && character.deepSeaSealed) {
+    portrait.src = v(`assets/images/${character.id}/deepsea_trapped_stone.jpg`);
+  } else if (isPetrifiedOther && !character.isKO) {
     // Grimtal's Beast Form (Death-Triggered Reversion #36) gets its own
     // petrified art (beast_stone.jpg) rather than the plain human stone.jpg
     // - his beast body looks nothing like his human one, so a single stone
