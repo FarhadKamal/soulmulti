@@ -81,6 +81,15 @@ let preChickenTrack = null;
 // seal, unlike Fowl Play which can apply to any character).
 const DEEPSEA_TRACK = 'bgm-deepsea.mp3';
 let preDeepSeaTrack = null;
+// A second, independent audio layer played ON TOP of bgm-deepsea.mp3 for the
+// whole seal duration (confirmed explicit request: "i want to play it
+// combiney at a time both") - deliberately NOT folded into the single-slot
+// musicAudio/musicTrack system (that system assumes exactly one swappable
+// "current track" at a time, which the mute toggle/ensureMusicPlaying
+// polling both rely on) - its own dedicated node instead, started/stopped in
+// lockstep with the main deep-sea track wherever possible.
+const DEEPSEA_TRACK_2 = 'bgm-deepsea-2.mp3';
+let deepSeaAudio2 = null;
 
 // Browsers block audio autoplay until the user has interacted with the
 // page. Two distinct failure modes seen in practice: (1) a play() call
@@ -118,6 +127,25 @@ if (typeof document !== 'undefined') {
 function startMusic(track, file, volume) {
   if (musicTrack === track) return;
   if (musicAudio) musicAudio.pause();
+  // Confirmed real bug, 2026-09-28 (live report: "background music was
+  // multiplying!"): every OTHER track switch (menu/battle/frozen/chicken)
+  // routes through this one shared function, but deepSeaAudio2 (Shark
+  // Hunt's second layered track) is invisible to it - a completely separate
+  // node outside the musicAudio/musicTrack system. If this function ever
+  // ran while musicTrack was 'deepsea' (any track switch firing during an
+  // active seal - a screen-transition edge case, a reconnect, etc.),
+  // deepSeaAudio2 was silently orphaned: never paused, still looping. The
+  // NEXT game-state broadcast (seal still active server-side) would then
+  // see musicTrack no longer 'deepsea', pass startDeepSeaMusic's own guard
+  // again, and spawn a SECOND deepSeaAudio2 node layered on top of the
+  // still-playing orphan - repeating indefinitely on every further track
+  // switch. Stopping it here, in the one shared choke point every track
+  // switch already passes through, is more robust than guarding each
+  // individual caller (menu/battle/frozen/chicken) separately.
+  if (track !== 'deepsea' && deepSeaAudio2) {
+    deepSeaAudio2.pause();
+    deepSeaAudio2 = null;
+  }
   try {
     const node = new Audio(v(`assets/sounds/${file}`));
     node.loop = true;
@@ -188,16 +216,6 @@ export function revertFromChickenMusic() {
     startBattleMusic();
   }
 }
-
-// A second, independent audio layer played ON TOP of bgm-deepsea.mp3 for the
-// whole seal duration (confirmed explicit request: "i want to play it
-// combiney at a time both") - deliberately NOT folded into the single-slot
-// musicAudio/musicTrack system above (that system assumes exactly one
-// swappable "current track" at a time, which the mute toggle/
-// ensureMusicPlaying polling both rely on) - its own dedicated node instead,
-// started/stopped in lockstep with the main deep-sea track.
-const DEEPSEA_TRACK_2 = 'bgm-deepsea-2.mp3';
-let deepSeaAudio2 = null;
 
 export function startDeepSeaMusic() {
   if (musicTrack === 'deepsea') return;
