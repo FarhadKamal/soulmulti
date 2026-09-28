@@ -1271,9 +1271,17 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
   // there's nothing to turn to stone, so this is now excluded via
   // !character.isKO, letting the normal isKO branch further below win for
   // them instead.
+  // Blade's Shark Hunt (Mutual Seal #41) - confirmed real bug (live report:
+  // "petrify image play inside sea!"): a sealed character's own deep-sea
+  // art (deepsea_form.jpg/deepsea_trapped.jpg) is supposed to be locked in
+  // for the WHOLE seal duration, but this branch's own "overrides literally
+  // everything" design (same shape as the isKO exclusion right above)
+  // predates Shark Hunt and was never audited against it - Rowan's Petrify
+  // stomped a sealed Blade/Akyros's own persistent seal portrait with
+  // stone.jpg. Same fix shape as the isKO gap: excluded here alongside it.
   if (isVictorious) {
     portrait.src = v(`assets/images/${character.id}/victory.jpg`);
-  } else if (isPetrifiedOther && !character.isKO) {
+  } else if (isPetrifiedOther && !character.isKO && !character.deepSeaSealed) {
     // Grimtal's Beast Form (Death-Triggered Reversion #36) gets its own
     // petrified art (beast_stone.jpg) rather than the plain human stone.jpg
     // - his beast body looks nothing like his human one, so a single stone
