@@ -100,6 +100,14 @@ function playInjuredVoiceIfNewlyHurt(game) {
     // while sealed - a landed Shark Strike drops the victim below half
     // routinely.
     if (character.deepSeaSealed) continue;
+    // Chronox's Time Freeze/World Stops - confirmed real gap (same class as
+    // the chicken/deep-sea guards above): "during frozen time. victim voice
+    // should not play. until frozen status end." A frozen character can
+    // still be hit for real damage (e.g. Blade's Blood Hunt landing on a
+    // frozen target), which can drop them below half hearts mid-freeze -
+    // their own injured voice line shouldn't fire until the freeze lifts,
+    // same "hero identity suppressed" reasoning as the other 2 guards.
+    if (computeFrozenIdsSet(game).has(character.id)) continue;
     const isInjuredNow = character.hearts <= character.maxHearts / 2;
     const wasInjuredBefore = prev <= character.maxHearts / 2;
     if (isInjuredNow && !wasInjuredBefore) playInjuredVoice(character.id);
