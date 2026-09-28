@@ -341,21 +341,30 @@ function playLaughVoiceIfAlive(characterId, game) {
 
 function playLogEntrySound(entry, game) {
   if (entry.type === 'dodge') {
+    // Shark Strike's own "underwater dodge" (blade.js's own execute()) -
+    // checked FIRST, before the per-character branches below, using
+    // entry.isDeepSeaDodge (set directly on the log entry at the moment it
+    // happened) rather than re-deriving target.deepSeaSealed off the live
+    // game snapshot. Confirmed real bug (live report: "grimtal dodge.jpg
+    // was playing deep inside sea!" - the same staleness affected this
+    // sound branch too): a single broadcast batch can contain both this
+    // dodge AND a later entry that ends the same seal, so re-deriving from
+    // live state could wrongly fall through past this check entirely and
+    // hit the Grim-Ward-specific magic_dodge.wav branch below instead -
+    // worse than just a wrong flash, since order matters here and
+    // Grimtal's own branch comes first.
+    if (entry.isDeepSeaDodge) {
+      playDeepSeaDodge();
+    }
     // Grimtal's Grim Ward uses the magic_dodge sound (same file as Marin's
     // Threefold Veil discovery sound - see sound.js's ACTION_SOUND) instead
     // of the plain generic dodge sound everyone else gets, per explicit
     // request for a more distinct/weighty cue on his counter-dodge.
-    if (entry.targetCharacterId === 'grimtal') playSound('magic_dodge.wav');
+    else if (entry.targetCharacterId === 'grimtal') playSound('magic_dodge.wav');
     // Illyra's passive uses its own dedicated illusion.mp3 sound, per
     // explicit request - distinct from both the plain generic dodge and
     // Grimtal's magic_dodge.wav.
     else if (entry.targetCharacterId === 'illyra') playSound('illusion.mp3');
-    // Shark Strike's own "underwater dodge" (blade.js's own execute(),
-    // attackerId always 'blade') - dedicated splash-dodge sound rather than
-    // the generic one, same distinct-cue reasoning as Grimtal/Illyra above.
-    else if (entry.attackerId === 'blade' && game.characters[entry.targetCharacterId]?.deepSeaSealed) {
-      playDeepSeaDodge();
-    }
     else playDodge();
     // Marin's Threefold Veil dodge gets its own spoken line on top of the
     // generic dodge sound - a no-op for Akyros's own dodge (same shared

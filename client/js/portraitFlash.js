@@ -1608,15 +1608,19 @@ export function handleDodgeForFlash(entry, game) {
     setFlash(target.id, `assets/images/${target.id}/frog_dodge.jpg`);
     return;
   }
-  // Blade's Shark Hunt (taxonomy #41, Mutual Seal) - same "checked via the
-  // flag directly, not a fixed target.id" reasoning as isFrog above, since
-  // the sealed victim can be any of the 15 non-Blade heroes. deepSeaSealed
-  // stays true through a successful dodge (only a landed hit's own KO/end
-  // logic in blade.js's registerOnAnyDeath/executeEscapeSeal clears it),
-  // so this correctly identifies "this was Shark Strike's own underwater
-  // dodge" - the ONLY dodge source reachable while sealed, since every
-  // other attacker is blocked from targeting a sealed character at all.
-  if (target.deepSeaSealed) {
+  // Blade's Shark Hunt (taxonomy #41, Mutual Seal) - confirmed real bug
+  // (live report: "grimtal dodge.jpg was playing deep inside sea!"): used to
+  // check target.deepSeaSealed off the live `game` snapshot here, but a
+  // single broadcast batch can contain both this dodge entry AND a LATER
+  // entry that ends the same seal (an escape success, a KO) - by the time
+  // this batch's entries are walked in arrival order, the earlier dodge
+  // could be checked against the already-ended seal state and wrongly fall
+  // through to the generic per-hero dodge art below instead of
+  // deepsea_dodge.jpg. Fixed at the source: blade.js's own sharkStrike now
+  // marks entry.isDeepSeaDodge directly on the log entry (true at the exact
+  // moment the dodge happened, immune to any later same-batch state
+  // change) - checked here INSTEAD of the live flag, not in addition to it.
+  if (entry.isDeepSeaDodge) {
     setFlash(target.id, `assets/images/${target.id}/deepsea_dodge.jpg`);
     return;
   }

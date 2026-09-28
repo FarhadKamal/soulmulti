@@ -228,7 +228,20 @@ export const actions = {
       // Veil, Akyros's passive, etc.) are suspended while sealed by
       // design - this flat 50% fully replaces them, not stacks with them.
       if (Math.random() < 0.5) {
-        log.push({ type: 'dodge', attackerId: character.id, targetCharacterId: victim.id, hearts: heartsSnapshot(game) });
+        // isDeepSeaDodge: true - confirmed real bug (live report: "grimtal
+        // dodge.jpg was playing deep inside sea!"): the client's own
+        // handleDodgeForFlash (portraitFlash.js) used to re-derive "was this
+        // sealed" by reading target.deepSeaSealed off the LATEST broadcast
+        // snapshot at dispatch time - but a single broadcast batch can
+        // contain both this dodge AND a later entry that ends the same seal
+        // (an escape success, a KO), so by the time the batch's entries are
+        // walked in order, the EARLIER dodge could be checked against the
+        // ALREADY-ended seal state and wrongly show the normal Grim-Ward-
+        // style dodge.jpg instead of deepsea_dodge.jpg. Marking the fact
+        // directly on the log entry itself (true at the moment this dodge
+        // actually happened) sidesteps the staleness entirely - no longer
+        // re-derived from live state at all.
+        log.push({ type: 'dodge', attackerId: character.id, targetCharacterId: victim.id, isDeepSeaDodge: true, hearts: heartsSnapshot(game) });
         return { dodged: true };
       }
       const amount = nextBladeHitCount(character, victim.id);
