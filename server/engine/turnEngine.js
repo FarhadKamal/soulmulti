@@ -792,6 +792,14 @@ export function beginCharacterTurn(character, game, log) {
     tickPoisonIfAny(character, game, log);
     tickSilenceIfAny(character, game, log);
     resolveHeadacheIfDue(character, game, log);
+    // Chronox's Time Freeze/World Stops - confirmed real bug (Shark Hunt
+    // sealing Chronox himself suspended his own already-active freeze on a
+    // third-party victim indefinitely, since the countdown used to live
+    // entirely inside his own onTurnStart, gated on deepSeaSealed below).
+    // Same "already-active status keeps resolving through the seal"
+    // treatment as poison/silence/headache above - see chronox.js's own
+    // tickFreezeIfAny for the full reasoning.
+    chronox.tickFreezeIfAny(character, game, log);
   }
   tickFowlPlayIfBoingoTurn(character, game, log);
   // deepSeaSealed DOES gate onTurnStart here, unlike the ticks above - the

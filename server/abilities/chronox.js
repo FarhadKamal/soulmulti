@@ -125,18 +125,24 @@ registerOnOwnDeath('chronox', (character, game, log) => {
 // below, so the group is frozen for this many of their own turns total.
 const WORLD_STOPS_TOTAL_ROUNDS = 4;
 
-export function onTurnStart(character, game, log) {
-  // Chrono Guard: shield RESETS to exactly 1 each turn - does not stack.
-  // Rowan's Silence Lock suppresses this entirely while active (blocks
-  // every shield source, not just special abilities) - a silenced Chronox
-  // gets 0 here instead of the usual reset-to-1.
-  if (isSilenced(character, game)) {
-    character.shield = 0;
-  } else {
-    character.shield = 1;
-    log.push({ type: 'passive', characterId: character.id, text: `${character.id}'s shield resets to 1 (Chrono Guard)`, hearts: heartsSnapshot(game) });
-  }
-
+// Blade's Shark Hunt (Mutual Seal #41) - confirmed real bug (live report +
+// direct question: "is it becasue after chronox freeze athena, and then
+// blade took choronox inside sea, that happend?"): Time Freeze/World Stops'
+// own countdown used to live entirely inside onTurnStart below, which is
+// blanket-suppressed for the WHOLE character while sealed (see
+// turnEngine.js's beginCharacterTurn) - so if Chronox himself got sealed
+// mid-freeze, the countdown on his THIRD-PARTY victim (Athena in the
+// reported case) simply stopped ticking for the whole seal duration,
+// leaving her frozen indefinitely instead of the normal 2/4-round window.
+// Confirmed ruling: an already-active freeze is the same "already-active
+// status keeps resolving through the seal" category as poison/silence/
+// headache (all tick via their OWN dedicated calls in turnEngine.js,
+// independent of onTurnStart's deepSeaSealed gate) - split out into its own
+// function, called unconditionally (never gated on deepSeaSealed) from
+// turnEngine.js's beginCharacterTurn, same treatment as tickPoisonIfAny/
+// tickSilenceIfAny. Chrono Guard (the shield reset) is a normal kit
+// passive, correctly still suppressed while sealed - stays in onTurnStart.
+export function tickFreezeIfAny(character, game, log) {
   // Time Freeze: flat 2-round duration, no coin flip. Casting already skips
   // the target's next turn (round 1); this extends it for 1 more round,
   // then ends automatically.
@@ -173,6 +179,19 @@ export function onTurnStart(character, game, log) {
       character.special.worldStopsFrozenIds = new Set();
       log.push({ type: 'world-stops-end', hearts: heartsSnapshot(game) });
     }
+  }
+}
+
+export function onTurnStart(character, game, log) {
+  // Chrono Guard: shield RESETS to exactly 1 each turn - does not stack.
+  // Rowan's Silence Lock suppresses this entirely while active (blocks
+  // every shield source, not just special abilities) - a silenced Chronox
+  // gets 0 here instead of the usual reset-to-1.
+  if (isSilenced(character, game)) {
+    character.shield = 0;
+  } else {
+    character.shield = 1;
+    log.push({ type: 'passive', characterId: character.id, text: `${character.id}'s shield resets to 1 (Chrono Guard)`, hearts: heartsSnapshot(game) });
   }
 }
 
