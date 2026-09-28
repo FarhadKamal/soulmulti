@@ -381,7 +381,19 @@ export const actions = {
       // (confirmed bug, 2026-09-01 - see chronox.js's identical fix/
       // comment on Time Freeze for the full reasoning).
       let blockedBy = null;
-      if (!result.dodged && result.amountDealt > 0 && !result.koTriggered) {
+      // Confirmed real gap (user question: "is it not possible to give him
+      // his turn move, when just rebirth after koed by skull crack?"): this
+      // condition already excludes a KO'd victim (koTriggered) from getting
+      // a fresh headache - "no next turn to roll against" - but a
+      // Rebirth-saved hit sets result.revived: true instead of
+      // koTriggered: true (Rebirth intercepts the KO before it's ever
+      // flagged as one), so a hit that would have KO'd the victim if not
+      // for Rebirth was still arming a brand-new headache on their revived
+      // self. Confirmed ruling: Rebirth is meant to be a genuinely fresh
+      // start (his own registerRebirth already clears every OTHER lingering
+      // status the same way) - the same killing blow that triggered the
+      // save shouldn't also saddle him with a fresh status effect from it.
+      if (!result.dodged && result.amountDealt > 0 && !result.koTriggered && !result.revived) {
         const target = game.characters[targetId];
         // Illyra's passive checked alongside Clean Slate - same "50%
         // chance the STATUS side effect itself doesn't take" reasoning as
