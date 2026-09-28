@@ -372,18 +372,26 @@ function playLogEntrySound(entry, game) {
     // up). See voice.js's ACTION_VOICE_LINES.marin comment for why this is
     // a separate key from threefoldVeil (that one's reserved for the
     // discovery moment, not the dodge itself).
-    if (entry.targetCharacterId === 'marin' && !game.characters.marin?.isKO) {
+    // !entry.isDeepSeaDodge added to all 3 branches below - confirmed real
+    // bug (live report: "grimtal voice dodge was playing" while sealed),
+    // same class as the flash/sound leak fixed in e7edf22 - these 3 own
+    // per-character voice checks only ever looked at entry.targetCharacterId,
+    // with no awareness Shark Strike's own underwater dodge shares the exact
+    // same 'dodge' entry shape. Only Grimtal can currently be sealed while
+    // these lines exist (Marin/Illyra have no seal-adjacent path yet), but
+    // guarding all 3 uniformly is more robust than special-casing just his.
+    if (entry.targetCharacterId === 'marin' && !game.characters.marin?.isKO && !entry.isDeepSeaDodge) {
       playMoveVoice('marin', 'threefoldDodge');
     }
     // Grimtal's Grim Ward, same reasoning as Marin's threefoldDodge above -
     // a spoken line on top of the generic dodge sound for this specific
     // dodge source only.
-    if (entry.targetCharacterId === 'grimtal' && !game.characters.grimtal?.isKO) {
+    if (entry.targetCharacterId === 'grimtal' && !game.characters.grimtal?.isKO && !entry.isDeepSeaDodge) {
       playMoveVoice('grimtal', 'grimWard');
     }
     // Illyra's passive, same reasoning as Marin/Grimtal above - a spoken
     // line on top of her own dedicated dodge sound.
-    if (entry.targetCharacterId === 'illyra' && !game.characters.illyra?.isKO) {
+    if (entry.targetCharacterId === 'illyra' && !game.characters.illyra?.isKO && !entry.isDeepSeaDodge) {
       playMoveVoice('illyra', 'dodge');
     }
     // Rowan's Frog Curse - the frog's passive 50% dodge is checked via
