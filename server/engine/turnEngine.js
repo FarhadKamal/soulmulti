@@ -230,6 +230,19 @@ export function isValidTarget(game, characterId, actionId, targetId) {
   // anyway (everything's hidden while chickenified).
   if (actionId === 'chickenAttack') {
     if (targetId === characterId) return false;
+    // Melyssa's Friendship - confirmed real gap (2026-09-28): Fowl Play can
+    // chickenify BOTH Melyssa and her currently-bonded friend at once (her
+    // own kit gets replaced by chickenAttack same as anyone else's), and
+    // this branch returns before the generic mutual-no-attack check further
+    // down ever runs - letting a chickenified bonded pair hit each other,
+    // which should never be legal. Confirmed ruling: the bond itself is
+    // suspended while chickenified (Melyssa's protection is a human-form-
+    // only mechanic - "chicken cannot protect Melyssa"), but that means
+    // suspended, not breakable - it must survive the chicken window intact
+    // and resume the instant both revert, so the attack itself still needs
+    // blocking here rather than being allowed to quietly land.
+    if (characterId === 'melyssa' && melyssa.isCurrentFriend(game, targetId)) return false;
+    if (targetId === 'melyssa' && melyssa.isCurrentFriend(game, characterId)) return false;
     if (targetId === 'boingo') return true;
     return isChickenified(target);
   }
