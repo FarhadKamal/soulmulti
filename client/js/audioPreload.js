@@ -48,6 +48,10 @@ const SOUND_EFFECT_FILES = [
   'deepsea_cast.mp3', 'deepsea_strike.mp3', 'deepsea_dodge.mp3',
   'deepsea_escape_success.mp3', 'deepsea_escape_fail.mp3',
 ];
+// Deliberately still excluded from SOUND_EFFECT_FILES preload (see the
+// bandwidth-cap comment above) - bgm-deepsea.mp3 and its new layered
+// companion bgm-deepsea-2.mp3 are both looping music tracks, same "each
+// startXMusic() fetches it live" reasoning as every other bgm-*.mp3.
 
 let started = false;
 // Deliberately NOT gating the battle screen's brief loading wait on this

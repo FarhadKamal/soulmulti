@@ -44,6 +44,7 @@ export function isMusicMuted() {
 export function setMusicMuted(muted) {
   musicMuted = muted;
   if (musicAudio) musicAudio.muted = muted;
+  if (deepSeaAudio2) deepSeaAudio2.muted = muted;
   try {
     localStorage.setItem(MUSIC_MUTE_KEY, String(muted));
   } catch {
@@ -97,6 +98,9 @@ let preDeepSeaTrack = null;
 function ensureMusicPlaying() {
   if (musicAudio && musicAudio.paused) {
     musicAudio.play().catch(() => {});
+  }
+  if (deepSeaAudio2 && deepSeaAudio2.paused) {
+    deepSeaAudio2.play().catch(() => {});
   }
 }
 if (typeof document !== 'undefined') {
@@ -185,6 +189,16 @@ export function revertFromChickenMusic() {
   }
 }
 
+// A second, independent audio layer played ON TOP of bgm-deepsea.mp3 for the
+// whole seal duration (confirmed explicit request: "i want to play it
+// combiney at a time both") - deliberately NOT folded into the single-slot
+// musicAudio/musicTrack system above (that system assumes exactly one
+// swappable "current track" at a time, which the mute toggle/
+// ensureMusicPlaying polling both rely on) - its own dedicated node instead,
+// started/stopped in lockstep with the main deep-sea track.
+const DEEPSEA_TRACK_2 = 'bgm-deepsea-2.mp3';
+let deepSeaAudio2 = null;
+
 export function startDeepSeaMusic() {
   if (musicTrack === 'deepsea') return;
   preDeepSeaTrack = musicTrack;
@@ -193,6 +207,16 @@ export function startDeepSeaMusic() {
   // (chicken/frozen), so this runs at full gain (1.0) to compensate,
   // confirmed explicit request ("it should be full volume").
   startMusic('deepsea', DEEPSEA_TRACK, 1.0);
+  try {
+    const node = new Audio(v(`assets/sounds/${DEEPSEA_TRACK_2}`));
+    node.loop = true;
+    node.volume = 1.0;
+    node.muted = musicMuted;
+    node.play().catch(() => {});
+    deepSeaAudio2 = node;
+  } catch {
+    // ignore
+  }
 }
 
 export function revertFromDeepSeaMusic() {
@@ -200,6 +224,10 @@ export function revertFromDeepSeaMusic() {
   const restoreTo = preDeepSeaTrack;
   preDeepSeaTrack = null;
   musicTrack = null;
+  if (deepSeaAudio2) {
+    deepSeaAudio2.pause();
+    deepSeaAudio2 = null;
+  }
   if (restoreTo === 'menu') {
     startMenuMusic();
   } else {
@@ -212,6 +240,10 @@ export function stopMusic() {
     musicAudio.pause();
     musicAudio = null;
     musicTrack = null;
+  }
+  if (deepSeaAudio2) {
+    deepSeaAudio2.pause();
+    deepSeaAudio2 = null;
   }
 }
 
