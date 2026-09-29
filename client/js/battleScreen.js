@@ -2514,6 +2514,18 @@ function actionLabel(actionId) {
 function describeLogEntry(entry) {
   const name = (id) => CHARACTERS[id]?.name || id;
   switch (entry.type) {
+    case 'match-start-roster': {
+      // Confirmed real request (2026-09-29): "you should add in log.
+      // before start match. which one human. which one bot" - the very
+      // first entry in every match's log, one line per player listing
+      // their character(s) and whether that seat is human- or
+      // bot-controlled.
+      const lines = entry.players.map((p) => {
+        const heroNames = p.characterIds.map(name).join(' & ');
+        return `${heroNames} (${p.isPC ? 'Bot' : 'Human'})`;
+      });
+      return `Match starting - ${lines.join(', ')}`;
+    }
     case 'mind-control-select':
       return `${name(entry.characterId)} took control of ${name(entry.targetId)}'s mind!`;
     case 'mind-control-resist':

@@ -649,7 +649,19 @@ export function createGame(mode, playerPicks) {
     fowlPlayActive: false,
     fowlPlayBoingoTurnsElapsed: 0,
     winnerPlayerId: null,
-    log: [],
+    // Confirmed real request (2026-09-29): "you should add in log. before
+    // start match. which one human. which one bot" - a real match log
+    // review turned into a lengthy detour investigating bot AI logic that
+    // turned out to be moot, since the character in question was actually
+    // human-controlled that match. Seeded as the very first log entry so
+    // it's visible in both the live battle log and the full end-of-match
+    // log, one line per player listing their character(s) and whether
+    // that seat is human- or bot-controlled (players[].isPC, set at
+    // createGame's own call sites from each seat's real kind).
+    log: [{
+      type: 'match-start-roster',
+      players: players.map((p) => ({ characterIds: p.characterIds, isPC: p.isPC })),
+    }],
   };
 }
 
