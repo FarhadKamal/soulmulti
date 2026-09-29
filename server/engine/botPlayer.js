@@ -1588,11 +1588,28 @@ function chooseGrimtalMove(character, game, usable) {
 //    risk, so she can afford to let stacks build higher before cashing in.
 const ILLYRA_BURST_THRESHOLD_BY_ALIVE = { 4: 2, 3: 3, 2: 4 };
 
+// Confirmed real bug (live report: "but we can make illyra bot clever" -
+// after a log showing "Illyra used Mirage Burst - nothing was marked!"
+// twice in a row): a mark on a currently-sealed target (Blade's Shark Hunt,
+// taxonomy #41) is skipped by the server's own detonation loop (see
+// illyra.js's own `if (game.characters[tid]?.deepSeaSealed) continue`) - the
+// stack survives, uncleared, but can't actually be cashed in while sealed.
+// Both illyraUrgentBurstTarget and chooseIllyraMove's own threshold check
+// used to sum/scan EVERY mark regardless of reachability, so a bot sitting
+// on stale marks against a sealed target (with nothing else marked) would
+// still see a nonzero/above-threshold total and burst anyway, wasting the
+// whole turn on a detonation that hits nobody. This helper mirrors the
+// server's own skip condition exactly, so the bot only ever counts marks it
+// can genuinely detonate right now.
+function isMirageMarkDetonatable(target) {
+  return !!target && !target.isKO && !target.deepSeaSealed;
+}
+
 function illyraUrgentBurstTarget(character, game) {
   for (const [tid, count] of character.special.mirageMarks) {
     if (count <= 0) continue;
     const target = game.characters[tid];
-    if (target && !target.isKO && activeHearts(target) <= count) return tid;
+    if (isMirageMarkDetonatable(target) && activeHearts(target) <= count) return tid;
   }
   return null;
 }
@@ -1613,7 +1630,9 @@ function chooseIllyraMove(character, game, usable) {
       return { actionId: 'mirageBurst', targetId: null };
     }
     let total = 0;
-    for (const count of character.special.mirageMarks.values()) total += count;
+    for (const [tid, count] of character.special.mirageMarks) {
+      if (isMirageMarkDetonatable(game.characters[tid])) total += count;
+    }
     const aliveCount = Object.values(game.characters).filter((c) => !c.isKO).length;
     const threshold = ILLYRA_BURST_THRESHOLD_BY_ALIVE[aliveCount] ?? 2;
     if (total >= threshold) {
