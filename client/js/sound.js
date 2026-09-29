@@ -382,11 +382,8 @@ const ACTION_SOUND = {
   // this static actionId->sound lookup can't express.
   sharkHunt: 'deepsea_cast',
   sharkStrike: 'deepsea_strike',
-  // Focus (added 2026-09-29) - reuses the shared magic.mp3 sound effect,
-  // same reuse pattern as several other minor/quiet casts in this table
-  // (Shadow Toll, Lifebond, Petrify) - a personal moment of concentration,
-  // no dedicated sound needed.
-  focus: 'magic',
+  // Focus (added 2026-09-29) - dedicated focus.mp3 sound effect.
+  focus: 'focus',
   curseStrike: 'curse',
   divineRestore: 'divinerestore',
   selfChoke: 'self_choke',

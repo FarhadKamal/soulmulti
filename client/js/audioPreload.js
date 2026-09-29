@@ -47,6 +47,7 @@ const SOUND_EFFECT_FILES = [
   // Shark Hunt (Mutual Seal #41, replaces Blood Frenzy).
   'deepsea_cast.mp3', 'deepsea_strike.mp3', 'deepsea_dodge.mp3',
   'deepsea_escape_success.mp3', 'deepsea_escape_fail.mp3',
+  'focus.mp3',
 ];
 // Deliberately still excluded from SOUND_EFFECT_FILES preload (see the
 // bandwidth-cap comment above) - bgm-deepsea.mp3 and its new layered
