@@ -744,6 +744,15 @@ function chooseBladeMove(character, game, usable) {
   if (byId.sharkStrike) {
     return { actionId: 'sharkStrike', targetId: character.deepSeaSealPartnerId };
   }
+  // Focus (added 2026-09-29): only ever offered alongside sharkStrike while
+  // sealed and NOT already armed (see getLegalActions) - reached here only
+  // when sharkStrike itself wasn't offered this turn, i.e. focusedStrikeArmed
+  // is already false and this IS his only real option. Bot always takes it
+  // the instant it's available: the guaranteed hit next turn is strictly
+  // better value than skipping it, no reason to hold off.
+  if (byId.focus) {
+    return { actionId: 'focus', targetId: null };
+  }
   // Shark Hunt: hearts<=3 one-time cast - take it against the biggest
   // threat once available, same target-priority shape as chooseRowanMove's
   // own frogCurse branch. No reason to delay a desperation move once

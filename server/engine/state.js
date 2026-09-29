@@ -136,6 +136,15 @@ function baseSpecialFor(id) {
       // one-directional).
       return {
         hitCountByTarget: {}, rebirthUsed: false, usedSharkHunt: false,
+        // Focus (added 2026-09-29): repeatable alternative to Shark Strike
+        // while sealed - costs his whole turn, guarantees his NEXT Shark
+        // Strike bypasses the 50% underwater dodge entirely. Confirmed
+        // exact sequencing: once armed, Focus itself is hidden until the
+        // guarantee is actually cashed in with a landed Shark Strike, then
+        // becomes available again the turn after. Quietly cleared (never
+        // carries outside the seal) whenever the seal itself ends, same
+        // "fresh copy" reasoning as every other Shark-Hunt-scoped field.
+        focusedStrikeArmed: false,
       };
     case 'athena':
       // divineJudgmentTargetId: her hearts<=3 one-time special's marked

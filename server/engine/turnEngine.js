@@ -176,7 +176,20 @@ export function getLegalActions(character, game, isPuppeted = false) {
   // override" convention as Grimtal's beastAttack just above).
   if (character.id === 'blade' && isDeepSeaSealed(character)) {
     const mod = ABILITY_MODULES.blade;
-    return [{ actionId: 'sharkStrike', ...mod.actions.sharkStrike }];
+    // Focus (added 2026-09-29): a repeatable alternative to Shark Strike -
+    // costs his whole turn, guarantees his NEXT Shark Strike bypasses the
+    // 50% underwater dodge entirely. Confirmed exact sequencing: while the
+    // guarantee is armed (focusedStrikeArmed), Focus itself is hidden until
+    // he actually cashes it in with a Shark Strike - "if focus button
+    // clicked prev turn it will not show next turn. and after that turn
+    // when attack finish, next turn focus will again available."
+    if (character.special.focusedStrikeArmed) {
+      return [{ actionId: 'sharkStrike', ...mod.actions.sharkStrike }];
+    }
+    return [
+      { actionId: 'sharkStrike', ...mod.actions.sharkStrike },
+      { actionId: 'focus', ...mod.actions.focus },
+    ];
   }
   // The SEALED VICTIM's own turn (any of the 15 non-Blade heroes) - kit
   // fully hidden except one synthetic action, escapeSeal (climbing-odds
@@ -1237,6 +1250,11 @@ function executeEscapeSeal(character, game, log) {
     partner.deepSeaSealed = false;
     partner.deepSeaSealPartnerId = null;
     partner.deepSeaEscapeAttempts = 0;
+    // Focus's own guarantee never carries outside the seal - same "quietly
+    // expires" treatment as blade.js's own 2 clear sites (Rebirth,
+    // registerOnAnyDeath). character is always the victim here (never
+    // Blade), so only partner can ever be him.
+    if (partner.id === 'blade') partner.special.focusedStrikeArmed = false;
   }
   log.push({ type: 'deep-sea-escape-attempt', characterId: character.id, succeeded: true, chance, hearts: heartsSnapshot(game) });
   log.push({ type: 'deep-sea-seal-end', characterIds: [character.id, partnerId].filter(Boolean), reason: 'escape', hearts: heartsSnapshot(game) });

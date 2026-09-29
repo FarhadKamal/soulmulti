@@ -298,6 +298,7 @@ const DEEP_SEA_BLADE_IMAGES = [
   'assets/images/blade/deepsea_revert.jpg',
   'assets/images/blade/deepsea_strike.jpg',
   'assets/images/blade/deepsea_heal.jpg',
+  'assets/images/blade/deepsea_focus.jpg',
 ];
 const DEEP_SEA_VICTIM_IMAGES = CHARACTER_IDS.filter((id) => id !== 'blade').flatMap(
   (id) => [

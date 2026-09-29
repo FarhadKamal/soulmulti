@@ -259,6 +259,7 @@ const DEEP_SEA_BLADE_FLASH_PATHS = new Set([
   'assets/images/blade/deepsea_strike.jpg',
   'assets/images/blade/deepsea_heal.jpg',
   'assets/images/blade/deepsea_revert.jpg',
+  'assets/images/blade/deepsea_focus.jpg',
 ]);
 const DEEP_SEA_VICTIM_FLASH_PATHS = new Set(
   CHARACTER_IDS.filter((id) => id !== 'blade').flatMap((id) => [
@@ -1384,6 +1385,12 @@ export function handleLogEntryForFlash(entry, game) {
       if (targetCharacterId) {
         setFlash(targetCharacterId, `assets/images/${targetCharacterId}/deepsea_pulled.jpg`);
       }
+      break;
+    case 'focus':
+      // Focus (added 2026-09-29) - Blade's own cast flash only, no victim
+      // reaction (nothing has actually happened to them yet, just a
+      // guarantee armed for his NEXT strike).
+      setFlash(characterId, 'assets/images/blade/deepsea_focus.jpg');
       break;
     case 'sharkStrike':
       // Blade's own attack flash, plus the victim's own deepsea_hit.jpg

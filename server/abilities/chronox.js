@@ -513,6 +513,12 @@ export const actions = {
       const chronoxDeepSeaSealed = character.deepSeaSealed;
       const chronoxDeepSeaSealPartnerId = character.deepSeaSealPartnerId;
       const chronoxDeepSeaEscapeAttempts = character.deepSeaEscapeAttempts;
+      // Focus (added 2026-09-29) lives only on Blade's own .special object -
+      // same "only relevant when the caster IS that specific character,
+      // harmless no-op (undefined) otherwise" shape as Akyros's
+      // convertedHeartCount/usedShadowSeal above. Chronox himself can never
+      // be Blade in this file, so only the caster side needs it.
+      const casterFocusedStrikeArmed = caster.special.focusedStrikeArmed;
       // Akyros's Shadow Seal - same "survive the restore" treatment as
       // isChicken just above, for BOTH the caster and Chronox himself
       // (either one could be carrying locked hearts at snapshot time). See
@@ -619,6 +625,7 @@ export const actions = {
       character.deepSeaSealed = chronoxDeepSeaSealed;
       character.deepSeaSealPartnerId = chronoxDeepSeaSealPartnerId;
       character.deepSeaEscapeAttempts = chronoxDeepSeaEscapeAttempts;
+      if (casterFocusedStrikeArmed !== undefined) caster.special.focusedStrikeArmed = casterFocusedStrikeArmed;
       caster.lockedHearts = casterLockedHearts;
       character.lockedHearts = chronoxLockedHearts;
       // Only reapply if this snapshot could actually carry the field at

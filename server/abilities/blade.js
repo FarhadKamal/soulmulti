@@ -92,6 +92,10 @@ registerRebirth('blade', (character, game, log) => {
   character.deepSeaSealed = false;
   character.deepSeaSealPartnerId = null;
   character.deepSeaEscapeAttempts = 0;
+  // Focus's own guarantee is scoped entirely to the seal - never carries
+  // outside it (confirmed ruling), same "quietly expires" treatment as
+  // every other Shark-Hunt-only field cleared here.
+  character.special.focusedStrikeArmed = false;
   // hitCountByTarget deliberately NOT cleared here - confirmed ruling,
   // 2026-09-14: "counter will not reset on rebirth". Every per-target
   // count he's built up survives his own death/revival, same as it
@@ -125,10 +129,12 @@ registerOnAnyDeath((diedCharacterId, sourceCharacterId, isMirror, game, log) => 
   died.deepSeaSealed = false;
   died.deepSeaSealPartnerId = null;
   died.deepSeaEscapeAttempts = 0;
+  if (died.id === 'blade') died.special.focusedStrikeArmed = false;
   if (partner) {
     partner.deepSeaSealed = false;
     partner.deepSeaSealPartnerId = null;
     partner.deepSeaEscapeAttempts = 0;
+    if (partner.id === 'blade') partner.special.focusedStrikeArmed = false;
   }
   return {
     deepSeaSealEndLogEntry: {
@@ -194,6 +200,7 @@ export const actions = {
       // Curse's own cast was revised to (2026-09-25).
       character.deepSeaSealed = true;
       character.deepSeaSealPartnerId = targetId;
+      character.special.focusedStrikeArmed = false;
       target.deepSeaSealed = true;
       target.deepSeaSealPartnerId = character.id;
       target.deepSeaEscapeAttempts = 0;
@@ -220,6 +227,15 @@ export const actions = {
       // rather than trusting the passed value blindly, same defensive
       // shape snakeStrike takes with isFrog.
       const victim = game.characters[character.deepSeaSealPartnerId];
+      // Focus (added 2026-09-29): if armed, this strike is guaranteed to
+      // land - the flat 50% roll below is skipped entirely rather than
+      // just always winning it, same "the roll never happens" shape
+      // ignoresDodge already uses elsewhere. Consumed here, the instant
+      // the guaranteed strike is actually taken (getLegalActions only ever
+      // offers sharkStrike while armed, so this is always the next thing
+      // he does).
+      const wasFocused = character.special.focusedStrikeArmed;
+      if (wasFocused) character.special.focusedStrikeArmed = false;
       // "Underwater dodge" - flat 50%, checked HERE (attacker-specific),
       // not in damagePipeline.js's generic dodge block, since this dodge
       // only ever applies to ONE attacker (Blade) against ONE victim,
@@ -227,7 +243,7 @@ export const actions = {
       // own normal dodge sources (Illyra's Illusion, Marin's Threefold
       // Veil, Akyros's passive, etc.) are suspended while sealed by
       // design - this flat 50% fully replaces them, not stacks with them.
-      if (Math.random() < 0.5) {
+      if (!wasFocused && Math.random() < 0.5) {
         // isDeepSeaDodge: true - confirmed real bug (live report: "grimtal
         // dodge.jpg was playing deep inside sea!"): the client's own
         // handleDodgeForFlash (portraitFlash.js) used to re-derive "was this
@@ -252,6 +268,11 @@ export const actions = {
         ignoresShield: true, // Pure Attack, confirmed ruling
         ignoresDodge: true, // the 50% roll above IS the dodge - applyDamage's own dodge stack must not ALSO run
       });
+      // Focus's own guarantee is consumed the instant the strike LANDS
+      // (the flat 50% roll above never even runs while armed - see the
+      // isLegal-adjacent check further up this block), not merely
+      // attempted - matches "after that turn when attack finish, next
+      // turn focus will again available."
       log.push({ type: 'attack', characterId: character.id, actionId: 'sharkStrike', targetId: victim.id, streak: amount, ...result });
       if (bloodDrainHealAmount(amount, result) > 0) {
         const bloodDrainHealed = applyHeal(game, character.id, 1);
@@ -264,6 +285,25 @@ export const actions = {
         }
       }
       return result;
+    },
+  },
+  // Focus (added 2026-09-29): repeatable alternative to Shark Strike while
+  // sealed - costs his whole turn (no damage dealt), guarantees his NEXT
+  // Shark Strike bypasses the 50% underwater dodge entirely. Hidden (same
+  // "real actions-map entry, only surfaced through an explicit
+  // getLegalActions override" convention as sharkStrike itself) - offered
+  // alongside sharkStrike only while the guarantee ISN'T already armed;
+  // once armed, turnEngine.js's own override narrows his kit to sharkStrike
+  // only until he cashes it in.
+  focus: {
+    label: 'Focus',
+    needsTarget: false,
+    hidden: true,
+    isLegal: (character) => character.deepSeaSealed && !character.special.focusedStrikeArmed,
+    execute(character, targetId, game, log) {
+      character.special.focusedStrikeArmed = true;
+      log.push({ type: 'special', characterId: character.id, actionId: 'focus', hearts: heartsSnapshot(game) });
+      return {};
     },
   },
 };
