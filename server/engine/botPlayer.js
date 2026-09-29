@@ -741,17 +741,20 @@ function chooseBladeMove(character, game, usable) {
   // take it against his own sealed partner, same "no downside to cashing
   // in immediately" reasoning as Rowan's own snakeStrike-always-first
   // pattern.
-  if (byId.sharkStrike) {
-    return { actionId: 'sharkStrike', targetId: character.deepSeaSealPartnerId };
-  }
-  // Focus (added 2026-09-29): only ever offered alongside sharkStrike while
-  // sealed and NOT already armed (see getLegalActions) - reached here only
-  // when sharkStrike itself wasn't offered this turn, i.e. focusedStrikeArmed
-  // is already false and this IS his only real option. Bot always takes it
-  // the instant it's available: the guaranteed hit next turn is strictly
-  // better value than skipping it, no reason to hold off.
+  // Focus (added 2026-09-29): confirmed real bug found via direct review
+  // (2026-09-29) - checked AFTER sharkStrike originally, but both are
+  // offered together whenever focusedStrikeArmed is false (see
+  // getLegalActions), so sharkStrike's own unconditional check below
+  // would win every single time and Focus could never actually be chosen
+  // by the bot at all, contradicting the confirmed ruling ("always Focus
+  // when available"). Checked FIRST now: whenever it's offered at all, it
+  // means the guarantee ISN'T already armed, so taking it is always the
+  // right call (guaranteed future value, no downside).
   if (byId.focus) {
     return { actionId: 'focus', targetId: null };
+  }
+  if (byId.sharkStrike) {
+    return { actionId: 'sharkStrike', targetId: character.deepSeaSealPartnerId };
   }
   // Shark Hunt: hearts<=3 one-time cast - take it against the biggest
   // threat once available, same target-priority shape as chooseRowanMove's
