@@ -306,6 +306,10 @@ const DEEP_SEA_VICTIM_IMAGES = CHARACTER_IDS.filter((id) => id !== 'blade').flat
     `assets/images/${id}/deepsea_released.jpg`,
     `assets/images/${id}/deepsea_hit.jpg`,
     `assets/images/${id}/deepsea_dodge.jpg`,
+    // Escape Seal's own failed-attempt reaction (added 2026-09-29) -
+    // distinct from deepsea_released.jpg (success) and the calm
+    // deepsea_trapped.jpg persistent portrait.
+    `assets/images/${id}/deepsea_escape_fail.jpg`,
   ]
 );
 

@@ -266,6 +266,7 @@ const DEEP_SEA_VICTIM_FLASH_PATHS = new Set(
     `assets/images/${id}/deepsea_hit.jpg`,
     `assets/images/${id}/deepsea_dodge.jpg`,
     `assets/images/${id}/deepsea_released.jpg`,
+    `assets/images/${id}/deepsea_escape_fail.jpg`,
   ])
 );
 let isCurrentlyDeepSeaSealed = () => false;
@@ -1002,6 +1003,18 @@ export function handleLogEntryForFlash(entry, game) {
     // won't fight this flash - the persistent portrait naturally takes
     // over again once this flash's own timer expires.
     if (!isKO(entry.characterId)) setFlash(entry.characterId, 'assets/images/grimtal/beast_end.jpg');
+    return;
+  }
+  if (entry.type === 'deep-sea-escape-attempt') {
+    // Escape Seal's own struggling-but-still-caught reaction (added
+    // 2026-09-29) - a FAILED roll only; a successful roll already gets its
+    // own moment via the 'deep-sea-seal-end' handler below
+    // (deepsea_released.jpg), so this is deliberately the "tried, didn't
+    // make it" beat, distinct from both that success art and the calm
+    // deepsea_trapped.jpg persistent portrait shown the rest of the time.
+    if (!entry.succeeded && !isKO(entry.characterId)) {
+      setFlash(entry.characterId, `assets/images/${entry.characterId}/deepsea_escape_fail.jpg`);
+    }
     return;
   }
   if (entry.type === 'deep-sea-seal-end') {
