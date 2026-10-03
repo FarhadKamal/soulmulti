@@ -24,9 +24,12 @@ const HERO_ABILITIES = {
   ],
   blade: [
     ['Blood Hunt', 'Basic attack against a chosen target: damage climbs on a repeating 1→2→3 cycle per target, tracked independently for each enemy he’s hit.'],
-    ['Blood Frenzy', 'One-time special at hearts ≤ 3: immediately unleashes a burst of random consecutive strikes (2–5, based on how many are alive) against living enemies, with each target’s own independent hit-streak climbing hit-by-hit during the burst, same as a normal Blood Hunt streak.'],
-    ['Blood Drain (passive)', 'Always active from turn one, no threshold needed: whenever a Blood Hunt or Blood Frenzy strike lands as the 3rd hit of a target’s own 1-2-3 cycle and actually connects, Blade heals 1 heart.'],
-    ['Example', 'You Blood Hunt the same enemy 3 turns in a row: 1 damage, then 2, then 3 — and that 3rd hit also heals you 1 heart. Switch to a different target and their own cycle starts fresh at 1, but the first enemy’s progress is still banked for whenever you come back to them.'],
+    ['Blood Drain (passive)', 'Always active from turn one, no threshold needed: whenever a Blood Hunt or Shark Strike lands as the 3rd hit of a target’s own 1-2-3 cycle and actually connects, Blade heals 1 heart.'],
+    ['Rebirth (passive)', 'Once per match, automatically: the first time Blade would be KO’d, he revives instead with 2 hearts.'],
+    ['Shark Hunt', 'One-time special at hearts ≤ 3: Blade becomes a shark and drags one enemy into the deep sea. While sealed, no one else can target either of them. Blade can only use Shark Strike or Focus; the victim’s only action is Escape (5% chance, +5% after every failed try). Ends when the victim escapes or either of them is KO’d.'],
+    ['Shark Strike', 'Only while sealed: hits the trapped enemy, continuing their own Blood Hunt 1→2→3 cycle and ignoring shield — but the victim has a 50% chance to dodge underwater.'],
+    ['Focus', 'Only while sealed: spends Blade’s turn so his next Shark Strike can’t be dodged.'],
+    ['Example', 'You Blood Hunt the same enemy 3 turns in a row: 1 damage, then 2, then 3 — and that 3rd hit also heals you 1 heart. Later, at 3 hearts, you cast Shark Hunt on your biggest threat: now no one else can reach either of you. Use Focus, then Shark Strike for a hit they can’t dodge, while they keep trying to Escape.'],
   ],
   boingo: [
     ['Chaos Gamble', 'Basic attack: random outcome — win (3 damage), draw (1 damage), or miss (0).'],
