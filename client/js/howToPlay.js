@@ -142,6 +142,12 @@ const HERO_ABILITIES = {
 // style rather than showing all 16 at once, so the panel stays scannable.
 let howToPlayOpen = false;
 let howToPlayOpenHeroId = null;
+// Set on a header tap, consumed by the next render - keeps the tapped
+// hero's card on screen. lobbyScreen.js preserves the scroll position
+// across the rebuild, but collapsing a card ABOVE the tapped one (only one
+// is open at a time) still shifts everything below it upward, which could
+// push the tapped card out of view.
+let scrollToHeroId = null;
 
 export function isHowToPlayOpen() {
   return howToPlayOpen;
@@ -187,8 +193,17 @@ export function renderHowToPlayPanel(rerender) {
     header.style.setProperty('--hero-color', hero.color);
     header.onclick = () => {
       howToPlayOpenHeroId = isExpanded ? null : id;
+      scrollToHeroId = id;
       rerender();
     };
+    if (scrollToHeroId === id) {
+      scrollToHeroId = null;
+      // Next frame - the header isn't attached to the document yet while
+      // this panel is still being built. Header rather than the whole card:
+      // an expanded card can be taller than the screen, and 'nearest' won't
+      // move a partly-visible oversized element at all.
+      requestAnimationFrame(() => header.scrollIntoView({ block: 'nearest' }));
+    }
 
     const portrait = document.createElement('img');
     portrait.className = 'how-to-play-hero-portrait';

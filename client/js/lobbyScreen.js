@@ -27,10 +27,24 @@ let confirmingKickSeatIndex = null;
 // confirmingKickSeatIndex above.
 let choosingBotSeatIndex = null;
 
+// Which view the last render's .lobby-scroll belonged to ('entry' or a
+// room code) - the whole screen is rebuilt from scratch on every render
+// (root.innerHTML = ''), so the new scroll region always starts at 0.
+// Confirmed live report: tapping a hero in How to Play jumped the page back
+// to the top every time. Scroll position is carried over only when the
+// rebuilt view is the SAME one (expanding a hero card, a lobby-update for
+// the same room) - switching views (entry -> room) still starts at the top.
+let lastScrollViewKey = null;
+
 // Renders the pre-match lobby: room type choice -> create/join -> seat
 // list + character picking -> start. `room` is null until a create-room or
 // join-room response/lobby-update has arrived at least once.
 export function renderLobby(root, { room, error, connectionLost }, { onEnterMatch, rerender }) {
+  const viewKey = room ? room.code : 'entry';
+  const previousScrollTop = viewKey === lastScrollViewKey
+    ? (root.querySelector('.lobby-scroll')?.scrollTop ?? 0)
+    : 0;
+  lastScrollViewKey = viewKey;
   root.innerHTML = '';
   const wrap = document.createElement('div');
   wrap.className = 'lobby';
@@ -120,6 +134,7 @@ export function renderLobby(root, { room, error, connectionLost }, { onEnterMatc
 
   wrap.appendChild(scroll);
   root.appendChild(wrap);
+  scroll.scrollTop = previousScrollTop;
 }
 
 // Icon button matching fullscreen/exit's exact corner style - toggles
