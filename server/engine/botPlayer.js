@@ -695,7 +695,17 @@ function chooseVeloryaMove(character, game, usable) {
     return { actionId: 'lunarEclipse', targetId: null };
   }
   if (byId.moonstep) {
-    const targets = validTargetsFor(game, character, 'moonstep');
+    // Mirror Reflect avoidance - this branch picks its own target directly
+    // instead of going through pickDefaultTarget, so it never applied the
+    // shared avoidance every other hero's targeting uses (confirmed gap,
+    // 2026-10-03). Moonstep ignores shield, so Rowan stays a fair target
+    // only when this hit would KO him outright (no reflect fires on a KO):
+    // 2 damage if switching to him from someone else, 1 otherwise.
+    const allMoonTargets = validTargetsFor(game, character, 'moonstep');
+    const rowanMoonDamage = character.special.lastTargetId !== null && character.special.lastTargetId !== 'rowan' ? 2 : 1;
+    const moonstepKillsRowan = allMoonTargets.includes('rowan')
+      && activeHearts(game.characters.rowan) <= rowanMoonDamage;
+    const targets = moonstepKillsRowan ? allMoonTargets : avoidMirrorReflectRowan(game, allMoonTargets);
     // Hitting a live Athena while she's cursing someone else lands damage
     // on both of them for one action - worth more than the plain
     // different-target bonus alone, so check it first.

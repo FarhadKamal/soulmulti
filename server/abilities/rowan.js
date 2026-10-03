@@ -39,6 +39,12 @@ registerOnHitLandedEarly('rowan', (character, game, log, ctx) => {
     targetCharacterId: ctx.sourceCharacterId,
     amount: 3,
     isMirror: true,
+    // Confirmed ruling, 2026-10-03 (live report: Velorya attacked Rowan
+    // mid-Lunar-Eclipse and took no reflect, but the mirror was still used
+    // up): the reflect is a reaction to the attacker's OWN hit, not a fresh
+    // targeting choice, so untargetable doesn't stop it - same reasoning as
+    // Athena's curse-mirror and active poison ticks. Shield still applies.
+    ignoresUntargetable: true,
   });
   return {
     mirrorReflectResult,
@@ -46,7 +52,11 @@ registerOnHitLandedEarly('rowan', (character, game, log, ctx) => {
       type: 'mirror-reflect',
       fromCharacterId: character.id,
       toCharacterId: ctx.sourceCharacterId,
-      amount: 3,
+      // Real damage that got through, not the flat 3 - the log used to
+      // always say "3 damage" even when the attacker's shield absorbed
+      // some or all of it.
+      amount: mirrorReflectResult.amountDealt,
+      absorbed: mirrorReflectResult.absorbed,
       koTriggered: mirrorReflectResult.koTriggered,
       revived: mirrorReflectResult.revived,
     },

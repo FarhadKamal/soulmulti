@@ -2875,7 +2875,7 @@ function describeLogEntry(entry) {
     case 'silence-end':
       return `${name(entry.targetCharacterId)}'s Silence Lock wears off`;
     case 'mirror-reflect':
-      return `${name(entry.fromCharacterId)}'s Mirror Reflect deals ${entry.amount} damage back to ${name(entry.toCharacterId)}${entry.koTriggered ? ' - KO!' : ''}`;
+      return `${name(entry.fromCharacterId)}'s Mirror Reflect deals ${entry.amount} damage back to ${name(entry.toCharacterId)}${entry.absorbed ? ` (${entry.absorbed} absorbed by shield)` : ''}${entry.koTriggered ? ' - KO!' : ''}`;
     case 'everbloom-tick':
       return `${name(entry.characterId)}'s Everbloom heals +${entry.healed}`;
     case 'clean-slate-trigger':
