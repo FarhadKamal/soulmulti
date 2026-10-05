@@ -489,14 +489,15 @@ export function handleLogEntryForEffects(entry, game) {
   // will play" + "we will remove the current frozen status animation
   // effect."
 
-  // Thunder Wrath (and Soul Swap Wrath, which delegates straight into this
-  // same execute() and logs the identical actionId - one trigger covers
-  // both automatically): a jagged lightning-bolt strike flashing down onto
+  // Thunder Wrath (and Soul Swap's free follow-up, soulSwapWrath - checked
+  // explicitly since it logs its OWN actionId; confirmed real bug,
+  // 2026-10-05: the free Wrath showed only the generic hit flash, no bolt,
+  // after zerathys.js started tagging it separately): a jagged lightning-bolt strike flashing down onto
   // the target, distinct from every other effect (nothing else does a
   // literal bolt). Scales with amountDealt (his charge-tier damage, 1/2/3):
   // tier 1 = single thin bolt; tier 3 = branching bolts plus shake, echoing
   // how his charge-up payoff should feel like the biggest hit in the kit.
-  if (actionId === 'thunderWrath' && targetId && !dodged && amountDealt > 0) {
+  if ((actionId === 'thunderWrath' || actionId === 'soulSwapWrath') && targetId && !dodged && amountDealt > 0) {
     addEffect(targetId, 'lightning', EFFECT_DURATION_MS.lightning, amountDealt);
     if (amountDealt === 3) addEffect(targetId, 'shake', EFFECT_DURATION_MS.shake);
   }

@@ -2090,9 +2090,15 @@ function formatDebugAnnotation(entry) {
   if (nested && Array.isArray(nested) && nested.length > 0) {
     const nestedText = nested.map((h) => {
       const bits = [];
-      if (h.targetId !== undefined) bits.push(h.targetId);
+      // `changes` arrays (Lifebond, Shadow Seal, Moonlit Theft, Soul Storm)
+      // key by characterId, not targetId - without this fallback their
+      // debug line rendered as an empty "hits:[, , ]".
+      const who = h.targetId ?? h.characterId;
+      if (who !== undefined) bits.push(who);
       if (h.dodged) bits.push('dodged');
       if (h.amountDealt !== undefined) bits.push(`${h.amountDealt}dmg`);
+      if (h.before !== undefined && h.after !== undefined) bits.push(`${h.before}→${h.after}`);
+      if (h.lockedHearts !== undefined) bits.push(`${h.lockedHearts}locked`);
       if (h.koTriggered) bits.push('KO');
       return bits.join(' ');
     }).join(', ');
