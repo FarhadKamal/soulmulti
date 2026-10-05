@@ -217,6 +217,11 @@ export function getLegalActions(character, game, isPuppeted = false) {
   if (character.id === 'grimtal' && character.special.beastFormActive) {
     return [{ actionId: 'beastAttack', ...mod.actions.beastAttack }];
   }
+  // Kaelis's Wings of Ashka (added 2026-10-05) - same override shape as
+  // Beast Form just above: while airborne, Phoenix Dive is her ONLY action.
+  if (character.id === 'kaelis' && character.special.airborne) {
+    return [{ actionId: 'phoenixDive', ...mod.actions.phoenixDive }];
+  }
   const silenced = isSilenced(character, game);
   return Object.entries(mod.actions)
     .filter(([actionId, def]) => !def.hidden && def.isLegal(character, game) && !(silenced && def.special)
@@ -260,7 +265,13 @@ export function isValidTarget(game, characterId, actionId, targetId) {
     return isChickenified(target);
   }
   if (target.ownerId === character.ownerId) return false;
-  if (target.untargetable) return false;
+  // Kaelis's Phoenix Dive ignores untargetable (confirmed ruling,
+  // 2026-10-05: a dive from the sky can't be hidden from) - but never a
+  // transformed Beast Form Grimtal, who's fully immune anyway (a dive into
+  // him would always deal 0).
+  if (actionId === 'phoenixDive') {
+    if (target.id === 'grimtal' && target.special?.beastFormActive) return false;
+  } else if (target.untargetable) return false;
   // Blade's Shark Hunt (taxonomy #41, Mutual Seal) - nobody outside the
   // sealed pair can target EITHER sealed character with ANYTHING, not just
   // Blade's own sharkStrike/sharkHunt targeting (those two have their own

@@ -50,6 +50,8 @@ const SOUND_EFFECT_FILES = [
   'focus.mp3',
   // Zerathys's Soul Storm.
   'soul_storm.mp3',
+  // Kaelis's Wings of Ashka / Phoenix Dive.
+  'wings_of_ashka.mp3', 'phoenix_dive.mp3',
 ];
 // Deliberately still excluded from SOUND_EFFECT_FILES preload (see the
 // bandwidth-cap comment above) - bgm-deepsea.mp3 and its new layered

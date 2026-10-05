@@ -5,6 +5,7 @@ import {
 import { isFrozenByChronox } from './damagePipeline.js';
 import { BEAST_ATTACK_HIGH_DAMAGE, BEAST_ATTACK_LOW_DAMAGE } from '../abilities/grimtal.js';
 import { soulStormParticipants } from '../abilities/zerathys.js';
+import { phoenixDiveDamage } from '../abilities/kaelis.js';
 import { isCurrentFriend } from '../abilities/melyssa.js';
 
 // Pure decision logic for PC-controlled characters - no DOM, no side
@@ -1100,6 +1101,26 @@ const KAELIS_ASHKA_THRESHOLD = 4;
 
 function chooseKaelisMove(character, game, usable) {
   const byId = Object.fromEntries(usable.map((a) => [a.actionId, a]));
+  // Phoenix Dive - her ONLY action while airborne (Wings of Ashka). Secure
+  // a kill if the dive's damage (total living grudge, min 2; shield still
+  // absorbs) can finish someone, else hit the biggest threat.
+  if (byId.phoenixDive) {
+    const diveDamage = phoenixDiveDamage(character, game);
+    const targets = avoidMirrorReflectRowan(game, validTargetsFor(game, character, 'phoenixDive'), diveDamage);
+    const killTarget = targets.find((tid) => {
+      const t = game.characters[tid];
+      return activeHearts(t) <= Math.max(0, diveDamage - t.shield);
+    });
+    const targetId = killTarget || biggestThreatTarget(game, character, targets)
+      || lowestHeartsTarget(game, targets) || pickRandom(targets);
+    return { actionId: 'phoenixDive', targetId };
+  }
+  // Wings of Ashka (hearts<=3 one-time special) - same "cast eagerly once
+  // legal" policy as every other desperation special: she's safe in the
+  // air for a round and lands with a guaranteed dodge-proof hit.
+  if (byId.wingsOfAshka) {
+    return { actionId: 'wingsOfAshka', targetId: null };
+  }
   // Cast Call Ashka when critical - securing the heal-over-turns before
   // it's too late outranks a normal Grudge Strike that turn.
   if (byId.callAshka && character.hearts <= KAELIS_ASHKA_THRESHOLD) {

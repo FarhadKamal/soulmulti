@@ -1,6 +1,7 @@
 import { applyDamage, applyHeal, heartsSnapshot } from '../engine/damagePipeline.js';
 import { registerOnOtherRevived } from '../engine/categories/onOtherRevived.js';
 import { registerOnHitLanded } from '../engine/categories/onHitLanded.js';
+import { registerOnOwnDeath } from '../engine/categories/onOwnDeath.js';
 import { isCurrentFriend } from './melyssa.js';
 
 // Grudge accumulation (see engine/categories/onHitLanded.js): whenever a
@@ -34,6 +35,27 @@ registerOnOtherRevived((revivedCharacterId, game) => {
 
 const ASHKAS_VENGEANCE_HEARTS_THRESHOLD = 3;
 const ASHKAS_VENGEANCE_DAMAGE = 1;
+const WINGS_OF_ASHKA_HEARTS_THRESHOLD = 3;
+const PHOENIX_DIVE_MIN_DAMAGE = 2;
+
+// Phoenix Dive's damage (confirmed ruling, 2026-10-05): every grudge count
+// she currently holds against a LIVING character, added up, never less
+// than 2. Exported for the bot's own kill check.
+export function phoenixDiveDamage(character, game) {
+  let total = 0;
+  for (const [attackerId, count] of character.special.grudgeCounts) {
+    if (game.characters[attackerId] && !game.characters[attackerId].isKO) total += count;
+  }
+  return Math.max(PHOENIX_DIVE_MIN_DAMAGE, total);
+}
+
+// If she's KO'd mid-flight (only reachable via something that ignores
+// untargetable - Earthshatter, Prophecy of Doom, a curse mirror...), she
+// simply falls - clear the airborne state so nothing stale lingers.
+registerOnOwnDeath('kaelis', (character) => {
+  character.special.airborne = false;
+  character.untargetable = false;
+});
 
 // Bird heal ticks fire on Kaelis's own onTurnStart, unconditionally - this
 // runs BEFORE any freeze/skip check (turnEngine.js's beginCharacterTurn
@@ -66,7 +88,11 @@ export function onTurnStart(character, game, log) {
     character.special.ashkasVengeanceActive = true;
     log.push({ type: 'ashkas-vengeance-activate', characterId: character.id, hearts: heartsSnapshot(game) });
   }
-  if (character.special.ashkasVengeanceActive) {
+  // Confirmed ruling, 2026-10-05: "during merge form ashka should not attack
+  // enemy" - while Kaelis is airborne (Wings of Ashka), Ashka is carrying
+  // her, so the passive's bonus strike is skipped for those turns. The
+  // passive itself stays active and resumes once she lands.
+  if (character.special.ashkasVengeanceActive && !character.special.airborne) {
     // Melyssa's Friendship (Redirect Bond #39) - confirmed real bug,
     // 2026-09-22 (live report: "if melyssa becom friend with kaelis. ashka
     // will not attack melyssa also, during friendship"). Ashka's random
@@ -189,6 +215,52 @@ export const actions = {
         amount,
       });
       log.push({ type: 'attack', characterId: character.id, actionId: 'grudgeStrike', targetId, wasGrudged: grudgeCount > 0, grudgeCount, ...result });
+      return result;
+    },
+  },
+  // Wings of Ashka (design-locked 2026-10-05): hearts<=3 one-time special.
+  // Kaelis merges with Ashka and rises into the sky - this cast is her whole
+  // turn. While airborne she's untargetable, and on her next REAL turn
+  // (a frozen/skipped turn doesn't land her) her only action is Phoenix
+  // Dive (see turnEngine.js's getLegalActions override).
+  wingsOfAshka: {
+    label: 'Wings of Ashka',
+    needsTarget: false,
+    special: true,
+    isLegal: (character) => character.hearts <= WINGS_OF_ASHKA_HEARTS_THRESHOLD
+      && !character.special.usedWingsOfAshka && !character.special.airborne,
+    execute(character, targetId, game, log) {
+      character.special.usedWingsOfAshka = true;
+      character.special.airborne = true;
+      character.untargetable = true;
+      log.push({ type: 'special', characterId: character.id, actionId: 'wingsOfAshka' });
+      return {};
+    },
+  },
+  // Phoenix Dive: the crash that ends Wings of Ashka - her ONLY legal action
+  // while airborne (hidden: true, surfaced only through turnEngine.js's
+  // override, same convention as Grimtal's beastAttack). Confirmed rulings:
+  // damage = phoenixDiveDamage (total living grudge, min 2); ignores dodge
+  // and untargetable but shield still absorbs; every grudge resets to 0
+  // afterward; she lands (no longer untargetable).
+  phoenixDive: {
+    label: 'Phoenix Dive',
+    needsTarget: true,
+    hidden: true,
+    isLegal: (character) => !!character.special.airborne,
+    execute(character, targetId, game, log) {
+      const amount = phoenixDiveDamage(character, game);
+      const result = applyDamage(game, log, {
+        sourceCharacterId: character.id,
+        targetCharacterId: targetId,
+        amount,
+        ignoresDodge: true,
+        ignoresUntargetable: true,
+      });
+      character.special.grudgeCounts.clear();
+      character.special.airborne = false;
+      character.untargetable = false;
+      log.push({ type: 'attack', characterId: character.id, actionId: 'phoenixDive', targetId, amount, ...result });
       return result;
     },
   },

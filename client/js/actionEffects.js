@@ -639,6 +639,13 @@ export function handleLogEntryForEffects(entry, game) {
     if (amountDealt > 1) addEffect(targetId, 'shake', EFFECT_DURATION_MS.shake);
   }
 
+  // Kaelis's Phoenix Dive: a heavy crash from the sky - shake plus the big
+  // radial shatter Titan Smash uses, on any landed hit.
+  if (actionId === 'phoenixDive' && targetId && amountDealt > 0) {
+    addEffect(targetId, 'shake', EFFECT_DURATION_MS.shake);
+    addEffect(targetId, 'bigshatter', EFFECT_DURATION_MS.bigshatter);
+  }
+
   // Dying Blow: a downward axe-chop wedge on any landed hit - a directional
   // slam-and-embed motion (unlike every other effect's radiate/spin/pop),
   // matching his axe rather than reusing claw/crack/vortex language. Scales

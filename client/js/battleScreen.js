@@ -2490,7 +2490,7 @@ const ACTION_LABELS = {
   chaosGamble: 'Chaos Gamble', jesterBall: 'Jester Ball', fowlPlay: 'Fowl Play', chickenAttack: 'Chicken Attack', bloodHunt: 'Blood Hunt',
   curseStrike: 'Curse Strike', divineRestore: 'Divine Restore', divineSacrifice: 'Divine Sacrifice', divineJudgment: 'Divine Judgment',
   selfChoke: 'Self Choke',
-  grudgeStrike: 'Grudge Strike', callAshka: 'Call Ashka',
+  grudgeStrike: 'Grudge Strike', callAshka: 'Call Ashka', wingsOfAshka: 'Wings of Ashka', phoenixDive: 'Phoenix Dive',
   dyingBlow: 'Dying Blow', deathlessFury: 'Deathless Fury', cheatDeath: 'Cheat Death',
   wandStrike: 'Wand Strike', arcaneStudy: 'Arcane Study',
   poisonCloud: 'Poison Cloud', purify: 'Purify', wildLightning: 'Wild Lightning',
@@ -2563,6 +2563,9 @@ function describeLogEntry(entry) {
         // enemy AND the random hearts it actually cost her this cast,
         // including if it happened to KO her too.
         return `${name(entry.characterId)} used ${actionLabel(entry.actionId)} on ${name(actualAttackTargetId(entry))}${entry.amountDealt != null ? ` - ${entry.amountDealt} damage` : ''}${entry.koTriggered ? ' - KO!' : ''} (sacrificed ${entry.selfCost} heart${entry.selfCost > 1 ? 's' : ''}${entry.selfResult?.koTriggered ? ' - KO!' : ''})`;
+      }
+      if (entry.actionId === 'phoenixDive') {
+        return `${name(entry.characterId)} crashes down with Phoenix Dive on ${name(actualAttackTargetId(entry))}${entry.amountDealt != null ? ` - ${entry.amountDealt} damage` : ''}${entry.absorbed ? ` (${entry.absorbed} absorbed by shield)` : ''}${entry.koTriggered ? ' - KO!' : ''} - every grudge released!`;
       }
       if (entry.actionId === 'beastAttack') {
         // High/low damage tier (Death-Triggered Reversion #36) - noted
@@ -2689,6 +2692,11 @@ function describeLogEntry(entry) {
         const shared = entry.changes[0].after;
         const parts = entry.changes.map((c) => `${name(c.characterId)} (${c.before}→${c.after})`);
         return `${name(entry.characterId)} unleashed Lifebond - everyone's hearts became ${shared}! ${parts.join(', ')}`;
+      }
+      if (entry.actionId === 'wingsOfAshka') {
+        // Kaelis's Wings of Ashka - the rise only; the crash is its own
+        // later 'attack' entry (phoenixDive).
+        return `${name(entry.characterId)} merges with Ashka and rises into the sky!`;
       }
       if (entry.actionId === 'soulStorm') {
         // Zerathys's Soul Storm - entry.changes (server's zerathys.js) has

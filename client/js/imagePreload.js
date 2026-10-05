@@ -112,6 +112,9 @@ const FLASH_IMAGES = [
   'assets/images/kaelis/grudge.jpg',
   'assets/images/kaelis/bird.jpg',
   'assets/images/kaelis/surprise.jpg',
+  'assets/images/kaelis/wings_rise.jpg',
+  'assets/images/kaelis/wings_of_ashka.jpg',
+  'assets/images/kaelis/phoenix_dive.jpg',
   'assets/images/draxus/idle.jpg',
   'assets/images/draxus/normal_strike.jpg',
   'assets/images/draxus/immortal_strike.jpg',
@@ -377,8 +380,14 @@ const MOONLIT_THEFT_REACTION_IMAGES = ['athena', 'boingo', 'tharox', 'chronox', 
   (id) => `assets/images/${id}/shield_stolen.jpg`
 );
 
+// Kaelis's Phoenix Dive victim reaction (added 2026-10-05) - one per hero
+// except Kaelis herself.
+const PHOENIX_DIVE_HIT_IMAGES = CHARACTER_IDS.filter((id) => id !== 'kaelis').map(
+  (id) => `assets/images/${id}/phoenix_dive_hit.jpg`
+);
+
 function allBattleImagePaths() {
-  const paths = [...FLASH_IMAGES, ...BADGE_ICONS, ...CHICKEN_IMAGES, ...DIVINE_JUDGMENT_STRUCK_IMAGES, ...PROPHECY_OF_DOOM_STRIKE_IMAGES, ...ASHKAS_VENGEANCE_STRIKE_IMAGES, ...SHADOW_SEAL_STRIKE_IMAGES, ...PETRIFY_STONE_IMAGES, ...FROG_IMAGES, ...SELF_CHOKE_VICTIM_IMAGES, ...LIFEBOND_REACTION_IMAGES, ...MOONLIT_THEFT_REACTION_IMAGES, ...FRIENDSHIP_BOND_IMAGES, ...PROTECTS_MELYSSA_IMAGES, ...BEAST_MAULED_IMAGES, ...SOUL_DRAIN_IMAGES, ...RUNE_STRIKE_HIT_IMAGES, ...TIME_FROZEN_IMAGES, ...REWOUND_IMAGES, ...BOMB_HIT_IMAGES, ...DEEP_SEA_BLADE_IMAGES, ...DEEP_SEA_VICTIM_IMAGES, ...DEEP_SEA_PETRIFIED_IMAGES];
+  const paths = [...PHOENIX_DIVE_HIT_IMAGES, ...FLASH_IMAGES, ...BADGE_ICONS, ...CHICKEN_IMAGES, ...DIVINE_JUDGMENT_STRUCK_IMAGES, ...PROPHECY_OF_DOOM_STRIKE_IMAGES, ...ASHKAS_VENGEANCE_STRIKE_IMAGES, ...SHADOW_SEAL_STRIKE_IMAGES, ...PETRIFY_STONE_IMAGES, ...FROG_IMAGES, ...SELF_CHOKE_VICTIM_IMAGES, ...LIFEBOND_REACTION_IMAGES, ...MOONLIT_THEFT_REACTION_IMAGES, ...FRIENDSHIP_BOND_IMAGES, ...PROTECTS_MELYSSA_IMAGES, ...BEAST_MAULED_IMAGES, ...SOUL_DRAIN_IMAGES, ...RUNE_STRIKE_HIT_IMAGES, ...TIME_FROZEN_IMAGES, ...REWOUND_IMAGES, ...BOMB_HIT_IMAGES, ...DEEP_SEA_BLADE_IMAGES, ...DEEP_SEA_VICTIM_IMAGES, ...DEEP_SEA_PETRIFIED_IMAGES];
   // Default battle portrait, KO'd, injured, and victory images - each now
   // lives inside the hero's own images/<id>/ folder with a fixed filename
   // (confirmed rename, 2026-09-15; previously 4 separate top-level folders

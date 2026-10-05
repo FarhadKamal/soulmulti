@@ -226,7 +226,7 @@ const ACTION_VOICE_LINES = {
   // type: 'special' entry), same generic path - no bespoke wiring needed
   // since it's a real player-picked action, unlike Melyssa's mindControl
   // selection above.
-  kaelis: { grudgeStrike: 'grudge_strike', callAshka: 'thank_you' },
+  kaelis: { grudgeStrike: 'grudge_strike', callAshka: 'thank_you', wingsOfAshka: 'wings_of_ashka', phoenixDive: 'phoenix_dive' },
   // dyingBlow (both normal and bonus strikes) stays voice-silent on a
   // normal strike, matching Kaelis's own baseline-hit silence - normal
   // strikes get no entry here at all. The bonus-turn One/Two/Three lines

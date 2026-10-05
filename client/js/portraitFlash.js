@@ -78,6 +78,15 @@ const SOUL_DRAIN_FLASH_DURATION_MS = 3000;
 // Seal rather than Soul Swap's single-victim 3s.
 const SOUL_STORM_FLASH_DURATION_MS = 4500;
 
+// Kaelis's Wings of Ashka (added 2026-10-05): wings_rise.jpg flashes on the
+// cast (the merge moment), then wings_of_ashka.jpg holds as her persistent
+// portrait while airborne; phoenix_dive.jpg flashes on the crash, with each
+// victim's own per-hero phoenix_dive_hit.jpg.
+const KAELIS_RISE_IMAGE = 'assets/images/kaelis/wings_rise.jpg';
+const KAELIS_AIRBORNE_IMAGE = 'assets/images/kaelis/wings_of_ashka.jpg';
+const KAELIS_DIVE_IMAGE = 'assets/images/kaelis/phoenix_dive.jpg';
+const PHOENIX_DIVE_FLASH_DURATION_MS = 3000;
+
 // Chronox's Rewind victim reaction (rewound.jpg) - held to at least 3s per
 // direct request (2026-09-25), same duration as Ashka's Vengeance/Soul
 // Swap's own victim flashes, so the reaction has more time to read on the
@@ -558,6 +567,9 @@ export function getPersistentPortrait(character, isFrozenVisual = false) {
   // here already occupies), reverting automatically the instant
   // beastFormActive flips back false (see grimtal.js's registerOnAnyDeath).
   if (character.id === 'grimtal' && character.special?.beastFormActive) return v('assets/images/grimtal/beast.jpg');
+  // Kaelis's Wings of Ashka (added 2026-10-05) - held for as long as she's
+  // airborne (real serialized state, same shape as Beast Form above).
+  if (character.id === 'kaelis' && character.special?.airborne) return v(KAELIS_AIRBORNE_IMAGE);
   return null;
 }
 
@@ -629,6 +641,9 @@ export function checkIdlePortrait(character, round) {
   // reasoning as above. Unlike frozen, deepSeaSealed is directly readable
   // off the character object here (no separate registered check needed).
   if (character.deepSeaSealed) return false;
+  // Kaelis airborne (Wings of Ashka) - her idle image must not cover the
+  // in-the-sky portrait.
+  if (character.id === 'kaelis' && character.special?.airborne) return false;
   const lastHearts = heartsAtLastTurnStart.has(character.id) ? heartsAtLastTurnStart.get(character.id) : null;
   const wasUntouched = lastHearts === null || character.hearts >= lastHearts;
   const isIdle = wasUntouched && character.hearts > character.maxHearts / 2;
@@ -1438,6 +1453,16 @@ export function handleLogEntryForFlash(entry, game) {
       break;
     case 'callAshka':
       setFlash(characterId, 'assets/images/kaelis/bird.jpg'); break;
+    case 'wingsOfAshka':
+      setFlash(characterId, KAELIS_RISE_IMAGE, PHOENIX_DIVE_FLASH_DURATION_MS); break;
+    case 'phoenixDive':
+      setFlash(characterId, KAELIS_DIVE_IMAGE, PHOENIX_DIVE_FLASH_DURATION_MS);
+      // Not gated on !isKO - a killing dive should still show the strike
+      // over koed.jpg, same as Snake Strike/Beast Attack's victim flashes.
+      if (targetCharacterId && amountDealt > 0) {
+        setFlash(targetCharacterId, `assets/images/${targetCharacterId}/phoenix_dive_hit.jpg`, PHOENIX_DIVE_FLASH_DURATION_MS);
+      }
+      break;
     case 'dyingBlow':
       // Bonus-turn strikes (during his Deathless Fury payoff) flash a
       // distinct immortal_strike image, layered on top of his persistent

@@ -207,7 +207,11 @@ function baseSpecialFor(id) {
       // every one of her own onTurnStart calls fires a bonus 1 pure damage
       // Ashka strike on a random living enemy, on top of her own normal
       // action that turn - see kaelis.js's own onTurnStart.
-      return { grudgeCounts: new Map(), ashkaHealsRemaining: 0, ashkasVengeanceActive: false };
+      // usedWingsOfAshka/airborne: Wings of Ashka (design-locked
+      // 2026-10-05, see kaelis.js) - her hearts<=3 one-time special. Cast
+      // turn: she rises (airborne + untargetable). Her next real turn: her
+      // only action is Phoenix Dive, which crashes down and lands her.
+      return { grudgeCounts: new Map(), ashkaHealsRemaining: 0, ashkasVengeanceActive: false, usedWingsOfAshka: false, airborne: false };
     case 'draxus':
       // deathproofActive: true from the moment Deathless Fury is cast
       // until his own next onTurnStart clears it (see draxus.js) -

@@ -397,6 +397,8 @@ const ACTION_SOUND = {
   friendshipSelfChoke: 'self_choke',
   grudgeStrike: 'grudge_hit',
   callAshka: 'bird_heal',
+  wingsOfAshka: 'wings_of_ashka',
+  phoenixDive: 'phoenix_dive',
   dyingBlow: 'axe_strike',
   deathlessFury: 'deathless_fury',
   // Resurrection Gamble (Draxus's Cheat Death, taxonomy #32) - a
