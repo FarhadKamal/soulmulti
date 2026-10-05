@@ -1382,8 +1382,15 @@ export function handleLogEntryForFlash(entry, game) {
       // state, not a timed flash) - this case only fires the brief
       // cast-moment flashes.
       setFlash(characterId, 'assets/images/blade/deepsea_cast.jpg');
-      if (targetCharacterId) {
-        setFlash(targetCharacterId, `assets/images/${targetCharacterId}/deepsea_pulled.jpg`);
+      // Confirmed real bug, 2026-10-05 (live report: "i have not seen
+      // deepsea_pulled.jpg during animation"): this read targetCharacterId,
+      // which only exists on entries that spread an applyDamage result -
+      // Shark Hunt's own cast entry (blade.js) deals no damage and only ever
+      // sets targetId, so the victim flash never fired. Same bug/fix as Soul
+      // Swap's soul_drain.jpg above. Skipped when Clean Slate blocked the
+      // cast (blockedBy) - nobody was actually pulled under.
+      if (entry.targetId && !entry.blockedBy) {
+        setFlash(entry.targetId, `assets/images/${entry.targetId}/deepsea_pulled.jpg`);
       }
       break;
     case 'focus':
