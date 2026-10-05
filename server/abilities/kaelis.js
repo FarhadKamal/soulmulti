@@ -208,7 +208,13 @@ export const actions = {
       // attacker's count stays untouched.
       const grudgeCount = character.special.grudgeCounts.get(targetId) || 0;
       const amount = 1 + grudgeCount;
-      character.special.grudgeCounts.set(targetId, 0);
+      // Only touch the map when there's a real grudge to clear - confirmed
+      // real bug, 2026-10-05: an unconditional set(targetId, 0) changed
+      // Kaelis's state even with no grudge, so a fully shield-absorbed hit
+      // on Chronox counted as "a real effect" and bot Chronox spent Rewind
+      // undoing nothing (twice in one live match). Deleting the key is
+      // equivalent to 0 (get() falls back to 0).
+      if (grudgeCount > 0) character.special.grudgeCounts.delete(targetId);
       const result = applyDamage(game, log, {
         sourceCharacterId: character.id,
         targetCharacterId: targetId,

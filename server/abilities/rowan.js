@@ -438,12 +438,16 @@ export const actions = {
       // frog-specific block, is skipped entirely). Confirmed ruling: still
       // ends the curse, it just never goes through that specific code path
       // to get there.
+      // The attack line goes first, then "turns back into a hero" - confirmed
+      // real bug, 2026-10-05: the old order printed the curse ending BEFORE
+      // the strike that caused it. Skipped entirely when the strike KO'd the
+      // frog (they don't turn back into a hero, they just fall).
+      log.push({ type: 'attack', characterId: character.id, actionId: 'snakeStrike', targetId, ...result });
       const target = game.characters[targetId];
       if (target?.isFrog) {
         target.isFrog = false;
-        log.push({ type: 'frog-curse-end', characterId: targetId, hearts: heartsSnapshot(game) });
+        if (!target.isKO) log.push({ type: 'frog-curse-end', characterId: targetId, hearts: heartsSnapshot(game) });
       }
-      log.push({ type: 'attack', characterId: character.id, actionId: 'snakeStrike', targetId, ...result });
       return result;
     },
   },
