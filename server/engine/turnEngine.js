@@ -1104,6 +1104,19 @@ function earthshatterMayTargetChronox(game, characterId, actionId) {
   return !!chronoxChar && !chronoxChar.isKO;
 }
 
+// Zerathys's Soul Storm (design-locked 2026-10-05): confirmed ruling -
+// Chronox CAN Rewind it, but only if it actually changed his hearts. Same
+// candidate-record shape as Earthshatter above (no single targetId). The
+// stricter "his hearts must have changed" commit gate lives in
+// executeAction's own commit step - the generic chronoxStateActuallyChanged
+// would otherwise also commit just because the caster's own usedSoulStorm
+// flipped.
+function soulStormMayTargetChronox(game, characterId, actionId) {
+  if (actionId !== 'soulStorm') return false;
+  const chronoxChar = game.characters.chronox;
+  return !!chronoxChar && !chronoxChar.isKO && !chronoxChar.deepSeaSealed;
+}
+
 // Oraclus's Rune Vision: checks a pending prediction against the VERY NEXT
 // genuine attack anyone takes (see oraclus.js's runeVision.execute for how
 // the guess itself is stored) - written generically here in turnEngine.js,
@@ -1272,7 +1285,9 @@ export function executeAction(game, characterId, actionId, targetId, extra) {
   // during THIS action" apart from "no death happened at all, he's just
   // still transformed from before."
   const koCountBefore = countKO(game);
-  const effectiveTargetId = (mirageBurstTargetsChronox(game, characterId, actionId) || earthshatterMayTargetChronox(game, characterId, actionId))
+  const effectiveTargetId = (mirageBurstTargetsChronox(game, characterId, actionId)
+    || earthshatterMayTargetChronox(game, characterId, actionId)
+    || soulStormMayTargetChronox(game, characterId, actionId))
     ? 'chronox' : targetId;
   const candidateRecord = buildActionAgainstChronoxRecord(game, characterId, actionId, effectiveTargetId);
   const character = game.characters[characterId];
@@ -1330,7 +1345,12 @@ export function executeAction(game, characterId, actionId, targetId, extra) {
   // at all, regardless of this individual call's own effect.
   if (candidateRecord && candidateRecord !== 'keep-existing') {
     const chronoxChar = game.characters.chronox;
-    if (chronoxChar && chronoxStateActuallyChanged(chronoxChar, candidateRecord.chronoxSnapshot, character, candidateRecord.casterSnapshot)) {
+    // Soul Storm: only Rewindable if Chronox's own hearts actually changed
+    // (confirmed ruling) - checked against Chronox alone, not the caster.
+    const changed = actionId === 'soulStorm'
+      ? chronoxStateActuallyChanged(chronoxChar, candidateRecord.chronoxSnapshot, null, null)
+      : chronoxStateActuallyChanged(chronoxChar, candidateRecord.chronoxSnapshot, character, candidateRecord.casterSnapshot);
+    if (chronoxChar && changed) {
       chronoxChar.special.lastActionAgainstMe = candidateRecord;
     }
   }

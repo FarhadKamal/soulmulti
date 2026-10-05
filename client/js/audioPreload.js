@@ -48,6 +48,8 @@ const SOUND_EFFECT_FILES = [
   'deepsea_cast.mp3', 'deepsea_strike.mp3', 'deepsea_dodge.mp3',
   'deepsea_escape_success.mp3', 'deepsea_escape_fail.mp3',
   'focus.mp3',
+  // Zerathys's Soul Storm.
+  'soul_storm.mp3',
 ];
 // Deliberately still excluded from SOUND_EFFECT_FILES preload (see the
 // bandwidth-cap comment above) - bgm-deepsea.mp3 and its new layered

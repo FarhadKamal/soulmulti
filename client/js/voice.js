@@ -184,7 +184,7 @@ const ACTION_VOICE_LINES = {
   velorya: { lunarEclipse: 'eclipse', moonlitTheft: 'moonlit_theft' },
   boingo: { jesterBall: 'jerster', fowlPlay: 'fowl_play' },
   athena: { divineRestore: 'devine', divineSacrifice: 'sacrifice', divineJudgment: 'divine_judgment' },
-  zerathys: { chargeUp: 'charge', thunderWrath: 'release', soulSwap: 'soul_swap' },
+  zerathys: { chargeUp: 'charge', thunderWrath: 'release', soulSwap: 'soul_swap', soulStorm: 'soul_storm' },
   tharox: { titanToss: 'titan_toss', titanSmash: 'titan_smash', glorySmash: 'glory', earthshatter: 'earthshatter' },
   // shadowSeal: "Your heart... isn't yours anymore." - quiet/whispered
   // delivery (design-locked 2026-09-19, replaces the old shadowArmy/

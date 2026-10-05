@@ -128,7 +128,8 @@ const HERO_ABILITIES = {
     ['Charge Up', 'Repeatable setup move (unavailable while Overcharge Collapse is active): banks charge (up to 2 stacks) to power up his next Thunder Wrath.'],
     ['Thunder Wrath', 'Basic attack: damage scales with banked charge (1/2/3), always resets charge to 0 after use.'],
     ['Soul Swap', 'One-time special: swaps his current hearts with a target’s, then immediately gets one free follow-up Thunder Wrath.'],
-    ['Overcharge Collapse (passive)', 'Automatically active whenever his hearts are ≤ 3: Charge Up is disabled, and every Thunder Wrath instead deals a flat 3 damage and grants +1 permanent shield, regardless of charge.'],
+    ['Soul Storm', 'One-time special at hearts ≤ 3: a storm tears every living hero’s soul loose and reshuffles everyone’s hearts at random — every hero ends up with someone else’s number, Zerathys included, so it can save him or backfire. Doesn’t reach a transformed Beast Form Grimtal or a deep-sea sealed pair.'],
+    ['Overcharge Collapse (passive)','Automatically active whenever his hearts are ≤ 3: Charge Up is disabled, and every Thunder Wrath instead deals a flat 3 damage and grants +1 permanent shield, regardless of charge.'],
     ['Example', 'You Charge Up twice (banking 2 stacks), then Thunder Wrath for 3 damage, resetting to 0. Or cast Soul Swap on a nearly-dead enemy — you take their low hearts, they take your higher total, and you immediately get a free Thunder Wrath on top of it.'],
   ],
 };

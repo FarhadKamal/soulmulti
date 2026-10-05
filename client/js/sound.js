@@ -349,6 +349,7 @@ const ACTION_SOUND = {
   chargeUp: 'charge',
   thunderWrath: 'thunder',
   soulSwap: 'soulswap',
+  soulStorm: 'soul_storm',
   soulSwapWrath: 'thunder',
   hiddenMark: 'hiddenmark',
   fatalSlash: 'sword',

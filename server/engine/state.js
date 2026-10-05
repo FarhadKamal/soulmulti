@@ -74,7 +74,11 @@ function baseSpecialFor(id) {
       // flat used/unused flag.
       return { hasCharge: false, usedEarthshatter: false, glorySmashesUsed: 0 };
     case 'zerathys':
-      return { chargeCount: 0 };
+      // usedSoulStorm: his hearts<=3 one-time special (design-locked
+      // 2026-10-05, see zerathys.js) - own flag, separate from usedSpecial
+      // (already spoken for by Soul Swap), same multi-special pattern as
+      // every other hero's desperation move.
+      return { chargeCount: 0, usedSoulStorm: false };
     case 'akyros':
       // convertedHeartCount: Shadow Toll (Threshold Shift #38, design-
       // locked 2026-09-20) - how many of Akyros's OWN current hearts he's

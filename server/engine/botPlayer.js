@@ -4,6 +4,7 @@ import {
 } from './turnEngine.js';
 import { isFrozenByChronox } from './damagePipeline.js';
 import { BEAST_ATTACK_HIGH_DAMAGE, BEAST_ATTACK_LOW_DAMAGE } from '../abilities/grimtal.js';
+import { soulStormParticipants } from '../abilities/zerathys.js';
 import { isCurrentFriend } from '../abilities/melyssa.js';
 
 // Pure decision logic for PC-controlled characters - no DOM, no side
@@ -341,6 +342,20 @@ function chooseZerathysMove(character, game, usable) {
         : killableTargets;
       const securesKill = safeKills[0] ?? killableTargets[0];
       return { actionId: 'thunderWrath', targetId: securesKill };
+    }
+  }
+  // Soul Storm (hearts<=3 one-time special): he always ends up with SOMEONE
+  // ELSE's hearts value, picked at random - so on average he gets the mean
+  // of everyone else's hearts. Worth casting once that average is
+  // meaningfully above his own (same "more than 1 better" margin Soul Swap
+  // uses below); otherwise hold it and keep fighting, since the shuffle is
+  // re-evaluated fresh every turn it stays legal. Checked after the
+  // kill-securing Thunder Wrath above (a kill this turn beats a gamble).
+  if (byId.soulStorm) {
+    const others = soulStormParticipants(game).filter((c) => c.id !== character.id);
+    const averageOther = others.reduce((sum, c) => sum + c.hearts, 0) / others.length;
+    if (averageOther >= character.hearts + 1) {
+      return { actionId: 'soulStorm', targetId: null };
     }
   }
   // Soul Swap is strongest when the target has meaningfully more hearts

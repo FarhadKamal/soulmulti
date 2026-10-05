@@ -158,6 +158,11 @@ function wouldEndangerMelyssa(character, game, actionId) {
     // possibly-beneficial outcome).
     case 'lifebond':
       return true;
+    // Soul Storm (Zerathys, added 2026-10-05): reshuffles every living
+    // character's hearts, Melyssa included - same "blocked regardless of
+    // whether it would help or hurt her" reasoning as Lifebond above.
+    case 'soulStorm':
+      return true;
     // Moonlit Theft (Velorya): drains shield from every OTHER living
     // character - only a real risk to her if she currently HAS shield to
     // lose; a shieldless Melyssa has nothing this action could take.

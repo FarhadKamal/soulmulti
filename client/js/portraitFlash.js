@@ -73,6 +73,11 @@ const ASHKAS_VENGEANCE_STRIKE_FLASH_DURATION_MS = 3000;
 // than the default 1.6s.
 const SOUL_DRAIN_FLASH_DURATION_MS = 3000;
 
+// Zerathys's Soul Storm (added 2026-10-05) - one cast, every reached hero
+// reacting at once, so the same 4.5s multi-beat scale as Lifebond/Shadow
+// Seal rather than Soul Swap's single-victim 3s.
+const SOUL_STORM_FLASH_DURATION_MS = 4500;
+
 // Chronox's Rewind victim reaction (rewound.jpg) - held to at least 3s per
 // direct request (2026-09-25), same duration as Ashka's Vengeance/Soul
 // Swap's own victim flashes, so the reaction has more time to read on the
@@ -1147,6 +1152,18 @@ export function handleLogEntryForFlash(entry, game) {
     }
     return;
   }
+  if (entry.type === 'special' && entry.actionId === 'soulStorm') {
+    // Zerathys's Soul Storm (added 2026-10-05) - every OTHER character the
+    // shuffle reached shows their own soul_drain.jpg (the same per-hero
+    // "soul torn out" art Soul Swap's victim already uses - no new asset
+    // needed). Zerathys's own cast flash comes from the generic switch
+    // below (case 'soulStorm'), so this deliberately doesn't return.
+    for (const change of entry.changes || []) {
+      if (change.characterId !== entry.characterId && !isKO(change.characterId)) {
+        setFlash(change.characterId, `assets/images/${change.characterId}/soul_drain.jpg`, SOUL_STORM_FLASH_DURATION_MS);
+      }
+    }
+  }
   if (entry.type === 'special' && entry.actionId === 'moonlitTheft') {
     // Velorya's Moonlit Theft (taxonomy #35 Siphon) - flashes shield_stolen.jpg
     // on every character entry.changes actually drained shield from (server's
@@ -1311,6 +1328,9 @@ export function handleLogEntryForFlash(entry, game) {
       break;
     case 'chargeUp':
       setFlash(characterId, 'assets/images/zerathys/charge.jpg'); break;
+    case 'soulStorm':
+      // Same multi-beat duration as every other board-wide special.
+      setFlash(characterId, 'assets/images/zerathys/soul_storm.jpg', SOUL_STORM_FLASH_DURATION_MS); break;
     case 'thunderWrath': case 'soulSwapWrath':
       // Overcharge Collapse (hearts<=3): a distinct, more intense strike
       // image for the moment he's both dealing the guaranteed 3 damage AND

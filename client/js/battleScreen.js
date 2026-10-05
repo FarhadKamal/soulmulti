@@ -2477,7 +2477,7 @@ function actualAttackTargetId(entry) {
 const ACTION_LABELS = {
   cyclonePunch: 'Cyclone Punch', timeFreeze: 'Time Freeze', rewind: 'Rewind', worldStops: 'World Stops',
   smash: 'Smash', titanToss: 'Titan Toss', titanSmash: 'Titan Smash', glorySmash: 'Glory Smash', earthshatter: 'Earthshatter',
-  chargeUp: 'Charge Up', thunderWrath: 'Thunder Wrath', soulSwap: 'Soul Swap', soulSwapWrath: 'Thunder Wrath (free)',
+  chargeUp: 'Charge Up', thunderWrath: 'Thunder Wrath', soulSwap: 'Soul Swap', soulSwapWrath: 'Thunder Wrath (free)', soulStorm: 'Soul Storm',
   hiddenMark: 'Hidden Mark', fatalSlash: 'Fatal Slash', shadowExecution: 'Shadow Execution', shadowSeal: 'Shadow Seal', shadowToll: 'Shadow Toll',
   sharkHunt: 'Shark Hunt', sharkStrike: 'Shark Strike', escapeSeal: 'Escape', focus: 'Focus',
   lunarStrike: 'Lunar Strike', moonstep: 'Moonstep', lunarEclipse: 'Lunar Eclipse', moonlitTheft: 'Moonlit Theft',
@@ -2683,6 +2683,17 @@ function describeLogEntry(entry) {
         const shared = entry.changes[0].after;
         const parts = entry.changes.map((c) => `${name(c.characterId)} (${c.before}→${c.after})`);
         return `${name(entry.characterId)} unleashed Lifebond - everyone's hearts became ${shared}! ${parts.join(', ')}`;
+      }
+      if (entry.actionId === 'soulStorm') {
+        // Zerathys's Soul Storm - entry.changes (server's zerathys.js) has
+        // one { characterId, before, after } per character the shuffle
+        // reached. Unlike Lifebond, everyone ends on a different number, so
+        // each before->after pair is shown individually.
+        if (!entry.changes || entry.changes.length === 0) {
+          return `${name(entry.characterId)} unleashed Soul Storm!`;
+        }
+        const parts = entry.changes.map((c) => `${name(c.characterId)} (${c.before}→${c.after})`);
+        return `${name(entry.characterId)} unleashed Soul Storm - every soul is torn loose! ${parts.join(', ')}`;
       }
       if (entry.actionId === 'moonlitTheft') {
         // Moonlit Theft (Velorya's hearts<=3 one-time special, taxonomy #35

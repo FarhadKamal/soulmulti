@@ -2,6 +2,41 @@ import { applyDamage, applyShield, clampLockedHearts } from '../engine/damagePip
 import { makeSetupAction } from '../engine/categories/neutralAction.js';
 
 const DAMAGE_BY_CHARGE = [1, 2, 3];
+const SOUL_STORM_HEARTS_THRESHOLD = 3;
+
+// Everyone Soul Storm reaches: living, not a transformed Beast Form Grimtal,
+// not either deep-sea sealed party (same exclusions as Marin's Lifebond).
+export function soulStormParticipants(game) {
+  return Object.values(game.characters).filter(
+    (c) => !c.isKO && !(c.id === 'grimtal' && c.special?.beastFormActive) && !c.deepSeaSealed
+  );
+}
+
+// A random derangement of slot indices (nobody keeps their own slot), so
+// order[i] is whose hearts slot i receives. Prefers - among a handful of
+// random derangements - one where every character's hearts NUMBER actually
+// changes too; when that's impossible (e.g. two characters share a value
+// that has nowhere else to go) any derangement is accepted.
+function pickSoulStormPermutation(values) {
+  const n = values.length;
+  const randomDerangement = () => {
+    for (;;) {
+      const p = [...Array(n).keys()];
+      for (let i = n - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [p[i], p[j]] = [p[j], p[i]];
+      }
+      if (p.every((v, i) => v !== i)) return p;
+    }
+  };
+  let fallback = null;
+  for (let attempt = 0; attempt < 50; attempt++) {
+    const p = randomDerangement();
+    if (!fallback) fallback = p;
+    if (p.every((src, i) => values[src] !== values[i])) return p;
+  }
+  return fallback;
+}
 const OVERCHARGE_COLLAPSE_THRESHOLD = 3;
 const OVERCHARGE_COLLAPSE_DAMAGE = 3;
 
@@ -104,6 +139,43 @@ export const actions = {
       clampLockedHearts(target);
       log.push({ type: 'special', characterId: character.id, actionId: 'soulSwap', targetId });
       return { swapped: true };
+    },
+  },
+  // Soul Storm (design-locked 2026-10-05): hearts<=3 one-time special - a
+  // board-wide Soul Swap. Every eligible living character's hearts are
+  // shuffled among them so that NOBODY keeps their own slot (confirmed
+  // ruling: "everyone must change" - when two characters happen to hold the
+  // same hearts value, that number can still come back, but never from
+  // their own slot). Zerathys himself is part of the shuffle with no
+  // guarantee of landing high. No free Thunder Wrath afterward (confirmed
+  // ruling). Like Lifebond, this sets hearts directly (not a hit or a
+  // heal - no shield/dodge interaction) and excludes a transformed Beast
+  // Form Grimtal and both deep-sea sealed parties (confirmed ruling). Chronox
+  // can Rewind it if it changed his hearts (see turnEngine.js's
+  // soulStormMayTargetChronox).
+  soulStorm: {
+    label: 'Soul Storm',
+    needsTarget: false,
+    special: true,
+    isLegal: (character, game) => character.hearts <= SOUL_STORM_HEARTS_THRESHOLD
+      && !character.special.usedSoulStorm
+      && soulStormParticipants(game).length >= 2
+      && soulStormParticipants(game).some((c) => c.id === character.id),
+    execute(character, targetId, game, log) {
+      character.special.usedSoulStorm = true;
+      const living = soulStormParticipants(game);
+      const before = living.map((c) => c.hearts);
+      const order = pickSoulStormPermutation(before);
+      const changes = living.map((c, i) => ({ characterId: c.id, before: before[i], after: before[order[i]] }));
+      living.forEach((c, i) => {
+        c.hearts = before[order[i]];
+        // Sets hearts directly outside applyDamage/applyHeal - same
+        // Shadow Seal clamp Soul Swap/Lifebond need (see
+        // clampLockedHearts's own comment).
+        clampLockedHearts(c);
+      });
+      log.push({ type: 'special', characterId: character.id, actionId: 'soulStorm', changes });
+      return { changes };
     },
   },
   // Follow-up Thunder Wrath fired for free immediately after Soul Swap.

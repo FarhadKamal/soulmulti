@@ -100,6 +100,7 @@ const FLASH_IMAGES = [
   'assets/images/zerathys/soul.jpg',
   'assets/images/zerathys/strike.jpg',
   'assets/images/zerathys/overcharge_strike.jpg',
+  'assets/images/zerathys/soul_storm.jpg',
   'assets/images/melyssa/idle.jpg',
   'assets/images/melyssa/mind_control_selection.jpg',
   'assets/images/melyssa/mind_control_action.jpg',
