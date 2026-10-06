@@ -955,7 +955,10 @@ export function handleLogEntryForFlash(entry, game) {
     // Kaelis's passive follow-up bird heal (Call Ashka's 2 free ticks) -
     // its own dedicated type, same reasoning as hidden-mark/curse above,
     // since it's not player-triggered and never carries an actionId.
-    if (!isKO(entry.characterId)) setFlash(entry.characterId, 'assets/images/kaelis/bird.jpg');
+    // Skipped while airborne (Wings of Ashka, confirmed ruling 2026-10-06) -
+    // bird.jpg shows Ashka as a separate bird beside her on the ground,
+    // which would cover her in-the-sky portrait with the wrong scene.
+    if (!isKO(entry.characterId) && !entry.airborne) setFlash(entry.characterId, 'assets/images/kaelis/bird.jpg');
     return;
   }
   if (entry.type === 'blood-drain') {

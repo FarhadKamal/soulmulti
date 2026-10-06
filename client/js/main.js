@@ -593,7 +593,9 @@ function playLogEntrySound(entry, game) {
     // Same "thank you, Ashka" line as the cast itself (reuses
     // ACTION_VOICE_LINES.kaelis.callAshka via playMoveVoice's normal
     // actionId lookup) - she thanks the bird every time it actually heals
-    // her, not just on the initial summon.
+    // her, not just on the initial summon. Still plays while airborne (Wings
+    // of Ashka) - confirmed ruling 2026-10-06: only the bird.jpg flash is
+    // skipped then, the voice line stays.
     playMoveVoice('kaelis', 'callAshka');
     return;
   }

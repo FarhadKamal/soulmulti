@@ -68,7 +68,13 @@ export function onTurnStart(character, game, log) {
   if (character.special.ashkaHealsRemaining > 0) {
     const healed = applyHeal(game, character.id, 2);
     character.special.ashkaHealsRemaining -= 1;
-    log.push({ type: 'ashka-heal', characterId: character.id, healed, hearts: heartsSnapshot(game) });
+    // airborne: stamped at the moment of the tick (confirmed ruling,
+    // 2026-10-06: the heal continues during Wings of Ashka, but its flash
+    // flash is skipped while she's merged with Ashka in the sky; sound and
+    // voice still play).
+    // Marked on the entry itself rather than read from live state, since a
+    // single broadcast can also contain her Phoenix Dive landing her.
+    log.push({ type: 'ashka-heal', characterId: character.id, healed, airborne: !!character.special.airborne, hearts: heartsSnapshot(game) });
   }
   // Ashka's Vengeance (hearts<=3 passive, see project memory
   // soulclash_kaelis_ashkas_vengeance.md) - a fully automatic bonus effect,
