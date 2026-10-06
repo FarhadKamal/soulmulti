@@ -103,12 +103,13 @@ let windowWinnerPriority = -1;
 // next player's own move-voice on their following turn). The normal
 // ARBITRATION_WINDOW_MS is sized for genuinely simultaneous same-broadcast
 // collisions (an attack landing + a KO + the next idle, all within ~300ms
-// of each other) - Earthshatter's own clip runs ~2.7s, well past that
-// window, so without this it would get talked over by whoever acts next.
+// of each other) - Earthshatter's own clip runs ~4.1s (re-recorded
+// 2026-10-06, was ~2.7s), well past that window, so without this it would
+// get talked over by whoever acts next. Keep in sync with the clip length.
 // koed/rebirth are still allowed through even during the lock (matches the
 // existing "biggest/rarest moments are never drowned out" reasoning behind
 // PRIORITY itself) - only lower-priority categories are held back.
-const EARTHSHATTER_VOICE_LOCK_MS = 2700;
+const EARTHSHATTER_VOICE_LOCK_MS = 4100;
 let voiceLockUntil = 0;
 
 function playVoiceFile(characterId, line, priority) {
