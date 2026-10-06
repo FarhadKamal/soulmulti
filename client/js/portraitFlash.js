@@ -1453,6 +1453,12 @@ export function handleLogEntryForFlash(entry, game) {
       break;
     case 'grudgeStrike':
       if (!dodged) setFlash(characterId, 'assets/images/kaelis/grudge.jpg');
+      // Victim's own per-hero chakram-impact reaction (added 2026-10-06) -
+      // every landed hit, same gate as the crack effect in actionEffects.js.
+      // Not gated on !isKO, same as phoenix_dive_hit below.
+      if (!dodged && targetCharacterId && amountDealt > 0) {
+        setFlash(targetCharacterId, `assets/images/${targetCharacterId}/grudge_hit.jpg`);
+      }
       break;
     case 'callAshka':
       setFlash(characterId, 'assets/images/kaelis/bird.jpg'); break;
