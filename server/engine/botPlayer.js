@@ -1102,7 +1102,7 @@ const KAELIS_ASHKA_THRESHOLD = 4;
 function chooseKaelisMove(character, game, usable) {
   const byId = Object.fromEntries(usable.map((a) => [a.actionId, a]));
   // Phoenix Dive - her ONLY action while airborne (Wings of Ashka). Secure
-  // a kill if the dive's damage (total living grudge, min 2; shield still
+  // a kill if the dive's damage (total living grudge, min 3; shield still
   // absorbs) can finish someone, else hit the biggest threat.
   if (byId.phoenixDive) {
     const diveDamage = phoenixDiveDamage(character, game);

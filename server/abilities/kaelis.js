@@ -36,7 +36,7 @@ registerOnOtherRevived((revivedCharacterId, game) => {
 const ASHKAS_VENGEANCE_HEARTS_THRESHOLD = 3;
 const ASHKAS_VENGEANCE_DAMAGE = 1;
 const WINGS_OF_ASHKA_HEARTS_THRESHOLD = 3;
-const PHOENIX_DIVE_MIN_DAMAGE = 2;
+const PHOENIX_DIVE_MIN_DAMAGE = 3; // raised from 2, confirmed ruling 2026-10-06
 
 // Phoenix Dive's damage (confirmed ruling, 2026-10-05): every grudge count
 // she currently holds against a LIVING character, added up, never less
@@ -252,7 +252,7 @@ export const actions = {
   // Phoenix Dive: the crash that ends Wings of Ashka - her ONLY legal action
   // while airborne (hidden: true, surfaced only through turnEngine.js's
   // override, same convention as Grimtal's beastAttack). Confirmed rulings:
-  // damage = phoenixDiveDamage (total living grudge, min 2); ignores dodge
+  // damage = phoenixDiveDamage (total living grudge, min 3); ignores dodge
   // and untargetable but shield still absorbs; every grudge resets to 0
   // afterward; she lands (no longer untargetable).
   phoenixDive: {
