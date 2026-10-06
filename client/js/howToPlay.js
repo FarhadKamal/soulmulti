@@ -70,7 +70,7 @@ const HERO_ABILITIES = {
     ['Grudge Strike', 'Basic attack: deals bonus damage equal to how many times that specific target has hit her since her last Grudge Strike against them.'],
     ['Call Ashka', 'One-time special: heals 2 hearts immediately, then heals 2 more on each of her next 2 turns.'],
     ['Wings of Ashka', 'One-time special at hearts ≤ 3: Kaelis merges with Ashka and rises into the sky, untargetable. On her next turn she crashes down with Phoenix Dive on any enemy for damage equal to ALL her grudges added together (minimum 3) — it can’t be dodged or hidden from, though shield still absorbs it. Every grudge resets afterward.'],
-    ['Ashka’s Vengeance (passive)','Activates permanently once her hearts first drop to ≤ 3: every one of her own turns from then on, her phoenix companion automatically strikes a random enemy for 1 true damage that bypasses shield, dodge, and untargetable — in addition to her normal action.'],
+    ['Ashka’s Vengeance (passive)','Activates permanently once her hearts first drop to ≤ 3: every one of her own turns from then on, her phoenix companion automatically strikes a random enemy for 1 true damage that bypasses shield, dodge, and untargetable — in addition to her normal action. Ashka holds back while Kaelis is frozen or airborne.'],
     ['Example', 'The same enemy hits you 3 times without you landing Grudge Strike back on them. Your next Grudge Strike against that specific enemy deals your normal damage PLUS 3 bonus — one for every hit you banked. Hit a different enemy first and that grudge count doesn’t apply.'],
   ],
   marin: [

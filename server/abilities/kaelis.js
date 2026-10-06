@@ -85,10 +85,8 @@ export function onTurnStart(character, game, log) {
   // turns from that point on, layered ON TOP of her normal action that
   // turn (confirmed ruling: "she don't have to hit anything. she will do
   // just her normal attack" - the bonus strike is pure addition, no
-  // opportunity cost). Deliberately fires here in onTurnStart - runs even
-  // on a turn she ends up frozen/skipped, same reasoning as the bird-heal
-  // tick above (both are true passives, unaffected by her own turn being
-  // interrupted).
+  // opportunity cost). Fires here in onTurnStart; skipped while she's
+  // airborne or frozen (see below).
   const wasAlreadyActive = character.special.ashkasVengeanceActive;
   if (!wasAlreadyActive && character.hearts <= ASHKAS_VENGEANCE_HEARTS_THRESHOLD) {
     character.special.ashkasVengeanceActive = true;
@@ -98,7 +96,11 @@ export function onTurnStart(character, game, log) {
   // enemy" - while Kaelis is airborne (Wings of Ashka), Ashka is carrying
   // her, so the passive's bonus strike is skipped for those turns. The
   // passive itself stays active and resumes once she lands.
-  if (character.special.ashkasVengeanceActive && !character.special.airborne) {
+  // Confirmed ruling, 2026-10-06: Ashka also doesn't attack while Kaelis is
+  // frozen (Time Freeze/World Stops - skipNextTurn is only ever set by
+  // Chronox, and is still set here since consumeSkipIfFrozen runs after
+  // onTurnStart). The Ashka heal tick above still lands while frozen.
+  if (character.special.ashkasVengeanceActive && !character.special.airborne && !character.skipNextTurn) {
     // Melyssa's Friendship (Redirect Bond #39) - confirmed real bug,
     // 2026-09-22 (live report: "if melyssa becom friend with kaelis. ashka
     // will not attack melyssa also, during friendship"). Ashka's random
