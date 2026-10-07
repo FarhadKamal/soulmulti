@@ -486,13 +486,8 @@ export function playVictory() {
   playSound('common/victory');
 }
 
-// The same coin sound, as each hero's own copy.
 export function playJesterBallCheckpoint() {
   playSound('boingo/jester_ball_checkpoint');
-}
-
-export function playCoinFlip() {
-  playSound('chronox/coin_flip');
 }
 
 export function playRebirth() {

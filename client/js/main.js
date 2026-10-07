@@ -6,7 +6,7 @@ import {
   startMenuMusic, startBattleMusic, stopMusic, startFrozenMusic, revertFromFrozenMusic,
   startChickenMusic, revertFromChickenMusic,
   startDeepSeaMusic, revertFromDeepSeaMusic,
-  playActionSound, playSound, playKO, playVictory, playDodge, playRebirth, playJesterBallCheckpoint, playCoinFlip,
+  playActionSound, playSound, playKO, playVictory, playDodge, playRebirth, playJesterBallCheckpoint,
   playDeepSeaDodge, playDeepSeaEscapeSuccess, playDeepSeaEscapeFail,
 } from './sound.js';
 import { handleLogEntryForFlash, handleDodgeForFlash, checkIdlePortrait, registerFlashRerender, queueGrimtalPowerFlash, registerChickenCheck, registerFrogCheck, registerFrozenCheck, registerDeepSeaCheck, setDebugLogEntryIndex, snapshotActiveFlashForDebug, resetFlashDebugHistoryForNewMatch, resetRenderTraceForNewMatch, beginFlashDispatchBatch } from './portraitFlash.js';
@@ -727,7 +727,6 @@ function playLogEntrySound(entry, game) {
   // not a second distinct action - without this it would play the mystical
   // casting sound TWICE in quick succession for one prediction.
   if (entry.actionId === 'runeVision' && entry.stage === 2) return;
-  if (entry.actionId === 'cyclonePunch') playCoinFlip();
   if (entry.actionId === 'chaosGamble' && entry.outcome === 'lose') {
     playSound('boingo/chaos_gamble_miss');
     return;
