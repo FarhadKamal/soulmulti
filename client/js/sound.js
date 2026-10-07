@@ -8,7 +8,7 @@ import { v } from './assetVersion.js';
 const cache = {};
 
 // name is a path under assets/sounds/, split per hero (2026-10-07) - e.g.
-// 'kaelis/bird_heal', or 'common/click' for sounds no single hero owns. A
+// 'kaelis/call_ashka', or 'common/click' for sounds no single hero owns. A
 // sound shared by several heroes has its own copy in each hero's folder,
 // so one hero's copy can be replaced without touching the others. name may
 // include its own extension (e.g. 'marin/everbloom.wav') - defaults to
@@ -69,20 +69,20 @@ const MENU_TRACKS = ['common/bgm-menu.mp3', 'common/bgm-menu-2.mp3', 'common/bgm
 // dedicated tick-tock ambient track for the duration, reverting to
 // whichever track was actually playing before once the full freeze ends
 // (main.js's 'world-stops-end' handler calls revertFromFrozenMusic).
-const FROZEN_TRACK = 'chronox/bgm-frozen.mp3';
+const FROZEN_TRACK = 'chronox/bgm-world-stops.mp3';
 let preFrozenTrack = null; // 'menu' | 'battle' | null - remembers what to restore
 
 // Boingo's Fowl Play: same swap-and-restore pattern as World Stops' own
 // frozen track above, for as long as game.fowlPlayActive is true (main.js
 // checks this fresh on every game-state broadcast).
-const CHICKEN_TRACK = 'boingo/bgm-chicken.mp3';
+const CHICKEN_TRACK = 'boingo/bgm-fowl-play.mp3';
 let preChickenTrack = null;
 
 // Blade's Shark Hunt (Mutual Seal #41): same swap-and-restore pattern,
 // checked fresh on every broadcast against game.characters.blade?.deepSeaSealed
 // (no separate game-level flag needed - only Blade can ever hold this
 // seal, unlike Fowl Play which can apply to any character).
-const DEEPSEA_TRACK = 'blade/bgm-deepsea.mp3';
+const DEEPSEA_TRACK = 'blade/bgm-shark-hunt.mp3';
 let preDeepSeaTrack = null;
 // A second, independent audio layer played ON TOP of bgm-deepsea.mp3 for the
 // whole seal duration (confirmed explicit request: "i want to play it
@@ -91,7 +91,7 @@ let preDeepSeaTrack = null;
 // "current track" at a time, which the mute toggle/ensureMusicPlaying
 // polling both rely on) - its own dedicated node instead, started/stopped in
 // lockstep with the main deep-sea track wherever possible.
-const DEEPSEA_TRACK_2 = 'blade/bgm-deepsea-2.mp3';
+const DEEPSEA_TRACK_2 = 'blade/bgm-shark-hunt-2.mp3';
 let deepSeaAudio2 = null;
 
 // Browsers block audio autoplay until the user has interacted with the
@@ -342,124 +342,125 @@ export function playSound(name) {
 }
 
 const ACTION_SOUND = {
-  cyclonePunch: 'chronox/cyclonepunch',
-  timeFreeze: 'chronox/freeze',
-  worldStops: 'chronox/world_stop',
+  cyclonePunch: 'chronox/cyclone_punch',
+  timeFreeze: 'chronox/time_freeze',
+  worldStops: 'chronox/world_stops',
   smash: 'tharox/smash',
-  titanToss: 'tharox/toss',
-  titanSmash: 'tharox/smash',
-  glorySmash: 'tharox/smash',
+  titanToss: 'tharox/titan_toss',
+  titanSmash: 'tharox/titan_smash',
+  glorySmash: 'tharox/glory_smash',
   earthshatter: 'tharox/earthshatter',
-  chargeUp: 'zerathys/charge',
-  thunderWrath: 'zerathys/thunder',
-  soulSwap: 'zerathys/soulswap',
+  chargeUp: 'zerathys/charge_up',
+  thunderWrath: 'zerathys/thunder_wrath',
+  soulSwap: 'zerathys/soul_swap',
   soulStorm: 'zerathys/soul_storm',
-  soulSwapWrath: 'zerathys/thunder',
-  hiddenMark: 'akyros/hiddenmark',
-  fatalSlash: 'akyros/sword',
-  shadowExecution: 'akyros/shadowexecution',
+  soulSwapWrath: 'zerathys/thunder_wrath',
+  hiddenMark: 'akyros/hidden_mark',
+  fatalSlash: 'akyros/fatal_slash',
+  shadowExecution: 'akyros/shadow_execution',
   // Shadow Toll (Threshold Shift #38) - reuses the shared magic.mp3 sound
   // effect per explicit direction, same reuse pattern as Moonlit Theft/
   // Lifebond/Petrify above - a quiet personal transformation, no dedicated
   // sound needed.
-  shadowToll: 'akyros/magic',
+  shadowToll: 'akyros/shadow_toll',
   // Shadow Seal (replaces Shadow Army) - reuses Athena's own curse sound
   // effect per explicit direction ("sound effect we can use same curse"),
   // same reuse pattern as Petrify/Lifebond/Moonlit Theft above - thematically
   // both are curse-shaped debuffs, no dedicated sound needed.
-  shadowSeal: 'akyros/curse',
-  lunarStrike: 'velorya/sword',
+  shadowSeal: 'akyros/shadow_seal',
+  lunarStrike: 'velorya/lunar_strike',
   moonstep: 'velorya/moonstep',
-  lunarEclipse: 'velorya/eclipse',
+  lunarEclipse: 'velorya/lunar_eclipse',
   // Moonlit Theft (hearts<=3 one-time special) - reuses the shared
   // magic.mp3 sound effect, confirmed ruling: "for sound effect magic.mp3",
   // no dedicated sound needed (same reuse pattern as Petrify/Lifebond).
-  moonlitTheft: 'velorya/magic',
-  chaosGamble: 'boingo/punch',
-  jesterBall: 'boingo/jesterball',
-  fowlPlay: 'boingo/chicken_cast',
+  moonlitTheft: 'velorya/moonlit_theft',
+  chaosGamble: 'boingo/chaos_gamble',
+  jesterBall: 'boingo/jester_ball',
+  fowlPlay: 'boingo/fowl_play',
   chickenAttack: 'boingo/chicken_attack',
-  bloodHunt: 'blade/sword',
+  bloodHunt: 'blade/blood_hunt',
   // Shark Hunt (Mutual Seal #41, replaces Blood Frenzy) - dedicated cast
   // and strike SFX. sharkStrike's own dodge/escape sounds are NOT routed
   // through this table (see 'deep-sea-escape-attempt'/'dodge' handling in
   // main.js/portraitFlash.js instead) since they need per-outcome branching
   // this static actionId->sound lookup can't express.
-  sharkHunt: 'blade/deepsea_cast',
-  sharkStrike: 'blade/deepsea_strike',
+  sharkHunt: 'blade/shark_hunt',
+  sharkStrike: 'blade/shark_strike',
   // Focus (added 2026-09-29) - dedicated focus.mp3 sound effect.
   focus: 'blade/focus',
-  curseStrike: 'athena/curse',
-  divineRestore: 'athena/divinerestore',
+  curseStrike: 'athena/curse_strike',
+  divineRestore: 'athena/divine_restore',
   selfChoke: 'melyssa/self_choke',
   // Friendship (Redirect Bond, design-locked 2026-09-20, replaces Full
   // Control) - reuses the shared magic.mp3 sound effect, same reuse
   // pattern as Shadow Toll/Moonlit Theft/Lifebond above.
-  friendship: 'melyssa/magic',
+  friendship: 'melyssa/friendship',
   // The forced/voluntary break - same guaranteed flat-2 choke as normal
   // Self Choke, reuses its own sound.
   friendshipSelfChoke: 'melyssa/self_choke',
-  grudgeStrike: 'kaelis/grudge_hit',
-  callAshka: 'kaelis/bird_heal',
+  grudgeStrike: 'kaelis/grudge_strike',
+  callAshka: 'kaelis/call_ashka',
   wingsOfAshka: 'kaelis/wings_of_ashka',
   phoenixDive: 'kaelis/phoenix_dive',
-  dyingBlow: 'draxus/axe_strike',
+  dyingBlow: 'draxus/dying_blow',
   deathlessFury: 'draxus/deathless_fury',
   // Resurrection Gamble (Draxus's Cheat Death, taxonomy #32) - a
-  // SUCCESSFUL revival reuses the exact same sound effect as Deathless
-  // Fury's own cast (confirmed ruling 2026-09-06: "same mp3 deathless_
-  // fury"), not a new file. Only ever played on success - main.js's own
-  // 'cheat-death' dispatch branch gates this on entry.success itself,
-  // since a failed roll makes no sound at all.
-  cheatDeath: 'draxus/deathless_fury',
+  // SUCCESSFUL revival plays the same sound as Deathless Fury's own cast
+  // (confirmed ruling 2026-09-06: "same mp3 deathless_fury"), as its own
+  // copy (cheat_death.mp3) so either can be replaced alone. Only ever
+  // played on success - main.js's own 'cheat-death' dispatch branch gates
+  // this on entry.success itself, since a failed roll makes no sound at all.
+  cheatDeath: 'draxus/cheat_death',
   wandStrike: 'marin/wand_strike',
-  arcaneStudy: 'rowan/study',
-  poisonCloud: 'rowan/cloud',
-  purify: 'rowan/healing',
-  wildLightning: 'rowan/lightning',
-  mirrorReflect: 'rowan/mirror',
-  silenceLock: 'rowan/lock',
+  arcaneStudy: 'rowan/arcane_study',
+  poisonCloud: 'rowan/poison_cloud',
+  purify: 'rowan/purify',
+  wildLightning: 'rowan/wild_lightning',
+  mirrorReflect: 'rowan/mirror_reflect',
+  silenceLock: 'rowan/silence_lock',
   // Petrify (hearts<=3 one-time bonus action) - reuses the shared magic.mp3
   // sound effect, confirmed ruling: "use common sound magic.mp3", no
   // dedicated sound needed.
-  petrify: 'rowan/magic',
-  // Frog Curse - dedicated one-shot cast SFX (assets/sounds/frog_curse_cast.mp3).
-  frogCurse: 'rowan/frog_curse_cast',
-  // Snake Strike - dedicated one-shot attack SFX (assets/sounds/snake_bite.mp3).
-  snakeStrike: 'rowan/snake_bite',
+  petrify: 'rowan/petrify',
+  // Frog Curse - dedicated one-shot cast SFX. NOTE: rowan/frog_curse.mp3
+  // doesn't exist yet (was already missing as frog_curse_cast.mp3), so
+  // Frog Curse is silent until it's added.
+  frogCurse: 'rowan/frog_curse',
+  // Snake Strike - dedicated one-shot attack SFX.
+  snakeStrike: 'rowan/snake_strike',
   // Marin: all 5 fire once, at the moment each is discovered (see
   // main.js's 'spell-discovered' handler) - none of them are cast
   // separately later, unlike Rowan's kit. Piercing Wand and Wand Mastery
-  // deliberately share one sound (wandDiscover -> wand_discover.mp3), both
-  // being permanent "the wand just got better" announcements.
+  // play the same "the wand just got better" sound, each as its own copy.
   everbloom: 'marin/everbloom.wav',
-  threefoldVeil: 'marin/magic_dodge.wav',
-  cleanSlate: 'marin/cleanSlate',
-  wandDiscover: 'marin/wand_discover',
+  threefoldVeil: 'marin/threefold_veil.wav',
+  cleanSlate: 'marin/clean_slate',
+  piercingWand: 'marin/piercing_wand',
+  wandMastery: 'marin/wand_mastery',
   // Lifebond (hearts<=3 one-time special) - reuses the shared magic.mp3
   // sound effect, confirmed ruling: "sound effect same. magic.mp3", no
   // dedicated sound needed (same reuse pattern as Rowan's Petrify above).
-  lifebond: 'marin/magic',
-  grimStrike: 'grimtal/sword_thud',
-  skullCrack: 'grimtal/bullet_hit',
+  lifebond: 'marin/lifebond',
+  grimStrike: 'grimtal/grim_strike',
+  skullCrack: 'grimtal/skull_crack',
   // Death-Triggered Reversion #36 - both the transformation cast and the
   // Beast Attack strike have their own real dedicated sound effects.
   beastForm: 'grimtal/beast_form',
   beastAttack: 'grimtal/beast_attack',
   // Reuses Grimtal's spear-thrust impact sound - fitting for her own
   // spear-lunge sacrifice attack, per explicit request.
-  divineSacrifice: 'athena/sword_thud',
+  divineSacrifice: 'athena/divine_sacrifice',
   divineJudgment: 'athena/divine_judgment',
   mirageMark: 'illyra/mirage_mark',
   mirageBurst: 'illyra/mirage_burst',
   mirageOverload: 'illyra/mirage_overload',
   rewind: 'chronox/rewind',
   runeStrike: 'oraclus/rune_strike',
-  runeVision: 'oraclus/predict',
-  // Prophecy of Doom's cast reuses the same sound as Rune Vision's own
-  // cast (confirmed ruling: "yes because both are prediciton") - no new
-  // cast sound effect needed.
-  prophecyOfDoom: 'oraclus/predict',
+  runeVision: 'oraclus/rune_vision',
+  // Prophecy of Doom's cast uses the same sound as Rune Vision's own cast
+  // (confirmed ruling: "yes because both are prediciton"), as its own copy.
+  prophecyOfDoom: 'oraclus/prophecy_of_doom',
 };
 
 // The few actionIds two heroes share (Rowan and Marin both have Wand
@@ -485,10 +486,13 @@ export function playVictory() {
   playSound('common/victory');
 }
 
-// heroId: 'boingo' (Jester Ball checkpoint) or 'chronox' (Cyclone Punch's
-// coin flip) - each has its own copy of coin.mp3.
-export function playCoin(heroId) {
-  playSound(`${heroId}/coin`);
+// The same coin sound, as each hero's own copy.
+export function playJesterBallCheckpoint() {
+  playSound('boingo/jester_ball_checkpoint');
+}
+
+export function playCoinFlip() {
+  playSound('chronox/coin_flip');
 }
 
 export function playRebirth() {
@@ -505,15 +509,15 @@ export function playDodge() {
 // distinct, thematic sound for this one attacker/victim pair, same
 // reasoning as Frog Curse's own frog_dodge_hop.mp3.
 export function playDeepSeaDodge() {
-  playSound('blade/deepsea_dodge');
+  playSound('blade/shark_strike_dodge');
 }
 
 // Escape Seal's own success/fail stingers - main.js's 'deep-sea-escape-
 // attempt' handler picks one based on entry.succeeded.
 export function playDeepSeaEscapeSuccess() {
-  playSound('blade/deepsea_escape_success');
+  playSound('blade/escape_seal_success');
 }
 
 export function playDeepSeaEscapeFail() {
-  playSound('blade/deepsea_escape_fail');
+  playSound('blade/escape_seal_fail');
 }

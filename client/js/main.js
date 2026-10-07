@@ -6,7 +6,7 @@ import {
   startMenuMusic, startBattleMusic, stopMusic, startFrozenMusic, revertFromFrozenMusic,
   startChickenMusic, revertFromChickenMusic,
   startDeepSeaMusic, revertFromDeepSeaMusic,
-  playActionSound, playSound, playKO, playVictory, playDodge, playRebirth, playCoin,
+  playActionSound, playSound, playKO, playVictory, playDodge, playRebirth, playJesterBallCheckpoint, playCoinFlip,
   playDeepSeaDodge, playDeepSeaEscapeSuccess, playDeepSeaEscapeFail,
 } from './sound.js';
 import { handleLogEntryForFlash, handleDodgeForFlash, checkIdlePortrait, registerFlashRerender, queueGrimtalPowerFlash, registerChickenCheck, registerFrogCheck, registerFrozenCheck, registerDeepSeaCheck, setDebugLogEntryIndex, snapshotActiveFlashForDebug, resetFlashDebugHistoryForNewMatch, resetRenderTraceForNewMatch, beginFlashDispatchBatch } from './portraitFlash.js';
@@ -368,11 +368,11 @@ function playLogEntrySound(entry, game) {
     // Threefold Veil discovery sound - see sound.js's ACTION_SOUND) instead
     // of the plain generic dodge sound everyone else gets, per explicit
     // request for a more distinct/weighty cue on his counter-dodge.
-    else if (entry.targetCharacterId === 'grimtal') playSound('grimtal/magic_dodge.wav');
+    else if (entry.targetCharacterId === 'grimtal') playSound('grimtal/grim_ward.wav');
     // Illyra's passive uses its own dedicated illusion.mp3 sound, per
     // explicit request - distinct from both the plain generic dodge and
     // Grimtal's magic_dodge.wav.
-    else if (entry.targetCharacterId === 'illyra') playSound('illyra/illusion.mp3');
+    else if (entry.targetCharacterId === 'illyra') playSound('illyra/illusion_dodge.mp3');
     else playDodge();
     // Marin's Threefold Veil dodge gets its own spoken line on top of the
     // generic dodge sound - a no-op for Akyros's own dodge (same shared
@@ -417,7 +417,7 @@ function playLogEntrySound(entry, game) {
     // a spoken line on top would be redundant.
     const dodgeTarget = game.characters[entry.targetCharacterId];
     if (dodgeTarget?.isFrog && !dodgeTarget.isKO) {
-      playSound('rowan/frog_dodge_hop.mp3');
+      playSound('rowan/frog_dodge.mp3');
     }
     return;
   }
@@ -426,7 +426,7 @@ function playLogEntrySound(entry, game) {
     // sound/tile animation - a roll that resolves with no skip is a non-
     // event visually (nothing was lost), same "only the consequential
     // outcome gets feedback" reasoning as chaosGamble's 'lose' branch below.
-    if (entry.skipped) playSound('grimtal/head_spin.mp3');
+    if (entry.skipped) playSound('grimtal/skull_crack_headache.mp3');
     return;
   }
   if (entry.type === 'rebirth') {
@@ -477,7 +477,7 @@ function playLogEntrySound(entry, game) {
     // multiple simultaneous KOs don't talk over each other.
     const hits = entry.hits || [];
     if (hits.some((h) => h.amountDealt > 0)) {
-      playSound('oraclus/doom_strike');
+      playSound('oraclus/prophecy_of_doom_strike');
     }
     let staggerIndex = 0;
     for (const hit of hits) {
@@ -498,11 +498,11 @@ function playLogEntrySound(entry, game) {
     return;
   }
   if (entry.type === 'jester-ball-pass') {
-    playSound('boingo/kick');
+    playSound('boingo/jester_ball_pass');
     return;
   }
   if (entry.type === 'jester-ball-return') {
-    playSound('boingo/magic');
+    playSound('boingo/jester_ball_return');
     // Layered on top, never replacing the return sound - a no-op for
     // anyone but Boingo (see voice.js's playLaughVoice), and for a KO'd
     // Boingo (see playLaughVoiceIfAlive above).
@@ -515,7 +515,7 @@ function playLogEntrySound(entry, game) {
   // time it lands on him (confirmed ruling - "he will laugh each time ball
   // landed on him"), not just the big payoff moments.
   if (entry.type === 'jester-ball-checkpoint-heal') {
-    playCoin('boingo');
+    playJesterBallCheckpoint();
     playLaughVoiceIfAlive(entry.boingoId, game);
     return;
   }
@@ -527,7 +527,7 @@ function playLogEntrySound(entry, game) {
     // (previously reused Tharox's 'smash' effect, since both are impact
     // sounds - now distinct so updating one doesn't also change the other).
     if (!entry.revived) {
-      playSound('boingo/explosion');
+      playSound('boingo/jester_ball_explosion');
       // Boingo gets the last laugh whenever the ball bursts on SOMEONE
       // ELSE - not when it bursts on himself (he can hold his own ball
       // mid-pass-chain in a multi-target room). A no-op for anyone but
@@ -579,7 +579,7 @@ function playLogEntrySound(entry, game) {
     // action, so it can't flow through the generic playActionSound
     // dispatch below either. matched decides win (triumphant chime) vs
     // miss (fizzle/shatter) - see correct.mp3/wrong.mp3.
-    playSound(entry.matched ? 'oraclus/correct' : 'oraclus/wrong');
+    playSound(entry.matched ? 'oraclus/rune_vision_correct' : 'oraclus/rune_vision_wrong');
     playMoveVoice('oraclus', entry.matched ? 'runeVisionWin' : 'runeVisionLoss');
     return;
   }
@@ -589,7 +589,7 @@ function playLogEntrySound(entry, game) {
     // playActionSound(entry.actionId) dispatch below (no actionId on this
     // entry type). The CAST turn's own heal (a real 'special' entry with
     // actionId: 'callAshka') already gets its sound via that generic path.
-    playSound('kaelis/bird_heal');
+    playSound('kaelis/call_ashka');
     // Same "thank you, Ashka" line as the cast itself (reuses
     // ACTION_VOICE_LINES.kaelis.callAshka via playMoveVoice's normal
     // actionId lookup) - she thanks the bird every time it actually heals
@@ -607,7 +607,7 @@ function playLogEntrySound(entry, game) {
     // with the dark, visceral "feeding off the blade" visual. Voice line:
     // assets/voice/blade/blood_drain.mp3 (looked up via
     // ACTION_VOICE_LINES.blade.bloodDrain in voice.js).
-    playSound('blade/blood_lick');
+    playSound('blade/blood_drain');
     // A heal landed via Shark Strike (viaSharkStrike, see blade.js) keeps
     // the same blood_lick.mp3 sound (generic enough - still a heal off a
     // landed hit) but stays voice-silent - confirmed ruling: the normal
@@ -634,7 +634,7 @@ function playLogEntrySound(entry, game) {
     // ruling: no voice line needed for this, "no need"). Plays every time
     // regardless of amountDealt, same as its own flash - this is always
     // flat 1 pure damage with nothing to dodge/block against.
-    playSound('kaelis/bird_hit');
+    playSound('kaelis/ashkas_vengeance');
     return;
   }
   if (entry.type === 'spell-discovered') {
@@ -654,7 +654,7 @@ function playLogEntrySound(entry, game) {
     // nothing happened yet worth announcing.
     if (entry.characterId === 'marin' && entry.spellId
       && entry.spellId !== 'everbloom' && entry.spellId !== 'cleanSlate') {
-      playActionSound(entry.spellId === 'piercingWand' || entry.spellId === 'wandMastery' ? 'wandDiscover' : entry.spellId);
+      playActionSound(entry.spellId);
       playMoveVoice('marin', entry.spellId);
     }
     return;
@@ -727,9 +727,9 @@ function playLogEntrySound(entry, game) {
   // not a second distinct action - without this it would play the mystical
   // casting sound TWICE in quick succession for one prediction.
   if (entry.actionId === 'runeVision' && entry.stage === 2) return;
-  if (entry.actionId === 'cyclonePunch') playCoin('chronox');
+  if (entry.actionId === 'cyclonePunch') playCoinFlip();
   if (entry.actionId === 'chaosGamble' && entry.outcome === 'lose') {
-    playSound('boingo/miss');
+    playSound('boingo/chaos_gamble_miss');
     return;
   }
   // Marin's Arcane Study cast uses her own quiet notification sound
@@ -738,7 +738,7 @@ function playLogEntrySound(entry, game) {
   // actionId-keyed map with no per-character branching, so this one
   // shared action id needs an explicit override here instead.
   if (entry.actionId === 'arcaneStudy' && entry.characterId === 'marin') {
-    playSound('marin/silent_study.wav');
+    playSound('marin/arcane_study.wav');
     playMoveVoice('marin', 'arcaneStudy');
     return;
   }
