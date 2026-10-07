@@ -8,12 +8,13 @@
 import { allVoiceFilePaths } from './voice.js';
 import { v } from './assetVersion.js';
 
-// Every one-shot sound effect under assets/sounds/ - listed explicitly (not
+// Every one-shot sound effect under assets/sounds/<hero>/ (and common/ for
+// the few no single hero owns - split per hero 2026-10-07; a sound shared
+// by several heroes has its own copy in each) - listed explicitly (not
 // derived from sound.js's ACTION_SOUND map, which only covers ability-
 // triggered sounds and misses click/dodge/victory/etc.) since this list
-// changes rarely, unlike voice lines which are actively being added
-// character-by-character - keep this in sync with assets/sounds/ if a new
-// effect is ever added.
+// changes rarely - keep this in sync with assets/sounds/ if a new effect
+// is ever added.
 //
 // Deliberately excludes the 6 bgm-*.mp3 music tracks (~26MB total) - each
 // startMenuMusic()/startBattleMusic() call randomly picks ONE track and
@@ -26,37 +27,28 @@ import { v } from './assetVersion.js';
 // begin with - unlike the short action-sound effects below, where that
 // gap is real and worth avoiding.
 const SOUND_EFFECT_FILES = [
-  'charge.mp3', 'click.mp3', 'coin.mp3', 'curse.mp3', 'cyclonepunch.mp3',
-  'divinerestore.mp3', 'dodge.mp3', 'eclipse.mp3', 'explosion.mp3', 'freeze.mp3',
-  'game-over.mp3', 'hiddenmark.mp3', 'jesterball.mp3', 'kick.mp3',
-  'magic.mp3', 'miss.mp3', 'moonstep.mp3', 'punch.mp3', 'rebirth.mp3',
-  'shadowexecution.mp3', 'smash.mp3', 'soulswap.mp3',
-  'sword.mp3', 'thunder.mp3', 'toss.mp3', 'victory.mp3',
-  'mind_control.mp3', 'self_choke.mp3',
-  'grudge_hit.mp3', 'bird_heal.mp3', 'blood_lick.mp3',
-  'axe_strike.mp3', 'deathless_fury.mp3',
-  'wand_strike.mp3', 'study.mp3', 'cloud.mp3', 'healing.mp3', 'lightning.mp3', 'mirror.mp3', 'lock.mp3',
-  'frog_curse_cast.mp3', 'frog_dodge_hop.mp3', 'snake_bite.mp3',
-  'everbloom.wav', 'magic_dodge.wav', 'silent_study.wav', 'cleanSlate.mp3', 'wand_discover.mp3',
-  'sword_thud.mp3', 'bullet_hit.mp3', 'head_spin.mp3',
-  'illusion.mp3', 'mirage_mark.mp3', 'mirage_burst.mp3', 'mirage_overload.mp3', 'rewind.mp3',
-  'rune_strike.mp3', 'rune_strike_strong.mp3', 'predict.mp3', 'correct.mp3', 'wrong.mp3',
-  'earthshatter.mp3', 'world_stop.mp3', 'divine_judgment.mp3', 'divine_judgment_strike.mp3',
-  'chicken_cast.mp3', 'chicken_attack.mp3', 'chicken_hit.mp3', 'chicken_koed.mp3',
-  'stabbing.mp3', 'beast_form.mp3', 'beast_attack.mp3',
-  // Shark Hunt (Mutual Seal #41, replaces Blood Frenzy).
-  'deepsea_cast.mp3', 'deepsea_strike.mp3', 'deepsea_dodge.mp3',
-  'deepsea_escape_success.mp3', 'deepsea_escape_fail.mp3',
-  'focus.mp3',
-  // Zerathys's Soul Storm.
-  'soul_storm.mp3',
-  // Kaelis's Wings of Ashka / Phoenix Dive.
-  'wings_of_ashka.mp3', 'phoenix_dive.mp3',
+  'common/click.mp3', 'common/dodge.mp3', 'common/game-over.mp3', 'common/stabbing.mp3', 'common/victory.mp3',
+  'akyros/curse.mp3', 'akyros/hiddenmark.mp3', 'akyros/magic.mp3', 'akyros/shadowexecution.mp3', 'akyros/sword.mp3',
+  'athena/curse.mp3', 'athena/divine_judgment.mp3', 'athena/divine_judgment_strike.mp3', 'athena/divinerestore.mp3', 'athena/sword_thud.mp3',
+  'blade/blood_lick.mp3', 'blade/deepsea_cast.mp3', 'blade/deepsea_dodge.mp3', 'blade/deepsea_escape_fail.mp3', 'blade/deepsea_escape_success.mp3', 'blade/deepsea_strike.mp3', 'blade/focus.mp3', 'blade/rebirth.mp3', 'blade/sword.mp3',
+  'boingo/chicken_attack.mp3', 'boingo/chicken_cast.mp3', 'boingo/chicken_hit.mp3', 'boingo/chicken_koed.mp3', 'boingo/coin.mp3', 'boingo/explosion.mp3', 'boingo/jesterball.mp3', 'boingo/kick.mp3', 'boingo/magic.mp3', 'boingo/miss.mp3', 'boingo/punch.mp3',
+  'chronox/coin.mp3', 'chronox/cyclonepunch.mp3', 'chronox/freeze.mp3', 'chronox/rewind.mp3', 'chronox/world_stop.mp3',
+  'draxus/axe_strike.mp3', 'draxus/deathless_fury.mp3',
+  'grimtal/beast_attack.mp3', 'grimtal/beast_form.mp3', 'grimtal/bullet_hit.mp3', 'grimtal/head_spin.mp3', 'grimtal/magic_dodge.wav', 'grimtal/sword_thud.mp3',
+  'illyra/illusion.mp3', 'illyra/mirage_burst.mp3', 'illyra/mirage_mark.mp3', 'illyra/mirage_overload.mp3',
+  'kaelis/bird_heal.mp3', 'kaelis/bird_hit.mp3', 'kaelis/grudge_hit.mp3', 'kaelis/phoenix_dive.mp3', 'kaelis/wings_of_ashka.mp3',
+  'marin/cleanSlate.mp3', 'marin/everbloom.wav', 'marin/magic.mp3', 'marin/magic_dodge.wav', 'marin/silent_study.wav', 'marin/wand_discover.mp3', 'marin/wand_strike.mp3',
+  'melyssa/magic.mp3', 'melyssa/mind_control.mp3', 'melyssa/self_choke.mp3',
+  'oraclus/correct.mp3', 'oraclus/doom_strike.mp3', 'oraclus/predict.mp3', 'oraclus/rune_strike.mp3', 'oraclus/rune_strike_strong.mp3', 'oraclus/wrong.mp3',
+  'rowan/cloud.mp3', 'rowan/frog_curse_cast.mp3', 'rowan/frog_dodge_hop.mp3', 'rowan/healing.mp3', 'rowan/lightning.mp3', 'rowan/lock.mp3', 'rowan/magic.mp3', 'rowan/mirror.mp3', 'rowan/snake_bite.mp3', 'rowan/study.mp3', 'rowan/wand_strike.mp3',
+  'tharox/earthshatter.mp3', 'tharox/smash.mp3', 'tharox/toss.mp3',
+  'velorya/eclipse.mp3', 'velorya/magic.mp3', 'velorya/moonstep.mp3', 'velorya/sword.mp3',
+  'zerathys/charge.mp3', 'zerathys/soul_storm.mp3', 'zerathys/soulswap.mp3', 'zerathys/thunder.mp3',
 ];
 // Deliberately still excluded from SOUND_EFFECT_FILES preload (see the
-// bandwidth-cap comment above) - bgm-deepsea.mp3 and its new layered
-// companion bgm-deepsea-2.mp3 are both looping music tracks, same "each
-// startXMusic() fetches it live" reasoning as every other bgm-*.mp3.
+// bandwidth-cap comment above) - every bgm-*.mp3 looping music track
+// (common/ menu+battle, and the hero-themed ones under chronox/, boingo/,
+// blade/), same "each startXMusic() fetches it live" reasoning.
 
 let started = false;
 // Deliberately NOT gating the battle screen's brief loading wait on this
