@@ -644,6 +644,10 @@ export function checkIdlePortrait(character, round) {
   // Kaelis airborne (Wings of Ashka) - her idle image must not cover the
   // in-the-sky portrait.
   if (character.id === 'kaelis' && character.special?.airborne) return false;
+  // Grimtal's Beast Form - same reasoning: confirmed live report 2026-10-07
+  // ("idle animation played during beast form") - his human idle.jpg (and
+  // idle voice line, via this same return value) flashed over beast.jpg.
+  if (character.id === 'grimtal' && character.special?.beastFormActive) return false;
   const lastHearts = heartsAtLastTurnStart.has(character.id) ? heartsAtLastTurnStart.get(character.id) : null;
   const wasUntouched = lastHearts === null || character.hearts >= lastHearts;
   const isIdle = wasUntouched && character.hearts > character.maxHearts / 2;
@@ -1379,8 +1383,11 @@ export function handleLogEntryForFlash(entry, game) {
       // the top of this function) is null for a Jester Ball explosion (no
       // single attacker to react to), same guard the old effect already
       // had.
+      // Beast Form Grimtal gets his own beast_rewound.jpg (added 2026-10-07 -
+      // live report: the human rewound.jpg flashed over the Beast).
       if (entry.rewoundCasterId) {
-        setFlash(entry.rewoundCasterId, `assets/images/${entry.rewoundCasterId}/rewound.jpg`, REWOUND_FLASH_DURATION_MS);
+        const rewoundImage = entry.rewoundCasterBeastForm ? 'beast_rewound.jpg' : 'rewound.jpg';
+        setFlash(entry.rewoundCasterId, `assets/images/${entry.rewoundCasterId}/${rewoundImage}`, REWOUND_FLASH_DURATION_MS);
       }
       break;
     case 'cyclonePunch':

@@ -671,6 +671,9 @@ export const actions = {
       log.push({
         type: 'special', characterId: character.id, actionId: 'rewind',
         rewoundCasterId: record.casterId, rewoundActionId: record.actionId,
+        // Stamped after the restore (Beast Form survives it) so the client
+        // shows grimtal/beast_rewound.jpg instead of his human rewound.jpg.
+        rewoundCasterBeastForm: !!game.characters[record.casterId]?.special?.beastFormActive,
       });
       return {};
     },

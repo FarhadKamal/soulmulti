@@ -152,6 +152,7 @@ const FLASH_IMAGES = [
   'assets/images/grimtal/beast_heal.jpg',
   'assets/images/grimtal/beast_end.jpg',
   'assets/images/grimtal/beast_stone.jpg',
+  'assets/images/grimtal/beast_rewound.jpg',
   'assets/images/illyra/idle.jpg',
   'assets/images/illyra/illusion.jpg',
   'assets/images/illyra/mirage_mark.jpg',
