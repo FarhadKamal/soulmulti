@@ -1132,14 +1132,28 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
     tile.appendChild(grudge);
   }
 
+  // Mirage Mark, Blade's hit count and Friendship share one bottom-center
+  // column that stacks upward automatically (added 2026-10-08, when Mirage
+  // Mark switched from an emoji to an image icon and grew as tall as the
+  // other two) - replaces hand-tuned per-badge bottom offsets, which
+  // overlapped once two image badges were on the same tile.
+  const bottomStack = document.createElement('div');
+  bottomStack.className = 'bottom-badge-stack';
+
   if (mirageMarkCount > 0 && !character.isKO) {
     // Illyra's Mirage Mark - same per-relationship badge reasoning as
-    // Kaelis's grudge badge above.
+    // Kaelis's grudge badge above. Custom icon (assets/badge/mirage.png,
+    // 2026-10-08) instead of the old 🪞 emoji.
     const mirage = document.createElement('div');
     mirage.className = 'mirage-mark-badge';
-    mirage.textContent = `🪞${mirageMarkCount}`;
+    const mirageIcon = document.createElement('img');
+    mirageIcon.src = v('assets/badge/mirage.png');
+    mirageIcon.className = 'status-badge-icon';
+    mirageIcon.alt = '';
+    mirage.appendChild(mirageIcon);
+    mirage.appendChild(document.createTextNode(`${mirageMarkCount}`));
     mirage.title = `Illyra's Mirage Mark: ${mirageMarkCount} stack${mirageMarkCount > 1 ? 's' : ''} (her Mirage Burst on you would deal ${mirageMarkCount})`;
-    tile.appendChild(mirage);
+    bottomStack.appendChild(mirage);
   }
 
   if (bladeHitCount > 0 && !character.isKO) {
@@ -1172,7 +1186,7 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
     bladeBadge.title = nextHit === 3
       ? `Blade's hit count on you: ${bladeHitCount} (his next Blood Hunt on you would deal 3 - and drain your blood to heal him)`
       : `Blade's hit count on you: ${bladeHitCount} (his next Blood Hunt on you would deal ${nextHit})`;
-    tile.appendChild(bladeBadge);
+    bottomStack.appendChild(bladeBadge);
   }
 
   if (isFriendshipTile && !character.isKO) {
@@ -1180,9 +1194,7 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
     // own tile and her current friend's (see renderBattle's own
     // isFriendshipTile comment for why this one badge differs from every
     // other per-relationship badge here, which only ever shows on the
-    // OTHER character's tile). Stacks in the same bottom-center column as
-    // Blade's hit-count badge, one slot higher - both are per-relationship
-    // indicators that could plausibly be live on the same tile at once.
+    // OTHER character's tile). Top of the shared bottom-center stack.
     // Custom icon (assets/badge/friendship.png, added 2026-09-22) - same
     // image-badge treatment as Blade's own hit-count badge, no count/text
     // overlay needed here since this is a plain on/off bond indicator.
@@ -1196,8 +1208,9 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
     friendship.title = character.id === 'melyssa'
       ? "Melyssa's Friendship bond is active - any damage aimed at her redirects to her friend instead"
       : "Bonded with Melyssa's Friendship - damage aimed at her redirects to you instead";
-    tile.appendChild(friendship);
+    bottomStack.appendChild(friendship);
   }
+  if (bottomStack.childElementCount > 0) tile.appendChild(bottomStack);
 
   if (isPoisoned && !character.isKO) {
     // Rowan's Poison Cloud - same per-relationship-badge reasoning as
