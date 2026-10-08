@@ -15,82 +15,10 @@ import { v, hardRefresh } from './assetVersion.js';
 // below never throws before the first render.
 let triggerRerender = () => {};
 
-// Live on-screen clock (2026-09-22) - added specifically to close a
-// correlation gap that repeated live-bug investigations kept hitting: the
-// user reports seeing a stuck/wrong portrait image via a SCREENSHOT, but
-// every trace we have (flash-call history, snapshot history, the
-// render-event trace) is only readable AFTER the fact, pasted into chat
-// with no hard link to which exact moment the screenshot was taken -
-// forcing an unreliable reconstruction by eye (matching hearts/round
-// number between the screenshot and the log, which is exactly what went
-// wrong investigating the choke-on-Illyra bug: a misread heart count sent
-// the whole correlation down the wrong log line). Per direct request ("you
-// have to show live timestamp then logs also"): this renders the same
-// Date.now() epoch-millisecond value the render trace's own [render @...]
-// lines already use, updated continuously - so a screenshot's visible
-// timestamp can be searched for VERBATIM in a debug-mode log pasted
-// afterward, no reconstruction needed. Ticks via setInterval rather than
-// being written once at render time, since renderBattle only re-runs on a
-// game-state change - without its own timer this would otherwise go stale
-// between broadcasts and no longer reflect "right now" at screenshot time.
-let liveClockInterval = null;
-// Off by default (2026-09-22, follow-up to the clock's own introduction
-// earlier the same day) - the bug-hunt phase that needed it to always be
-// visible is over ("we will focus on bug and bot improvement base on
-// log"); a dedicated toggle button (see renderTimestampToggleButton
-// below) shows/hides it on demand instead, same on/off pattern as the
-// winner screen's own Debug mode button, so it's available the moment a
-// visual bug needs pinpointing again without permanently taking up space
-// otherwise. Module-level (survives renderBattle's own root.innerHTML =
-// '' teardown/rebuild) so the choice persists across renders within a
-// match, same pattern debugLogMode already uses on the winner screen.
-let showTimestamp = false;
-function renderLiveClock() {
-  const el = document.createElement('div');
-  el.className = 'live-clock';
-  el.title = 'Matches the [render @...] timestamps in a debug-mode log (press D on the winner screen) - include this number if reporting a visual bug, so the exact moment can be found in the log.';
-  if (!showTimestamp) {
-    el.style.display = 'none';
-    // Still needs to exist (even hidden) so toggling it back on doesn't
-    // need a fresh renderBattle pass to pick up a freshly-created element -
-    // the interval below keeps its (invisible) text current the whole
-    // time, same reasoning as always: renderBattle only re-runs on a
-    // game-state change, so without its own timer the clock would read
-    // stale the instant it's shown again.
-  }
-  const tick = () => { el.textContent = String(Date.now()); };
-  tick();
-  // Clear any previous interval before starting a new one - renderBattle
-  // does root.innerHTML = '' on every render, which detaches the old
-  // element from the DOM but does NOT stop its setInterval on its own;
-  // without this, every render would leak one more ticking interval
-  // (each redundantly writing to an element no longer on screen) for the
-  // rest of the match.
-  if (liveClockInterval) clearInterval(liveClockInterval);
-  liveClockInterval = setInterval(tick, 100);
-  return el;
-}
-
-// Tappable show/hide toggle for the live clock above - same compact icon-
-// button style as Leave/Hard Refresh/Mute/Fullscreen, sits alongside them
-// in top-right-controls. A clock emoji reads as "timestamp," distinct
-// from the winner screen's own text-label "Debug: ON/OFF" button (a
-// DIFFERENT feature - that one gates the whole raw-data annotation dump
-// on the match log; this one only shows/hides the small always-ticking
-// number under the Round indicator during live play).
-function renderTimestampToggleButton() {
-  const btn = document.createElement('button');
-  btn.className = 'hard-refresh-btn';
-  btn.title = showTimestamp ? 'Hide timestamp' : 'Show timestamp (for reporting a visual bug)';
-  btn.textContent = '🕐';
-  btn.style.opacity = showTimestamp ? '1' : '0.5';
-  btn.onclick = () => {
-    playUiClick();
-    showTimestamp = !showTimestamp;
-    triggerRerender();
-  };
-  return btn;
-}
+// The live on-screen debug clock and its 🕐 toggle button (added
+// 2026-09-22 for matching bug screenshots to the debug log) were removed
+// 2026-10-08 per user request ("the clock is not needed now"). The debug
+// log's own [render @...] timestamps are unaffected.
 
 // Functional-first battle screen: no portrait art/animation yet (see
 // characterCard.js in the main game for that system) - just hearts,
@@ -164,7 +92,6 @@ export function renderBattle(root, state) {
   roundInfo.className = 'round-info';
   roundInfo.textContent = `Round ${game.round}`;
   wrap.appendChild(roundInfo);
-  wrap.appendChild(renderLiveClock());
 
   // A match can NEVER be force-abandoned/reset for everyone mid-battle
   // (confirmed ruling: "game cannot be exit during battle. only leave
@@ -179,7 +106,6 @@ export function renderBattle(root, state) {
   // manual reset button is needed for that case either.
   const topControls = document.createElement('div');
   topControls.className = 'top-right-controls';
-  topControls.appendChild(renderTimestampToggleButton());
   topControls.appendChild(renderLeaveButton());
   topControls.appendChild(renderHardRefreshIconButton());
   topControls.appendChild(renderMusicMuteButton());
