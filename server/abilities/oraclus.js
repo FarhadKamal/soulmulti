@@ -32,6 +32,14 @@ function resolveProphecyOfDoomStrike(game, log) {
   // it's a flag on THIS entry, not a standalone entry of its own. "First
   // occurrence wins", same reasoning as every other deferred field here.
   let redirectedToFriendId = null;
+  // Rowan's Mirror Reflect - an armed mirror DOES fire on this hit (and is
+  // used up), reflecting at Oraclus who is already dead, so it does
+  // nothing. Confirmed ruling, 2026-10-09 (option B): keep that behavior,
+  // but make it visible - it used to vanish without any log line, since
+  // this loop never forwarded mirrorReflectLogEntry. Folded onto THIS entry
+  // (same as redirectedToFriendId) rather than a separate deferred line,
+  // so none of the 4 callers needs new forwarding code.
+  let mirrorReflect = null;
   for (const target of Object.values(game.characters)) {
     if (target.id === 'oraclus' || target.isKO) continue;
     // Blade's Shark Hunt (taxonomy #41, Mutual Seal) - a sealed character
@@ -62,6 +70,10 @@ function resolveProphecyOfDoomStrike(game, log) {
     if (result.friendshipEndLogEntry && !friendshipEndLogEntry) friendshipEndLogEntry = result.friendshipEndLogEntry;
     if (result.friendshipSpilloverLogEntry && !friendshipSpilloverLogEntry) friendshipSpilloverLogEntry = result.friendshipSpilloverLogEntry;
     if (result.redirectedToFriendId && !redirectedToFriendId) redirectedToFriendId = result.redirectedToFriendId;
+    if (result.mirrorReflectLogEntry && !mirrorReflect) {
+      const m = result.mirrorReflectLogEntry;
+      mirrorReflect = { fromCharacterId: m.fromCharacterId, toCharacterId: m.toCharacterId, amount: m.amount };
+    }
   }
   if (hits.length === 0) return null;
   // Returned as a wrapper (not mixed directly into the entry object) so
@@ -76,6 +88,7 @@ function resolveProphecyOfDoomStrike(game, log) {
     entry: {
       type: 'prophecy-of-doom-trigger', fromCharacterId: 'oraclus', hits,
       ...(redirectedToFriendId ? { redirectedToFriendId } : {}),
+      ...(mirrorReflect ? { mirrorReflect } : {}),
     },
     friendshipEndLogEntry, friendshipSpilloverLogEntry,
   };

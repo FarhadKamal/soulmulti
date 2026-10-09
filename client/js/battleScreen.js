@@ -2748,7 +2748,13 @@ function describeLogEntry(entry) {
       const hitsText = (entry.hits || [])
         .map((h) => `${name(h.targetId)} (${h.amountDealt} dmg${h.koTriggered ? ' - KO!' : ''})`)
         .join(', ');
-      return `Prophecy of Doom rains down - ${hitsText}`;
+      // Rowan's Mirror Reflect fires on this hit and is used up, but Oraclus
+      // is already dead, so the reflected damage does nothing (ruling
+      // 2026-10-09: keep it, just show it - see oraclus.js).
+      const mirrorText = entry.mirrorReflect
+        ? ` - ${name(entry.mirrorReflect.fromCharacterId)}'s Mirror Reflect fires back at the fallen ${name(entry.mirrorReflect.toCharacterId)} and is spent`
+        : '';
+      return `Prophecy of Doom rains down - ${hitsText}${mirrorText}`;
     }
     case 'ashka-heal':
       return `${name(entry.characterId)}'s Ashka heals +${entry.healed}`;
