@@ -13,14 +13,24 @@ import { v } from './assetVersion.js';
 const BADGE_ICONS = [
   'assets/badge/beast.png',
   'assets/badge/blade_hit.png',
+  'assets/badge/charge.png',
+  'assets/badge/clean_slate.png',
+  'assets/badge/everbloom.png',
   'assets/badge/friendship.png',
   'assets/badge/glory_smash.png',
+  'assets/badge/grudge.png',
   'assets/badge/mirage.png',
+  'assets/badge/piercing_wand.png',
+  'assets/badge/poison.png',
+  'assets/badge/rewind.png',
   'assets/badge/seal_heart.png',
   'assets/badge/skull.png',
   'assets/badge/skull_crack.png',
+  'assets/badge/silence.png',
   'assets/badge/skull_heart.png',
   'assets/badge/tharox_charge.png',
+  'assets/badge/threefold_veil.png',
+  'assets/badge/wand_mastery.png',
 ];
 
 // Flash/persistent-portrait images - filenames don't follow a fixed

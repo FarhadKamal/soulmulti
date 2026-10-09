@@ -561,6 +561,16 @@ input {
    badge pattern as .grudge-badge above, positioned at the bottom corners
    so neither collides with the grudge badge (top-right) or the Jester
    Ball icon (top-left). */
+/* Corner badges built by battleScreen.js's iconBadge() (2026-10-09) - icon
+   image plus optional count, vertically centered together. */
+.icon-badge { display: flex; align-items: center; line-height: 1; }
+.icon-badge .status-badge-icon { vertical-align: middle; }
+/* Dark backing so the colored icon stays visible (a red chakram on a red
+   pill / green drop on a green pill nearly vanished) - each badge keeps its
+   identity color as a border + glow instead. */
+.grudge-badge.icon-badge { background: rgba(28, 28, 44, 0.92); border: 1px solid #c53030; box-shadow: 0 0 6px rgba(197, 48, 48, 0.7); }
+.poison-badge.icon-badge { background: rgba(28, 28, 44, 0.92); border: 1px solid #2f9e44; box-shadow: 0 0 6px rgba(47, 158, 68, 0.7); }
+.silence-badge.icon-badge { background: rgba(28, 28, 44, 0.92); border: 1px solid #7b3fc4; box-shadow: 0 0 6px rgba(123, 63, 196, 0.7); }
 .poison-badge {
   position: absolute; bottom: 6px; left: 8px;
   background: rgba(34, 139, 34, 0.85); color: #fff;

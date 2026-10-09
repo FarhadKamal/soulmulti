@@ -1063,11 +1063,8 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
     // (never a per-enemy breakdown, which wouldn't fit), gated to only
     // render when there's a real count to show. Vanishes the instant a
     // landed Grudge Strike resets it to 0.
-    const grudge = document.createElement('div');
-    grudge.className = 'grudge-badge';
-    grudge.textContent = `🗡${grudgeCount}`;
-    grudge.title = `Kaelis's grudge: ${grudgeCount} (her next Grudge Strike on you deals ${1 + grudgeCount})`;
-    tile.appendChild(grudge);
+    tile.appendChild(iconBadge('grudge-badge', 'assets/badge/grudge.png', `${grudgeCount}`,
+      `Kaelis's grudge: ${grudgeCount} (her next Grudge Strike on you deals ${1 + grudgeCount})`));
   }
 
   // Mirage Mark, Blade's hit count and Friendship share one bottom-center
@@ -1156,11 +1153,8 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
     // collides with it (both could theoretically be active on the same
     // target at once). No count/duration shown since the DoT has no fixed
     // duration - it's purely a yes/no "currently poisoned" signal.
-    const poison = document.createElement('div');
-    poison.className = 'poison-badge';
-    poison.textContent = '☠';
-    poison.title = "Poisoned by Rowan's Poison Cloud - loses 1 heart at the start of every turn until cured or Rowan is KO'd";
-    tile.appendChild(poison);
+    tile.appendChild(iconBadge('poison-badge', 'assets/badge/poison.png', '',
+      "Poisoned by Rowan's Poison Cloud - loses 1 heart at the start of every turn until cured or Rowan is KO'd"));
   }
 
   if (silencedTurns > 0 && !character.isKO) {
@@ -1168,11 +1162,8 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
     // Chain icon (matches the cast animation's own chain-arc visual, see
     // the .lock-chain elements further down) rather than a mute-speaker
     // icon, which read as "can't speak" instead of "special ability locked."
-    const silence = document.createElement('div');
-    silence.className = 'silence-badge';
-    silence.textContent = `⛓️${silencedTurns}`;
-    silence.title = `Silenced by Rowan - cannot use their special ability for ${silencedTurns} more of their own turn(s)`;
-    tile.appendChild(silence);
+    tile.appendChild(iconBadge('silence-badge', 'assets/badge/silence.png', `${silencedTurns}`,
+      `Silenced by Rowan - cannot use their special ability for ${silencedTurns} more of their own turn(s)`));
   }
 
 
@@ -1472,6 +1463,22 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
 // These are ongoing state (Zerathys's charge count in particular has no
 // other visible indicator once the one-shot Charge Up flash expires),
 // unlike the timed action-flash portraits/tile effects above.
+// Tile-corner badge with a custom icon (assets/badge/*.png, 2026-10-09 -
+// replaced the old ☠ / ⛓️ / 🗡 emoji) plus an optional count, same
+// icon-then-number layout as Blade's hit-count badge.
+function iconBadge(className, iconPath, countText, title) {
+  const badge = document.createElement('div');
+  badge.className = `${className} icon-badge`;
+  const img = document.createElement('img');
+  img.src = v(iconPath);
+  img.className = 'status-badge-icon';
+  img.alt = '';
+  badge.appendChild(img);
+  if (countText) badge.appendChild(document.createTextNode(countText));
+  badge.title = title;
+  return badge;
+}
+
 function statusBadges(character) {
   const badges = [];
   // Tharox gets his own dedicated "N/2" badge below instead of the generic
@@ -1499,7 +1506,7 @@ function statusBadges(character) {
   }
   switch (character.id) {
     case 'chronox':
-      badges.push({ text: `Rewind: ${character.special.rewindUsesRemaining}/2` });
+      badges.push({ icon: 'assets/badge/rewind.png', text: `${character.special.rewindUsesRemaining}/2`, title: 'Rewind uses remaining' });
       // World Stops has its own dedicated usedWorldStops flag (separate
       // from usedSpecial, which Time Freeze owns) - only surfaced here
       // while its 2-round effect is actively ongoing (matching the action
@@ -1528,7 +1535,7 @@ function statusBadges(character) {
       if (character.hearts <= 3) {
         badges.push({ text: 'Overcharged (Thunder Wrath: 3)', cls: 'warn' });
       } else {
-        badges.push({ text: `Charge: ${character.special.chargeCount}/2` });
+        badges.push({ icon: 'assets/badge/charge.png', text: `${character.special.chargeCount}/2`, title: 'Charge - Thunder Wrath deals 1 + charge' });
       }
       break;
     // No dedicated Blade badge on his own tile - his per-target hit counts
@@ -1587,18 +1594,18 @@ function statusBadges(character) {
         // Icon-only (no label text) - keeps the tile from getting cluttered
         // once several of these badges stack up at once; each icon's
         // meaning is established by its own discovery flash/voice line.
-        badges.push({ text: '🍃', title: 'Everbloom active - heals +1 every other of her own turns' });
+        badges.push({ icon: 'assets/badge/everbloom.png', title: 'Everbloom active - heals +1 every other of her own turns' });
       }
       if (character.special.veilChargesRemaining > 0) {
-        badges.push({ text: `🌀 ${character.special.veilChargesRemaining}`, title: 'Threefold Veil - dodge charges remaining' });
+        badges.push({ icon: 'assets/badge/threefold_veil.png', text: `${character.special.veilChargesRemaining}`, title: 'Threefold Veil - dodge charges remaining' });
       }
       if (character.special.piercingWandActive) {
         // Permanent passive, one-shot discovery flash only - same "no
         // ongoing confirmation otherwise" reasoning as Everbloom above.
-        badges.push({ text: '🗡️', title: 'Piercing Wand - Wand Strike ignores shield' });
+        badges.push({ icon: 'assets/badge/piercing_wand.png', title: 'Piercing Wand - Wand Strike ignores shield' });
       }
       if (character.special.wandMasteryActive) {
-        badges.push({ text: '⭐', title: 'Wand Mastery - Wand Strike deals 2 damage' });
+        badges.push({ icon: 'assets/badge/wand_mastery.png', title: 'Wand Mastery - Wand Strike deals 2 damage' });
       }
       if (character.special.cleanSlateArmed) {
         // Discovered but hasn't fired yet - a purely reactive, one-time
@@ -1608,10 +1615,10 @@ function statusBadges(character) {
         // without this, the only confirmation was a flash at the exact
         // instant it triggers (easy to miss) plus a log line - no ongoing
         // "this is active and waiting" indicator like every other spell.
-        badges.push({ text: '🕯️', title: 'Clean Slate ready - will cleanse and grant immunity on the next negative status' });
+        badges.push({ icon: 'assets/badge/clean_slate.png', title: 'Clean Slate ready - will cleanse and grant immunity on the next negative status' });
       }
       if (character.special.cleanSlateImmuneTurnsRemaining > 0) {
-        badges.push({ text: `🕯️ ${character.special.cleanSlateImmuneTurnsRemaining}`, cls: 'warn', title: 'Clean Slate immunity - turns remaining' });
+        badges.push({ icon: 'assets/badge/clean_slate.png', text: `${character.special.cleanSlateImmuneTurnsRemaining}`, cls: 'warn', title: 'Clean Slate immunity - turns remaining' });
       }
       break;
     case 'grimtal': {
