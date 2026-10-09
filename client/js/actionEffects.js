@@ -39,6 +39,7 @@ const EFFECT_DURATION_MS = {
   predictionloss: 700,
   mirageshatter: 600,
   shieldgain: 900,
+  shieldblock: 900,
 };
 
 // How long the mirror-shard counter-hit effect waits before it even starts,
@@ -182,6 +183,16 @@ function applyHitFlash(targetCharacterId, amountDealt) {
   }
 }
 
+// A hit that landed but was FULLY soaked by shield (0 hearts lost, absorbed
+// > 0) - added 2026-10-09 (live report: Boingo blocked 6 damage across
+// Earthshatter and Titan Smash with no reaction on his tile at all). Only
+// fires when no hearts were lost, so it never stacks with the red hit-flash.
+function applyShieldBlock(targetCharacterId, amountDealt, absorbed) {
+  if (targetCharacterId && !(amountDealt > 0) && absorbed > 0) {
+    addEffect(targetCharacterId, 'shieldblock', EFFECT_DURATION_MS.shieldblock);
+  }
+}
+
 // Processes one NEW log entry and fires whatever tile effect(s) it implies.
 // Call in log-append order, alongside handleLogEntryForFlash.
 export function handleLogEntryForEffects(entry, game) {
@@ -310,6 +321,7 @@ export function handleLogEntryForEffects(entry, game) {
   // duration, giving it room to read before the shard burst starts.
   if (entry.type === 'mirror-reflect') {
     applyHitFlash(entry.toCharacterId, entry.amount);
+    if (!isKO(entry.toCharacterId)) applyShieldBlock(entry.toCharacterId, entry.amount, entry.absorbed);
     if (entry.amount > 0) addEffect(entry.toCharacterId, 'shake', EFFECT_DURATION_MS.shake);
     setTimeout(() => {
       addEffect(entry.toCharacterId, 'mirrorshard', EFFECT_DURATION_MS.mirrorshard);
@@ -399,6 +411,8 @@ export function handleLogEntryForEffects(entry, game) {
         // own render (not cached here), so it genuinely looks different
         // every single detonation rather than reusing one fixed pattern.
         addEffect(burst.targetId, 'mirageshatter', EFFECT_DURATION_MS.mirageshatter);
+      } else if (!isKO(burst.targetId)) {
+        applyShieldBlock(burst.targetId, burst.amountDealt, burst.absorbed);
       }
     }
     return;
@@ -414,7 +428,19 @@ export function handleLogEntryForEffects(entry, game) {
         // landed on at once, matching "one overwhelming blow" scaled up to
         // hit everyone rather than a new bespoke effect.
         addEffect(hit.targetId, 'bigshatter', EFFECT_DURATION_MS.bigshatter);
+      } else if (!isKO(hit.targetId)) {
+        applyShieldBlock(hit.targetId, hit.amountDealt, hit.absorbed);
       }
+    }
+    return;
+  }
+
+  // Prophecy of Doom's meteor - no tile effects of its own (the doom_strike
+  // portrait flash carries the moment), except the shield-block reaction for
+  // anyone whose shield soaked the whole hit.
+  if (entry.type === 'prophecy-of-doom-trigger') {
+    for (const hit of entry.hits || []) {
+      if (!isKO(hit.targetId)) applyShieldBlock(hit.targetId, hit.amountDealt, hit.absorbed);
     }
     return;
   }
@@ -432,6 +458,7 @@ export function handleLogEntryForEffects(entry, game) {
   const targetId = entry.targetCharacterId ?? entry.targetId;
 
   applyHitFlash(targetId, amountDealt);
+  if (!dodged && targetId && !isKO(targetId)) applyShieldBlock(targetId, amountDealt, entry.absorbed);
 
   // Self-buff golden glow: Divine Restore, Glory Smash, and Rowan's Purify
   // all self-heal the caster - only if the buff actually landed (caster

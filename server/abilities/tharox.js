@@ -115,6 +115,10 @@ export const actions = {
       // shield absorbs the same total whether given N points at once or
       // one at a time (Math.min(shield, amt) per hit, damagePipeline.js).
       const dealtByTarget = {};
+      // Shield-blocked points per target (2026-10-09) - so the log can say
+      // "Boingo (0 dmg, 3 absorbed by shield)" instead of a bare "0 dmg",
+      // and the client can show a shield-block effect on a full block.
+      const absorbedByTarget = {};
       const koTriggeredByTarget = {};
       // First mid-cast Rebirth save (if any) - surfaced as the top-level
       // rebirthLogEntry return field, matching the single-field contract
@@ -210,6 +214,7 @@ export const actions = {
         // though her hearts never moved and the friend's did.
         const dealtTargetId = result.targetCharacterId;
         dealtByTarget[dealtTargetId] = (dealtByTarget[dealtTargetId] || 0) + (result.amountDealt || 0);
+        absorbedByTarget[dealtTargetId] = (absorbedByTarget[dealtTargetId] || 0) + (result.absorbed || 0);
         if (result.rebirthLogEntry && !rebirthLogEntry) rebirthLogEntry = result.rebirthLogEntry;
         if (result.mirrorLogEntry) {
           mirrorTotal += result.mirrorLogEntry.amount;
@@ -256,6 +261,7 @@ export const actions = {
       const hits = Object.entries(dealtByTarget).map(([tid, amountDealt]) => ({
         targetId: tid,
         amountDealt,
+        absorbed: absorbedByTarget[tid] || 0,
         koTriggered: !!koTriggeredByTarget[tid],
       }));
       log.push({ type: 'special', characterId: character.id, actionId: 'earthshatter', hits, ...(redirectedToFriendId ? { redirectedToFriendId } : {}) });

@@ -631,6 +631,18 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
   if (effects.has('shake') && !character.isKO) tile.classList.add('char-tile--shake');
   if (effects.has('dodge') && !character.isKO) tile.classList.add('char-tile--dodge');
   if (effects.has('divine') && !character.isKO) tile.classList.add('char-tile--divine');
+  // A hit fully soaked by shield (actionEffects.js's applyShieldBlock) -
+  // blue ring pulse plus a shield popping up over the tile, so a full block
+  // visibly registers instead of nothing happening at all.
+  if (effects.has('shieldblock') && !character.isKO) {
+    tile.classList.add('char-tile--shieldblock');
+    const block = document.createElement('div');
+    block.className = 'shield-block-fx';
+    // U+FE0F forces the full-color emoji - without it Windows draws a thin
+    // monochrome outline that's nearly invisible over a portrait.
+    block.textContent = '\u{1F6E1}️';
+    tile.appendChild(block);
+  }
   if (effects.has('revive') && !character.isKO) tile.classList.add('char-tile--revive');
   if (effects.has('claw') && !character.isKO) {
     const claw = document.createElement('div');
@@ -2389,6 +2401,13 @@ function fallbackCopy(text, onDone) {
   document.body.removeChild(ta);
 }
 
+// " (3 absorbed by shield)" when a hit's shield soaked some or all of it
+// (2026-10-09) - otherwise a fully blocked hit read as a bare "0 damage",
+// as if it did nothing. '' when nothing was absorbed.
+function absorbedText(absorbed) {
+  return absorbed ? ` (${absorbed} absorbed by shield)` : '';
+}
+
 // Describes which status-block mechanic actually intercepted a
 // curse/mark/freeze/silence/headache attempt - reads entry.blockedBy
 // (confirmed bug fix, 2026-09-01: every status-application site used to
@@ -2510,9 +2529,9 @@ function describeLogEntry(entry) {
         // High/low damage tier (Death-Triggered Reversion #36) - noted
         // explicitly since the number alone (2 vs 3) doesn't otherwise
         // explain WHY this particular target took more/less than usual.
-        return `${name(entry.characterId)} used ${actionLabel(entry.actionId)} on ${name(actualAttackTargetId(entry))}${entry.amountDealt != null ? ` - ${entry.amountDealt} damage` : ''}${entry.isHighTier ? ' (highest hearts!)' : ''}${entry.koTriggered ? ' - KO!' : ''}`;
+        return `${name(entry.characterId)} used ${actionLabel(entry.actionId)} on ${name(actualAttackTargetId(entry))}${entry.amountDealt != null ? ` - ${entry.amountDealt} damage` : ''}${absorbedText(entry.absorbed)}${entry.isHighTier ? ' (highest hearts!)' : ''}${entry.koTriggered ? ' - KO!' : ''}`;
       }
-      return `${name(entry.characterId)} used ${actionLabel(entry.actionId)} on ${name(actualAttackTargetId(entry))}${entry.amountDealt != null ? ` - ${entry.amountDealt} damage` : ''}${entry.koTriggered ? ' - KO!' : ''}`;
+      return `${name(entry.characterId)} used ${actionLabel(entry.actionId)} on ${name(actualAttackTargetId(entry))}${entry.amountDealt != null ? ` - ${entry.amountDealt} damage` : ''}${absorbedText(entry.absorbed)}${entry.koTriggered ? ' - KO!' : ''}`;
     case 'special':
       if (entry.actionId === 'fowlPlay') {
         const victims = entry.chickenIds || [];
@@ -2541,7 +2560,7 @@ function describeLogEntry(entry) {
         // (markedCharacterId will always equal targetId in that case).
         const parts = entry.bursts.map((b) => {
           const stackText = `${b.stackCount} stack${b.stackCount > 1 ? 's' : ''}`;
-          const dmgText = `${b.amountDealt != null ? `, ${b.amountDealt} dmg` : ''}${b.koTriggered ? ' - KO!' : ''}`;
+          const dmgText = `${b.amountDealt != null ? `, ${b.amountDealt} dmg` : ''}${b.absorbed ? `, ${b.absorbed} absorbed by shield` : ''}${b.koTriggered ? ' - KO!' : ''}`;
           if (b.markedCharacterId && b.markedCharacterId !== b.targetId) {
             return `${name(b.markedCharacterId)}'s mark (redirected to ${name(b.targetId)}) - ${stackText}${dmgText}`;
           }
@@ -2564,7 +2583,7 @@ function describeLogEntry(entry) {
           return `${name(entry.characterId)} unleashed Earthshatter - the ground cracked, but no one was left to hit!`;
         }
         const parts = entry.hits.map((h) =>
-          `${name(h.targetId)} (${h.amountDealt != null ? `${h.amountDealt} dmg` : '0 dmg'}${h.koTriggered ? ' - KO!' : ''})`
+          `${name(h.targetId)} (${h.amountDealt != null ? `${h.amountDealt} dmg` : '0 dmg'}${h.absorbed ? `, ${h.absorbed} absorbed by shield` : ''}${h.koTriggered ? ' - KO!' : ''})`
         );
         return `${name(entry.characterId)} unleashed Earthshatter - ${parts.join(', ')}`;
       }
@@ -2724,7 +2743,7 @@ function describeLogEntry(entry) {
         // decaying shield). The hearts-snapshot suffix rendered the shield
         // correctly, but nothing in the line text itself explained WHY it
         // changed - reported live as "that was not showing in screen."
-        return `${name(entry.characterId)} used their SPECIAL: Glory Smash on ${name(actualAttackTargetId(entry))}${entry.amountDealt != null ? ` - ${entry.amountDealt} damage` : ''}${entry.koTriggered ? ' - KO!' : ''} (+2 hearts, +2 shield)`;
+        return `${name(entry.characterId)} used their SPECIAL: Glory Smash on ${name(actualAttackTargetId(entry))}${entry.amountDealt != null ? ` - ${entry.amountDealt} damage` : ''}${absorbedText(entry.absorbed)}${entry.koTriggered ? ' - KO!' : ''} (+2 hearts, +2 shield)`;
       }
       return `${name(entry.characterId)} used their SPECIAL: ${actionLabel(entry.actionId)}${entry.targetId ? ` on ${name(actualAttackTargetId(entry))}` : ''}${blockedByText(entry.blockedBy)}`;
     case 'setup':
@@ -2746,7 +2765,7 @@ function describeLogEntry(entry) {
       return `Divine Judgment falls upon ${name(entry.toCharacterId)}${entry.koTriggered ? ' - KO!' : ''}`;
     case 'prophecy-of-doom-trigger': {
       const hitsText = (entry.hits || [])
-        .map((h) => `${name(h.targetId)} (${h.amountDealt} dmg${h.koTriggered ? ' - KO!' : ''})`)
+        .map((h) => `${name(h.targetId)} (${h.amountDealt} dmg${h.absorbed ? `, ${h.absorbed} absorbed by shield` : ''}${h.koTriggered ? ' - KO!' : ''})`)
         .join(', ');
       // Rowan's Mirror Reflect fires on this hit and is used up, but Oraclus
       // is already dead, so the reflected damage does nothing (ruling

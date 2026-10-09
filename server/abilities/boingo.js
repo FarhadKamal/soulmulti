@@ -102,7 +102,7 @@ registerOnOwnDeath('boingo', (character, game, log) => {
       // targetId uses result.targetCharacterId, not the loop's own
       // pre-redirect target.id - same fix/reasoning as blade.js's Blood
       // Frenzy (confirmed real bug, 2026-09-21, Melyssa's Friendship).
-      hits.push({ targetId: result.targetCharacterId, amountDealt: result.amountDealt, koTriggered: result.koTriggered });
+      hits.push({ targetId: result.targetCharacterId, amountDealt: result.amountDealt, absorbed: result.absorbed || 0, koTriggered: result.koTriggered });
       if (result.friendshipEndLogEntry && !friendshipEndLogEntry) friendshipEndLogEntry = result.friendshipEndLogEntry;
       if (result.friendshipSpilloverLogEntry && !friendshipSpilloverLogEntry) friendshipSpilloverLogEntry = result.friendshipSpilloverLogEntry;
       if (result.redirectedToFriendId && !redirectedToFriendId) redirectedToFriendId = result.redirectedToFriendId;
