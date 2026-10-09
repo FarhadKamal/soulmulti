@@ -669,6 +669,12 @@ export function createGame(mode, playerPicks) {
     log: [{
       type: 'match-start-roster',
       players: players.map((p) => ({ characterIds: p.characterIds, isPC: p.isPC })),
+      // True starting hearts/shield (same shape as damagePipeline.js's
+      // heartsSnapshot, built inline - importing it here would be circular).
+      // Without its own snapshot the log viewer borrowed the NEXT action's,
+      // so a first move that dealt damage (e.g. Skull Crack) showed up as
+      // the "starting" state (confirmed live report, 2026-10-09).
+      hearts: Object.fromEntries(Object.values(characters).map((c) => [c.id, { hearts: c.hearts, shield: c.shield }])),
     }],
   };
 }
