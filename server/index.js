@@ -984,11 +984,12 @@ function stepBotMindControlTurn(room, melyssaId, puppetId) {
   }
 
   // decision.kind === 'realAction'
-  executeActionAsPuppet(room.game, melyssaId, puppetId, decision.actionId, decision.targetId);
+  const puppetResult = executeActionAsPuppet(room.game, melyssaId, puppetId, decision.actionId, decision.targetId);
   // excludeOwnerId=Melyssa's own side - see chooseSoulSwapWrathTarget's own
   // comment for why this follow-up needs it and a normal (non-puppeted)
-  // Soul Swap doesn't.
-  const wrathTarget = decision.actionId === 'soulSwap'
+  // Soul Swap doesn't. A resisted Soul Swap never happened, so no free
+  // Wrath either.
+  const wrathTarget = decision.actionId === 'soulSwap' && !puppetResult?.resisted
     ? chooseSoulSwapWrathTarget(puppet, room.game, room.game.characters[melyssaId].ownerId)
     : null;
   if (wrathTarget) {
@@ -1887,8 +1888,9 @@ function handleMindControlAction(room, sessionId, { characterId, puppetId, actio
     finishJesterBall(room.game, 'pass', targetId);
     // Pass DOES consume the holder's action - Mind Control turn is complete.
   } else {
-    executeActionAsPuppet(room.game, characterId, puppetId, actionId, targetId);
-    if (actionId === 'soulSwap') {
+    const puppetResult = executeActionAsPuppet(room.game, characterId, puppetId, actionId, targetId);
+    // A resisted Soul Swap never happened, so no free Wrath follow-up.
+    if (actionId === 'soulSwap' && !puppetResult?.resisted) {
       // Puppeted Soul Swap's automatic Thunder Wrath follow-up - she picks
       // its target too, same Mind Control turn. Submitted back through
       // THIS same handler (not handleSoulSwapWrath, whose seat-check

@@ -1514,7 +1514,10 @@ export function executeActionAsPuppet(game, melyssaCharacterId, puppetCharacterI
       controllingMelyssaId: melyssaCharacterId,
     }];
     finalizeAction(game, log, {}, puppetCharacterId, actionId, targetId);
-    return {};
+    // resisted lets callers skip follow-ups that only exist because the
+    // action ran - e.g. a resisted Soul Swap must not still grant its free
+    // Thunder Wrath (confirmed real bug, 2026-10-10).
+    return { resisted: true };
   }
   const before = game.log.length;
   const result = executeAction(game, puppetCharacterId, actionId, targetId, extra);
