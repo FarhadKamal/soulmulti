@@ -1366,6 +1366,11 @@ export function handleLogEntryForFlash(entry, game) {
           ? 'assets/images/zerathys/overcharge_strike.jpg'
           : 'assets/images/zerathys/strike.jpg');
       }
+      // Victim's own per-hero lightning reaction (added 2026-10-10) - one set
+      // for every Wrath tier, same gate and no-!isKO rule as grudge_hit.jpg.
+      if (!dodged && targetCharacterId && amountDealt > 0) {
+        setFlash(targetCharacterId, `assets/images/${targetCharacterId}/thunder_hit.jpg`);
+      }
       break;
     case 'timeFreeze':
       setFlash(characterId, 'assets/images/chronox/time.jpg'); break;
