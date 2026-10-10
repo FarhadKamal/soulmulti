@@ -1392,6 +1392,11 @@ export function handleLogEntryForFlash(entry, game) {
       break;
     case 'cyclonePunch':
       if (!dodged) setFlash(characterId, 'assets/images/chronox/cyclone.jpg');
+      // Victim's own per-hero clock-punch reaction (added 2026-10-10) - same
+      // gate and no-!isKO rule as grudge_hit.jpg below.
+      if (!dodged && targetCharacterId && amountDealt > 0) {
+        setFlash(targetCharacterId, `assets/images/${targetCharacterId}/cyclone_hit.jpg`);
+      }
       break;
     case 'shadowExecution':
       if (!dodged) setFlash(characterId, 'assets/images/akyros/shadow.jpg');
