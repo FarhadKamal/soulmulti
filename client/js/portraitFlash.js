@@ -1408,6 +1408,11 @@ export function handleLogEntryForFlash(entry, game) {
       break;
     case 'fatalSlash':
       if (!dodged) setFlash(characterId, 'assets/images/akyros/fatal.jpg');
+      // Victim's own per-hero slash reaction (added 2026-10-11) - one set for
+      // marked and unmarked hits, same gate and no-!isKO rule as grudge_hit.jpg.
+      if (!dodged && targetCharacterId && amountDealt > 0) {
+        setFlash(targetCharacterId, `assets/images/${targetCharacterId}/fatal_slash_hit.jpg`);
+      }
       break;
     case 'shadowToll':
       // Threshold Shift (#38) - self-only, no victims, default flash
