@@ -1296,7 +1296,25 @@ export function handleLogEntryForFlash(entry, game) {
     // to amount for any entry that predates it.
     const dealt = entry.amountDealt ?? entry.amount;
     if (dealt > 0 && !entry.revived && (!isKO(entry.toCharacterId) || entry.koTriggered)) {
-      setFlash(entry.toCharacterId, `assets/images/${entry.toCharacterId}/curse_hit.jpg`);
+      const cursedId = entry.toCharacterId;
+      const src = `assets/images/${cursedId}/curse_hit.jpg`;
+      // When the cursed hero's tile already got a flash from this same
+      // broadcast (they attacked Athena themselves, or were the Divine
+      // Sacrifice target whose self-cost bounced back), let that image play
+      // its full turn first, then show the curse striking back (confirmed
+      // direction 2026-10-11) - otherwise curse_hit.jpg replaces it
+      // instantly. Skipped if something newer took the tile meanwhile.
+      const earlier = activeFlash.get(cursedId);
+      if (earlier && earlier.setAt === currentBatchToken) {
+        const earlierSrc = earlier.src;
+        setTimeout(() => {
+          const now = activeFlash.get(cursedId);
+          if (now && now.src !== earlierSrc) return;
+          setFlash(cursedId, src);
+        }, FLASH_DURATION_MS);
+      } else {
+        setFlash(cursedId, src);
+      }
     }
     return;
   }
@@ -1452,6 +1470,13 @@ export function handleLogEntryForFlash(entry, game) {
       setFlash(characterId, 'assets/images/velorya/moonlit_theft.jpg', MOONLIT_THEFT_FLASH_DURATION_MS); break;
     case 'lunarStrike': case 'moonstep':
       if (!dodged) setFlash(characterId, 'assets/images/velorya/strike.jpg');
+      // Victim's own per-hero reaction (added 2026-10-11) - a separate set per
+      // move (crescent slash vs. moonlight strike from behind), same gate and
+      // no-!isKO rule as grudge_hit.jpg.
+      if (!dodged && targetCharacterId && amountDealt > 0) {
+        const hitImage = actionId === 'moonstep' ? 'moonstep_hit.jpg' : 'lunar_strike_hit.jpg';
+        setFlash(targetCharacterId, `assets/images/${targetCharacterId}/${hitImage}`);
+      }
       break;
     case 'bloodHunt':
       if (!dodged) setFlash(characterId, 'assets/images/blade/strike.jpg');
