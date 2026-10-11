@@ -189,6 +189,9 @@ registerOnHitLanded('athena', (character, game, log, ctx) => {
       fromCharacterId: 'athena',
       toCharacterId: cursedId,
       amount: ctx.amountDealt,
+      // What actually got through the cursed character's shield - the
+      // client's curse_hit.jpg flash only fires when this is > 0.
+      amountDealt: mirrorResult.amountDealt,
       koTriggered: mirrorResult.koTriggered,
       revived: mirrorResult.revived,
     },

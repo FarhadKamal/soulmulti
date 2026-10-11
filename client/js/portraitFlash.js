@@ -1287,6 +1287,20 @@ export function handleLogEntryForFlash(entry, game) {
     setFlash('melyssa', `assets/images/${entry.redirectedToFriendId}/protects_melyssa.jpg`, PROTECTS_MELYSSA_FLASH_DURATION_MS);
   }
 
+  if (entry.type === 'curse-mirror') {
+    // Athena's curse trigger (added 2026-10-11) - the cursed character's own
+    // per-hero curse_hit.jpg whenever mirrored damage actually gets through
+    // their shield. Shown over koed.jpg on a killing mirror (same rule as
+    // grudge_hit.jpg); skipped when Blade's Rebirth caught it (rebirth.jpg
+    // covers that). amountDealt is newer than the entry itself - fall back
+    // to amount for any entry that predates it.
+    const dealt = entry.amountDealt ?? entry.amount;
+    if (dealt > 0 && !entry.revived && (!isKO(entry.toCharacterId) || entry.koTriggered)) {
+      setFlash(entry.toCharacterId, `assets/images/${entry.toCharacterId}/curse_hit.jpg`);
+    }
+    return;
+  }
+
   if (entry.type !== 'attack' && entry.type !== 'special' && entry.type !== 'setup') return;
   const { characterId, actionId, dodged, amountDealt, targetCharacterId } = entry;
   if (isKO(characterId)) return;
@@ -1298,6 +1312,11 @@ export function handleLogEntryForFlash(entry, game) {
       setFlash(characterId, 'assets/images/athena/heal.jpg'); break;
     case 'divineSacrifice':
       if (!dodged) setFlash(characterId, 'assets/images/athena/sacrifice.jpg');
+      // Victim's own per-hero spear-impact reaction (added 2026-10-11) - same
+      // gate and no-!isKO rule as grudge_hit.jpg.
+      if (!dodged && targetCharacterId && amountDealt > 0) {
+        setFlash(targetCharacterId, `assets/images/${targetCharacterId}/sacrifice_hit.jpg`);
+      }
       break;
     case 'divineJudgment':
       setFlash(characterId, 'assets/images/athena/judgment.jpg'); break;
