@@ -1405,6 +1405,11 @@ export function handleLogEntryForFlash(entry, game) {
       break;
     case 'shadowExecution':
       if (!dodged) setFlash(characterId, 'assets/images/akyros/shadow.jpg');
+      // Victim's own per-hero shadow-wraith reaction (added 2026-10-11) - same
+      // gate and no-!isKO rule as grudge_hit.jpg.
+      if (!dodged && targetCharacterId && amountDealt > 0) {
+        setFlash(targetCharacterId, `assets/images/${targetCharacterId}/shadow_execution_hit.jpg`);
+      }
       break;
     case 'fatalSlash':
       if (!dodged) setFlash(characterId, 'assets/images/akyros/fatal.jpg');
