@@ -2137,7 +2137,7 @@ export function chooseBotJesterBallMove(character, game) {
   // advancing the ball toward a real enemy target clearly beats it
   // whenever one's available.
   if (canPass) {
-    const candidates = livingEnemies(game, character).filter((c) => c.id !== character.id);
+    const candidates = livingEnemies(game, character).filter((c) => c.id !== character.id && canReceiveJesterBallPass(c, character));
     if (candidates.length > 0) {
       const targetId = biggestThreatTarget(game, character, candidates.map((c) => c.id))
         || lowestHeartsTarget(game, candidates.map((c) => c.id));
@@ -2153,10 +2153,10 @@ export function chooseBotJesterBallMove(character, game) {
   // survive a Take comfortably - handled by the low-hearts fallback below
   // instead of a flat exclusion, matching the previous reasoning's spirit
   // now that the stakes of passing to him are much lower than before.
-  if (canPass && boingo && !boingo.isKO && boingo.ownerId === character.ownerId) {
+  if (canPass && boingo && !boingo.isKO && canReceiveJesterBallPass(boingo, character) && boingo.ownerId === character.ownerId) {
     return { choice: 'pass', targetId: boingo.id };
   }
-  if (canPass && boingo && !boingo.isKO && character.hearts <= 4) {
+  if (canPass && boingo && !boingo.isKO && canReceiveJesterBallPass(boingo, character) && character.hearts <= 4) {
     return { choice: 'pass', targetId: boingo.id };
   }
   // Otherwise Take is the only sensible remaining option.
@@ -2181,8 +2181,15 @@ export function chooseBotBoingoJesterBallMove(character, game) {
   // free-for-all has no teammates, so Boingo being the sole living
   // character left holding the ball would already mean the match is over
   // before this could ever be called.
-  const candidates = livingEnemies(game, character).filter((c) => c.id !== character.id);
+  const candidates = livingEnemies(game, character).filter((c) => c.id !== character.id && canReceiveJesterBallPass(c, character));
   const targetId = biggestThreatTarget(game, character, candidates.map((c) => c.id))
     || lowestHeartsTarget(game, candidates.map((c) => c.id));
   return { choice: 'pass', targetId };
+}
+
+// Blade's Shark Hunt - a sealed hero can only receive a pass from their own
+// seal partner (same rule as index.js's isJesterBallPassTarget, confirmed
+// real bug 2026-10-12: a bot Melyssa passed the ball into the deep sea).
+function canReceiveJesterBallPass(target, holder) {
+  return !target.deepSeaSealed || target.deepSeaSealPartnerId === holder.id;
 }

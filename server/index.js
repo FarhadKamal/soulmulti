@@ -1952,6 +1952,11 @@ function isJesterBallPassTarget(game, holderId, targetId) {
   const t = game.characters[targetId];
   const holder = game.characters[holderId];
   if (!t || t.isKO || targetId === holderId) return false;
+  // Blade's Shark Hunt - nobody outside the seal can pass the ball INTO it
+  // (confirmed real bug, 2026-10-12: Melyssa passed it to a sealed Blade).
+  // The sealed partner can still pass to the other one, and a sealed holder
+  // can still pass it back out (otherwise they'd be stuck with Take).
+  if (t.deepSeaSealed && t.deepSeaSealPartnerId !== holderId) return false;
   const isBoingo = targetId === game.jesterBall.thrownByCharacterId;
   // Boingo is a legal Pass target regardless of team (passing to him always
   // heals him and ends the ball, same as the old dedicated Return choice) -
