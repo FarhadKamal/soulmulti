@@ -1480,6 +1480,13 @@ export function handleLogEntryForFlash(entry, game) {
       break;
     case 'bloodHunt':
       if (!dodged) setFlash(characterId, 'assets/images/blade/strike.jpg');
+      // Victim's own per-hero crimson-slash reaction (added 2026-10-12) -
+      // every tick of the 1->2->3 cycle, same gate and no-!isKO rule as
+      // grudge_hit.jpg. Skipped when Rebirth caught the hit (rebirth.jpg
+      // covers Blade-as-victim then).
+      if (!dodged && targetCharacterId && amountDealt > 0 && !entry.revived) {
+        setFlash(targetCharacterId, `assets/images/${targetCharacterId}/blood_hunt_hit.jpg`);
+      }
       break;
     case 'sharkHunt':
       // Blade's own transformation cast flash, plus the victim's own
