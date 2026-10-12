@@ -1578,6 +1578,13 @@ export function handleLogEntryForFlash(entry, game) {
       else if (!dodged) {
         if (entry.outcome === 'win') setFlash(characterId, 'assets/images/boingo/hardpunch.jpg');
         else if (entry.outcome === 'draw') setFlash(characterId, 'assets/images/boingo/normalpunch.jpg');
+        // Victim's own per-hero reaction (added 2026-10-12) - a separate set
+        // per roll (3 = giant clown glove, 1 = thrown card), same gate and
+        // no-!isKO rule as grudge_hit.jpg.
+        if (targetCharacterId && amountDealt > 0 && (entry.outcome === 'win' || entry.outcome === 'draw')) {
+          const hitImage = entry.outcome === 'win' ? 'clown_punch_hit.jpg' : 'card_hit.jpg';
+          setFlash(targetCharacterId, `assets/images/${targetCharacterId}/${hitImage}`);
+        }
       }
       break;
     case 'fowlPlay':
