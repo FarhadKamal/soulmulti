@@ -1480,7 +1480,20 @@ export function finalizeAction(game, log, result, characterId, actionId, targetI
     }
   }
   applyEndOfActionChecks(game);
-  game.log.push(...log, { type: 'end-action', round: game.round, characterId, actionId, targetId, hearts: heartsSnapshot(game) });
+  game.log.push(...moveAfterActionEntriesLast(log), { type: 'end-action', round: game.round, characterId, actionId, targetId, hearts: heartsSnapshot(game) });
+}
+
+// Death-cleanup entries pushed from inside applyDamage (e.g. Chronox's own
+// death ending World Stops/Time Freeze) land BEFORE the killing blow's own
+// log line, since the ability only pushes that line after applyDamage
+// returns - confirmed real ordering bug, 2026-10-13 ("World Stops ends"
+// printed above "Beast Attack on Chronox - KO!"). Flagged afterAction and
+// moved to the end of this action's batch here (stable order otherwise).
+function moveAfterActionEntriesLast(log) {
+  const later = log.filter((e) => e.afterAction);
+  if (later.length === 0) return log;
+  for (const e of later) delete e.afterAction;
+  return [...log.filter((e) => !later.includes(e)), ...later];
 }
 
 // Executes a puppeted action on behalf of Melyssa's Mind Control - calls
@@ -1630,7 +1643,7 @@ export function resolveJesterBall(game, holderCharacterId, choice, extra) {
     }
   }
   applyEndOfActionChecks(game);
-  game.log.push(...log, { type: 'end-action', round: game.round, characterId: holderCharacterId, actionId: `jesterBall:${choice}`, hearts: heartsSnapshot(game) });
+  game.log.push(...moveAfterActionEntriesLast(log), { type: 'end-action', round: game.round, characterId: holderCharacterId, actionId: `jesterBall:${choice}`, hearts: heartsSnapshot(game) });
   return result;
 }
 

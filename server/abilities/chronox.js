@@ -90,7 +90,9 @@ registerOnOwnDeath('chronox', (character, game, log) => {
     if (frozen) frozen.skipNextTurn = false;
     character.special.freezeActive = false;
     character.special.freezeTargetId = null;
-    log.push({ type: 'freeze-end', targetCharacterId: frozenId });
+    // afterAction: this runs mid-applyDamage, before the killing blow's own
+    // log line exists - finalizeAction moves it after that line.
+    log.push({ type: 'freeze-end', targetCharacterId: frozenId, afterAction: true });
   }
   // Same reasoning for World Stops - frees the WHOLE group at once, unlike
   // Blade's own Rebirth cleanup (which only removes Blade himself from an
@@ -104,7 +106,7 @@ registerOnOwnDeath('chronox', (character, game, log) => {
     }
     character.special.worldStopsActive = false;
     character.special.worldStopsFrozenIds = new Set();
-    log.push({ type: 'world-stops-end', frozenIds });
+    log.push({ type: 'world-stops-end', frozenIds, afterAction: true });
   }
   // His own death ends any pending Rewind opportunity and lockout
   // immediately - not strictly load-bearing today (he has no revival
