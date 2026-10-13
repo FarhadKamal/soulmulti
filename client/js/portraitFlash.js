@@ -1287,6 +1287,18 @@ export function handleLogEntryForFlash(entry, game) {
     setFlash('melyssa', `assets/images/${entry.redirectedToFriendId}/protects_melyssa.jpg`, PROTECTS_MELYSSA_FLASH_DURATION_MS);
   }
 
+  if (entry.type === 'headache-roll') {
+    // Grimtal's Skull Crack headache making the victim skip their turn
+    // (added 2026-10-13) - their own per-hero groggy headache.jpg, replacing
+    // the old spinning-tile effect for this moment (actionEffects.js). A
+    // roll that's shaken off shows nothing, same as before. Grimtal has no
+    // headache.jpg - he's the only one who can cause it.
+    if (entry.skipped && entry.targetCharacterId !== 'grimtal' && !isKO(entry.targetCharacterId)) {
+      setFlash(entry.targetCharacterId, `assets/images/${entry.targetCharacterId}/headache.jpg`);
+    }
+    return;
+  }
+
   if (entry.type === 'curse-mirror') {
     // Athena's curse trigger (added 2026-10-11) - the cursed character's own
     // per-hero curse_hit.jpg whenever mirrored damage actually gets through
@@ -1686,11 +1698,17 @@ export function handleLogEntryForFlash(entry, game) {
       // case only fires Rowan's own cast flash on his own tile, same
       // FLASH_DURATION_MS as any normal cast.
       setFlash(characterId, 'assets/images/rowan/petrify.jpg'); break;
-    case 'grimStrike':
-      if (!dodged) setFlash(characterId, 'assets/images/grimtal/normal_attack.jpg');
-      break;
-    case 'skullCrack':
-      if (!dodged) setFlash(characterId, 'assets/images/grimtal/skull_crack.jpg');
+    case 'grimStrike': case 'skullCrack':
+      if (!dodged) {
+        setFlash(characterId, actionId === 'skullCrack' ? 'assets/images/grimtal/skull_crack.jpg' : 'assets/images/grimtal/normal_attack.jpg');
+      }
+      // Victim's own per-hero reaction (added 2026-10-13) - a separate set
+      // per move, same gate and no-!isKO rule as grudge_hit.jpg; skipped
+      // when Rebirth caught the hit (rebirth.jpg covers that).
+      if (!dodged && targetCharacterId && amountDealt > 0 && !entry.revived) {
+        const hitImage = actionId === 'skullCrack' ? 'skull_crack_hit.jpg' : 'grim_strike_hit.jpg';
+        setFlash(targetCharacterId, `assets/images/${targetCharacterId}/${hitImage}`);
+      }
       break;
     case 'claimKill':
       setFlash(characterId, 'assets/images/grimtal/claim_kill.jpg'); break;

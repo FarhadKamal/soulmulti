@@ -219,16 +219,11 @@ export function handleLogEntryForEffects(entry, game) {
     return;
   }
 
-  // Grimtal's Skull Crack headache: only an actual SKIP outcome gets a
-  // visual - a roll that resolves with no skip is a non-event (nothing
-  // changed), matching playLogEntrySound's same skipped-only gate in
-  // main.js. The head_spin.mp3 sound plays alongside this from there.
-  if (entry.type === 'headache-roll') {
-    if (entry.skipped && !isKO(entry.targetCharacterId)) {
-      addEffect(entry.targetCharacterId, 'headspin', EFFECT_DURATION_MS.headspin);
-    }
-    return;
-  }
+  // Grimtal's Skull Crack headache: no tile effect anymore - the skip now
+  // shows the victim's own headache.jpg portrait instead (portraitFlash.js,
+  // confirmed direction 2026-10-13: "we don't need that rotate card
+  // animation"). The head_spin.mp3 sound still plays from main.js.
+  if (entry.type === 'headache-roll') return;
 
   // Jester Ball "Take": explodes on the holder (shake + smoke) UNLESS it
   // triggered Blade's Rebirth instead - that case already got its own
