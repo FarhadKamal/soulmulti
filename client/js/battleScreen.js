@@ -2767,7 +2767,9 @@ function describeLogEntry(entry) {
     case 'curse':
       return `${name(entry.characterId)} cast Curse Strike on ${name(entry.targetId)}${blockedByText(entry.blockedBy)}`;
     case 'curse-mirror':
-      return `Curse mirrors ${entry.amount} damage to ${name(entry.toCharacterId)}${entry.koTriggered ? ' - KO!' : ''}`;
+      // amountDealt (what actually got through - 0 against Beast Form or a
+      // full shield), falling back to amount for entries that predate it.
+      return `Curse mirrors ${entry.amountDealt ?? entry.amount} damage to ${name(entry.toCharacterId)}${entry.koTriggered ? ' - KO!' : ''}`;
     case 'divine-judgment-trigger':
       return `Divine Judgment falls upon ${name(entry.toCharacterId)}${entry.koTriggered ? ' - KO!' : ''}`;
     case 'prophecy-of-doom-trigger': {
