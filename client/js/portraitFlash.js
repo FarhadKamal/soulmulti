@@ -375,6 +375,24 @@ function setFlash(characterId, src, durationMs = FLASH_DURATION_MS) {
   activeFlash.set(characterId, { src, timer, setAt: currentBatchToken });
 }
 
+// Like setFlash, but when this tile already got a flash from the SAME
+// dispatch batch (two images for one hero in one instant), lets that
+// earlier image play its full turn first instead of replacing it at once.
+// Skipped if something newer took the tile during the wait.
+function setFlashAfterSameBatch(characterId, src) {
+  const earlier = activeFlash.get(characterId);
+  if (!earlier || earlier.setAt !== currentBatchToken) {
+    setFlash(characterId, src);
+    return;
+  }
+  const earlierSrc = earlier.src;
+  setTimeout(() => {
+    const now = activeFlash.get(characterId);
+    if (now && now.src !== earlierSrc) return;
+    setFlash(characterId, src);
+  }, FLASH_DURATION_MS);
+}
+
 // Incremented once per processNewLogEntries call (main.js) via
 // beginFlashDispatchBatch below - a monotonic token identifying "this
 // broadcast's dispatch pass," independent of wall-clock time (which
@@ -1294,7 +1312,10 @@ export function handleLogEntryForFlash(entry, game) {
     // roll that's shaken off shows nothing, same as before. Grimtal has no
     // headache.jpg - he's the only one who can cause it.
     if (entry.skipped && entry.targetCharacterId !== 'grimtal' && !isKO(entry.targetCharacterId)) {
-      setFlash(entry.targetCharacterId, `assets/images/${entry.targetCharacterId}/headache.jpg`);
+      // Waits for the victim's skull_crack_hit.jpg when their turn comes
+      // straight after Grimtal's in the same broadcast (confirmed direction
+      // 2026-10-13) - otherwise the hit image never shows.
+      setFlashAfterSameBatch(entry.targetCharacterId, `assets/images/${entry.targetCharacterId}/headache.jpg`);
     }
     return;
   }
@@ -1308,25 +1329,10 @@ export function handleLogEntryForFlash(entry, game) {
     // to amount for any entry that predates it.
     const dealt = entry.amountDealt ?? entry.amount;
     if (dealt > 0 && !entry.revived && (!isKO(entry.toCharacterId) || entry.koTriggered)) {
-      const cursedId = entry.toCharacterId;
-      const src = `assets/images/${cursedId}/curse_hit.jpg`;
-      // When the cursed hero's tile already got a flash from this same
-      // broadcast (they attacked Athena themselves, or were the Divine
-      // Sacrifice target whose self-cost bounced back), let that image play
-      // its full turn first, then show the curse striking back (confirmed
-      // direction 2026-10-11) - otherwise curse_hit.jpg replaces it
-      // instantly. Skipped if something newer took the tile meanwhile.
-      const earlier = activeFlash.get(cursedId);
-      if (earlier && earlier.setAt === currentBatchToken) {
-        const earlierSrc = earlier.src;
-        setTimeout(() => {
-          const now = activeFlash.get(cursedId);
-          if (now && now.src !== earlierSrc) return;
-          setFlash(cursedId, src);
-        }, FLASH_DURATION_MS);
-      } else {
-        setFlash(cursedId, src);
-      }
+      // Waits its turn when the cursed hero already flashed this broadcast
+      // (they attacked Athena themselves, or were the Divine Sacrifice
+      // target whose self-cost bounced back) - confirmed direction 2026-10-11.
+      setFlashAfterSameBatch(entry.toCharacterId, `assets/images/${entry.toCharacterId}/curse_hit.jpg`);
     }
     return;
   }
