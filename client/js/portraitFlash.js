@@ -1569,6 +1569,14 @@ export function handleLogEntryForFlash(entry, game) {
       if (!dodged) {
         const usesImmortalStrike = entry.isBonusStrike || game.characters.draxus?.special?.hasRevivedOnce;
         setFlash(characterId, usesImmortalStrike ? 'assets/images/draxus/immortal_strike.jpg' : 'assets/images/draxus/normal_strike.jpg');
+        // Victim's own per-hero reaction (added 2026-10-13) - the golden
+        // immortal set whenever Draxus himself shows immortal_strike.jpg,
+        // same gate and no-!isKO rule as grudge_hit.jpg; skipped when
+        // Rebirth caught the hit (rebirth.jpg covers that).
+        if (targetCharacterId && amountDealt > 0 && !entry.revived) {
+          const hitImage = usesImmortalStrike ? 'immortal_axe_hit.jpg' : 'axe_hit.jpg';
+          setFlash(targetCharacterId, `assets/images/${targetCharacterId}/${hitImage}`);
+        }
       }
       break;
     case 'deathlessFury':
