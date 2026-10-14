@@ -2752,7 +2752,14 @@ function describeLogEntry(entry) {
         // changed - reported live as "that was not showing in screen."
         return `${name(entry.characterId)} used their SPECIAL: Glory Smash on ${name(actualAttackTargetId(entry))}${entry.amountDealt != null ? ` - ${entry.amountDealt} damage` : ''}${absorbedText(entry.absorbed)}${entry.koTriggered ? ' - KO!' : ''} (+2 hearts, +2 shield)`;
       }
-      return `${name(entry.characterId)} used their SPECIAL: ${actionLabel(entry.actionId)}${entry.targetId ? ` on ${name(actualAttackTargetId(entry))}` : ''}${blockedByText(entry.blockedBy)}`;
+      // Damage-dealing specials (Wild Lightning, Shadow Execution, ...) spread
+      // applyDamage's result onto the entry - show it, same as the
+      // Skull Crack / Glory Smash lines above (confirmed gap 2026-10-14:
+      // "used their SPECIAL: Wild Lightning on Chronox" with no damage).
+      const specialDamageText = entry.amountDealt != null
+        ? ` - ${entry.amountDealt} damage${absorbedText(entry.absorbed)}${entry.koTriggered ? ' - KO!' : ''}`
+        : '';
+      return `${name(entry.characterId)} used their SPECIAL: ${actionLabel(entry.actionId)}${entry.targetId ? ` on ${name(actualAttackTargetId(entry))}` : ''}${specialDamageText}${blockedByText(entry.blockedBy)}`;
     case 'setup':
       if (entry.actionId === 'mirageMark') {
         return `${name(entry.characterId)} used Mirage Mark on ${name(entry.targetId)} - ${entry.stackCount} stack${entry.stackCount > 1 ? 's' : ''}`;
