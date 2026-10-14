@@ -390,6 +390,11 @@ function setFlashAfterSameBatch(characterId, src) {
     const now = activeFlash.get(characterId);
     if (now && now.src !== earlierSrc) return;
     setFlash(characterId, src);
+    // setFlash never redraws by itself - without this the delayed image
+    // only appeared if something else happened to rerender in time
+    // (confirmed real bug, 2026-10-14: Oraclus's mirror_reflect_hit.jpg
+    // never showed). Same as queueGrimtalPowerFlash below.
+    onFlashExpired();
   }, FLASH_DURATION_MS);
 }
 
@@ -1008,6 +1013,7 @@ export function handleLogEntryForFlash(entry, game) {
     if (entry.afterBloodFrenzy) {
       setTimeout(() => {
         if (!isKO(entry.characterId)) setFlash(entry.characterId, 'assets/images/blade/blood_drain.jpg');
+        onFlashExpired(); // redraw - setFlash doesn't by itself
       }, BLOOD_FRENZY_FLASH_DURATION_MS);
       return;
     }

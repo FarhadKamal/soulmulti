@@ -26,10 +26,15 @@ import { getDodgeDefenseProvider } from './dodgeDefenseRegistry.js';
 // callers should `return result` immediately on a true return, matching the
 // original inline blocks' own early-return shape.
 export function resolveDodgeDefense(game, log, target, sourceCharacterId, ctx) {
-  const { isMirror, ignoresDodge, isFrozen } = ctx;
+  const { isMirror, ignoresDodge, isFrozen, isPoisonTick } = ctx;
   const provider = getDodgeDefenseProvider(target.id);
   if (!provider) return false;
-  if (isMirror || ignoresDodge || isFrozen) return false;
+  // Poison ticks are never dodgeable by anyone (user ruling 2026-10-14
+  // "A") - an already-applied poison isn't a fresh attack, the same
+  // reasoning Illyra's own passive already used. Returning before
+  // recordHit also keeps a tick from counting as an attacker for
+  // Grimtal's Grim Ward or using up Akyros's per-attacker dodge.
+  if (isMirror || ignoresDodge || isFrozen || isPoisonTick) return false;
   const dodged = provider.canDodge(target, game, sourceCharacterId, ctx);
   // Grimtal's Grim Ward needs to record ANY attacker's hit this cycle -
   // dodged or not, run AFTER canDodge (matching the original inline block's
