@@ -1305,6 +1305,31 @@ export function handleLogEntryForFlash(entry, game) {
     setFlash('melyssa', `assets/images/${entry.redirectedToFriendId}/protects_melyssa.jpg`, PROTECTS_MELYSSA_FLASH_DURATION_MS);
   }
 
+  if (entry.type === 'mirror-reflect') {
+    // Rowan's Mirror Reflect bouncing damage back (added 2026-10-14) - the
+    // ATTACKER's own per-hero mirror_reflect_hit.jpg when it got through
+    // their shield (amount is already the real dealt damage), also on a
+    // killing bounce, skipped when Rebirth caught it. Waits for the
+    // attacker's own attack image from this same moment to finish first.
+    const hitId = entry.toCharacterId;
+    if (hitId && hitId !== 'rowan' && entry.amount > 0 && !entry.revived && (!isKO(hitId) || entry.koTriggered)) {
+      setFlashAfterSameBatch(hitId, `assets/images/${hitId}/mirror_reflect_hit.jpg`);
+    }
+    return;
+  }
+
+  if (entry.type === 'poison-tick') {
+    // Rowan's Poison Cloud ticking (added 2026-10-14) - the victim's own
+    // poisoned.jpg whenever the tick actually hurts, also on the tick that
+    // KOs them; skipped when Rebirth caught it. Waits its turn if the tile
+    // already flashed this broadcast.
+    const victimId = entry.targetCharacterId;
+    if (victimId && entry.amountDealt > 0 && !entry.revived && (!isKO(victimId) || entry.koTriggered)) {
+      setFlashAfterSameBatch(victimId, `assets/images/${victimId}/poisoned.jpg`);
+    }
+    return;
+  }
+
   if (entry.type === 'headache-roll') {
     // Grimtal's Skull Crack headache making the victim skip their turn
     // (added 2026-10-13) - their own per-hero groggy headache.jpg, replacing
@@ -1663,7 +1688,14 @@ export function handleLogEntryForFlash(entry, game) {
       setFlash(characterId, characterId === 'marin' ? 'assets/images/marin/arcane_study.jpg' : 'assets/images/rowan/arcane_study.jpg');
       break;
     case 'poisonCloud':
-      setFlash(characterId, 'assets/images/rowan/poison_cloud.jpg'); break;
+      setFlash(characterId, 'assets/images/rowan/poison_cloud.jpg');
+      // Victim's own per-hero choking-in-poison reaction (added 2026-10-14)
+      // - the cast moment; every later tick reuses it (see the poison-tick
+      // block above). Cast entry only sets targetId (no applyDamage).
+      if (entry.targetId && !isKO(entry.targetId)) {
+        setFlash(entry.targetId, `assets/images/${entry.targetId}/poisoned.jpg`);
+      }
+      break;
     case 'purify':
       setFlash(characterId, 'assets/images/rowan/purify.jpg'); break;
     case 'wildLightning':
@@ -1678,7 +1710,16 @@ export function handleLogEntryForFlash(entry, game) {
     case 'mirrorReflect':
       setFlash(characterId, 'assets/images/rowan/mirror_reflect.jpg'); break;
     case 'silenceLock':
-      setFlash(characterId, 'assets/images/rowan/silence_lock.jpg'); break;
+      setFlash(characterId, 'assets/images/rowan/silence_lock.jpg');
+      // Victim's own per-hero chained-and-silenced reaction (added
+      // 2026-10-14) - same filename as Rowan's cast image, but inside the
+      // victim's own folder. Skipped when Clean Slate / Illyra blocked it
+      // (they show their own images). Silence Lock's entry only sets
+      // targetId (it bypasses applyDamage), not targetCharacterId.
+      if (entry.targetId && !entry.blockedBy && !isKO(entry.targetId)) {
+        setFlash(entry.targetId, `assets/images/${entry.targetId}/silence_lock.jpg`);
+      }
+      break;
     case 'frogCurse':
       setFlash(characterId, 'assets/images/rowan/frog_curse.jpg'); break;
     case 'snakeStrike':

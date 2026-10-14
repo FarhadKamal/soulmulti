@@ -468,7 +468,7 @@ const GRIMTAL_HIT_IMAGES = CHARACTER_IDS.filter((id) => id !== 'grimtal').flatMa
 
 // Rowan's Wand Strike / Wild Lightning victim reactions (added 2026-10-14).
 const ROWAN_HIT_IMAGES = CHARACTER_IDS.filter((id) => id !== 'rowan').flatMap(
-  (id) => [`assets/images/${id}/rowan_wand_hit.jpg`, `assets/images/${id}/wild_lightning_hit.jpg`]
+  (id) => [`assets/images/${id}/rowan_wand_hit.jpg`, `assets/images/${id}/wild_lightning_hit.jpg`, `assets/images/${id}/silence_lock.jpg`, `assets/images/${id}/poisoned.jpg`, `assets/images/${id}/mirror_reflect_hit.jpg`]
 );
 
 function allBattleImagePaths() {
