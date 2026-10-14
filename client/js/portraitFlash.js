@@ -1651,6 +1651,12 @@ export function handleLogEntryForFlash(entry, game) {
       if (!dodged) {
         setFlash(characterId, characterId === 'marin' ? 'assets/images/marin/wand_strike.jpg' : 'assets/images/rowan/wand_strike.jpg');
       }
+      // Victim's own per-hero golden-bolt reaction (added 2026-10-14) -
+      // Rowan's set only for now (Marin's wand gets its own), same gate and
+      // no-!isKO rule as grudge_hit.jpg; skipped when Rebirth caught it.
+      if (characterId === 'rowan' && !dodged && targetCharacterId && amountDealt > 0 && !entry.revived) {
+        setFlash(targetCharacterId, `assets/images/${targetCharacterId}/rowan_wand_hit.jpg`);
+      }
       break;
     case 'arcaneStudy':
       // Same shared-action-id reasoning as wandStrike above.
@@ -1662,6 +1668,12 @@ export function handleLogEntryForFlash(entry, game) {
       setFlash(characterId, 'assets/images/rowan/purify.jpg'); break;
     case 'wildLightning':
       if (!dodged) setFlash(characterId, 'assets/images/rowan/wild_lightning.jpg');
+      // Victim's own per-hero violet-lightning reaction (added 2026-10-14) -
+      // same gate and no-!isKO rule as grudge_hit.jpg; skipped when Rebirth
+      // caught it.
+      if (!dodged && targetCharacterId && amountDealt > 0 && !entry.revived) {
+        setFlash(targetCharacterId, `assets/images/${targetCharacterId}/wild_lightning_hit.jpg`);
+      }
       break;
     case 'mirrorReflect':
       setFlash(characterId, 'assets/images/rowan/mirror_reflect.jpg'); break;
