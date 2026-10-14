@@ -1163,7 +1163,9 @@ export function handleLogEntryForFlash(entry, game) {
         wandMastery: 'assets/images/marin/wand_mastery.jpg',
       };
       const src = MARIN_DISCOVERY_FLASH[entry.spellId];
-      if (src) setFlash('marin', src);
+      // Waits for a hit image from this same moment (e.g. Moonstep landing
+      // right before her turn) instead of hiding it - added 2026-10-14.
+      if (src) setFlashAfterSameBatch('marin', src);
     }
     return;
   }
@@ -1173,7 +1175,9 @@ export function handleLogEntryForFlash(entry, game) {
     // shape as Rowan's Poison Cloud tile effect re-firing every damage
     // tick (see actionEffects.js's own poison-tick handling for the
     // client-side precedent this follows).
-    if (entry.healed > 0 && !isKO(entry.characterId)) setFlash(entry.characterId, 'assets/images/marin/everbloom.jpg');
+    // Waits for a poison tick / hit image from this same moment instead of
+    // hiding it - added 2026-10-14.
+    if (entry.healed > 0 && !isKO(entry.characterId)) setFlashAfterSameBatch(entry.characterId, 'assets/images/marin/everbloom.jpg');
     return;
   }
   if (entry.type === 'clean-slate-trigger') {
