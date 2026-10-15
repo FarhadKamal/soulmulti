@@ -1643,11 +1643,9 @@ export function handleLogEntryForFlash(entry, game) {
       // persistent override (getPersistentPortrait) then holds.
       setFlash(characterId, 'assets/images/draxus/immortality.jpg'); break;
     case 'chaosGamble':
-      // 'lose' always flashes the miss portrait regardless of dodged (a
-      // 0-damage roll can still report dodged:true against Akyros's first
-      // hit) - matches the main game, which has no dodge guard on this
-      // branch. 'win'/'draw' stay dodge-gated since those rolls deal real
-      // damage that Akyros can actually dodge.
+      // 'lose' always flashes the miss portrait (it never reaches
+      // applyDamage, so it can't be dodged). 'win'/'draw' stay dodge-gated
+      // since those rolls deal real damage that can be dodged.
       if (entry.outcome === 'lose') setFlash(characterId, 'assets/images/boingo/miss.jpg');
       else if (!dodged) {
         if (entry.outcome === 'win') setFlash(characterId, 'assets/images/boingo/hardpunch.jpg');
@@ -1655,9 +1653,14 @@ export function handleLogEntryForFlash(entry, game) {
         // Victim's own per-hero reaction (added 2026-10-12) - a separate set
         // per roll (3 = giant clown glove, 1 = thrown card), same gate and
         // no-!isKO rule as grudge_hit.jpg.
+        // A chickenified victim (Fowl Play) gets their own chicken_hit.jpg
+        // instead (2026-10-15) - setFlash blocks every non-chicken image on
+        // a chicken's tile, so the glove/card image used to show nothing.
         if (targetCharacterId && amountDealt > 0 && (entry.outcome === 'win' || entry.outcome === 'draw')) {
           const hitImage = entry.outcome === 'win' ? 'clown_punch_hit.jpg' : 'card_hit.jpg';
-          setFlash(targetCharacterId, `assets/images/${targetCharacterId}/${hitImage}`);
+          setFlash(targetCharacterId, game.characters[targetCharacterId]?.isChicken
+            ? chickenImagePath(targetCharacterId, '_hit.jpg')
+            : `assets/images/${targetCharacterId}/${hitImage}`);
         }
       }
       break;
