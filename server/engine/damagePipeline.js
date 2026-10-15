@@ -459,7 +459,13 @@ export function applyDamage(game, log, {
     // Blade's Shark Hunt (taxonomy #41, Mutual Seal) - same "incapacitated,
     // nothing left to redirect to" reasoning as the frozen/frogged-friend
     // exclusions above.
-    if (friend && !friend.isKO && !isFrozenByChronox(friend, game) && !friend.isFrog && !friend.deepSeaSealed) {
+    // Velorya's Lunar Eclipse (confirmed ruling 2026-10-15): a hidden friend
+    // can't step in front of a blow either. Before this, the redirected hit
+    // was blocked by her own untargetable and dealt 0, so an Eclipsed friend
+    // made Melyssa unhittable - and with Velorya unable to attack anyone (her
+    // only targets a Beast Form Grimtal and her own friend) the Eclipse never
+    // ended, stalling the match for 20 rounds until Beast Form timed out.
+    if (friend && !friend.isKO && !isFrozenByChronox(friend, game) && !friend.isFrog && !friend.deepSeaSealed && !friend.untargetable) {
       const beforeHearts = friend.hearts;
       const redirectedResult = applyDamage(game, log, {
         sourceCharacterId, targetCharacterId: friendId, amount,

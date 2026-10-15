@@ -103,6 +103,9 @@ export function redirectStatusTargetIfProtected(game, targetId, sourceCharacterI
   // nothing left to redirect to" reasoning as the frozen/frogged-friend
   // checks above.
   if (friend.deepSeaSealed) return targetId;
+  // Untargetable friend (Velorya's Lunar Eclipse, Kaelis airborne) - same
+  // ruling as applyDamage's redirect gate (2026-10-15): hidden, can't step in.
+  if (friend.untargetable) return targetId;
   return friendId;
 }
 
