@@ -119,7 +119,6 @@ const FLASH_IMAGES = [
   'assets/images/melyssa/self_choke.jpg',
   'assets/images/melyssa/useless.jpg',
   'assets/images/melyssa/friendship.jpg',
-  'assets/images/melyssa/mind_control_overlay.jpg',
   'assets/images/kaelis/idle.jpg',
   'assets/images/kaelis/grudge.jpg',
   'assets/images/kaelis/bird.jpg',
@@ -471,8 +470,18 @@ const ROWAN_HIT_IMAGES = CHARACTER_IDS.filter((id) => id !== 'rowan').flatMap(
   (id) => [`assets/images/${id}/rowan_wand_hit.jpg`, `assets/images/${id}/wild_lightning_hit.jpg`, `assets/images/${id}/silence_lock.jpg`, `assets/images/${id}/poisoned.jpg`, `assets/images/${id}/mirror_reflect_hit.jpg`]
 );
 
+// Marin's Wand Strike victim reaction (added 2026-10-15).
+const MARIN_HIT_IMAGES = CHARACTER_IDS.filter((id) => id !== 'marin').map(
+  (id) => `assets/images/${id}/marin_wand_hit.jpg`
+);
+
+// Melyssa's Mind Control puppet portrait (added 2026-10-15).
+const MIND_CONTROLLED_IMAGES = CHARACTER_IDS.filter((id) => id !== 'melyssa').map(
+  (id) => `assets/images/${id}/mind_controlled.jpg`
+);
+
 function allBattleImagePaths() {
-  const paths = [...PHOENIX_DIVE_HIT_IMAGES, ...GRUDGE_HIT_IMAGES, ...CYCLONE_HIT_IMAGES, ...THUNDER_HIT_IMAGES, ...FATAL_SLASH_HIT_IMAGES, ...SHADOW_EXECUTION_HIT_IMAGES, ...SACRIFICE_HIT_IMAGES, ...CURSE_HIT_IMAGES, ...LUNAR_STRIKE_HIT_IMAGES, ...MOONSTEP_HIT_IMAGES, ...CHAOS_GAMBLE_HIT_IMAGES, ...BLOOD_HUNT_HIT_IMAGES, ...DYING_BLOW_HIT_IMAGES, ...GRIMTAL_HIT_IMAGES, ...ROWAN_HIT_IMAGES, ...FLASH_IMAGES, ...BADGE_ICONS, ...CHICKEN_IMAGES, ...DIVINE_JUDGMENT_STRUCK_IMAGES, ...PROPHECY_OF_DOOM_STRIKE_IMAGES, ...ASHKAS_VENGEANCE_STRIKE_IMAGES, ...SHADOW_SEAL_STRIKE_IMAGES, ...PETRIFY_STONE_IMAGES, ...FROG_IMAGES, ...SELF_CHOKE_VICTIM_IMAGES, ...LIFEBOND_REACTION_IMAGES, ...MOONLIT_THEFT_REACTION_IMAGES, ...FRIENDSHIP_BOND_IMAGES, ...PROTECTS_MELYSSA_IMAGES, ...BEAST_MAULED_IMAGES, ...SOUL_DRAIN_IMAGES, ...RUNE_STRIKE_HIT_IMAGES, ...TIME_FROZEN_IMAGES, ...REWOUND_IMAGES, ...BOMB_HIT_IMAGES, ...DEEP_SEA_BLADE_IMAGES, ...DEEP_SEA_VICTIM_IMAGES, ...DEEP_SEA_PETRIFIED_IMAGES];
+  const paths = [...PHOENIX_DIVE_HIT_IMAGES, ...GRUDGE_HIT_IMAGES, ...CYCLONE_HIT_IMAGES, ...THUNDER_HIT_IMAGES, ...FATAL_SLASH_HIT_IMAGES, ...SHADOW_EXECUTION_HIT_IMAGES, ...SACRIFICE_HIT_IMAGES, ...CURSE_HIT_IMAGES, ...LUNAR_STRIKE_HIT_IMAGES, ...MOONSTEP_HIT_IMAGES, ...CHAOS_GAMBLE_HIT_IMAGES, ...BLOOD_HUNT_HIT_IMAGES, ...DYING_BLOW_HIT_IMAGES, ...GRIMTAL_HIT_IMAGES, ...ROWAN_HIT_IMAGES, ...MARIN_HIT_IMAGES, ...MIND_CONTROLLED_IMAGES, ...FLASH_IMAGES, ...BADGE_ICONS, ...CHICKEN_IMAGES, ...DIVINE_JUDGMENT_STRUCK_IMAGES, ...PROPHECY_OF_DOOM_STRIKE_IMAGES, ...ASHKAS_VENGEANCE_STRIKE_IMAGES, ...SHADOW_SEAL_STRIKE_IMAGES, ...PETRIFY_STONE_IMAGES, ...FROG_IMAGES, ...SELF_CHOKE_VICTIM_IMAGES, ...LIFEBOND_REACTION_IMAGES, ...MOONLIT_THEFT_REACTION_IMAGES, ...FRIENDSHIP_BOND_IMAGES, ...PROTECTS_MELYSSA_IMAGES, ...BEAST_MAULED_IMAGES, ...SOUL_DRAIN_IMAGES, ...RUNE_STRIKE_HIT_IMAGES, ...TIME_FROZEN_IMAGES, ...REWOUND_IMAGES, ...BOMB_HIT_IMAGES, ...DEEP_SEA_BLADE_IMAGES, ...DEEP_SEA_VICTIM_IMAGES, ...DEEP_SEA_PETRIFIED_IMAGES];
   // Default battle portrait, KO'd, injured, and victory images - each now
   // lives inside the hero's own images/<id>/ folder with a fixed filename
   // (confirmed rename, 2026-09-15; previously 4 separate top-level folders

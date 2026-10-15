@@ -1198,7 +1198,7 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
   // unconditionally rather than getting preempted by e.g. a flash still
   // mid-animation from the winning hit.
   const flashSrc = getFlashSrc(character.id);
-  const persistentSrc = getPersistentPortrait(character, isFrozenVisual && !character.isKO);
+  const persistentSrc = getPersistentPortrait(character, isFrozenVisual && !character.isKO, isPuppet);
   // Rowan's Petrify - while active, every OTHER character shows ONLY
   // stone.jpg, overriding literally everything below (flash, persistent
   // portrait, idle) - confirmed ruling: "during stone image of other .. no
@@ -1307,32 +1307,9 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
   portrait.alt = def.name;
   tile.appendChild(portrait);
 
-  // Melyssa's own face, faded in via CSS opacity (the source image is a
-  // normal opaque JPG - Gemini couldn't reliably produce a real
-  // transparent-alpha PNG, so the fade is done here instead of via image
-  // transparency), layered on top of a puppet's own portrait. Originally
-  // shared with Full Control's own multi-puppet burst (retired 2026-09-20,
-  // replaced by Friendship - see melyssa.js) - now only the single window
-  // below still uses it:
-  // - Normal single-puppet Mind Control (isPuppet, real server state -
-  //   character.special.controlling/puppetCharacterId - spanning the
-  //   whole control window exactly like the hypnotic-ripple pulse below).
-  //   This REPLACES char-tile--puppet's old glow-ring + "PUPPET" text
-  //   badge entirely (confirmed ruling: a full-face overlay reads as
-  //   "under her control" more clearly than a small badge, and the two
-  //   together looked cluttered) - the ripple pulse itself is UNCHANGED,
-  //   both layer together for the whole window.
-  // Never shown on Melyssa herself (she is never a puppet of either
-  // mechanic) or on a KO'd character (matches every other timed effect's
-  // own isKO guard in this file).
-  if (isPuppet && !character.isKO) {
-    const mindControlOverlay = document.createElement('img');
-    mindControlOverlay.className = 'char-portrait char-portrait--mind-control-overlay';
-    mindControlOverlay.src = v('assets/images/melyssa/mind_control_overlay.jpg');
-    mindControlOverlay.alt = '';
-    tile.appendChild(mindControlOverlay);
-  }
-
+  // The faded Melyssa-face overlay that used to sit on a puppet's portrait
+  // was replaced 2026-10-15 by the puppet's own per-hero
+  // mind_controlled.jpg (getPersistentPortrait's isPuppet branch).
 
   const name = document.createElement('div');
   name.className = 'char-name';

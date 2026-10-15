@@ -508,7 +508,7 @@ export function getFlashSrc(characterId) {
 // worldStopsFrozenIds), never mirrored onto the victim character the way
 // isFrog/isChicken are, so this function (which only ever receives the
 // victim's own character object, no `game`) can't look it up itself.
-export function getPersistentPortrait(character, isFrozenVisual = false) {
+export function getPersistentPortrait(character, isFrozenVisual = false, isPuppet = false) {
   if (character.isKO) return null;
   // Chronox's Time Freeze/World Stops (added 2026-09-25) - confirmed
   // ruling: "this frozen image only show during frozen status. no other
@@ -552,6 +552,12 @@ export function getPersistentPortrait(character, isFrozenVisual = false) {
   // comment: "a persistent hero portrait always won regardless of chicken
   // status"), just never extended to isFrog when Frog Curse was added.
   if (character.isFrog) return null;
+  // Melyssa's current Mind Control puppet (added 2026-10-15) - held for the
+  // whole control window (isPuppet comes from battleScreen.js: her
+  // controlling/puppetCharacterId state, or the selection-click highlight).
+  // The puppet's own action flash still wins while it plays, since flashes
+  // are checked before persistent portraits.
+  if (isPuppet && character.id !== 'melyssa') return v(`assets/images/${character.id}/mind_controlled.jpg`);
   // Held for the entire duration of a Mind Control sequence (from puppet
   // selection through the puppeted action and any nested follow-up) -
   // character.special.controlling is real, serialized character state, set
@@ -1686,11 +1692,13 @@ export function handleLogEntryForFlash(entry, game) {
       if (!dodged) {
         setFlash(characterId, characterId === 'marin' ? 'assets/images/marin/wand_strike.jpg' : 'assets/images/rowan/wand_strike.jpg');
       }
-      // Victim's own per-hero golden-bolt reaction (added 2026-10-14) -
-      // Rowan's set only for now (Marin's wand gets its own), same gate and
-      // no-!isKO rule as grudge_hit.jpg; skipped when Rebirth caught it.
-      if (characterId === 'rowan' && !dodged && targetCharacterId && amountDealt > 0 && !entry.revived) {
-        setFlash(targetCharacterId, `assets/images/${targetCharacterId}/rowan_wand_hit.jpg`);
+      // Victim's own per-hero reaction - Rowan's golden bolt (added
+      // 2026-10-14) or Marin's green petal bolt (added 2026-10-15), same
+      // gate and no-!isKO rule as grudge_hit.jpg; skipped when Rebirth
+      // caught it.
+      if (!dodged && targetCharacterId && amountDealt > 0 && !entry.revived) {
+        const wandHit = characterId === 'marin' ? 'marin_wand_hit' : 'rowan_wand_hit';
+        setFlash(targetCharacterId, `assets/images/${targetCharacterId}/${wandHit}.jpg`);
       }
       break;
     case 'arcaneStudy':

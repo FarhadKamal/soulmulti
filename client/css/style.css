@@ -195,13 +195,10 @@ input {
 }
 /* Melyssa's current Mind Control puppet used to get a distinct violet glow
    ring + "PUPPET" text badge here (char-tile--puppet) - removed entirely
-   2026-09-05, replaced by the mind-control face overlay
-   (.char-portrait--mind-control-overlay, shared with Full Control) - a
-   full-face image reads as "under her control" more immediately than a
-   small badge, and the two together looked cluttered. The overlay is
-   added directly in renderCharacterTile alongside the hypnotic-ripple
-   pulse below, which is UNCHANGED - both effects still layer together for
-   the whole control window.
+   2026-09-05, replaced by a faded Melyssa-face overlay, itself replaced
+   2026-10-15 by the puppet's own per-hero mind_controlled.jpg portrait
+   (getPersistentPortrait). The hypnotic-ripple pulse below is UNCHANGED
+   and still layers over it for the whole control window.
 
    Hypnotic ripple: looping concentric rings pulsing outward from the
    puppet's portrait center, for the ENTIRE control window (unlike the
@@ -250,18 +247,6 @@ input {
      query below tightens this further for phone screens. */
   width: 100%; max-height: 16vh; object-fit: contain; border-radius: 6px;
   margin-bottom: 4px; display: block; background: #0d0d14;
-}
-/* Melyssa's Full Control: her own face layered on top of a puppet's own
-   portrait for the burst's duration - positioned to exactly overlay the
-   base .char-portrait (same width/max-height/object-fit, zeroed margin so
-   it doesn't push .char-name down a second time), faded via opacity since
-   the source image is a normal opaque JPG rather than a real transparent
-   PNG (Gemini couldn't reliably produce genuine alpha transparency).
-   pointer-events: none so it never blocks clicking the tile underneath. */
-.char-portrait--mind-control-overlay {
-  position: absolute; top: 8px; left: 8px; right: 8px;
-  width: calc(100% - 16px); margin-bottom: 0;
-  opacity: 0.4; pointer-events: none; z-index: 2;
 }
 .char-name { font-weight: 700; }
 .char-hearts { font-size: 0.9em; display: flex; flex-wrap: wrap; gap: 2px; }
