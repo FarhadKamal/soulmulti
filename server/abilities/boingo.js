@@ -142,11 +142,18 @@ export const actions = {
       let amount = 0;
       if (outcome === 'win') amount = 3;
       else if (outcome === 'draw') amount = 1;
-      const result = applyDamage(game, log, {
-        sourceCharacterId: character.id,
-        targetCharacterId: targetId,
-        amount,
-      });
+      // A 'lose' roll is Boingo whiffing on his own, not a hit the target
+      // has to defend against - skip applyDamage entirely (2026-10-15).
+      // Running a 0-damage hit through it still rolled every on-hit
+      // defense: burned a Threefold Veil charge or Akyros's per-attacker
+      // dodge, counted for Grim Ward, and used up an armed Mirror Reflect.
+      const result = outcome === 'lose'
+        ? { targetCharacterId: targetId, amountDealt: 0, absorbed: 0, dodged: false, revived: false, koTriggered: false, mirrorResult: null }
+        : applyDamage(game, log, {
+          sourceCharacterId: character.id,
+          targetCharacterId: targetId,
+          amount,
+        });
       // Confirmed ruling: the "win" roll's old +1 decaying shield bonus is
       // removed - a pure 3-damage hit now, no side benefit. His shield
       // reward comes from the reworked Jester Ball toll-booth instead (see
