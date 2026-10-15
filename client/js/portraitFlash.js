@@ -1821,7 +1821,16 @@ export function handleLogEntryForFlash(entry, game) {
       // normal attack, this can never be dodged (ignoresDodge: true is
       // always set server-side), so the detonation itself always visibly
       // happens even if the target's shield ends up absorbing all of it.
-      setFlash(characterId, 'assets/images/illyra/mirage_burst.jpg'); break;
+      setFlash(characterId, 'assets/images/illyra/mirage_burst.jpg');
+      // Per-victim reaction (added 2026-10-15) - one per burst that actually
+      // hurt (b.targetId is the post-redirect victim); same no-!isKO rule as
+      // the other hit images, skipped when Rebirth caught it.
+      for (const b of entry.bursts || []) {
+        if (b.targetId && b.amountDealt > 0 && !b.revived) {
+          setFlash(b.targetId, `assets/images/${b.targetId}/mirage_burst_hit.jpg`);
+        }
+      }
+      break;
     case 'mirageOverload':
       setFlash(characterId, 'assets/images/illyra/mirage_overload.jpg'); break;
     case 'runeStrike':
@@ -1853,6 +1862,16 @@ export function handleLogEntryForFlash(entry, game) {
       setFlash(characterId, 'assets/images/oraclus/prophecy.jpg'); break;
     default:
       break;
+  }
+  // Illyra's illusion dodge (added 2026-10-15) - the attacker's own per-hero
+  // "struck through a mirage" image replaces whatever attack image the
+  // switch above just set. Only real dodged hits (entry.dodged); her status-
+  // only dodges (Curse Strike's curse, Silence Lock...) still landed the
+  // action itself, so they keep the normal attack image. Beast Form Grimtal
+  // gets his own beast version.
+  if (dodged && targetCharacterId === 'illyra' && characterId !== 'illyra') {
+    const beast = characterId === 'grimtal' && game.characters.grimtal?.special?.beastFormActive;
+    setFlash(characterId, `assets/images/${characterId}/${beast ? 'beast_illusion_miss' : 'illusion_miss'}.jpg`);
   }
 }
 
