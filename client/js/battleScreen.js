@@ -2519,7 +2519,7 @@ function describeLogEntry(entry) {
     case 'special':
       if (entry.actionId === 'fowlPlay') {
         const victims = entry.chickenIds || [];
-        return `${name(entry.characterId)} unleashed Fowl Play - ${victims.map(name).join(', ')} turned into chickens!`;
+        return `${name(entry.characterId)} unleashed Fowl Play - ${victims.map(name).join(', ')} turned into ${victims.length === 1 ? 'a chicken' : 'chickens'}!`;
       }
       if (entry.actionId === 'mirageBurst') {
         // No single target - detonates everyone currently marked at once,
@@ -2830,10 +2830,10 @@ function describeLogEntry(entry) {
       // reversion - worth its own wording so this shows up distinctly if
       // it's ever seen in a real match log again.
       return entry.reason === 'timeout'
-        ? `${name(entry.characterId)}'s Beast Form times out and reverts back to normal form`
-        : `${name(entry.characterId)} reverts back to normal form`;
+        ? `${name(entry.characterId)}'s Beast Form times out - back to normal form`
+        : `${name(entry.characterId)} returns to normal form`;
     case 'jester-ball-take':
-      return `${name(entry.targetCharacterId)} took the Jester Ball${entry.amountDealt != null ? ` - -${entry.amountDealt} hearts` : ''}`;
+      return `${name(entry.targetCharacterId)} took the Jester Ball${entry.amountDealt != null ? ` - ${entry.amountDealt} damage` : ''}${absorbedText(entry.absorbed)}${entry.koTriggered ? ' - KO!' : ''}`;
     case 'jester-ball-pass':
       return `${name(entry.fromCharacterId)} passed the Jester Ball to ${name(entry.toCharacterId)}`;
     case 'jester-ball-return': {

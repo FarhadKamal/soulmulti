@@ -193,7 +193,7 @@ export function onTurnStart(character, game, log) {
     character.shield = 0;
   } else {
     character.shield = 1;
-    log.push({ type: 'passive', characterId: character.id, text: `${character.id}'s shield resets to 1 (Chrono Guard)`, hearts: heartsSnapshot(game) });
+    log.push({ type: 'passive', characterId: character.id, text: "Chronox's shield resets to 1 (Chrono Guard)", hearts: heartsSnapshot(game) });
   }
 }
 

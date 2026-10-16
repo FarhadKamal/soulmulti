@@ -173,7 +173,7 @@ export function getActingCharacterId(game) {
       // valid targets" line (same reasoning as the isSilenced branch below,
       // added 2026-09-22 for the identical class of misleading-message bug).
       const text = isFrogged(character)
-        ? `${CHARACTERS[character.id].name} is a frog and can't act - skips their turn!`
+        ? `${CHARACTERS[character.id].name} is a frog and can't act - turn skipped!`
         : isSilenced(character, game)
           ? `${CHARACTERS[character.id].name} is silenced and has no other action - skips their turn.`
           : `${CHARACTERS[character.id].name} has no valid targets and skips their turn.`;
