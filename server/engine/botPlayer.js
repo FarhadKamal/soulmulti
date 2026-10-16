@@ -61,6 +61,19 @@ function isAvoidingDivineJudgmentVictim(game, character, targetId) {
   return !!athena && !athena.isKO && athena.special?.divineJudgmentTargetId === character.id;
 }
 
+// Same Judgment self-preservation, for UNTARGETED damage (2026-10-16): the
+// target filter below never sees Mirage Burst / Earthshatter, so a marked
+// Illyra burst the 2 stacks already on Athena, killed her and died to
+// her own Judgment while Boingo was still alive to hit instead. True when
+// `character` is Athena's marked victim, Athena could die to `maxDamage`
+// (shield counted), and some OTHER living enemy exists to fight instead.
+function untargetedHitRisksJudgment(game, character, maxDamage) {
+  if (!isAvoidingDivineJudgmentVictim(game, character, 'athena')) return false;
+  const athena = game.characters.athena;
+  if (maxDamage < athena.hearts + (athena.shield || 0)) return false;
+  return Object.values(game.characters).some((c) => !c.isKO && c.id !== character.id && c.id !== 'athena');
+}
+
 function validTargetsFor(game, character, actionId) {
   const all = Object.keys(game.characters).filter((tid) => isValidTarget(game, character.id, actionId, tid));
   if (!isAvoidingDivineJudgmentVictim(game, character, 'athena')) return all;
@@ -262,7 +275,9 @@ function chooseTharoxMove(character, game, usable) {
   // it's available (no self-damage, no cost) - doesn't touch hasCharge at
   // all, so it's checked first, unconditionally, ahead of the
   // mandatory-cash-in narrowing below.
-  if (byId.earthshatter) {
+  // 7 random points could land enough on Athena to kill her - hold it while
+  // marked by her Judgment (it stays available for after she's gone).
+  if (byId.earthshatter && !untargetedHitRisksJudgment(game, character, 7)) {
     return { actionId: 'earthshatter', targetId: null };
   }
   // Mandatory cash-in already narrows usable to just Titan Smash/Glory
@@ -1683,7 +1698,12 @@ function chooseIllyraMove(character, game, usable) {
   if (byId.mirageOverload) {
     return { actionId: 'mirageOverload', targetId: null };
   }
-  if (byId.mirageBurst) {
+  // Burst detonates every mark at once (floor(stacks*1.5), ignores dodge),
+  // so stacks left on Athena from before her Judgment can't be skipped -
+  // don't burst at all while that would kill her and trigger the pact.
+  const athenaStacks = character.special.mirageMarks.get('athena') || 0;
+  const burstRisksJudgment = untargetedHitRisksJudgment(game, character, Math.floor(athenaStacks * 1.5));
+  if (byId.mirageBurst && !burstRisksJudgment) {
     if (illyraUrgentBurstTarget(character, game)) {
       return { actionId: 'mirageBurst', targetId: null };
     }
