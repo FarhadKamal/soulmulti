@@ -421,8 +421,11 @@ export const actions = {
         const deepSeaSealedNoCaster = character.deepSeaSealed;
         const deepSeaSealPartnerIdNoCaster = character.deepSeaSealPartnerId;
         const deepSeaEscapeAttemptsNoCaster = character.deepSeaEscapeAttempts;
+        const shieldAtCastNoCaster = character.shield;
         Object.assign(character, structuredClone(record.chronoxSnapshot));
         character.special.rewindUsesRemaining = rewindUsesRemaining;
+        // Same "never less shield than at cast" rule as the main branch below.
+        character.shield = Math.max(character.shield, shieldAtCastNoCaster);
         character.usedSpecial = usedSpecialNoCaster;
         character.special.usedWorldStops = usedWorldStopsNoCaster;
         Object.assign(character.special, freezeStateNoCaster);
@@ -610,9 +613,15 @@ export const actions = {
         worldStopsFrozenIds: character.special.worldStopsFrozenIds,
         worldStopsSkipsApplied: character.special.worldStopsSkipsApplied,
       };
+      const shieldAtCast = character.shield;
       Object.assign(caster, structuredClone(record.casterSnapshot));
       Object.assign(character, structuredClone(record.chronoxSnapshot));
       character.special.rewindUsesRemaining = rewindUsesRemaining; // re-assert past the restore
+      // Never come out of a Rewind with LESS shield than he cast it with
+      // (2026-10-16): a snapshot taken while Silence Lock had stripped him
+      // restored 0 over the Chrono Guard shield he'd since re-armed. A
+      // shield the undone hit broke still comes back (snapshot wins then).
+      character.shield = Math.max(character.shield, shieldAtCast);
       character.usedSpecial = usedSpecial;
       character.special.usedWorldStops = usedWorldStops;
       Object.assign(character.special, freezeState);
