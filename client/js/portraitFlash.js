@@ -856,8 +856,16 @@ export function handleLogEntryForFlash(entry, game) {
   // coexist). controllingMelyssaId is stamped server-side by
   // executeActionAsPuppet (turnEngine.js) onto every log entry a puppeted
   // action produces.
+  // Doesn't cover an image she already got this same instant (2026-10-16):
+  // when her puppet's victim is Melyssa herself, her own hit image was
+  // being replaced by this flash from the action's trailing end-action
+  // entry (which carries controllingMelyssaId too).
   if (entry.controllingMelyssaId && !isKO(entry.controllingMelyssaId)) {
-    setFlash(entry.controllingMelyssaId, 'assets/images/melyssa/mind_control_action.jpg');
+    const mindControlSrc = 'assets/images/melyssa/mind_control_action.jpg';
+    const current = activeFlash.get(entry.controllingMelyssaId);
+    if (!(current && current.setAt === currentBatchToken && current.src !== mindControlSrc)) {
+      setFlash(entry.controllingMelyssaId, mindControlSrc);
+    }
   }
 
   if (entry.type === 'special' && entry.actionId === 'friendship') {
