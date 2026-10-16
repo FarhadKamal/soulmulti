@@ -1111,12 +1111,15 @@ export function handleLogEntryForFlash(entry, game) {
     // side is the one who just died, in which case only the survivor
     // needs a revert flash; the dead character's own koed.jpg already
     // covers them, per the "universal replacement" design note).
+    // After-same-batch (2026-10-16): when Blade's own Shark Strike is the
+    // killing blow, deepsea_revert used to replace deepsea_strike in the
+    // same instant, so the finishing strike was never seen.
     for (const id of entry.characterIds || []) {
       if (isKO(id)) continue; // koed.jpg already covers a dead party, no revert flash needed
       if (id === 'blade') {
-        setFlash('blade', 'assets/images/blade/deepsea_revert.jpg');
+        setFlashAfterSameBatch('blade', 'assets/images/blade/deepsea_revert.jpg');
       } else {
-        setFlash(id, `assets/images/${id}/deepsea_released.jpg`);
+        setFlashAfterSameBatch(id, `assets/images/${id}/deepsea_released.jpg`);
       }
     }
     return;
@@ -1142,7 +1145,7 @@ export function handleLogEntryForFlash(entry, game) {
     // same deepsea_released.jpg as a normal seal end (2026-10-16).
     const partnerId = entry.sealReleasedPartnerId;
     if (partnerId && !isKO(partnerId)) {
-      setFlash(partnerId, `assets/images/${partnerId}/deepsea_released.jpg`);
+      setFlashAfterSameBatch(partnerId, `assets/images/${partnerId}/deepsea_released.jpg`);
     }
     return;
   }
