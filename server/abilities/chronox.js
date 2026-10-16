@@ -279,7 +279,15 @@ export const actions = {
     label: 'World Stops',
     needsTarget: false,
     special: true,
-    isLegal: (character) => character.hearts <= 3 && !character.special.usedWorldStops,
+    // Hidden while nobody could be frozen (user ruling 2026-10-16) - e.g. the
+    // only opponent left is a Beast Form Grimtal - so the one-time special
+    // can't be wasted on "froze no one". Same idea as Fowl Play/Moonlit
+    // Theft's own "no-op cast hidden" isLegal checks. Clean Slate isn't
+    // checked here (it's consumed by blocking), same as Fowl Play.
+    isLegal: (character, game) => character.hearts <= 3 && !character.special.usedWorldStops
+      && Object.values(game.characters).some(
+        (c) => c.id !== character.id && !c.isKO && !(c.id === 'grimtal' && c.special?.beastFormActive)
+      ),
     execute(character, targetId, game, log) {
       character.special.usedWorldStops = true;
       // Grimtal's Beast Form (Death-Triggered Reversion #36) - excluded
