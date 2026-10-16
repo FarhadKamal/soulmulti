@@ -238,8 +238,13 @@ export const actions = {
         }
       }
       character.skipNextTurn = false;
+      // Akyros's Shadow Seal is a negative status placed on him too (user
+      // ruling 2026-10-16 "A") - frees all his locked hearts. Everyone else
+      // stays sealed. Cleared before the heal so the full pool is live again.
+      const sealBroken = (character.lockedHearts || 0) > 0;
+      character.lockedHearts = 0;
       const healed = applyHeal(game, character.id, character.maxHearts);
-      log.push({ type: 'special', characterId: character.id, actionId: 'purify', healed });
+      log.push({ type: 'special', characterId: character.id, actionId: 'purify', healed, ...(sealBroken ? { sealBroken } : {}) });
       return { healed };
     },
   },

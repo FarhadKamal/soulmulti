@@ -2691,6 +2691,9 @@ function describeLogEntry(entry) {
         }
         return `${name(entry.characterId)} used Rewind - undid ${name(entry.rewoundCasterId)}'s ${actionLabel(entry.rewoundActionId)}!`;
       }
+      if (entry.actionId === 'purify' && entry.sealBroken) {
+        return `${name(entry.characterId)} used their SPECIAL: Purify - Shadow Seal broken!`;
+      }
       if (entry.actionId === 'friendship') {
         // Melyssa's Friendship (Redirect Bond, design-locked 2026-09-20,
         // replaces Full Control) - the bond is NOT secret (no
