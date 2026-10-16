@@ -2504,7 +2504,13 @@ function describeLogEntry(entry) {
         // Shows both sides of the gamble - the guaranteed 3 dealt to the
         // enemy AND the random hearts it actually cost her this cast,
         // including if it happened to KO her too.
-        return `${name(entry.characterId)} used ${actionLabel(entry.actionId)} on ${name(actualAttackTargetId(entry))}${entry.amountDealt != null ? ` - ${entry.amountDealt} damage` : ''}${entry.koTriggered ? ' - KO!' : ''} (sacrificed ${entry.selfCost} heart${entry.selfCost > 1 ? 's' : ''}${entry.selfResult?.koTriggered ? ' - KO!' : ''})`;
+        // Her own shield can soak the self-cost (by design) - say so, rather
+        // than claiming hearts were sacrificed that never left (2026-10-16).
+        const selfAbsorbed = entry.selfResult?.absorbed || 0;
+        const costText = selfAbsorbed > 0
+          ? `sacrifice cost ${entry.selfCost} - ${selfAbsorbed} absorbed by shield`
+          : `sacrificed ${entry.selfCost} heart${entry.selfCost > 1 ? 's' : ''}`;
+        return `${name(entry.characterId)} used ${actionLabel(entry.actionId)} on ${name(actualAttackTargetId(entry))}${entry.amountDealt != null ? ` - ${entry.amountDealt} damage` : ''}${entry.koTriggered ? ' - KO!' : ''} (${costText}${entry.selfResult?.koTriggered ? ' - KO!' : ''})`;
       }
       if (entry.actionId === 'phoenixDive') {
         return `${name(entry.characterId)} crashes down with Phoenix Dive on ${name(actualAttackTargetId(entry))}${entry.amountDealt != null ? ` - ${entry.amountDealt} damage` : ''}${entry.absorbed ? ` (${entry.absorbed} absorbed by shield)` : ''}${entry.koTriggered ? ' - KO!' : ''} - every grudge released!`;
