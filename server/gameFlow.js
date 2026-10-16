@@ -127,9 +127,10 @@ export function getActingCharacterId(game) {
           game.log.push({ type: 'passive', characterId: character.id, text: `${CHARACTERS[character.id].name}'s headache is too much to resolve the Jester Ball - it bursts on them!`, hearts: heartsSnapshot(game) });
           finishJesterBall(game, 'take', undefined);
         }
-      } else {
-        game.log.push({ type: 'passive', characterId: character.id, text: `${CHARACTERS[character.id].name}'s headache is too much - they skip their turn.`, hearts: heartsSnapshot(game) });
       }
+      // No separate "skips their turn" line otherwise (removed 2026-10-16) -
+      // the headache-roll entry already said "turn skipped!", so the log
+      // repeated itself on every flare-up.
       clearStalledBonusTurn(character);
       markCharacterActed(game, character.id);
       continue;
