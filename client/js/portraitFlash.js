@@ -210,6 +210,7 @@ const CHICKEN_FLASH_PATHS = new Set([
     chickenImagePath(id, '.jpg'),
     chickenImagePath(id, '_attack.jpg'),
     chickenImagePath(id, '_hit.jpg'),
+    chickenImagePath(id, '_pass.jpg'),
   ]),
   'assets/images/boingo/foul_play.jpg',
 ]);
@@ -876,6 +877,19 @@ export function handleLogEntryForFlash(entry, game) {
   if (entry.type === 'special' && entry.actionId === 'jesterBall') {
     lastJesterBallThrowerId = entry.characterId;
     if (!isKO(entry.characterId)) setFlash(entry.characterId, 'assets/images/boingo/throwing.jpg');
+    return;
+  }
+  // The passer's own "get this thing away from me" toss (added 2026-10-16) -
+  // per-hero jester_pass.jpg, or chicken_pass.jpg while chickenified (Fowl
+  // Play); Boingo reuses his throwing.jpg. The receiver just gets the ball
+  // icon, same as before.
+  if (entry.type === 'jester-ball-pass') {
+    const from = entry.fromCharacterId;
+    if (from && !isKO(from)) {
+      setFlash(from, from === 'boingo' ? 'assets/images/boingo/throwing.jpg'
+        : game.characters[from]?.isChicken ? chickenImagePath(from, '_pass.jpg')
+          : `assets/images/${from}/jester_pass.jpg`);
+    }
     return;
   }
   if (entry.type === 'jester-ball-return') {
