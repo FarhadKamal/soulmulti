@@ -12,7 +12,7 @@ import { createGame } from './engine/state.js';
 import {
   getUsableActions, getUsablePuppetActions, executeAction, isValidTarget, isValidMindControlTarget,
   isValidPuppetTarget, markCharacterActed, finalizeAction, executeActionAsPuppet,
-  isMelyssaLoneDuel, LONE_DUEL_EXCEPTIONS, buildActionAgainstChronoxRecord, chronoxStateActuallyChanged,
+  isMelyssaLoneDuel, LONE_DUEL_EXCEPTIONS, buildActionAgainstChronoxRecord, chronoxStateActuallyChanged, stampRewindAfterState,
   resolveOraclusPredictionIfPending, isValidRuneVisionAttackerPick, isValidRuneVisionTargetPick, countKO,
 } from './engine/turnEngine.js';
 import { applyDamage, heartsSnapshot } from './engine/damagePipeline.js';
@@ -489,6 +489,7 @@ function executeSelfChoke(game, melyssaId, puppetId) {
       chronoxChar.special.lastActionAgainstMe = candidateRecord;
     }
   }
+  if (candidateRecord) stampRewindAfterState(game, melyssaId);
   log.push({ type: 'attack', characterId: melyssaId, actionId: 'selfChoke', targetId: puppetId, ...result });
   // Melyssa's Friendship - Self Choke against her CURRENT friend always
   // permanently ends the bond, whether she chose it voluntarily or it was

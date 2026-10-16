@@ -876,6 +876,23 @@ export function beginCharacterTurn(character, game, log) {
 // caller must not touch lastActionAgainstMe at all, whether or not this
 // individual call ends up dealing damage), or a fresh record object ready
 // to commit pending the post-execute effect check.
+// Rewind policy (2026-10-16, user: "just follow the policy"): Rewind undoes
+// ONLY what the recorded action itself did - anything from an unrelated
+// source afterwards (another hero's damage, a heal, a shield gain) is kept.
+// Stamps the caster's and Chronox's hearts/shield right after the recorded
+// action (and after each same-combo continuation), so Rewind can reverse
+// just that difference instead of snapping back to the whole old snapshot.
+// Live case: Athena's Divine Sacrifice recorded at 5 hearts, Tharox's Glory
+// Smash took her to 1, Rewind restored her to 5.
+export function stampRewindAfterState(game, casterId) {
+  const record = game.characters.chronox?.special?.lastActionAgainstMe;
+  if (!record || record.casterId !== casterId) return;
+  const chronox = game.characters.chronox;
+  record.chronoxAfter = { hearts: chronox.hearts, shield: chronox.shield || 0 };
+  const caster = casterId ? game.characters[casterId] : null;
+  if (caster) record.casterAfter = { hearts: caster.hearts, shield: caster.shield || 0 };
+}
+
 export function buildActionAgainstChronoxRecord(game, characterId, actionId, targetId) {
   if (targetId !== 'chronox') return null;
   // Oraclus's Rune Vision (stage 1) is a SELECTION, not an attack - picking
@@ -1368,6 +1385,7 @@ export function executeAction(game, characterId, actionId, targetId, extra) {
       chronoxChar.special.lastActionAgainstMe = candidateRecord;
     }
   }
+  if (candidateRecord) stampRewindAfterState(game, characterId);
   finalizeAction(game, log, result, characterId, actionId, targetId, koCountBefore);
   return result;
 }
@@ -1605,6 +1623,7 @@ export function resolveJesterBall(game, holderCharacterId, choice, extra) {
   if (preSnapshot && game.characters.chronox
     && chronoxStateActuallyChanged(game.characters.chronox, preSnapshot.chronoxSnapshot, null, null)) {
     game.characters.chronox.special.lastActionAgainstMe = preSnapshot;
+    stampRewindAfterState(game, null);
   }
   // Not stamped with its own hearts - same reasoning as finalizeAction's
   // own deferred pushes above (this log array is local, followed by this

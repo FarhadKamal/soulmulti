@@ -3,43 +3,17 @@ import { redirectStatusTargetIfProtected } from './melyssa.js';
 import { flipCoin } from '../engine/random.js';
 import { registerOnOwnDeath } from '../engine/categories/onOwnDeath.js';
 import { registerOnOtherRevived } from '../engine/categories/onOtherRevived.js';
-import { registerOnHitLandedEarly } from '../engine/categories/onHitLandedEarly.js';
 
-// Rewind pending-snapshot drift correction (see
-// engine/categories/onHitLandedEarly.js): his snapshot
-// (special.lastActionAgainstMe.chronoxSnapshot.hearts) is captured at some
-// point in the PAST - the moment right before whichever action is
-// currently the "most recent action against him." If damage lands on him
-// from a source that ISN'T that recorded action (poison ticks, a
-// curse-mirror bounce, Mirror Reflect's counter-hit, anything not routed
-// through the normal recording flow), the snapshot itself must shift down
-// by that same amount too - otherwise Rewind would restore him past damage
-// it was never meant to touch, i.e. free healing for damage from an
-// unrelated source.
-//
-// EXCLUDED: damage from the SAME caster+turnInstance as the currently
-// pending record - this is a chained follow-up within the same combo
-// (Soul Swap's soulSwapWrath, Draxus's bonus strikes), and that damage
-// genuinely SHOULD be absorbed into the existing snapshot's own
-// before-state, not corrected away as "unrelated." mindControl (Melyssa's
-// puppet SELECTION step) is excluded from combo continuation too - a
-// pending mindControl record's snapshot must still drift-correct against
-// any damage that follows in the same turn (e.g. Self Choke), not be
-// treated as "part of the same combo" and skipped. Matches the same
-// turnInstance-based combo detection turnEngine.js's
-// buildActionAgainstChronoxRecord already uses.
-registerOnHitLandedEarly('chronox', (character, game, log, ctx) => {
-  const record = character.special?.lastActionAgainstMe;
-  if (!record) return;
-  const isSameComboContinuation = record.casterId === ctx.sourceCharacterId
-    && game.turnInstanceFor?.get(ctx.sourceCharacterId) === record.casterTurnInstance
-    && record.actionId !== 'mindControl';
-  if (isSameComboContinuation) return;
-  const drift = ctx.heartsBefore - character.hearts;
-  if (drift > 0) {
-    record.chronoxSnapshot.hearts = Math.max(0, record.chronoxSnapshot.hearts - drift);
-  }
-});
+// Rewind policy: it never gives free healing for damage from an unrelated
+// source (poison ticks, a curse-mirror bounce, another hero's hit) and never
+// wipes an unrelated heal or shield gain either. This used to be a hearts-
+// only drift correction on HIS snapshot (an onHitLandedEarly hook); since
+// 2026-10-16 the record stores the after-action hearts/shield of both
+// parties (turnEngine.js stampRewindAfterState) and Rewind reverses only
+// that difference, for the caster as well as for Chronox.
+function clampHearts(character, hearts) {
+  return Math.min(character.maxHearts ?? 7, Math.max(1, hearts));
+}
 
 // Revival cleanup (see engine/categories/onOtherRevived.js) - 3 separate
 // stale-reference risks, all against the now-revived character specifically.
@@ -422,10 +396,15 @@ export const actions = {
         const deepSeaSealPartnerIdNoCaster = character.deepSeaSealPartnerId;
         const deepSeaEscapeAttemptsNoCaster = character.deepSeaEscapeAttempts;
         const shieldAtCastNoCaster = character.shield;
+        const heartsNowNoCaster = character.hearts;
         Object.assign(character, structuredClone(record.chronoxSnapshot));
         character.special.rewindUsesRemaining = rewindUsesRemaining;
-        // Same "never less shield than at cast" rule as the main branch below.
+        // Same "never less shield than at cast" and "only reverse what the
+        // explosion did" rules as the main branch below.
         character.shield = Math.max(character.shield, shieldAtCastNoCaster);
+        if (record.chronoxAfter) {
+          character.hearts = clampHearts(character, heartsNowNoCaster + record.chronoxSnapshot.hearts - record.chronoxAfter.hearts);
+        }
         character.usedSpecial = usedSpecialNoCaster;
         character.special.usedWorldStops = usedWorldStopsNoCaster;
         Object.assign(character.special, freezeStateNoCaster);
@@ -614,6 +593,8 @@ export const actions = {
         worldStopsSkipsApplied: character.special.worldStopsSkipsApplied,
       };
       const shieldAtCast = character.shield;
+      const chronoxHeartsNow = character.hearts;
+      const casterNow = { hearts: caster.hearts, shield: caster.shield || 0, shieldDecaying: caster.shieldDecaying };
       Object.assign(caster, structuredClone(record.casterSnapshot));
       Object.assign(character, structuredClone(record.chronoxSnapshot));
       character.special.rewindUsesRemaining = rewindUsesRemaining; // re-assert past the restore
@@ -622,6 +603,17 @@ export const actions = {
       // restored 0 over the Chrono Guard shield he'd since re-armed. A
       // shield the undone hit broke still comes back (snapshot wins then).
       character.shield = Math.max(character.shield, shieldAtCast);
+      // Hearts/shield: reverse only what the recorded action changed, keep
+      // everything unrelated since (see turnEngine.js stampRewindAfterState).
+      // Floored at 1 - a Rewind never kills anyone.
+      if (record.chronoxAfter) {
+        character.hearts = clampHearts(character, chronoxHeartsNow + record.chronoxSnapshot.hearts - record.chronoxAfter.hearts);
+      }
+      if (record.casterAfter) {
+        caster.hearts = clampHearts(caster, casterNow.hearts + record.casterSnapshot.hearts - record.casterAfter.hearts);
+        caster.shield = Math.max(0, casterNow.shield + (record.casterSnapshot.shield || 0) - record.casterAfter.shield);
+        caster.shieldDecaying = casterNow.shieldDecaying;
+      }
       character.usedSpecial = usedSpecial;
       character.special.usedWorldStops = usedWorldStops;
       Object.assign(character.special, freezeState);
