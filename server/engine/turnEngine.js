@@ -1200,12 +1200,13 @@ export function resolveOraclusPredictionIfPending(game, log, characterId, action
   }
   oraclusChar.special.predictionWins += 1;
   oraclusChar.special.runeStrikeBonusDamage += 1;
-  applyHeal(game, 'oraclus', 3);
+  // Real amount healed (0 at full hearts) so the log doesn't claim +3.
+  const healed = applyHeal(game, 'oraclus', 3);
   applyShield(game, 'oraclus', 3, { decaying: false });
   log.push({
     type: 'prediction-result', characterId: 'oraclus', matched: true,
     predictedAttackerId: characterId, predictedTargetId: targetId,
-    predictionWins: oraclusChar.special.predictionWins,
+    predictionWins: oraclusChar.special.predictionWins, healed,
     hearts: heartsSnapshot(game),
   });
 }

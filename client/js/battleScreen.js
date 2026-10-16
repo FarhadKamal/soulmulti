@@ -2783,7 +2783,7 @@ function describeLogEntry(entry) {
       return `Ashka strikes ${name(entry.targetId)} - ${entry.amountDealt} damage${entry.koTriggered ? ' - KO!' : ''}`;
     case 'prediction-result':
       return entry.matched
-        ? `Rune Vision confirmed! ${name(entry.predictedAttackerId)} struck ${name(entry.predictedTargetId)} exactly as foreseen - +3 hearts, +3 shield, +1 damage (${entry.predictionWins}/2 wins)`
+        ? `Rune Vision confirmed! ${name(entry.predictedAttackerId)} struck ${name(entry.predictedTargetId)} exactly as foreseen - +${entry.healed ?? 3} heart${(entry.healed ?? 3) === 1 ? '' : 's'}, +3 shield, +1 damage (${entry.predictionWins}/2 wins)`
         : `Rune Vision failed - the vision did not come to pass`;
     case 'deathless-fury-end':
       return `${name(entry.characterId)}'s Deathless Fury ends - 3 strikes granted!`;
