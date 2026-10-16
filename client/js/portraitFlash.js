@@ -835,7 +835,9 @@ export function handleLogEntryForFlash(entry, game) {
     // amountDealt > 0 gate for the choke-ring/ghost-hand CSS effect) so a
     // dodged choke shows ONLY Melyssa's own cast/attempt flash plus the
     // victim's normal dodge reaction - not both a fake hit AND a dodge.
-    if (entry.targetId && !isKO(entry.targetId) && !entry.dodged) {
+    // No !isKO gate (2026-10-16) - same rule as every other hit image, so a
+    // killing choke still shows; skipped when Blade's Rebirth caught it.
+    if (entry.targetId && !entry.dodged && !entry.revived) {
       setFlash(entry.targetId, `assets/images/${entry.targetId}/choke.jpg`);
     }
     return;
