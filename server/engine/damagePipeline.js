@@ -726,6 +726,22 @@ export function applyDamage(game, log, {
     amountDealt: result.amountDealt, isMirror, isPoisonTick, isAshkaStrike, sourceCharacterId, heartsBefore,
   });
   if (earlyExtra) Object.assign(result, earlyExtra);
+  // Rewind drift correction for the recorded CASTER (2026-10-16) - same
+  // "no free healing for unrelated damage" rule chronox.js already applies
+  // to his own snapshot. Live: Athena's Divine Sacrifice on Chronox was
+  // recorded at 5 hearts, Tharox's Glory Smash then took her to 1, and
+  // Rewind restored her to 5 - erasing Tharox's hit. Same combo-continuation
+  // exclusion as Chronox's own drift hook.
+  const rewindRecord = game.characters.chronox?.special?.lastActionAgainstMe;
+  if (rewindRecord?.casterSnapshot && rewindRecord.casterId === target.id) {
+    const isSameComboContinuation = rewindRecord.casterId === sourceCharacterId
+      && game.turnInstanceFor?.get(sourceCharacterId) === rewindRecord.casterTurnInstance
+      && rewindRecord.actionId !== 'mindControl';
+    const drift = heartsBefore - target.hearts;
+    if (!isSameComboContinuation && drift > 0) {
+      rewindRecord.casterSnapshot.hearts = Math.max(0, rewindRecord.casterSnapshot.hearts - drift);
+    }
+  }
 
   // Akyros's Shadow Seal - a KO can now fire from the ACTIVE pool
   // (hearts - lockedHearts) hitting 0 even while real hearts reads higher
