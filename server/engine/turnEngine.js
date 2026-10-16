@@ -293,6 +293,16 @@ export function isValidTarget(game, characterId, actionId, targetId) {
   // covers every current and future targeted action automatically.
   if (characterId === 'melyssa' && melyssa.isCurrentFriend(game, targetId)) return false;
   if (targetId === 'melyssa' && melyssa.isCurrentFriend(game, characterId)) return false;
+  // Chronox's Rewind lockout: the caster it was cast against cannot use
+  // that EXACT SAME action against Chronox specifically, for their own
+  // next turn only (see tickChronoxLockoutIfAny for the timing). Every
+  // OTHER action against Chronox, and this exact action against anyone
+  // else, remain fully legal - only this one precise (caster, action,
+  // Chronox) combination is blocked. Checked BEFORE the per-action early
+  // returns below (moved 2026-10-16) - it used to sit after them, so Hidden
+  // Mark, Shadow Execution, Snake Strike and Shark Strike skipped the lock
+  // entirely (live: Akyros re-marked Chronox right after it was rewound).
+  if (isLockedOutByRewind(game, characterId, actionId, targetId)) return false;
   if (actionId === 'shadowExecution') return character.special.marks.has(targetId);
   if (actionId === 'hiddenMark') return !character.special.everMarkedIds.has(targetId);
   // Rowan's Frog Curse - mutually exclusive with Boingo's Fowl Play
@@ -315,20 +325,17 @@ export function isValidTarget(game, characterId, actionId, targetId) {
   // whoever he dragged into the seal, not a general-purpose attack), same
   // shape as snakeStrike's own isFrogged(target) check above.
   if (actionId === 'sharkStrike') return character.deepSeaSealPartnerId === targetId;
-  // Chronox's Rewind lockout: the caster it was cast against cannot use
-  // that EXACT SAME action against Chronox specifically, for their own
-  // next turn only (see tickChronoxLockoutIfAny for the timing). Every
-  // OTHER action against Chronox, and this exact action against anyone
-  // else, remain fully legal - only this one precise (caster, action,
-  // Chronox) combination is blocked.
-  if (targetId === 'chronox') {
-    const chronoxChar = game.characters.chronox;
-    if (chronoxChar && chronoxChar.special.lockedActionCasterId === characterId
-      && chronoxChar.special.lockedActionId === actionId) {
-      return false;
-    }
-  }
   return true;
+}
+
+// True when Chronox's Rewind has locked this exact (caster, action) pair
+// out of targeting him - shared by isValidTarget and isValidPuppetTarget
+// (a puppeted attacker is still the same character the lock is keyed on).
+function isLockedOutByRewind(game, characterId, actionId, targetId) {
+  if (targetId !== 'chronox') return false;
+  const chronoxChar = game.characters.chronox;
+  return !!chronoxChar && chronoxChar.special.lockedActionCasterId === characterId
+    && chronoxChar.special.lockedActionId === actionId;
 }
 
 // True if targetId is under an ACTIVE Time Freeze right now, regardless of
@@ -460,18 +467,13 @@ export function isValidPuppetTarget(game, puppetId, actionId, targetId) {
   // unavoidable side-effect of a global/multi-target action, never lets
   // her deliberately choose her own friend to directly attack her.
   if (targetId === 'melyssa' && melyssa.isCurrentFriend(game, puppetId)) return false;
-  if (actionId === 'shadowExecution') return puppet.special.marks.has(targetId);
-  if (actionId === 'hiddenMark') return !puppet.special.everMarkedIds.has(targetId);
   // Chronox's Rewind lockout applies here too - a puppeted attacker is
   // still the same underlying character the lock is keyed on, so forcing
-  // them into it via Mind Control shouldn't bypass the restriction.
-  if (targetId === 'chronox') {
-    const chronoxChar = game.characters.chronox;
-    if (chronoxChar && chronoxChar.special.lockedActionCasterId === puppetId
-      && chronoxChar.special.lockedActionId === actionId) {
-      return false;
-    }
-  }
+  // them into it via Mind Control shouldn't bypass the restriction. Before
+  // the per-action early returns, same fix as isValidTarget (2026-10-16).
+  if (isLockedOutByRewind(game, puppetId, actionId, targetId)) return false;
+  if (actionId === 'shadowExecution') return puppet.special.marks.has(targetId);
+  if (actionId === 'hiddenMark') return !puppet.special.everMarkedIds.has(targetId);
   return true;
 }
 
