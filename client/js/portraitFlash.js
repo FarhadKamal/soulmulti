@@ -379,17 +379,17 @@ function setFlash(characterId, src, durationMs = FLASH_DURATION_MS) {
 // dispatch batch (two images for one hero in one instant), lets that
 // earlier image play its full turn first instead of replacing it at once.
 // Skipped if something newer took the tile during the wait.
-function setFlashAfterSameBatch(characterId, src) {
+function setFlashAfterSameBatch(characterId, src, durationMs = FLASH_DURATION_MS) {
   const earlier = activeFlash.get(characterId);
   if (!earlier || earlier.setAt !== currentBatchToken) {
-    setFlash(characterId, src);
+    setFlash(characterId, src, durationMs);
     return;
   }
   const earlierSrc = earlier.src;
   setTimeout(() => {
     const now = activeFlash.get(characterId);
     if (now && now.src !== earlierSrc) return;
-    setFlash(characterId, src);
+    setFlash(characterId, src, durationMs);
     // setFlash never redraws by itself - without this the delayed image
     // only appeared if something else happened to rerender in time
     // (confirmed real bug, 2026-10-14: Oraclus's mirror_reflect_hit.jpg
@@ -944,8 +944,10 @@ export function handleLogEntryForFlash(entry, game) {
     // assets/images/<victimId>/judgement_strike.jpg (this exact spelling
     // is the real filename used, not "judgment_struck"), one per hero (all
     // 15 possible victims, everyone except Athena herself).
+    // Waits its turn when the victim already flashed this instant - e.g.
+    // their own killing blow on Athena is what triggered it (2026-10-16).
     if (entry.koTriggered) {
-      setFlash(entry.toCharacterId, `assets/images/${entry.toCharacterId}/judgement_strike.jpg`, DIVINE_JUDGMENT_TRIGGER_FLASH_DURATION_MS);
+      setFlashAfterSameBatch(entry.toCharacterId, `assets/images/${entry.toCharacterId}/judgement_strike.jpg`, DIVINE_JUDGMENT_TRIGGER_FLASH_DURATION_MS);
     }
     return;
   }
@@ -1379,8 +1381,12 @@ export function handleLogEntryForFlash(entry, game) {
   }
 
   if (entry.type !== 'attack' && entry.type !== 'special' && entry.type !== 'setup') return;
+  // No isKO(characterId) bail-out here any more (removed 2026-10-16): the
+  // whole batch is processed against the final state, so an attacker who
+  // died from their OWN action (Divine Judgment, Mirror Reflect, curse
+  // mirror) already read as KO'd and lost both their attack image and the
+  // victim's hit image. The attack image now plays, then the KO portrait.
   const { characterId, actionId, dodged, amountDealt, targetCharacterId } = entry;
-  if (isKO(characterId)) return;
 
   switch (actionId) {
     case 'friendship':
