@@ -740,6 +740,10 @@ export function applyDamage(game, log, {
   // something specific to any one character's reset logic.
   const rebirthResetter = getRebirthResetter(target.id);
   if (rebirthResetter && wouldKO && !target.special.rebirthUsed && !ignoresRebirth) {
+    // Rebirth also releases Blade's own Shark Hunt seal (blade.js) - noted
+    // on the rebirth entry (2026-10-16) so the log and the partner's tile
+    // show the release; before, the seal just silently ended.
+    const sealPartnerId = target.deepSeaSealPartnerId || null;
     rebirthResetter(target, game, log);
     result.revived = true;
     // Every OTHER character's stale reference to the now-revived target
@@ -752,7 +756,7 @@ export function applyDamage(game, log, {
     // entry - otherwise it lands BEFORE that entry in the log, since this
     // runs mid-way through the ability's execute(), before its own
     // log.push() for the attack/special line itself.
-    result.rebirthLogEntry = { type: 'rebirth', targetCharacterId };
+    result.rebirthLogEntry = { type: 'rebirth', targetCharacterId, ...(sealPartnerId ? { sealReleasedPartnerId: sealPartnerId } : {}) };
   } else if (target.id === 'draxus' && wouldKO
     && (target.special.deathproofActive || target.special.reviveImmortalActive) && !ignoresImmortal) {
     // Floors at 1 instead of KO - NOT a revival event (isKO is never set,

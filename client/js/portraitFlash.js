@@ -1138,6 +1138,12 @@ export function handleLogEntryForFlash(entry, game) {
     // dead). Once this flash's own timer expires, getPersistentPortrait's
     // alive.jpg naturally takes over for the rest of the match.
     setFlash(entry.targetCharacterId, 'assets/images/blade/rebirth.jpg');
+    // Rebirth also ends his Shark Hunt seal - the partner surfaces with the
+    // same deepsea_released.jpg as a normal seal end (2026-10-16).
+    const partnerId = entry.sealReleasedPartnerId;
+    if (partnerId && !isKO(partnerId)) {
+      setFlash(partnerId, `assets/images/${partnerId}/deepsea_released.jpg`);
+    }
     return;
   }
   if (entry.type === 'ashkas-vengeance-strike') {

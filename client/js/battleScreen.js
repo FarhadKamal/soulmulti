@@ -2795,7 +2795,7 @@ function describeLogEntry(entry) {
         : `${name(entry.characterId)} tries to cheat death${oddsText}... and fails.`;
     }
     case 'rebirth':
-      return `${name(entry.targetCharacterId)} used REBIRTH - revived with 2 hearts!`;
+      return `${name(entry.targetCharacterId)} used REBIRTH - revived with 2 hearts!${entry.sealReleasedPartnerId ? ` The deep sea releases ${name(entry.sealReleasedPartnerId)}.` : ''}`;
     case 'dodge':
       return `${name(entry.targetCharacterId)} dodged ${name(entry.attackerId)}'s attack!`;
     case 'freeze-continue':
