@@ -42,7 +42,14 @@ export function runOnAnyDeath(diedCharacterId, sourceCharacterId, isMirror, game
   let merged;
   for (const callback of callbacks) {
     const extra = callback(diedCharacterId, sourceCharacterId, isMirror, game, log);
-    if (extra) merged = { ...merged, ...extra };
+    if (!extra) continue;
+    // Skip undefined fields (2026-10-16): Athena's Divine Judgment callback
+    // always returns every key, mostly undefined, and spreading that
+    // wiped out Melyssa's real friendshipEndLogEntry when her friend Athena
+    // died - the bond ended with no log line.
+    for (const [key, value] of Object.entries(extra)) {
+      if (value !== undefined) merged = { ...merged, [key]: value };
+    }
   }
   return merged;
 }

@@ -489,7 +489,17 @@ export function applyDamage(game, log, {
       // Overwritten here to the real destination so every existing display
       // site picks it up automatically, no client changes needed.
       result.targetCharacterId = friendId;
-      if (redirectedResult.rebirthLogEntry) result.rebirthLogEntry = redirectedResult.rebirthLogEntry;
+      // Forward EVERY deferred log entry / nested result the redirected hit
+      // produced (2026-10-16) - this used to hand-pick only rebirth and
+      // friendship-end, so e.g. a redirected hit that killed a Divine-
+      // Judgment-holding Athena friend killed her marked victim with no
+      // "Divine Judgment falls upon X" line at all (live report). Generic so
+      // curse-mirror, Mirror Reflect, Prophecy, seal-end etc. are covered too.
+      for (const [key, value] of Object.entries(redirectedResult)) {
+        if (value && (key.endsWith('LogEntry') || key.endsWith('Result')) && !result[key]) {
+          result[key] = value;
+        }
+      }
       // Melyssa's Friendship - confirmed real bug, 2026-09-21 (live report,
       // deep-dive reproduction): if this redirected hit is ITSELF what
       // kills the friend (not the later spillover), Melyssa's own
