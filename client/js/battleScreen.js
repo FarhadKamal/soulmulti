@@ -2763,7 +2763,9 @@ function describeLogEntry(entry) {
       if (entry.beastImmune) return `Curse mirror - ${name(entry.toCharacterId)} is immune in Beast Form`;
       // amountDealt (what actually got through - 0 against Beast Form or a
       // full shield), falling back to amount for entries that predate it.
-      return `Curse mirrors ${entry.amountDealt ?? entry.amount} damage to ${name(entry.toCharacterId)}${entry.koTriggered ? ' - KO!' : ''}`;
+      // Say when the cursed hero's shield ate it, instead of a bare
+      // "mirrors 0 damage" (2026-10-17).
+      return `Curse mirrors ${entry.amountDealt ?? entry.amount} damage to ${name(entry.toCharacterId)}${entry.absorbed ? ` (${entry.absorbed} absorbed by shield)` : ''}${entry.koTriggered ? ' - KO!' : ''}`;
     case 'divine-judgment-trigger':
       return `Divine Judgment falls upon ${name(entry.toCharacterId)}${entry.koTriggered ? ' - KO!' : ''}`;
     case 'prophecy-of-doom-trigger': {

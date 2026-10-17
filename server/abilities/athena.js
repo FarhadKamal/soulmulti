@@ -192,6 +192,7 @@ registerOnHitLanded('athena', (character, game, log, ctx) => {
       // What actually got through the cursed character's shield - the
       // client's curse_hit.jpg flash only fires when this is > 0.
       amountDealt: mirrorResult.amountDealt,
+      absorbed: mirrorResult.absorbed || 0,
       koTriggered: mirrorResult.koTriggered,
       revived: mirrorResult.revived,
       // Beast Form Grimtal is immune - the log says so instead of a bare

@@ -156,6 +156,7 @@ export const actions = {
       let mirrorReflectLogEntry = null;
       let mirrorTotal = 0;
       let mirrorDealtTotal = 0;
+      let mirrorAbsorbedTotal = 0;
       let mirrorTargetId = null;
       let mirrorKoTriggered = false;
       let mirrorRevived = false;
@@ -220,6 +221,7 @@ export const actions = {
         if (result.mirrorLogEntry) {
           mirrorTotal += result.mirrorLogEntry.amount;
           mirrorDealtTotal += result.mirrorLogEntry.amountDealt || 0;
+          mirrorAbsorbedTotal += result.mirrorLogEntry.absorbed || 0;
           mirrorTargetId = result.mirrorLogEntry.toCharacterId;
           // Last hit's own koTriggered/revived wins - matches the real
           // final state of the cursed target after every mirror hit this
@@ -270,7 +272,7 @@ export const actions = {
       const mirrorLogEntry = mirrorTargetId
         ? {
           type: 'curse-mirror', fromCharacterId: 'athena', toCharacterId: mirrorTargetId,
-          amount: mirrorTotal, amountDealt: mirrorDealtTotal, koTriggered: mirrorKoTriggered, revived: mirrorRevived,
+          amount: mirrorTotal, amountDealt: mirrorDealtTotal, absorbed: mirrorAbsorbedTotal, koTriggered: mirrorKoTriggered, revived: mirrorRevived,
           ...(tryBeastFormImmunity(game.characters[mirrorTargetId], game) ? { beastImmune: true } : {}),
         }
         : null;
