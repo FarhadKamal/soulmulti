@@ -1,4 +1,4 @@
-import { applyDamage, applyHeal, applyShield } from '../engine/damagePipeline.js';
+import { applyDamage, applyHeal, applyShield, tryBeastFormImmunity } from '../engine/damagePipeline.js';
 import { makeSetupAction } from '../engine/categories/neutralAction.js';
 
 // Total damage points Earthshatter scatters, regardless of alive-count -
@@ -271,6 +271,7 @@ export const actions = {
         ? {
           type: 'curse-mirror', fromCharacterId: 'athena', toCharacterId: mirrorTargetId,
           amount: mirrorTotal, amountDealt: mirrorDealtTotal, koTriggered: mirrorKoTriggered, revived: mirrorRevived,
+          ...(tryBeastFormImmunity(game.characters[mirrorTargetId], game) ? { beastImmune: true } : {}),
         }
         : null;
       return { hits, rebirthLogEntry, mirrorLogEntry, mirrorReflectLogEntry, divineJudgmentTriggerLogEntry, prophecyOfDoomTriggerLogEntry, friendshipEndLogEntry, friendshipSpilloverLogEntry };

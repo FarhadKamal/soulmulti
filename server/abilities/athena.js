@@ -1,4 +1,4 @@
-import { applyDamage, applyHeal, applyShield, tryTriggerCleanSlate, tryIllyraDodgeStatus, heartsSnapshot } from '../engine/damagePipeline.js';
+import { applyDamage, applyHeal, applyShield, tryTriggerCleanSlate, tryIllyraDodgeStatus, heartsSnapshot, tryBeastFormImmunity } from '../engine/damagePipeline.js';
 import { redirectStatusTargetIfProtected } from './melyssa.js';
 import { registerOnOtherRevived } from '../engine/categories/onOtherRevived.js';
 import { registerOnOwnDeath } from '../engine/categories/onOwnDeath.js';
@@ -194,6 +194,9 @@ registerOnHitLanded('athena', (character, game, log, ctx) => {
       amountDealt: mirrorResult.amountDealt,
       koTriggered: mirrorResult.koTriggered,
       revived: mirrorResult.revived,
+      // Beast Form Grimtal is immune - the log says so instead of a bare
+      // "mirrors 0 damage" (2026-10-17).
+      ...(tryBeastFormImmunity(game.characters[cursedId], game) ? { beastImmune: true } : {}),
     },
   };
 });

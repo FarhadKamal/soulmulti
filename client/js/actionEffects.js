@@ -278,6 +278,8 @@ export function handleLogEntryForEffects(entry, game) {
   // on, same as the main game's markHitFromResult recursing into
   // result.mirrorResult.
   if (entry.type === 'curse-mirror') {
+    // Beast Form Grimtal is immune - nothing hit him, so no hit effects.
+    if (entry.beastImmune) return;
     applyHitFlash(entry.toCharacterId, entry.amount);
     // "Eye snap-back": distinct from the cast's own eyeburst+tendrils
     // (slow curl, "taking hold") - fast and sharp instead, reading as "the
