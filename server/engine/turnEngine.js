@@ -665,6 +665,12 @@ function resolveHeadacheIfDue(character, game, log) {
     (c) => c.special?.headacheVictimId === character.id && c.special.headacheRollPending
   );
   if (!caster) return;
+  // Frozen this turn (Time Freeze / World Stops): the turn is lost anyway,
+  // so the headache waits for the next turn they could really act - same
+  // pattern as Ashka and the Jester Ball waiting through a freeze.
+  // Decided 2026-10-17: Boingo's headache was rolled AND he was frozen on
+  // the same turn, so the headache cost him nothing.
+  if (character.skipNextTurn) return;
   caster.special.headacheVictimId = null;
   caster.special.headacheRollPending = false;
   const skipped = Math.random() < 0.5;

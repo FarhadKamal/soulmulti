@@ -124,7 +124,12 @@ export function tickFreezeIfAny(character, game, log) {
   // then ends automatically.
   if (character.special.freezeActive) {
     const frozenId = character.special.freezeTargetId;
-    if (character.special.freezeSkipsApplied < 2) {
+    // Target already KO'd (2026-10-17): end it quietly - the log used to
+    // keep saying "Time Freeze continues/ends on Athena" after she died.
+    if (!game.characters[frozenId] || game.characters[frozenId].isKO) {
+      character.special.freezeActive = false;
+      character.special.freezeTargetId = null;
+    } else if (character.special.freezeSkipsApplied < 2) {
       const frozen = game.characters[frozenId];
       if (frozen && !frozen.isKO) frozen.skipNextTurn = true;
       character.special.freezeSkipsApplied += 1;
@@ -143,7 +148,14 @@ export function tickFreezeIfAny(character, game, log) {
   // the group is later KO'd by something else (the `!frozen.isKO` guard
   // just skips re-applying to them, no error).
   if (character.special.worldStopsActive) {
-    if (character.special.worldStopsSkipsApplied < WORLD_STOPS_TOTAL_ROUNDS) {
+    // Drop anyone who has died since the cast (2026-10-17) - the log listed
+    // a dead Boingo as "still frozen" - and end quietly if nobody is left.
+    for (const id of [...character.special.worldStopsFrozenIds]) {
+      if (!game.characters[id] || game.characters[id].isKO) character.special.worldStopsFrozenIds.delete(id);
+    }
+    if (character.special.worldStopsFrozenIds.size === 0) {
+      character.special.worldStopsActive = false;
+    } else if (character.special.worldStopsSkipsApplied < WORLD_STOPS_TOTAL_ROUNDS) {
       for (const frozenId of character.special.worldStopsFrozenIds) {
         const frozen = game.characters[frozenId];
         if (frozen && !frozen.isKO) frozen.skipNextTurn = true;
