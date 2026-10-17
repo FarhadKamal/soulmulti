@@ -1,7 +1,7 @@
 import { CHARACTERS } from './characters.js';
-import { send, getWireDiagLog } from './net.js';
+import { send } from './net.js';
 import { playUiClick } from './sound.js';
-import { getFlashSrc, getPersistentPortrait, isPetrifyActive, getFlashCallHistory, getFlashSnapshotHistory, getRenderTrace, getLogEntryDispatchTime, getLastFlashEntrySnapshots } from './portraitFlash.js';
+import { getFlashSrc, getPersistentPortrait, isPetrifyActive, getFlashCallHistory, getFlashSnapshotHistory, getLogEntryDispatchTime } from './portraitFlash.js';
 import { getActiveEffects, getClawCount, getCrackCount, getPowSize, getVortexSize, getAxechopTier, getLightningTier, getWildLightningTier, getDarkslashVariant, getEffectCallHistory, getEffectSnapshotHistory } from './actionEffects.js';
 import { renderFullscreenButton } from './fullscreen.js';
 import { renderMusicMuteButton } from './musicMute.js';
@@ -2153,105 +2153,16 @@ function formatHeartsSnapshot(snapshot) {
 // For those (and only those - every standalone site above is now covered),
 // the forward-scan to that batch's own end-action is legitimate and safe.
 function renderFullLogWithCopy(log) {
+  // Copy layout (2026-10-17): the plain match log always comes FIRST, then
+  // (debug mode only) the same lines with their per-entry annotations. The
+  // chat box that match logs get pasted into stops at 50,000 characters;
+  // the four big temporary dumps that used to lead this text (wire log,
+  // render trace, setFlash stack traces, entry-field dump - leftovers from
+  // a finished 2026-09-22 investigation) were ~40k characters on their own
+  // and pushed the actual match off the end. Anything cut now is only
+  // debug detail, never the match itself.
   const lines = [];
-  // TEMPORARY diagnostic (2026-09-22) - net.js's own wire-level trace
-  // (every WebSocket connect()/message event, timestamped by a running
-  // counter, not tied to any single game.log entry since it covers the
-  // raw dispatch layer BELOW where game.log entries even exist yet).
-  // Surfaced here (debug mode only) per direct request: no dev-tools/
-  // console needed, just copy it out of this same panel like everything
-  // else. Shown as its own block, before the per-entry lines.
-  if (debugLogMode) {
-    const wireDiag = getWireDiagLog();
-    if (wireDiag.length > 0) {
-      lines.push('--- wire diagnostic (temporary) ---');
-      for (const line of wireDiag) lines.push(line);
-      lines.push('--- end wire diagnostic ---');
-    }
-  }
-  // TEMPORARY diagnostic (2026-09-22) - portraitFlash.js's own render-event
-  // trace (getRenderTrace). Every prior debug layer only snapshots ONCE PER
-  // BATCH of log entries (after a whole game-state message's worth of
-  // entries has been processed) - it can't see a separate, independent
-  // rerender triggered by a flash timer expiring on its own setTimeout
-  // schedule (portraitFlash.js's onFlashExpired -> main.js's rerender()),
-  // decoupled from any server message. Since renderBattle rebuilds the
-  // WHOLE board from scratch on every render (root.innerHTML = ''), any
-  // character's timer expiring forces every other character's portrait to
-  // be recomputed too - this trace is the only layer that can show a
-  // flicker faster than any per-batch snapshot could catch (follow-up to a
-  // live report described as "happening faster" than a screenshot could
-  // capture). Grouped by timestamp so a tight burst of renders within the
-  // same millisecond (multiple characters recomputed by one teardown/
-  // rebuild) reads as one line instead of a wall of duplicates.
-  if (debugLogMode) {
-    const renderTrace = getRenderTrace();
-    if (renderTrace.length > 0) {
-      lines.push('--- render trace (temporary) ---');
-      let lastT = null;
-      let group = [];
-      const flushGroup = () => {
-        if (group.length > 0) lines.push(`[render @${lastT}] ${group.join(', ')}`);
-        group = [];
-      };
-      for (const { t, characterId, src } of renderTrace) {
-        if (t !== lastT) { flushGroup(); lastT = t; }
-        group.push(`${characterId}=${src ?? '(none)'}`);
-      }
-      flushGroup();
-      lines.push('--- end render trace ---');
-    }
-  }
-  // TEMPORARY diagnostic (2026-09-22) - a raw, UNFILTERED dump of every
-  // setFlash call ever made this match, each with its own wall-clock
-  // timestamp and a captured JS stack trace. Added specifically because a
-  // fully cross-referenced investigation (comparing this file's own
-  // per-entry flash-call/snapshot annotations against getRenderTrace,
-  // both keyed to the same wall-clock timeline) found an unexplained
-  // anomaly: illyra/choke.jpg was shown as genuinely active in the render
-  // trace, in exact sync with a DODGED Self Choke entry, even though
-  // every per-entry annotation for that specific entry (and every
-  // surrounding entry in the same batch) correctly showed illusion.jpg,
-  // not choke.jpg - meaning some setFlash('illyra', '.../choke.jpg') call
-  // happened that the per-entry (logEntryIndex-keyed) trace didn't
-  // attribute to any entry. This raw dump - unlike
-  // formatFlashDebugAnnotation, which only ever shows calls already
-  // matched to a specific log entry index - cannot miss or misattribute
-  // any call, and the stack trace pinpoints exactly which function made
-  // it, however unexpected the call site turns out to be.
-  if (debugLogMode) {
-    const allCalls = getFlashCallHistory();
-    if (allCalls.length > 0) {
-      lines.push('--- raw setFlash call dump (temporary) ---');
-      for (const call of allCalls) {
-        const stackLines = (call.stack || '').split('\n').slice(1, 4).map((l) => l.trim()).join(' | ');
-        lines.push(`[t@${call.t}] logIndex=${call.logEntryIndex} ${call.characterId}<-${call.src} :: ${stackLines}`);
-      }
-      lines.push('--- end raw setFlash call dump ---');
-    }
-  }
-  // TEMPORARY diagnostic (2026-09-22) - a raw dump of the entry object's
-  // OWN fields (type/actionId/characterId/targetId/dodged) exactly as
-  // handleLogEntryForFlash saw them at evaluation time, one row per entry
-  // it was ever called with. Added as a direct follow-up to the raw
-  // setFlash dump above: that dump proved setFlash('illyra', choke.jpg)
-  // fires from the selfChoke branch's OWN !entry.dodged-gated line for a
-  // log index whose displayed text is a dodged Self Choke - meaning
-  // either that gate saw a different `dodged` value than the log text
-  // shows, or this function ran for an entry whose text doesn't match
-  // what this dump will show. Either way, comparing this dump's dodged
-  // field against the SAME logIndex's own {dodged:...} annotation further
-  // down in this log will show exactly where the two diverge.
-  if (debugLogMode) {
-    const entrySnapshots = getLastFlashEntrySnapshots();
-    if (entrySnapshots.length > 0) {
-      lines.push('--- handleLogEntryForFlash entry-field dump (temporary) ---');
-      for (const s of entrySnapshots) {
-        lines.push(`[t@${s.t}] logIndex=${s.logEntryIndex} type=${s.type} actionId=${s.actionId} characterId=${s.characterId} targetId=${s.targetId} targetCharacterId=${s.targetCharacterId} dodged=${s.dodged}`);
-      }
-      lines.push('--- end handleLogEntryForFlash entry-field dump ---');
-    }
-  }
+  const debugLines = [];
   for (let i = 0; i < log.length; i++) {
     const entry = log[i];
     if (entry.type === 'end-action') continue;
@@ -2291,7 +2202,11 @@ function renderFullLogWithCopy(log) {
     const effectSnapshotText = debugLogMode ? formatEffectSnapshotAnnotation(i) : '';
     const debugText = [dispatchTimeText, rawDebugText, flashDebugText, flashSnapshotText, effectDebugText, effectSnapshotText].filter(Boolean).join(' ');
     const withHearts = snapshotText ? `${text}  [${snapshotText}]` : text;
-    lines.push(debugText ? `${withHearts}  ${debugText}` : withHearts);
+    lines.push(withHearts);
+    if (debugLogMode) debugLines.push(debugText ? `${withHearts}  ${debugText}` : withHearts);
+  }
+  if (debugLines.length > 0) {
+    lines.push('', '--- debug details (same lines, with annotations) ---', ...debugLines);
   }
   const wrap = document.createElement('div');
   wrap.className = 'final-log-panel';
