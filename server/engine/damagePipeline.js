@@ -283,7 +283,10 @@ export function tryTriggerCleanSlate(target, game, log) {
 export function tryIllyraDodgeStatus(target, game, log, attackerId) {
   if (target.id !== 'illyra') return false;
   if (Math.random() < 0.5) {
-    log.push({ type: 'dodge', attackerId, targetCharacterId: target.id });
+    // isStatus: the caster's own line already says "blocked by Illusion",
+    // so the client keeps the illusion image but skips the "dodged X's
+    // attack!" text (a status isn't an attack - 2026-10-17).
+    log.push({ type: 'dodge', attackerId, targetCharacterId: target.id, isStatus: true });
     return true;
   }
   return false;

@@ -2806,6 +2806,9 @@ function describeLogEntry(entry) {
     case 'rebirth':
       return `${name(entry.targetCharacterId)} used REBIRTH - revived with 2 hearts!${entry.sealReleasedPartnerId ? ` The deep sea releases ${name(entry.sealReleasedPartnerId)}.` : ''}`;
     case 'dodge':
+      // A dodged status is already reported on the cast line ("blocked by
+      // Illusion"); only the image plays for it.
+      if (entry.isStatus) return '';
       return `${name(entry.targetCharacterId)} dodged ${name(entry.attackerId)}'s attack!`;
     case 'freeze-continue':
       return `Time Freeze continues on ${name(entry.targetCharacterId)}`;
