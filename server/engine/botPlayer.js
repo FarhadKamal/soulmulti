@@ -277,7 +277,16 @@ function chooseTharoxMove(character, game, usable) {
   // mandatory-cash-in narrowing below.
   // 7 random points could land enough on Athena to kill her - hold it while
   // marked by her Judgment (it stays available for after she's gone).
-  if (byId.earthshatter && !untargetedHitRisksJudgment(game, character, 7)) {
+  // Same for Athena's curse on HIM: whatever lands on her mirrors back, and
+  // the bots already avoid hitting her while cursed. Live 2026-10-17: a
+  // cursed 2-heart Tharox Earthshattered, put 3 on Athena and the mirror
+  // killed him. Hold it while the mirror could be lethal and someone else
+  // is still alive to fight.
+  const athenaNow = game.characters.athena;
+  const mirrorCouldKill = isCursedByLiveAthena(game, character)
+    && Math.min(7, athenaNow.hearts) >= character.hearts + (character.shield || 0)
+    && Object.values(game.characters).some((c) => !c.isKO && c.id !== character.id && c.id !== 'athena');
+  if (byId.earthshatter && !untargetedHitRisksJudgment(game, character, 7) && !mirrorCouldKill) {
     return { actionId: 'earthshatter', targetId: null };
   }
   // Mandatory cash-in already narrows usable to just Titan Smash/Glory

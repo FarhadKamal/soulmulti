@@ -2779,6 +2779,8 @@ function describeLogEntry(entry) {
       return `Prophecy of Doom rains down - ${hitsText}${mirrorText}`;
     }
     case 'ashka-heal':
+      // A tick at full hearts heals 0 - say that instead of "+0" (2026-10-17).
+      if (!entry.healed) return `${name(entry.characterId)}'s Ashka heal - already at full hearts`;
       return `${name(entry.characterId)}'s Ashka heals +${entry.healed}`;
     case 'beast-regen':
       return `${name(entry.characterId)}'s wounds knit shut - +${entry.healed}`;
