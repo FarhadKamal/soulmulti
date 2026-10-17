@@ -1790,7 +1790,14 @@ function chooseOraclusMove(character, game, usable) {
   if (byId.prophecyOfDoom) {
     return { actionId: 'prophecyOfDoom', targetId: null };
   }
-  if (byId.runeVision) {
+  // Don't re-cast while a locked-in prediction is still waiting on its
+  // attacker - a re-cast just overwrites it and burns the turn (live
+  // 2026-10-17: he re-predicted Athena 4 turns running while she was
+  // passing the Jester Ball / healing, and never attacked once).
+  const sp = character.special;
+  const predictionPending = sp.predictedAttackerId && sp.predictedTargetId
+    && game.characters[sp.predictedAttackerId] && !game.characters[sp.predictedAttackerId].isKO;
+  if (byId.runeVision && !predictionPending) {
     const attackerId = chooseRuneVisionAttackerPick(character, game);
     if (attackerId) return { actionId: 'runeVision', targetId: attackerId };
   }
