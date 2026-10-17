@@ -871,6 +871,9 @@ export function applyDamage(game, log, {
     // generic engine logic rather than a registered callback.
     if (game.jesterBall && game.jesterBall.holderCharacterId === target.id) {
       game.jesterBall = null;
+      // Announced by flushJesterBallDrop (turnEngine.js) after the killing
+      // line, so the ball doesn't just silently vanish (2026-10-17).
+      game.pendingJesterBallDropId = target.id;
     }
     // onAnyDeath dispatch (see engine/categories/onAnyDeath.js): Grimtal's
     // Grim Strike own-kill/unclaimed-kill bookkeeping now lives in his own

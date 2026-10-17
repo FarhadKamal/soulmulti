@@ -594,6 +594,7 @@ function tickPoisonIfAny(character, game, log) {
   // registerOnAnyDeath registration for why this can't be pushed directly
   // inside the callback).
   if (result.deepSeaSealEndLogEntry) log.push({ ...result.deepSeaSealEndLogEntry, hearts: heartsSnapshot(game) });
+  flushJesterBallDrop(game, log, true);
   // Melyssa's Friendship - a poison tick that kills her current friend
   // needs this path too, same deferred reasoning as every other entry on
   // this call path. Confirmed real bug, 2026-09-20: a poison tick landing
@@ -1501,7 +1502,20 @@ export function finalizeAction(game, log, result, characterId, actionId, targetI
     }
   }
   applyEndOfActionChecks(game);
+  flushJesterBallDrop(game, log);
   game.log.push(...moveAfterActionEntriesLast(log), { type: 'end-action', round: game.round, characterId, actionId, targetId, hearts: heartsSnapshot(game) });
+}
+
+// The Jester Ball's holder died, so the ball was removed (no explosion) -
+// say so after the killing line. Decided 2026-10-17 (the rulebook's last
+// open question): a silent disappearance read like a bug.
+// `stamp`: only for paths that push straight to game.log (poison ticks) -
+// inside an action batch the end-action entry carries the hearts.
+export function flushJesterBallDrop(game, log, stamp = false) {
+  const id = game.pendingJesterBallDropId;
+  if (!id) return;
+  game.pendingJesterBallDropId = null;
+  log.push({ type: 'jester-ball-drop', characterId: id, ...(stamp ? { hearts: heartsSnapshot(game) } : {}) });
 }
 
 // Death-cleanup entries pushed from inside applyDamage (e.g. Chronox's own
@@ -1665,6 +1679,7 @@ export function resolveJesterBall(game, holderCharacterId, choice, extra) {
     }
   }
   applyEndOfActionChecks(game);
+  flushJesterBallDrop(game, log);
   game.log.push(...moveAfterActionEntriesLast(log), { type: 'end-action', round: game.round, characterId: holderCharacterId, actionId: `jesterBall:${choice}`, hearts: heartsSnapshot(game) });
   return result;
 }

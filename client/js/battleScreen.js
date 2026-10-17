@@ -2827,6 +2827,8 @@ function describeLogEntry(entry) {
         ? `${name(entry.characterId)} breaks free of the deep sea! (${pct}% chance)`
         : `${name(entry.characterId)} tries to escape the deep sea (${pct}%)... and fails.`;
     }
+    case 'jester-ball-drop':
+      return `The Jester Ball drops - ${name(entry.characterId)} is down`;
     case 'deep-sea-seal-end': {
       const names = (entry.characterIds || []).map(name);
       return entry.reason === 'ko'
