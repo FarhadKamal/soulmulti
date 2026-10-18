@@ -2753,9 +2753,16 @@ function describeLogEntry(entry) {
       return `The Jester Ball drops - ${name(entry.characterId)} is down`;
     case 'deep-sea-seal-end': {
       const names = (entry.characterIds || []).map(name);
-      return entry.reason === 'ko'
-        ? `The deep sea releases its hold - ${names.join(' and ')} return to the surface.`
-        : `${names.join(' and ')} surface once more.`;
+      if (entry.reason === 'ko') {
+        // Only the survivor surfaces; older entries without diedCharacterId
+        // keep the old wording.
+        const survivors = entry.diedCharacterId
+          ? (entry.characterIds || []).filter((id) => id !== entry.diedCharacterId).map(name)
+          : names;
+        if (survivors.length === 0) return 'The deep sea releases its hold.';
+        return `The deep sea releases its hold - ${survivors.join(' and ')} return${survivors.length === 1 ? 's' : ''} to the surface.`;
+      }
+      return `${names.join(' and ')} surface once more.`;
     }
     case 'beast-form-end':
       // reason: 'timeout' - the stalemate safety valve (see grimtal.js's

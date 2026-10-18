@@ -141,6 +141,9 @@ registerOnAnyDeath((diedCharacterId, sourceCharacterId, isMirror, game, log) => 
       type: 'deep-sea-seal-end',
       characterIds: [diedCharacterId, partnerId].filter(Boolean),
       reason: 'ko',
+      // So the log only says the survivor surfaces (2026-10-18) - it read
+      // "Athena and Blade return to the surface" with Athena dead.
+      diedCharacterId,
     },
   };
 });
