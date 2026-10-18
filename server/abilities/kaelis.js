@@ -65,6 +65,11 @@ registerOnOwnDeath('kaelis', (character) => {
 // this hook only covers the 2 FOLLOW-UP heals, which do not consume her
 // turn (she still acts/skips normally alongside the heal).
 export function onTurnStart(character, game, log) {
+  // Vengeance's "first drop to <=3" check reads her hearts BEFORE this
+  // turn's Ashka heal (2026-10-18): live, Kaelis started two turns at 3 and
+  // 2 hearts, the heal lifted her to 5 and 4 first, and the passive never
+  // woke up - contradicting "activates the instant her hearts drop to <=3".
+  const droppedToThreshold = character.hearts <= ASHKAS_VENGEANCE_HEARTS_THRESHOLD;
   if (character.special.ashkaHealsRemaining > 0) {
     const healed = applyHeal(game, character.id, 2);
     character.special.ashkaHealsRemaining -= 1;
@@ -88,7 +93,7 @@ export function onTurnStart(character, game, log) {
   // opportunity cost). Fires here in onTurnStart; skipped while she's
   // airborne or frozen (see below).
   const wasAlreadyActive = character.special.ashkasVengeanceActive;
-  if (!wasAlreadyActive && character.hearts <= ASHKAS_VENGEANCE_HEARTS_THRESHOLD) {
+  if (!wasAlreadyActive && (droppedToThreshold || character.hearts <= ASHKAS_VENGEANCE_HEARTS_THRESHOLD)) {
     character.special.ashkasVengeanceActive = true;
     log.push({ type: 'ashkas-vengeance-activate', characterId: character.id, hearts: heartsSnapshot(game) });
   }
