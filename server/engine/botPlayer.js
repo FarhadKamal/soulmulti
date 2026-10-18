@@ -1898,6 +1898,22 @@ export function chooseBotMove(character, game) {
   if (!usableEntry) {
     return chooseFallbackMove(character, game, usable);
   }
+  // Divine Judgment self-preservation, checked across the WHOLE kit
+  // (2026-10-18): validTargetsFor's "Athena is the only option" fallback is
+  // per action, so a marked Akyros whose only marked target was Athena
+  // Shadow-Executed her - killing himself via the pact - while Draxus was
+  // alive and Fatal Slash could have hit him. If any other action can hit
+  // someone else, use that instead.
+  if (move.targetId === 'athena' && isAvoidingDivineJudgmentVictim(game, character, 'athena')) {
+    for (const a of usable) {
+      if (!a.needsTarget) continue;
+      const others = Object.keys(game.characters)
+        .filter((tid) => tid !== 'athena' && isValidTarget(game, character.id, a.actionId, tid));
+      if (others.length > 0) {
+        return { actionId: a.actionId, targetId: lowestHeartsTarget(game, others) || others[0] };
+      }
+    }
+  }
   if (move.targetId === null && usableEntry.needsTarget) {
     return { actionId: move.actionId, targetId: pickDefaultTarget(game, character, move.actionId) };
   }
