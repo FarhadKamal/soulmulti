@@ -1889,7 +1889,10 @@ export function handleLogEntryForFlash(entry, game) {
         // unlike Soul Swap's own bypass-applyDamage shape which only ever
         // sets targetId - see that earlier confirmed bug's fix for the
         // contrast).
-        if (targetCharacterId) {
+        // amountDealt > 0 (2026-10-18): a hit fully soaked by shield shows
+        // no victim reaction, same as Cyclone Punch/Blood Hunt - Chronox
+        // was showing rune_strike_hit for "0 damage (1 absorbed by shield)".
+        if (targetCharacterId && amountDealt > 0) {
           setFlash(targetCharacterId, `assets/images/${targetCharacterId}/rune_strike_hit.jpg`);
         }
       }
