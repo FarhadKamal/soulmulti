@@ -208,6 +208,16 @@ export const actions = {
       target.deepSeaSealPartnerId = character.id;
       target.deepSeaEscapeAttempts = 0;
       log.push({ type: 'special', characterId: character.id, actionId: 'sharkHunt', targetId });
+      // Decided 2026-10-18 (user: "it looks odd passing jester ball inside
+      // deep sea"): a ball held by either party sinks with them - gone, no
+      // explosion - instead of being passed back and forth under the sea.
+      // Nothing can be passed in from outside either, so a sealed pair
+      // never holds the ball.
+      const holderId = game.jesterBall?.holderCharacterId;
+      if (holderId === character.id || holderId === targetId) {
+        game.jesterBall = null;
+        log.push({ type: 'jester-ball-sink', characterId: holderId });
+      }
       return {};
     },
   },

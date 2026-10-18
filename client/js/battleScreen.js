@@ -2749,6 +2749,8 @@ function describeLogEntry(entry) {
         ? `${name(entry.characterId)} breaks free of the deep sea! (${pct}% chance)`
         : `${name(entry.characterId)} tries to escape the deep sea (${pct}%)... and fails.`;
     }
+    case 'jester-ball-sink':
+      return `The Jester Ball sinks into the deep sea with ${name(entry.characterId)}`;
     case 'jester-ball-drop':
       return `The Jester Ball drops - ${name(entry.characterId)} is down`;
     case 'deep-sea-seal-end': {
