@@ -1649,6 +1649,14 @@ export function resolveJesterBall(game, holderCharacterId, choice, extra) {
   // own deferred pushes above (this log array is local, followed by this
   // same call's own end-action a few lines down).
   if (result?.rebirthLogEntry) log.push(result.rebirthLogEntry);
+  // Athena's curse mirror / Rowan's Mirror Reflect off an explosion -
+  // missing here until 2026-10-18 (live: the ball burst on a cursed Athena
+  // and Marin silently lost 4 hearts). Same entries finalizeAction pushes.
+  if (result?.mirrorLogEntry) log.push(result.mirrorLogEntry);
+  if (result?.mirrorResult?.rebirthLogEntry) log.push(result.mirrorResult.rebirthLogEntry);
+  if (result?.mirrorReflectLogEntry) log.push(result.mirrorReflectLogEntry);
+  if (result?.mirrorReflectResult?.rebirthLogEntry) log.push(result.mirrorReflectResult.rebirthLogEntry);
+  if (result?.fowlPlayRevertLogEntry) log.push(result.fowlPlayRevertLogEntry);
   // Athena's Divine Judgment trigger - a Jester Ball explosion can KO her
   // too (she can hold/be forced to Take it like anyone else), same
   // deferred handling as every other call site that resolves applyDamage

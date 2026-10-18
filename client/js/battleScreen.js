@@ -2767,7 +2767,10 @@ function describeLogEntry(entry) {
         ? `${name(entry.characterId)}'s Beast Form times out - back to normal form`
         : `${name(entry.characterId)} returns to normal form`;
     case 'jester-ball-take':
-      return `${name(entry.targetCharacterId)} took the Jester Ball${entry.amountDealt != null ? ` - ${entry.amountDealt} damage` : ''}${absorbedText(entry.absorbed)}${entry.koTriggered ? ' - KO!' : ''}`;
+      // Every explosion uses this entry - a chosen Take, a forced burst
+      // (frozen/headache), the last pass, Illyra's fumble - so it says what
+      // happened rather than "took", which read as a choice (2026-10-18).
+      return `The Jester Ball explodes on ${name(entry.targetCharacterId)}${entry.amountDealt != null ? ` - ${entry.amountDealt} damage` : ''}${absorbedText(entry.absorbed)}${entry.koTriggered ? ' - KO!' : ''}`;
     case 'jester-ball-pass':
       return `${name(entry.fromCharacterId)} passed the Jester Ball to ${name(entry.toCharacterId)}`;
     case 'jester-ball-return': {

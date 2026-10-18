@@ -231,8 +231,13 @@ export const actions = {
     // its only candidate that way still correctly skips arming
     // fowlPlayActive (see execute() below), it just isn't preventable at
     // the button-legality level the way an empty-board case is.
+    // Also hidden when every other living hero is someone Fowl Play skips
+    // anyway (Beast Form Grimtal, a frog, the deep-sea pair) - live
+    // 2026-10-18: cast against a lone Beast Grimtal, it logged "Fowl Play -
+    // turned into chickens!" with nobody in it and wasted the special.
     isLegal: (character, game) => character.hearts <= 3 && !character.special.usedFowlPlay
-      && Object.values(game.characters).some((c) => c.id !== character.id && !c.isKO),
+      && Object.values(game.characters).some((c) => c.id !== character.id && !c.isKO
+        && !c.special?.beastFormActive && !c.isFrog && !c.deepSeaSealed),
     execute(character, targetId, game, log) {
       character.special.usedFowlPlay = true;
       // Grimtal's Beast Form (Death-Triggered Reversion #36, confirmed
