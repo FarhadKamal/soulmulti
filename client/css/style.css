@@ -1653,6 +1653,26 @@ input {
 .about-text { margin: 0 0 10px; font-size: 0.9em; line-height: 1.6; font-style: italic; opacity: 0.9; }
 .about-credit { font-size: 0.8em; opacity: 0.65; text-align: right; }
 
+/* Hidden win-rate panel (Ctrl+Shift+X on the main menu) - About's card. */
+.winrates-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.winrates-head h2 { margin: 0; font-size: 1.05em; }
+.winrates-close { width: 32px; height: 32px; padding: 0; }
+.winrates-tabs { display: flex; gap: 6px; margin-bottom: 8px; }
+.winrates-tab { padding: 4px 12px; font-size: 0.85em; }
+.winrates-tab--active { background: #3a3a6a; border-color: #6a6aaa; }
+.winrates-note { margin: 0 0 10px; font-size: 0.8em; opacity: 0.7; line-height: 1.5; }
+.winrates-error { color: #ffb3b3; font-size: 0.9em; }
+.winrates-table { width: 100%; border-collapse: collapse; font-size: 0.88em; font-variant-numeric: tabular-nums; }
+.winrates-table th { text-align: left; font-weight: 600; opacity: 0.7; padding: 4px 6px; border-bottom: 1px solid #2a2a3a; }
+.winrates-table td { padding: 5px 6px; border-bottom: 1px solid #22222f; }
+.winrates-table td:nth-child(2), .winrates-table td:nth-child(3) { opacity: 0.8; }
+.winrates-rate { position: relative; min-width: 90px; }
+.winrates-bar { position: absolute; left: 6px; top: 50%; height: 14px; transform: translateY(-50%); border-radius: 3px; opacity: 0.35; max-width: calc(100% - 12px); }
+.winrates-bar--high { background: #4caf7a; }
+.winrates-bar--mid { background: #8a8aaa; }
+.winrates-bar--low { background: #d0605e; }
+.winrates-pct { position: relative; font-weight: 600; }
+
 /* How to Play panel - same card/background language as .about-panel, but a
    collapsed accordion of all 16 heroes (portrait + name + role header,
    expanding to their full ability list on tap) rather than a single block

@@ -5,6 +5,7 @@ import { renderFullscreenButton } from './fullscreen.js';
 import { renderMusicMuteButton } from './musicMute.js';
 import { hardRefresh } from './assetVersion.js';
 import { renderHowToPlayButton, renderHowToPlayPanel, isHowToPlayOpen } from './howToPlay.js';
+import { renderWinRatesPanel, isWinRatesOpen, installWinRatesShortcut } from './winRates.js';
 
 // Whether the About panel is open - module state (not part of the shared
 // `state` object in main.js), same reasoning as battleScreen.js's
@@ -36,6 +37,12 @@ let choosingBotSeatIndex = null;
 // the same room) - switching views (entry -> room) still starts at the top.
 let lastScrollViewKey = null;
 
+// Hidden win-rate panel (Ctrl+Shift+X) - the keyboard listener is installed
+// once and only acts while the main menu (no room) is showing.
+let onEntryScreen = false;
+let latestRerender = null;
+let winRatesShortcutInstalled = false;
+
 // Renders the pre-match lobby: room type choice -> create/join -> seat
 // list + character picking -> start. `room` is null until a create-room or
 // join-room response/lobby-update has arrived at least once.
@@ -46,6 +53,12 @@ export function renderLobby(root, { room, error, connectionLost }, { onEnterMatc
     : 0;
   lastScrollViewKey = viewKey;
   root.innerHTML = '';
+  onEntryScreen = !room && !connectionLost;
+  latestRerender = rerender;
+  if (!winRatesShortcutInstalled) {
+    installWinRatesShortcut(() => onEntryScreen, () => latestRerender?.());
+    winRatesShortcutInstalled = true;
+  }
   const wrap = document.createElement('div');
   wrap.className = 'lobby';
 
@@ -116,6 +129,7 @@ export function renderLobby(root, { room, error, connectionLost }, { onEnterMatc
   // outside this region got clipped with no way to scroll to the rest of
   // it. About's own text happened to usually fit on screen, masking the
   // same structural issue, but it has the identical bug - moved here too.
+  if (!room && isWinRatesOpen()) scroll.appendChild(renderWinRatesPanel(rerender));
   if (!room && aboutOpen) scroll.appendChild(renderAboutPanel());
   if (!room && isHowToPlayOpen()) scroll.appendChild(renderHowToPlayPanel(rerender));
 

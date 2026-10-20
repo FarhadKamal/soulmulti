@@ -27,6 +27,50 @@ async function getCollection() {
   return collection;
 }
 
+// Per-hero win rates for 4-player matches, for the hidden main-menu stats
+// panel (Ctrl+Shift+X, 2026-10-20). Draws aren't recorded, so the fair
+// baseline is 25%. Cached briefly so repeated toggling doesn't hammer Atlas.
+const WIN_RATE_CACHE_MS = 60 * 1000;
+let winRateCache = null;
+
+function tallyWinRates(docs) {
+  const byHero = {};
+  for (const d of docs) {
+    for (const id of d.participantCharacterIds || []) {
+      byHero[id] ??= { games: 0, wins: 0 };
+      byHero[id].games += 1;
+    }
+    for (const id of d.winningCharacterIds || []) {
+      byHero[id] ??= { games: 0, wins: 0 };
+      byHero[id].wins += 1;
+    }
+  }
+  return Object.entries(byHero).map(([id, s]) => ({ id, ...s }));
+}
+
+export async function getWinRates() {
+  if (winRateCache && Date.now() - winRateCache.at < WIN_RATE_CACHE_MS) return winRateCache.data;
+  const col = await getCollection();
+  if (!col) return null;
+  const docs = await col.find(
+    { playerCount: 4 },
+    { projection: { winningCharacterIds: 1, participantCharacterIds: 1, recordedAt: 1 } },
+  ).toArray();
+  const since = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const times = docs.map((d) => new Date(d.recordedAt).getTime()).filter(Number.isFinite);
+  const recent = docs.filter((d) => new Date(d.recordedAt).getTime() >= since);
+  const data = {
+    matches: docs.length,
+    last7DaysMatches: recent.length,
+    from: times.length ? new Date(Math.min(...times)).toISOString() : null,
+    to: times.length ? new Date(Math.max(...times)).toISOString() : null,
+    allTime: tallyWinRates(docs),
+    last7Days: tallyWinRates(recent),
+  };
+  winRateCache = { at: Date.now(), data };
+  return data;
+}
+
 // Called once per finished match (see broadcastGameState's game-over
 // branch in index.js, guarded so this only fires on the actual phase
 // transition, not on every subsequent broadcast while already finished).

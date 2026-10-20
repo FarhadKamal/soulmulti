@@ -7,7 +7,7 @@ import { join, extname, normalize } from 'path';
 import { fileURLToPath } from 'url';
 
 import { CHARACTER_IDS } from '../client/js/characters.js';
-import { recordMatchResult } from './matchStats.js';
+import { recordMatchResult, getWinRates } from './matchStats.js';
 import { createGame } from './engine/state.js';
 import {
   getUsableActions, getUsablePuppetActions, executeAction, isValidTarget, isValidMindControlTarget,
@@ -152,7 +152,29 @@ async function serveStaticFile(req, res) {
   }
 }
 
+// Hidden main-menu win-rate panel (Ctrl+Shift+X) reads this.
+async function serveWinRates(res) {
+  try {
+    const data = await getWinRates();
+    if (!data) {
+      res.writeHead(503, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Stats are not available on this server.' }));
+      return;
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' });
+    res.end(JSON.stringify(data));
+  } catch (err) {
+    console.error('serveWinRates failed:', err.message);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Could not load stats.' }));
+  }
+}
+
 const httpServer = createServer((req, res) => {
+  if (req.method === 'GET' && req.url.split('?')[0] === '/api/winrates') {
+    serveWinRates(res);
+    return;
+  }
   serveStaticFile(req, res);
 });
 const wss = new WebSocketServer({ server: httpServer });
