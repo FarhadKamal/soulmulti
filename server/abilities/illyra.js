@@ -1,6 +1,7 @@
 import { applyDamage } from '../engine/damagePipeline.js';
 import { registerDodgeDefense } from '../engine/categories/dodgeDefenseRegistry.js';
 import { registerOnOtherRevived } from '../engine/categories/onOtherRevived.js';
+import { registerOnAnyDeath } from '../engine/categories/onAnyDeath.js';
 
 // Mirage Burst's per-target damage: each stack is worth 1.5 damage,
 // rounded down - confirmed ruling, matches the exact sequence given
@@ -41,6 +42,15 @@ registerOnOtherRevived((revivedCharacterId, game) => {
   if (illyra) illyra.special.mirageMarks.delete(revivedCharacterId);
 });
 
+// A dead hero's stacks are gone too (2026-10-20, live: a later Mirage Burst
+// "detonated Tharox (1 stack, 0 dmg)" on an already-dead Tharox). Cleared
+// on death so they can't be detonated or keep Mirage Burst legal; a revival
+// starts from zero anyway (above).
+registerOnAnyDeath((diedCharacterId, sourceCharacterId, isMirror, game) => {
+  const illyra = game.characters.illyra;
+  if (illyra) illyra.special.mirageMarks.delete(diedCharacterId);
+});
+
 export const actions = {
   mirageMark: {
     label: 'Mirage Mark',
@@ -64,9 +74,9 @@ export const actions = {
     // cooldown, no usedSpecial gate - the only limit is having any stacks
     // to detonate at all.
     needsTarget: false,
-    isLegal: (character) => {
-      for (const count of character.special.mirageMarks.values()) {
-        if (count > 0) return true;
+    isLegal: (character, game) => {
+      for (const [tid, count] of character.special.mirageMarks) {
+        if (count > 0 && !game?.characters[tid]?.isKO) return true;
       }
       return false;
     },
@@ -127,6 +137,8 @@ export const actions = {
       // makes the intent explicit and survives any future refactor safely.
       for (const [tid, stackCount] of [...marks.entries()]) {
         if (stackCount <= 0) continue;
+        // Safety net for the death cleanup above - never detonate the dead.
+        if (game.characters[tid]?.isKO) { marks.delete(tid); continue; }
         // Blade's Shark Hunt (taxonomy #41, Mutual Seal) - blocked even for
         // a mark placed BEFORE the seal (confirmed ruling: "pulling the
         // trigger is a fresh action" - detonating is Illyra choosing, on
