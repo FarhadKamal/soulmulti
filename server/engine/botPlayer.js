@@ -2068,6 +2068,24 @@ export function chooseBotMelyssaPuppetAction(puppetCharacter, game, melyssaId) {
   if (move.targetId === null && usableEntry?.needsTarget) {
     move = { actionId: move.actionId, targetId: pickDefaultTarget(game, puppetCharacter, move.actionId) };
   }
+  // Puppeted Earthshatter scatters 7 points over everyone the puppet
+  // counts as an opponent - Melyssa included - so it can kill her
+  // (2026-10-20 live: she puppeted her friend Tharox into it at 3 hearts
+  // and died to her own move). Skip it while it could be lethal to her and
+  // the puppet has any other action.
+  if (move.actionId === 'earthshatter' && melyssa && !melyssa.isKO
+    && activeHearts(melyssa) + (melyssa.shield || 0) <= 7) {
+    // `usable` (getUsablePuppetActions) already only lists actions with a target.
+    const alt = usable.find((a) => a.actionId !== 'earthshatter');
+    if (alt) {
+      const targets = alt.needsTarget
+        ? Object.keys(game.characters).filter((tid) => tid !== melyssa.id && isValidPuppetTarget(game, puppetCharacter.id, alt.actionId, tid))
+        : [];
+      if (!alt.needsTarget || targets.length > 0) {
+        move = { actionId: alt.actionId, targetId: alt.needsTarget ? (lowestHeartsTarget(game, targets) || targets[0]) : null };
+      }
+    }
+  }
 
   // Self Choke check: chooser() above only knows the puppet's own
   // perspective, so an enemy puppet's "best" real move is always aimed AT
