@@ -252,6 +252,13 @@ export const actions = {
       // Soul Swap's soulSwapWrath, because stage 2 never deals damage or
       // needs its own isLegal/execute pass through the normal ability
       // pipeline.
+      // A locked-in vision still waiting on a living attacker (who has only
+      // passed the Jester Ball or been skipped so far) is replaced - say so,
+      // rather than letting it vanish with no result line (2026-10-20).
+      const prevAttackerId = character.special.predictedAttackerId;
+      if (prevAttackerId && character.special.predictedTargetId && !game.characters[prevAttackerId]?.isKO) {
+        log.push({ type: 'prediction-replaced', characterId: character.id, predictedAttackerId: prevAttackerId });
+      }
       character.special.predictedAttackerId = targetId;
       character.special.predictedTargetId = null;
       log.push({ type: 'special', characterId: character.id, actionId: 'runeVision', predictedAttackerId: targetId, stage: 1 });

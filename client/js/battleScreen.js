@@ -2735,6 +2735,8 @@ function describeLogEntry(entry) {
       return entry.matched
         ? `Rune Vision confirmed! ${name(entry.predictedAttackerId)} struck ${name(entry.predictedTargetId)} exactly as foreseen - +${entry.healed ?? 3} heart${(entry.healed ?? 3) === 1 ? '' : 's'}, +3 shield, +1 damage (${entry.predictionWins}/2 wins)`
         : `Rune Vision failed - the vision did not come to pass`;
+    case 'prediction-replaced':
+      return `The earlier vision fades - ${name(entry.predictedAttackerId)} never struck`;
     case 'deathless-fury-end':
       return `${name(entry.characterId)}'s Deathless Fury ends - 3 strikes granted!`;
     case 'cheat-death': {
