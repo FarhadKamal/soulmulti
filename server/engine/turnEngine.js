@@ -1608,7 +1608,12 @@ export function executeActionAsPuppet(game, melyssaCharacterId, puppetCharacterI
   // rolls the normal 50/50, unlike the old Full Control's whole-board
   // guarantee.
   const melyssaChar = game.characters[melyssaCharacterId];
-  if (!melyssa.hasGuaranteedMindControl(melyssaChar, puppetCharacterId) && Math.random() < 0.5) {
+  // Soul Swap's free Thunder Wrath is part of the Soul Swap that already
+  // passed its roll this turn, not a new puppeted action - no second roll
+  // (decided 2026-10-20; live: the swap went through, then the free Wrath
+  // "resisted"). It only ever runs right after a successful puppeted swap.
+  const isFollowUpOfControlledAction = actionId === 'soulSwapWrath';
+  if (!isFollowUpOfControlledAction && !melyssa.hasGuaranteedMindControl(melyssaChar, puppetCharacterId) && Math.random() < 0.5) {
     // controllingMelyssaId stamped directly on the entry (not post-hoc via
     // array indexing) for consistency with how a successful puppeted
     // action gets it below - client-side flash logic keys on this field.
