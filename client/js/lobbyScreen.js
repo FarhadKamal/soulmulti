@@ -619,7 +619,20 @@ function renderRoomLobby(room, topControls, rerender) {
     fillAllBtn.className = 'fill-all-bots-btn';
     fillAllBtn.textContent = 'Make All Bots';
     fillAllBtn.onclick = () => send('fill-all-bots');
-    wrap.appendChild(fillAllBtn);
+
+    // Fills only the EMPTY seats with random bots, keeping every human seat
+    // (2026-10-20) - shown only while there's an empty seat to fill.
+    const btnRow = document.createElement('div');
+    btnRow.className = 'fill-bots-row';
+    if (hasEmptySeat) {
+      const fillEmptyBtn = document.createElement('button');
+      fillEmptyBtn.className = 'fill-all-bots-btn';
+      fillEmptyBtn.textContent = 'Fill Empty Seats with Bots';
+      fillEmptyBtn.onclick = () => send('fill-empty-bots');
+      btnRow.appendChild(fillEmptyBtn);
+    }
+    btnRow.appendChild(fillAllBtn);
+    wrap.appendChild(btnRow);
   } else {
     const waiting = document.createElement('div');
     waiting.className = 'waiting-note';

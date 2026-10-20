@@ -144,6 +144,9 @@ input {
 .character-grid-btn--selected { background: #2d6a2d; box-shadow: inset 0 0 0 2px #7ad67a; }
 .bot-choose-grid { margin: -4px 0 10px 0; padding: 8px; background: #1a1e2c; border-radius: 6px; }
 .start-btn { width: 100%; margin-top: 16px; background: #2d6a2d; font-size: 1.1em; }
+/* "Fill Empty Seats with Bots" + "Make All Bots" side by side, wrapping on
+   narrow phones. */
+.fill-bots-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 .waiting-note { text-align: center; opacity: 0.7; margin-top: 16px; }
 
 /* ---- Battle ---- */

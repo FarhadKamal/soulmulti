@@ -1282,6 +1282,18 @@ function fillSeatWithBot(room, seat) {
   }
 }
 
+// Owner-only, lobby-only (2026-10-20): fills every EMPTY seat with a random
+// bot in one click, leaving human seats alone - e.g. 2 humans seated, the
+// other 2 seats become random bots. Unlike Make All Bots, nobody is unseated.
+function handleFillEmptyBots(room, sessionId) {
+  if (sessionId !== room.ownerId) return;
+  if (room.phase !== 'lobby') return;
+  for (const seat of room.seats) {
+    if (seat.kind === 'empty') fillSeatWithBot(room, seat);
+  }
+  broadcastLobby(room);
+}
+
 function handleFillBot(room, sessionId, { seatIndex }) {
   if (sessionId !== room.ownerId) return;
   const seat = room.seats[seatIndex];
@@ -2071,6 +2083,7 @@ wss.on('connection', (ws) => {
       case 'remove-bot': return handleRemoveBot(room, sessionId, payload);
       case 'unseat-player': return handleUnseatPlayer(room, sessionId, payload);
       case 'fill-all-bots': return handleFillAllBots(room, sessionId);
+      case 'fill-empty-bots': return handleFillEmptyBots(room, sessionId);
       case 'become-guest': return handleBecomeGuest(room, sessionId);
       case 'claim-seat': return handleClaimSeat(room, sessionId, payload);
       case 'reorder-seats': return handleReorderSeats(room, sessionId, payload);
