@@ -1278,7 +1278,10 @@ function executeChickenAttack(character, targetId, game, log) {
     targetCharacterId: targetId,
     amount,
   });
-  log.push({ type: 'attack', characterId: character.id, actionId: 'chickenAttack', targetId, ...result });
+  // offBeatPeck: the alternating 0-damage hit on Boingo, so the log can say
+  // why it did nothing instead of a bare "0 damage" (2026-10-20).
+  const offBeatPeck = targetId === 'boingo' && amount === 0;
+  log.push({ type: 'attack', characterId: character.id, actionId: 'chickenAttack', targetId, ...(offBeatPeck ? { offBeatPeck } : {}), ...result });
   return result;
 }
 

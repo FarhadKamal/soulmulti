@@ -2313,6 +2313,13 @@ function absorbedText(absorbed) {
   return absorbed ? ` (${absorbed} absorbed by shield)` : '';
 }
 
+// Draxus's immortal floor (Deathless Fury / Cheat Death revive window) -
+// the hit lands for its full amount but his hearts are held at 1, which
+// otherwise read as "3 damage" with hearts unchanged (2026-10-20).
+function immortalFloorText(entry) {
+  return entry.deathproofSave ? ' (immortal - held at 1 heart)' : '';
+}
+
 // Describes which status-block mechanic actually intercepted a
 // curse/mark/freeze/silence/headache attempt - reads entry.blockedBy
 // (confirmed bug fix, 2026-09-01: every status-application site used to
@@ -2440,9 +2447,9 @@ function describeLogEntry(entry) {
         // High/low damage tier (Death-Triggered Reversion #36) - noted
         // explicitly since the number alone (2 vs 3) doesn't otherwise
         // explain WHY this particular target took more/less than usual.
-        return `${name(entry.characterId)} used ${actionLabel(entry.actionId)} on ${name(actualAttackTargetId(entry))}${entry.amountDealt != null ? ` - ${entry.amountDealt} damage` : ''}${absorbedText(entry.absorbed)}${entry.isHighTier ? ' (highest hearts!)' : ''}${entry.koTriggered ? ' - KO!' : ''}`;
+        return `${name(entry.characterId)} used ${actionLabel(entry.actionId)} on ${name(actualAttackTargetId(entry))}${entry.amountDealt != null ? ` - ${entry.amountDealt} damage` : ''}${absorbedText(entry.absorbed)}${immortalFloorText(entry)}${entry.isHighTier ? ' (highest hearts!)' : ''}${entry.koTriggered ? ' - KO!' : ''}`;
       }
-      return `${name(entry.characterId)} used ${actionLabel(entry.actionId)} on ${name(actualAttackTargetId(entry))}${entry.amountDealt != null ? ` - ${entry.amountDealt} damage` : ''}${absorbedText(entry.absorbed)}${entry.koTriggered ? ' - KO!' : ''}`;
+      return `${name(entry.characterId)} used ${actionLabel(entry.actionId)} on ${name(actualAttackTargetId(entry))}${entry.amountDealt != null ? ` - ${entry.amountDealt} damage` : ''}${absorbedText(entry.absorbed)}${immortalFloorText(entry)}${entry.offBeatPeck ? ' (only every 2nd peck on Boingo lands)' : ''}${entry.koTriggered ? ' - KO!' : ''}`;
     case 'special':
       if (entry.actionId === 'fowlPlay') {
         const victims = entry.chickenIds || [];
@@ -2657,14 +2664,14 @@ function describeLogEntry(entry) {
         // decaying shield). The hearts-snapshot suffix rendered the shield
         // correctly, but nothing in the line text itself explained WHY it
         // changed - reported live as "that was not showing in screen."
-        return `${name(entry.characterId)} used their SPECIAL: Glory Smash on ${name(actualAttackTargetId(entry))}${entry.amountDealt != null ? ` - ${entry.amountDealt} damage` : ''}${absorbedText(entry.absorbed)}${entry.koTriggered ? ' - KO!' : ''} (+2 hearts, +2 shield)`;
+        return `${name(entry.characterId)} used their SPECIAL: Glory Smash on ${name(actualAttackTargetId(entry))}${entry.amountDealt != null ? ` - ${entry.amountDealt} damage` : ''}${absorbedText(entry.absorbed)}${immortalFloorText(entry)}${entry.koTriggered ? ' - KO!' : ''} (+2 hearts, +2 shield)`;
       }
       // Damage-dealing specials (Wild Lightning, Shadow Execution, ...) spread
       // applyDamage's result onto the entry - show it, same as the
       // Skull Crack / Glory Smash lines above (confirmed gap 2026-10-14:
       // "used their SPECIAL: Wild Lightning on Chronox" with no damage).
       const specialDamageText = entry.amountDealt != null
-        ? ` - ${entry.amountDealt} damage${absorbedText(entry.absorbed)}${entry.koTriggered ? ' - KO!' : ''}`
+        ? ` - ${entry.amountDealt} damage${absorbedText(entry.absorbed)}${immortalFloorText(entry)}${entry.koTriggered ? ' - KO!' : ''}`
         : '';
       return `${name(entry.characterId)} used their SPECIAL: ${actionLabel(entry.actionId)}${entry.targetId ? ` on ${name(actualAttackTargetId(entry))}` : ''}${specialDamageText}${blockedByText(entry.blockedBy)}`;
     case 'setup':
@@ -2789,7 +2796,7 @@ function describeLogEntry(entry) {
       // Every explosion uses this entry - a chosen Take, a forced burst
       // (frozen/headache), the last pass, Illyra's fumble - so it says what
       // happened rather than "took", which read as a choice (2026-10-18).
-      return `The Jester Ball explodes on ${name(entry.targetCharacterId)}${entry.amountDealt != null ? ` - ${entry.amountDealt} damage` : ''}${absorbedText(entry.absorbed)}${entry.koTriggered ? ' - KO!' : ''}`;
+      return `The Jester Ball explodes on ${name(entry.targetCharacterId)}${entry.amountDealt != null ? ` - ${entry.amountDealt} damage` : ''}${absorbedText(entry.absorbed)}${immortalFloorText(entry)}${entry.koTriggered ? ' - KO!' : ''}`;
     case 'jester-ball-pass':
       return `${name(entry.fromCharacterId)} passed the Jester Ball to ${name(entry.toCharacterId)}`;
     case 'jester-ball-return': {
@@ -2810,7 +2817,7 @@ function describeLogEntry(entry) {
         : `${name(entry.characterId)}'s Arcane Study found nothing new.`;
     case 'poison-tick':
       // absorbedText (2026-10-20): "takes 0 poison damage" when a shield ate it.
-      return `${name(entry.targetCharacterId)} takes ${entry.amountDealt} poison damage${absorbedText(entry.absorbed)}${entry.koTriggered ? ' - KO!' : ''}`;
+      return `${name(entry.targetCharacterId)} takes ${entry.amountDealt} poison damage${absorbedText(entry.absorbed)}${immortalFloorText(entry)}${entry.koTriggered ? ' - KO!' : ''}`;
     case 'silence-end':
       return `${name(entry.targetCharacterId)}'s Silence Lock wears off`;
     case 'mirror-reflect':
