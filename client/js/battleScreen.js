@@ -1997,15 +1997,28 @@ function renderJesterBallPrompt(game, characterId, armedAction, state) {
 // (2026-09-21, user request: "remove the logs and chat on battle screen" -
 // logs are winner-screen-only now, chat is lobby-only).
 let debugLogMode = false;
+// The Debug button is hidden (2026-10-20, user request) until revealed by a
+// hidden gesture: Ctrl+Shift+X on a keyboard, or 5 quick taps on the
+// "Match log" title for phones. The old bare 'D' key toggle is gone - it
+// fired on any stray D press. Revealing again hides the button and turns
+// debug mode off.
+let debugButtonRevealed = false;
+function toggleDebugButtonRevealed() {
+  debugButtonRevealed = !debugButtonRevealed;
+  if (!debugButtonRevealed) debugLogMode = false;
+  triggerRerender();
+}
 window.addEventListener('keydown', (e) => {
-  // Ignore while typing in chat/any input - same guard pattern used
-  // elsewhere in this file for other single-key shortcuts.
-  if (e.target?.tagName === 'INPUT' || e.target?.tagName === 'TEXTAREA') return;
-  if (e.key === 'd' || e.key === 'D') {
-    debugLogMode = !debugLogMode;
-    triggerRerender();
-  }
+  if (!(e.ctrlKey && e.shiftKey && (e.key === 'X' || e.key === 'x'))) return;
+  // Only where the match log exists (the winner screen); the main menu uses
+  // the same shortcut for its win-rate panel.
+  if (!document.querySelector('.final-log-header')) return;
+  e.preventDefault();
+  toggleDebugButtonRevealed();
 });
+const DEBUG_REVEAL_TAPS = 5;
+const DEBUG_REVEAL_WINDOW_MS = 2000;
+let debugRevealTapTimes = [];
 
 // Fields worth showing for debugging animation/display logic - deliberately
 // excludes purely structural fields (type, characterId, actionId, targetId)
@@ -2227,7 +2240,7 @@ function renderFullLogWithCopy(log) {
   const header = document.createElement('div');
   header.className = 'final-log-header';
   const title = document.createElement('span');
-  // Debug mode (toggle: 'D' key) - the title itself doubles as the only
+  // Debug mode (hidden Debug button, see debugButtonRevealed) - the title itself doubles as the only
   // visible confirmation debug mode is active on THIS screen (no separate
   // badge here, unlike the old live-view drawer's .log-debug-badge, which
   // was removed along with that drawer) - without this, there was no way
@@ -2236,12 +2249,24 @@ function renderFullLogWithCopy(log) {
   // entry with nothing debug-worthy correctly shows no annotation at all -
   // see formatDebugAnnotation's own comment).
   title.textContent = debugLogMode ? 'Match log (DEBUG MODE)' : 'Match log';
+  // Hidden phone gesture - 5 taps within 2 seconds reveals/hides the Debug
+  // button (see toggleDebugButtonRevealed).
+  title.onclick = () => {
+    const now = Date.now();
+    debugRevealTapTimes = debugRevealTapTimes.filter((t) => now - t < DEBUG_REVEAL_WINDOW_MS);
+    debugRevealTapTimes.push(now);
+    if (debugRevealTapTimes.length >= DEBUG_REVEAL_TAPS) {
+      debugRevealTapTimes = [];
+      toggleDebugButtonRevealed();
+    }
+  };
   header.appendChild(title);
 
   const headerBtns = document.createElement('div');
   headerBtns.className = 'final-log-header-btns';
 
-  // Tappable debug-mode toggle (2026-09-22) - the 'D' keydown toggle above
+  // Tappable debug-mode toggle (2026-09-22; hidden until revealed since
+  // 2026-10-20, see debugButtonRevealed) - the old 'D' keydown toggle
   // has no equivalent on mobile (no physical keyboard, so debug mode was
   // completely unreachable there - confirmed live report: "I can't send
   // detail logs from mobile. Because of button d"). This button gives
@@ -2258,7 +2283,7 @@ function renderFullLogWithCopy(log) {
     debugLogMode = !debugLogMode;
     triggerRerender();
   };
-  headerBtns.appendChild(debugToggleBtn);
+  if (debugButtonRevealed) headerBtns.appendChild(debugToggleBtn);
 
   const copyBtn = document.createElement('button');
   copyBtn.className = 'final-log-copy-btn';
