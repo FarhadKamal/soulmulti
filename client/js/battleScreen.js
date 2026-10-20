@@ -2396,6 +2396,15 @@ function actionLabel(actionId) {
 
 function describeLogEntry(entry) {
   const name = (id) => CHARACTERS[id]?.name || id;
+  // Friendship overflow has its own "also strikes Melyssa" line, so the
+  // attack line shows only the friend's share (2026-10-20).
+  if (entry.spilloverDealt || entry.spilloverAbsorbed) {
+    entry = {
+      ...entry,
+      amountDealt: entry.amountDealt - (entry.spilloverDealt || 0),
+      absorbed: (entry.absorbed || 0) - (entry.spilloverAbsorbed || 0),
+    };
+  }
   switch (entry.type) {
     case 'match-start-roster': {
       // Confirmed real request (2026-09-29): "you should add in log.

@@ -396,9 +396,28 @@ export function isValidMindControlTarget(game, targetId) {
   // Mind Control target, had no legal action, got choked, the bond ended
   // and Kaelis turned on Melyssa. Not a valid target then - Melyssa skips
   // the turn instead and the bond holds.
-  if (game.characters.melyssa?.special?.friendCharacterId === targetId
-    && getUsablePuppetActions(target, game).length === 0) return false;
+  if (game.characters.melyssa?.special?.friendCharacterId === targetId) {
+    const puppetActions = getUsablePuppetActions(target, game);
+    if (puppetActions.length === 0) return false;
+    // Same for a friend whose ONLY puppet option is a Soul Storm that would,
+    // on average, cost Melyssa hearts (decided 2026-10-20). Live: Velorya
+    // was Eclipsed, Melyssa (3) puppeted her friend Zerathys into Soul Storm
+    // and ended up at 1 while Velorya went from 1 to 3.
+    if (puppetActions.every((a) => a.actionId === 'soulStorm') && soulStormHurtsMelyssa(game)) return false;
+  }
   return true; // deliberately no ownerId check - ally or enemy both legal
+}
+
+// Soul Storm hands every participant someone else's hearts at random, so
+// Melyssa's expected result is the average of the OTHER participants' hearts.
+function soulStormHurtsMelyssa(game) {
+  const melyssaChar = game.characters.melyssa;
+  const participants = zerathys.soulStormParticipants(game);
+  if (!melyssaChar || !participants.some((c) => c.id === 'melyssa')) return false;
+  const others = participants.filter((c) => c.id !== 'melyssa');
+  if (others.length === 0) return false;
+  const avg = others.reduce((sum, c) => sum + c.hearts, 0) / others.length;
+  return avg < melyssaChar.hearts;
 }
 
 // Oraclus's Rune Vision stage 1 (picking the predicted ATTACKER) - same

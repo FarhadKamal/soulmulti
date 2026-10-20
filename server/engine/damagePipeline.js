@@ -584,6 +584,11 @@ export function applyDamage(game, log, {
           }
           result.amountDealt += spilloverResult.amountDealt;
           result.absorbed += spilloverResult.absorbed;
+          // So the attack line can show only the friend's share - the
+          // spillover already has its own line (2026-10-20: "Moonstep on
+          // Zerathys - 3 damage" for a 2-damage Moonstep + 1 overflow).
+          result.spilloverDealt = spilloverResult.amountDealt;
+          result.spilloverAbsorbed = spilloverResult.absorbed;
           // Confirmed real bug, found alongside the spillover-visibility
           // one above: this used to be a flat overwrite
           // (`result.koTriggered = spilloverResult.koTriggered`), which
