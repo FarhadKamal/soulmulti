@@ -1234,7 +1234,11 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
     portrait.src = v(`assets/images/${character.id}/victory.jpg`);
   } else if (isPetrifiedOther && !character.isKO && character.deepSeaSealed) {
     portrait.src = v(`assets/images/${character.id}/deepsea_trapped_stone.jpg`);
-  } else if (isPetrifiedOther && !character.isKO) {
+  } else if (isPetrifiedOther && !character.isKO && !character.isFrog && !character.isChicken) {
+    // A frog or chicken stays as it is during Petrify (decided 2026-10-20,
+    // user pick) - there's no stone art for those forms, and the human
+    // stone.jpg showed the hero's normal body instead of the frog/chicken.
+    // They fall through to their usual frog/chicken portrait below.
     // Grimtal's Beast Form (Death-Triggered Reversion #36) gets its own
     // petrified art (beast_stone.jpg) rather than the plain human stone.jpg
     // - his beast body looks nothing like his human one, so a single stone
