@@ -69,10 +69,12 @@ export const actions = {
         targetCharacterId: targetId,
         amount: 2,
       });
-      applyHeal(game, character.id, 2);
+      // selfHealed: what the +2 actually restored (0 at full hearts), so the
+      // log doesn't claim "+2 hearts" for nothing (2026-10-20).
+      const selfHealed = applyHeal(game, character.id, 2);
       applyShield(game, character.id, 2, { decaying: true });
       character.special.hasCharge = true;
-      log.push({ type: 'special', characterId: character.id, actionId: 'glorySmash', targetId, ...result });
+      log.push({ type: 'special', characterId: character.id, actionId: 'glorySmash', targetId, selfHealed, ...result });
       return result;
     },
   },

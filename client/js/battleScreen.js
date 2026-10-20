@@ -2680,7 +2680,7 @@ function describeLogEntry(entry) {
         // decaying shield). The hearts-snapshot suffix rendered the shield
         // correctly, but nothing in the line text itself explained WHY it
         // changed - reported live as "that was not showing in screen."
-        return `${name(entry.characterId)} used their SPECIAL: Glory Smash on ${name(actualAttackTargetId(entry))}${entry.amountDealt != null ? ` - ${entry.amountDealt} damage` : ''}${absorbedText(entry.absorbed)}${immortalFloorText(entry)}${entry.koTriggered ? ' - KO!' : ''} (+2 hearts, +2 shield)`;
+        return `${name(entry.characterId)} used their SPECIAL: Glory Smash on ${name(actualAttackTargetId(entry))}${entry.amountDealt != null ? ` - ${entry.amountDealt} damage` : ''}${absorbedText(entry.absorbed)}${immortalFloorText(entry)}${entry.koTriggered ? ' - KO!' : ''} (${entry.selfHealed == null ? '+2 hearts' : `+${entry.selfHealed} heart${entry.selfHealed === 1 ? '' : 's'}`}, +2 shield)`;
       }
       // Damage-dealing specials (Wild Lightning, Shadow Execution, ...) spread
       // applyDamage's result onto the entry - show it, same as the
