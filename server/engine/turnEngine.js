@@ -862,6 +862,11 @@ export function beginCharacterTurn(character, game, log) {
   // through the seal; only FRESH targeting/actions are blocked by it. This
   // is a genuine difference from isChicken/isFrog, whose entire kit
   // (including already-active ticks) freezes solid.
+  // A turn-start tick (poison) can kill them below - their own passive
+  // must not then run on a corpse (2026-10-20, live: "Chronox's shield
+  // resets to 1 (Chrono Guard)" right after poison KO'd him). Draxus's
+  // Cheat Death turn is unaffected: he was already KO'd before this turn.
+  const wasKOAtTurnStart = character.isKO;
   if (!character.isChicken && !character.isFrog) {
     tickPoisonIfAny(character, game, log);
     tickSilenceIfAny(character, game, log);
@@ -881,7 +886,8 @@ export function beginCharacterTurn(character, game, log) {
   // while sealed (their kit is hidden/frozen), same "in-progress state
   // preserved, not reset" treatment as isChicken/isFrog - resumes once the
   // seal ends.
-  if (!character.isChicken && !character.isFrog && !character.deepSeaSealed) {
+  const diedToTurnStartTick = !wasKOAtTurnStart && character.isKO;
+  if (!character.isChicken && !character.isFrog && !character.deepSeaSealed && !diedToTurnStartTick) {
     const mod = ABILITY_MODULES[character.id];
     if (mod?.onTurnStart) mod.onTurnStart(character, game, log);
   }
