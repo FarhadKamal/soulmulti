@@ -280,6 +280,10 @@ export function renderBattle(root, state) {
       isDazed: isDazedFor(character.id),
       mirageMarkCount: mirageMarksFor(character.id),
       bladeHitCount: bladeHitCountFor(character.id),
+      // Fowl Play: an odd number of chicken pecks on Boingo = half a heart
+      // gone (every 2nd peck lands for 1). Clears itself when the landing
+      // peck is shield-blocked too, since the count goes even either way.
+      hasHalfHeart: character.id === 'boingo' && !!game.fowlPlayActive && (game.fowlPlayHitsOnBoingo || 0) % 2 === 1,
       isFriendshipTile: isFriendshipTile(character.id),
       isCursed: character.id === cursedId,
       isDivineJudgmentMarked: character.id === divineJudgmentTargetId,
@@ -551,7 +555,7 @@ export function computeFrozenIdsSet(game) {
   return ids;
 }
 
-function renderCharacterTile(character, { isActing, isMine, isTargetable, onTargetClick, isHoldingBall, isCursed, isDivineJudgmentMarked, isFrozenVisual, isVictorious, isPuppet, isHypnotized, grudgeCount, isPoisoned, silencedTurns, isDazed, mirageMarkCount, bladeHitCount, isFriendshipTile, isPetrifiedOther = false }) {
+function renderCharacterTile(character, { isActing, isMine, isTargetable, onTargetClick, isHoldingBall, isCursed, isDivineJudgmentMarked, isFrozenVisual, isVictorious, isPuppet, isHypnotized, grudgeCount, isPoisoned, silencedTurns, isDazed, mirageMarkCount, bladeHitCount, hasHalfHeart = false, isFriendshipTile, isPetrifiedOther = false }) {
   const def = CHARACTERS[character.id];
   const tile = document.createElement('div');
   tile.className = 'char-tile';
@@ -1348,6 +1352,9 @@ function renderCharacterTile(character, { isActing, isMine, isTargetable, onTarg
       if (i < convertedCount && i < activeCount) {
         heart.className = 'heart-icon heart-icon--converted';
         heart.title = 'Converted by Shadow Toll - no longer counts toward his Shadow Seal threshold';
+      } else if (hasHalfHeart && i === activeCount - 1) {
+        heart.className = 'heart-icon heart-icon--half';
+        heart.title = 'Half a heart - the next chicken peck takes the rest';
       } else if (i < activeCount) {
         heart.className = 'heart-icon heart-icon--full';
       } else if (i < character.hearts) {
@@ -2449,7 +2456,7 @@ function describeLogEntry(entry) {
         // explain WHY this particular target took more/less than usual.
         return `${name(entry.characterId)} used ${actionLabel(entry.actionId)} on ${name(actualAttackTargetId(entry))}${entry.amountDealt != null ? ` - ${entry.amountDealt} damage` : ''}${absorbedText(entry.absorbed)}${immortalFloorText(entry)}${entry.isHighTier ? ' (highest hearts!)' : ''}${entry.koTriggered ? ' - KO!' : ''}`;
       }
-      return `${name(entry.characterId)} used ${actionLabel(entry.actionId)} on ${name(actualAttackTargetId(entry))}${entry.amountDealt != null ? ` - ${entry.amountDealt} damage` : ''}${absorbedText(entry.absorbed)}${immortalFloorText(entry)}${entry.offBeatPeck ? ' (only every 2nd peck on Boingo lands)' : ''}${entry.koTriggered ? ' - KO!' : ''}`;
+      return `${name(entry.characterId)} used ${actionLabel(entry.actionId)} on ${name(actualAttackTargetId(entry))}${entry.offBeatPeck ? ' - ½ heart' : entry.amountDealt != null ? ` - ${entry.amountDealt} damage` : ''}${absorbedText(entry.absorbed)}${immortalFloorText(entry)}${entry.koTriggered ? ' - KO!' : ''}`;
     case 'special':
       if (entry.actionId === 'fowlPlay') {
         const victims = entry.chickenIds || [];

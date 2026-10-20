@@ -289,6 +289,9 @@ export const actions = {
       if (victims.length > 0) {
         game.fowlPlayActive = true;
         game.fowlPlayBoingoTurnsElapsed = 0;
+        // Fresh peck count each window, so a leftover half heart from an
+        // earlier window never carries over (2026-10-20).
+        game.fowlPlayHitsOnBoingo = 0;
       }
       log.push({ type: 'special', characterId: character.id, actionId: 'fowlPlay', chickenIds: victims.map((v) => v.id) });
       return {};
