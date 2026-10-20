@@ -729,6 +729,12 @@ export function applyDamage(game, log, {
     amountDealt: result.amountDealt, isMirror, isPoisonTick, isAshkaStrike, sourceCharacterId, heartsBefore,
   });
   if (earlyExtra) Object.assign(result, earlyExtra);
+  liftNestedDeferred(result, earlyExtra?.mirrorReflectResult);
+  // A reaction above can kill this target before its own KO check runs
+  // (2026-10-20, live: Rowan's Mirror Reflect killed Oraclus, whose Prophecy
+  // of Doom then killed Rowan). That nested call already ran the KO, so this
+  // hit must not KO him a second time or claim the kill.
+  const killedByReaction = target.isKO;
 
   // Akyros's Shadow Seal - a KO can now fire from the ACTIVE pool
   // (hearts - lockedHearts) hitting 0 even while real hearts reads higher
@@ -742,7 +748,7 @@ export function applyDamage(game, log, {
   // whose active pool was exhausted while real hearts was still nonzero -
   // confirmed ruling: these defensive mechanics should still get a chance
   // to trigger, same as against any other KO source.
-  const wouldKO = target.hearts - target.lockedHearts <= 0;
+  const wouldKO = !killedByReaction && target.hearts - target.lockedHearts <= 0;
 
   // Rebirth (category-driven, see engine/categories/rebirthRegistry.js +
   // onOtherRevived.js): automatic, intercepts the KO the instant it would
@@ -938,8 +944,25 @@ export function applyDamage(game, log, {
     amountDealt: result.amountDealt, isMirror, isPoisonTick, isAshkaStrike, sourceCharacterId, ...hitLandedCtxExtra,
   });
   if (hitLandedExtra) Object.assign(result, hitLandedExtra);
+  liftNestedDeferred(result, hitLandedExtra?.mirrorResult);
 
   return result;
+}
+
+// A counter hit (curse mirror, Mirror Reflect) runs its own applyDamage, and
+// whatever THAT call triggers (Prophecy of Doom, Divine Judgment, Fowl Play
+// revert, friendship end...) sits on the nested result where no caller looks.
+// Lift those deferred entries onto the outer result so they get logged.
+// rebirthLogEntry stays nested - callers already push mirrorResult/
+// mirrorReflectResult.rebirthLogEntry themselves, and the outer key means
+// the outer target's own Rebirth.
+function liftNestedDeferred(result, nested) {
+  if (!nested) return;
+  for (const [key, value] of Object.entries(nested)) {
+    if (value && key.endsWith('LogEntry') && key !== 'rebirthLogEntry' && !result[key]) {
+      result[key] = value;
+    }
+  }
 }
 
 export function applyHeal(game, targetCharacterId, amount) {
