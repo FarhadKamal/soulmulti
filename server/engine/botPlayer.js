@@ -6,7 +6,7 @@ import { isFrozenByChronox } from './damagePipeline.js';
 import { BEAST_ATTACK_HIGH_DAMAGE, BEAST_ATTACK_LOW_DAMAGE } from '../abilities/grimtal.js';
 import { soulStormParticipants } from '../abilities/zerathys.js';
 import { phoenixDiveDamage } from '../abilities/kaelis.js';
-import { isCurrentFriend } from '../abilities/melyssa.js';
+import { isCurrentFriend, SELF_CHOKE_DAMAGE } from '../abilities/melyssa.js';
 
 // Pure decision logic for PC-controlled characters - no DOM, no side
 // effects. Given a character whose turn it is, returns the action+target
@@ -2127,10 +2127,29 @@ export function chooseBotMelyssaPuppetAction(puppetCharacter, game, melyssaId) {
     // nothing this turn - reported live: Melyssa puppeting Zerathys into
     // Charge Up in a 1v1 instead of choking him down immediately.
     const dealsNoDamageThisTurn = !usableEntry?.needsTarget && move.actionId !== 'soulSwap';
-    // Self Choke always deals exactly 1 flat, ignoresShield damage (see
-    // executeSelfChoke in index.js) - safe to hardcode that amount here
-    // rather than importing the ability module just to read a constant.
-    const selfChokeWouldKill = activeHearts(puppetCharacter) <= 1;
+    // Self Choke deals a flat SELF_CHOKE_DAMAGE (2), ignoring shield (see
+    // executeSelfChoke in index.js) - this used to assume 1, so a 2-heart
+    // enemy puppet wasn't recognised as a guaranteed kill (2026-10-20).
+    // An immortal Draxus (Deathless Fury / Cheat Death revive window) is
+    // held at 1 heart, so a choke at 1 does nothing (2026-10-20 live: two
+    // wasted chokes on a 1-heart immortal Draxus).
+    const isImmortalDraxus = puppetCharacter.id === 'draxus'
+      && (puppetCharacter.special.deathproofActive || puppetCharacter.special.reviveImmortalActive);
+    const chokeHeldByImmortal = isImmortalDraxus && activeHearts(puppetCharacter) <= 1;
+    const selfChokeWouldKill = activeHearts(puppetCharacter) <= SELF_CHOKE_DAMAGE && !isImmortalDraxus;
+    if (chokeHeldByImmortal) {
+      // Spend the puppet's turn hitting someone other than Melyssa instead.
+      const attack = usableEntry?.needsTarget ? usableEntry : usable.find((a) => a.needsTarget);
+      const targets = attack
+        ? Object.keys(game.characters).filter((tid) => tid !== melyssa.id && isValidPuppetTarget(game, puppetCharacter.id, attack.actionId, tid))
+        : [];
+      if (targets.length > 0) {
+        const targetId = hitsMelyssaSide || !usableEntry?.needsTarget || !targets.includes(move.targetId)
+          ? (lowestHeartsTarget(game, targets) || targets[0])
+          : move.targetId;
+        return { kind: 'realAction', actionId: attack.actionId, targetId };
+      }
+    }
     // Lone-duel stall guard (see isMelyssaLoneDuel's own comment in
     // turnEngine.js): with only Melyssa and this one enemy left, Athena's
     // Curse Strike is the one remaining zero-damage move that
