@@ -235,8 +235,12 @@ export const actions = {
         log.push({ type: 'curse', characterId: character.id, targetId, blockedBy: 'illyra' });
         return {};
       }
+      // renewed: the target was already cursed - the cast changes nothing,
+      // so the log says the curse holds instead of reading like a fresh
+      // cast every turn (2026-10-20).
+      const renewed = character.special.curseTargetCharacterId === targetId;
       character.special.curseTargetCharacterId = targetId;
-      log.push({ type: 'curse', characterId: character.id, targetId });
+      log.push({ type: 'curse', characterId: character.id, targetId, ...(renewed ? { renewed } : {}) });
       return {};
     },
   },

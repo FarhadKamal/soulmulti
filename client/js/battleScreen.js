@@ -2727,6 +2727,7 @@ function describeLogEntry(entry) {
       // attempt silently read as a successful one.
       return `${name(entry.characterId)} placed a Hidden Mark${blockedByText(entry.blockedBy)}`;
     case 'curse':
+      if (entry.renewed && !entry.blockedBy) return `${name(entry.characterId)} keeps her curse on ${name(entry.targetId)}`;
       return `${name(entry.characterId)} cast Curse Strike on ${name(entry.targetId)}${blockedByText(entry.blockedBy)}`;
     case 'curse-mirror':
       if (entry.beastImmune) return `Curse mirror - ${name(entry.toCharacterId)} is immune in Beast Form`;
