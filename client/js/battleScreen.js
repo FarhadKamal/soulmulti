@@ -2479,10 +2479,10 @@ function describeLogEntry(entry) {
         const costText = selfAbsorbed > 0
           ? `sacrifice cost ${entry.selfCost} - ${selfAbsorbed} absorbed by shield`
           : `sacrificed ${entry.selfCost} heart${entry.selfCost > 1 ? 's' : ''}`;
-        return `${name(entry.characterId)} used ${actionLabel(entry.actionId)} on ${name(actualAttackTargetId(entry))}${entry.amountDealt != null ? ` - ${entry.amountDealt} damage` : ''}${entry.koTriggered ? ' - KO!' : ''} (${costText}${entry.selfResult?.koTriggered ? ' - KO!' : ''})`;
+        return `${name(entry.characterId)} used ${actionLabel(entry.actionId)} on ${name(actualAttackTargetId(entry))}${entry.amountDealt != null ? ` - ${entry.amountDealt} damage` : ''}${absorbedText(entry.absorbed)}${immortalFloorText(entry)}${entry.koTriggered ? ' - KO!' : ''} (${costText}${entry.selfResult?.koTriggered ? ' - KO!' : ''})`;
       }
       if (entry.actionId === 'phoenixDive') {
-        return `${name(entry.characterId)} crashes down with Phoenix Dive on ${name(actualAttackTargetId(entry))}${entry.amountDealt != null ? ` - ${entry.amountDealt} damage` : ''}${entry.absorbed ? ` (${entry.absorbed} absorbed by shield)` : ''}${entry.koTriggered ? ' - KO!' : ''} - every grudge released!`;
+        return `${name(entry.characterId)} crashes down with Phoenix Dive on ${name(actualAttackTargetId(entry))}${entry.amountDealt != null ? ` - ${entry.amountDealt} damage` : ''}${absorbedText(entry.absorbed)}${immortalFloorText(entry)}${entry.koTriggered ? ' - KO!' : ''} - every grudge released!`;
       }
       if (entry.actionId === 'beastAttack') {
         // High/low damage tier (Death-Triggered Reversion #36) - noted
@@ -2585,7 +2585,7 @@ function describeLogEntry(entry) {
         // (Rebirth intercepted it). blockedBy names which mechanic (Clean
         // Slate/Illusion) blocked the headache side effect specifically -
         // the pierce damage itself still lands regardless of that.
-        return `${name(entry.characterId)} used their SPECIAL: Skull Crack on ${name(actualAttackTargetId(entry))}${entry.amountDealt != null ? ` - ${entry.amountDealt} damage` : ''}${entry.koTriggered ? ' - KO!' : ''}${entry.blockedBy ? `, headache blocked by ${entry.blockedBy === 'cleanSlate' ? 'Clean Slate' : 'Illusion'}` : ''}`;
+        return `${name(entry.characterId)} used their SPECIAL: Skull Crack on ${name(actualAttackTargetId(entry))}${entry.amountDealt != null ? ` - ${entry.amountDealt} damage` : ''}${immortalFloorText(entry)}${entry.koTriggered ? ' - KO!' : ''}${entry.blockedBy ? `, headache blocked by ${entry.blockedBy === 'cleanSlate' ? 'Clean Slate' : 'Illusion'}` : ''}`;
       }
       if (entry.actionId === 'petrify') {
         // Petrify (Rowan's hearts<=3 one-time bonus action) - its own
