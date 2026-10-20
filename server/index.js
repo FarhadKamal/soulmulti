@@ -976,15 +976,24 @@ function stepBotMindControlTurn(room, melyssaId, puppetId) {
   if (!room.game) { room.botSequenceActive = false; return; }
   const puppet = room.game.characters[puppetId];
   const decision = chooseBotMelyssaPuppetAction(puppet, room.game, melyssaId);
+  // Debug-only bot reasoning (see botPlayer.js's botWhy) - stamped onto the
+  // first log entry this step produces.
+  const logLengthBefore = room.game.log.length;
+  const stampBotWhy = () => {
+    const entry = room.game?.log[logLengthBefore];
+    if (entry && decision.botWhy) entry.botWhy = decision.botWhy;
+  };
 
   if (decision.kind === 'selfChoke') {
     executeSelfChoke(room.game, melyssaId, puppetId);
+    stampBotWhy();
     finishBotMindControlTurn(room, melyssaId); // broadcasts internally
     return;
   }
 
   if (decision.kind === 'jesterBall') {
     finishJesterBall(room.game, decision.choice, decision.targetId);
+    stampBotWhy();
     // Take's flat -4 can itself KO the puppet outright - same gap as the
     // human path in handleMindControlAction, see its comment for why a
     // follow-up stage would otherwise offer a phantom action panel for an
@@ -1008,6 +1017,7 @@ function stepBotMindControlTurn(room, melyssaId, puppetId) {
 
   // decision.kind === 'realAction'
   const puppetResult = executeActionAsPuppet(room.game, melyssaId, puppetId, decision.actionId, decision.targetId);
+  stampBotWhy();
   // excludeOwnerId=Melyssa's own side - see chooseSoulSwapWrathTarget's own
   // comment for why this follow-up needs it and a normal (non-puppeted)
   // Soul Swap doesn't. A resisted Soul Swap never happened, so no free

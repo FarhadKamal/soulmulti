@@ -1929,7 +1929,32 @@ export function chooseBotMove(character, game) {
 // is, so calling MOVE_CHOOSERS[puppet.id] here with the puppet's own
 // character object is safe and reuses each character's full bot
 // intelligence rather than duplicating 8 separate decision trees.
+// Bot-reasoning note for the debug log (2026-10-20): which branch of the
+// puppet chooser produced the decision, plus the state it read. Added after a
+// live all-bot match showed puppet choices the current code didn't reproduce
+// (Deathless Fury at 5 hearts, skipping a sure-kill Self Choke) - the next
+// occurrence will show exactly why. Shown only in the log's debug mode.
+let puppetPath = '';
+let puppetChooserMove = null;
 export function chooseBotMelyssaPuppetAction(puppetCharacter, game, melyssaId) {
+  puppetPath = '';
+  puppetChooserMove = null;
+  const decision = choosePuppetActionImpl(puppetCharacter, game, melyssaId);
+  const melyssaChar = melyssaId ? game.characters[melyssaId] : null;
+  const sp = puppetCharacter.special || {};
+  const flags = [sp.deathproofActive && 'fury', sp.reviveImmortalActive && 'revived'].filter(Boolean).join('+');
+  decision.botWhy = [
+    `path=${puppetPath || 'final'}`,
+    `chooser=${puppetChooserMove ? `${puppetChooserMove.actionId}->${puppetChooserMove.targetId ?? '-'}` : '-'}`,
+    `owners=${melyssaChar?.ownerId ?? '?'}/${puppetCharacter.ownerId}`,
+    `friend=${melyssaChar?.special?.friendCharacterId ?? '-'}`,
+    `hp=${puppetCharacter.hearts}`,
+    flags ? `immortal=${flags}` : null,
+  ].filter(Boolean).join(' ');
+  return decision;
+}
+
+function choosePuppetActionImpl(puppetCharacter, game, melyssaId) {
   const jb = game.jesterBall;
   if (jb && jb.holderCharacterId === puppetCharacter.id) {
     // Boingo can NEVER choose Take on his own ball, full stop - not for
@@ -1947,6 +1972,7 @@ export function chooseBotMelyssaPuppetAction(puppetCharacter, game, melyssaId) {
     // advantage.
     if (puppetCharacter.id === 'boingo') {
       const move = chooseBotBoingoJesterBallMove(puppetCharacter, game);
+      puppetPath = 'boingo-ball';
       return { kind: 'jesterBall', choice: move.choice, targetId: move.targetId };
     }
     // chooseBotJesterBallMove decides Pass-vs-Take from the HOLDER's own
@@ -1965,6 +1991,7 @@ export function chooseBotMelyssaPuppetAction(puppetCharacter, game, melyssaId) {
     // chosen through that path either.
     const zerathysComboPending = puppetCharacter.id === 'zerathys' && !!zerathysBallComboTarget(puppetCharacter, game);
     if (!zerathysComboPending) {
+      puppetPath = 'ball-take';
       return { kind: 'jesterBall', choice: 'take' };
     }
     const move = chooseBotJesterBallMove(puppetCharacter, game);
@@ -1984,6 +2011,7 @@ export function chooseBotMelyssaPuppetAction(puppetCharacter, game, melyssaId) {
     // practice this should be unreachable (every living, non-frozen
     // character in the roster always has at least a base attack legal),
     // kept as a defensive fallback rather than assumed impossible.
+    puppetPath = 'no-usable';
     return { kind: 'selfChoke' };
   }
   // Puppeted Zerathys needs his OWN dedicated Soul Swap decision, not
@@ -2015,6 +2043,7 @@ export function chooseBotMelyssaPuppetAction(puppetCharacter, game, melyssaId) {
     // Same "meaningfully better" margin chooseZerathysMove itself uses
     // (>1 heart difference), just evaluated for HER pool instead of his.
     if (canTargetMelyssa && puppetCharacter.hearts > melyssa.hearts + 1) {
+      puppetPath = 'zerathys-rescue';
       return { kind: 'realAction', actionId: 'soulSwap', targetId: melyssa.id };
     }
   }
@@ -2045,6 +2074,7 @@ export function chooseBotMelyssaPuppetAction(puppetCharacter, game, melyssaId) {
       const pool = peakTargets.length > 0 ? peakTargets : targets;
       const redirectTarget = focusFireTarget(game, pool) || biggestThreatTarget(game, puppetCharacter, pool)
         || lowestHeartsTarget(game, pool) || pickRandom(pool);
+      puppetPath = 'blade-redirect';
       return { kind: 'realAction', actionId: 'bloodHunt', targetId: redirectTarget };
     }
   }
@@ -2061,10 +2091,11 @@ export function chooseBotMelyssaPuppetAction(puppetCharacter, game, melyssaId) {
   // has.
   const chooser = isChickenified(puppetCharacter) ? chooseChickenMove : (MOVE_CHOOSERS[puppetCharacter.id] || chooseFallbackMove);
   let move = chooser(puppetCharacter, game, usable);
-  if (!move) move = chooseFallbackMove(puppetCharacter, game, usable);
+  puppetChooserMove = move;
+  if (!move) { move = chooseFallbackMove(puppetCharacter, game, usable); puppetPath = 'fallback'; }
   // Same safety net as chooseBotMove's own post-processing above.
   const usableEntry = usable.find((a) => a.actionId === move.actionId);
-  if (!usableEntry) move = chooseFallbackMove(puppetCharacter, game, usable);
+  if (!usableEntry) { move = chooseFallbackMove(puppetCharacter, game, usable); puppetPath = 'fallback-unusable'; }
   if (move.targetId === null && usableEntry?.needsTarget) {
     move = { actionId: move.actionId, targetId: pickDefaultTarget(game, puppetCharacter, move.actionId) };
   }
@@ -2114,6 +2145,7 @@ export function chooseBotMelyssaPuppetAction(puppetCharacter, game, melyssaId) {
   // the friend here can never block that legitimate forced case.
   const isEnemyPuppet = melyssa && puppetCharacter.ownerId !== melyssa.ownerId
     && !isCurrentFriend(game, puppetCharacter.id);
+  if (!isEnemyPuppet) puppetPath = (puppetPath ? `${puppetPath}+` : '') + 'ally-or-friend';
   if (isEnemyPuppet) {
     const chosenTarget = move.targetId ? game.characters[move.targetId] : null;
     const hitsMelyssaSide = chosenTarget && chosenTarget.ownerId === melyssa.ownerId;
@@ -2147,6 +2179,7 @@ export function chooseBotMelyssaPuppetAction(puppetCharacter, game, melyssaId) {
         const targetId = hitsMelyssaSide || !usableEntry?.needsTarget || !targets.includes(move.targetId)
           ? (lowestHeartsTarget(game, targets) || targets[0])
           : move.targetId;
+        puppetPath = (puppetPath ? `${puppetPath}+` : '') + 'immortal-redirect';
         return { kind: 'realAction', actionId: attack.actionId, targetId };
       }
     }
@@ -2163,6 +2196,7 @@ export function chooseBotMelyssaPuppetAction(puppetCharacter, game, melyssaId) {
       && isMelyssaLoneDuel(game, melyssaId)
       && move.actionId === 'curseStrike';
     if (selfChokeWouldKill || hitsMelyssaSide || dealsNoDamageThisTurn || isLoneDuelStall) {
+      puppetPath = (puppetPath ? `${puppetPath}+` : '') + `choke(${[selfChokeWouldKill && 'kill', hitsMelyssaSide && 'hitsHer', dealsNoDamageThisTurn && 'noDamage', isLoneDuelStall && 'stall'].filter(Boolean).join(',')})`;
       return { kind: 'selfChoke' };
     }
   }

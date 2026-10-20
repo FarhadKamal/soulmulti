@@ -2030,6 +2030,8 @@ const DEBUG_ANNOTATION_FIELDS = [
   'redirectedToFriendId', 'targetCharacterId', 'streak', 'outcome', 'matched',
   'blockedBy', 'isHighTier', 'isNewTarget', 'stage', 'success', 'skipped',
   'wasKO', 'overcharged', 'flip',
+  // Bot Melyssa's puppet reasoning (2026-10-20, see botPlayer.js botWhy).
+  'botWhy',
 ];
 function formatDebugAnnotation(entry) {
   const parts = [];
