@@ -2166,8 +2166,14 @@ function renderFullLogWithCopy(log) {
   for (let i = 0; i < log.length; i++) {
     const entry = log[i];
     if (entry.type === 'end-action') continue;
-    const text = describeLogEntry(entry);
+    let text = describeLogEntry(entry);
     if (!text) continue;
+    // Friendship redirect (2026-10-18): the line names the friend who took
+    // the hit, so say who it was really aimed at.
+    if (entry.redirectedToFriendId && entry.targetId && entry.targetId !== entry.redirectedToFriendId) {
+      const nm = (id) => CHARACTERS[id]?.name || id;
+      text += ` (${nm(entry.redirectedToFriendId)} took it for ${nm(entry.targetId)})`;
+    }
     let hearts = entry.hearts;
     if (!hearts) {
       for (let j = i + 1; j < log.length; j++) {

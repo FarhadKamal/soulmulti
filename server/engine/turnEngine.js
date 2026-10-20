@@ -376,6 +376,14 @@ export function isValidMindControlTarget(game, targetId) {
   // self-targeted escapeSeal (genuinely useless to force via Mind
   // Control).
   if (isDeepSeaSealed(target)) return false;
+  // Her Friendship partner with nothing to do as a puppet (decided
+  // 2026-10-18): puppeting them would leave only Self Choke, which breaks
+  // the bond. Live: Velorya was Eclipsed, Kaelis (the friend) was the only
+  // Mind Control target, had no legal action, got choked, the bond ended
+  // and Kaelis turned on Melyssa. Not a valid target then - Melyssa skips
+  // the turn instead and the bond holds.
+  if (game.characters.melyssa?.special?.friendCharacterId === targetId
+    && getUsablePuppetActions(target, game).length === 0) return false;
   return true; // deliberately no ownerId check - ally or enemy both legal
 }
 
