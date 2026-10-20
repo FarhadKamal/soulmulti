@@ -280,10 +280,10 @@ export function renderBattle(root, state) {
       isDazed: isDazedFor(character.id),
       mirageMarkCount: mirageMarksFor(character.id),
       bladeHitCount: bladeHitCountFor(character.id),
-      // Fowl Play: an odd number of chicken pecks on Boingo = half a heart
-      // gone (every 2nd peck lands for 1). Clears itself when the landing
-      // peck is shield-blocked too, since the count goes even either way.
-      hasHalfHeart: character.id === 'boingo' && !!game.fowlPlayActive && (game.fowlPlayHitsOnBoingo || 0) % 2 === 1,
+      // Fowl Play: an odd number of chicken pecks on a human-form hero =
+      // half a heart gone (every 2nd peck lands for 1). Clears itself when
+      // the landing peck is shield-blocked too, since the count goes even.
+      hasHalfHeart: !!game.fowlPlayActive && !character.isChicken && (game.fowlPlayPecksByTarget?.[character.id] || 0) % 2 === 1,
       isFriendshipTile: isFriendshipTile(character.id),
       isCursed: character.id === cursedId,
       isDivineJudgmentMarked: character.id === divineJudgmentTargetId,

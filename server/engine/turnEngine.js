@@ -27,10 +27,17 @@ const ABILITY_MODULES = { chronox, tharox, zerathys, akyros, velorya, boingo, bl
 // himself. Ticked in beginCharacterTurn below, once each time Boingo's
 // own turn begins while game.fowlPlayActive is true.
 export const FOWL_PLAY_BOINGO_TURNS = 3;
-// Every 2nd cumulative hit a chicken lands on Boingo actually deals
-// damage - the alternating hit deals 0 (confirmed ruling). A GLOBAL
-// counter (game.fowlPlayHitsOnBoingo), not per-attacker.
+// Every 2nd chicken peck on the same human-form hero actually deals
+// damage - the alternating peck is half a heart (confirmed ruling, widened
+// from Boingo-only to every human-form hero 2026-10-20). Counted per target
+// in game.fowlPlayPecksByTarget, shared across attackers.
 export const FOWL_PLAY_BOINGO_HIT_INTERVAL = 2;
+
+// True when the NEXT chicken peck on this human-form target would land.
+export function chickenPeckWouldLand(game, targetId) {
+  const pecks = game.fowlPlayPecksByTarget?.[targetId] || 0;
+  return (pecks + 1) % FOWL_PLAY_BOINGO_HIT_INTERVAL === 0;
+}
 
 export function getAbilityModule(characterId) {
   return ABILITY_MODULES[characterId];
@@ -261,8 +268,15 @@ export function isValidTarget(game, characterId, actionId, targetId) {
     // blocking here rather than being allowed to quietly land.
     if (characterId === 'melyssa' && melyssa.isCurrentFriend(game, targetId)) return false;
     if (targetId === 'melyssa' && melyssa.isCurrentFriend(game, characterId)) return false;
-    if (targetId === 'boingo') return true;
-    return isChickenified(target);
+    if (isChickenified(target)) return true;
+    // Human-form heroes (2026-10-20, user ruling: "chicken can attack other
+    // human form hero also. example draxus") - Boingo, plus anyone Fowl Play
+    // skipped (Clean Slate) or who revived mid-window. Frogs, deep-sea
+    // sealed heroes and Beast Form Grimtal aren't human form; untargetable
+    // still protects, since a human-form target keeps its real defenses.
+    if (isFrogged(target) || isDeepSeaSealed(target) || target.untargetable) return false;
+    if (target.id === 'grimtal' && target.special?.beastFormActive) return false;
+    return true;
   }
   if (target.ownerId === character.ownerId) return false;
   // Kaelis's Phoenix Dive ignores untargetable (confirmed ruling,
@@ -1253,7 +1267,9 @@ export function resolveOraclusPredictionIfPending(game, log, characterId, action
 //   AUTOMATICALLY by applyDamage itself (damagePipeline.js forces every
 //   ignores* flag true whenever target.isChicken is true) - no flags need
 //   passing here for that case.
-// - Chicken vs. Boingo: uses game.fowlPlayHitsOnBoingo, a GLOBAL
+// - Chicken vs. a human-form hero (Boingo, or anyone Fowl Play skipped -
+//   widened from Boingo-only 2026-10-20): uses game.fowlPlayPecksByTarget,
+//   a per-target
 //   cumulative counter shared across every attacking chicken (not
 //   per-attacker) - every 2nd cumulative hit lands 1 damage, the
 //   alternating hit deals 0. Boingo himself is NEVER chickenified, so
@@ -1267,9 +1283,12 @@ export function resolveOraclusPredictionIfPending(game, log, characterId, action
 //   defenses apply normally.
 function executeChickenAttack(character, targetId, game, log) {
   let amount;
-  if (targetId === 'boingo') {
-    game.fowlPlayHitsOnBoingo += 1;
-    amount = (game.fowlPlayHitsOnBoingo % FOWL_PLAY_BOINGO_HIT_INTERVAL === 0) ? 1 : 0;
+  const target = game.characters[targetId];
+  if (!isChickenified(target)) {
+    if (!game.fowlPlayPecksByTarget) game.fowlPlayPecksByTarget = {};
+    const pecks = (game.fowlPlayPecksByTarget[targetId] || 0) + 1;
+    game.fowlPlayPecksByTarget[targetId] = pecks;
+    amount = (pecks % FOWL_PLAY_BOINGO_HIT_INTERVAL === 0) ? 1 : 0;
   } else {
     amount = 1;
   }
@@ -1280,7 +1299,7 @@ function executeChickenAttack(character, targetId, game, log) {
   });
   // offBeatPeck: the alternating 0-damage hit on Boingo, so the log can say
   // why it did nothing instead of a bare "0 damage" (2026-10-20).
-  const offBeatPeck = targetId === 'boingo' && amount === 0;
+  const offBeatPeck = !isChickenified(target) && amount === 0;
   log.push({ type: 'attack', characterId: character.id, actionId: 'chickenAttack', targetId, ...(offBeatPeck ? { offBeatPeck } : {}), ...result });
   return result;
 }

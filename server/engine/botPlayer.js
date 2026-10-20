@@ -1,6 +1,6 @@
 import {
   getUsableActions, getUsablePuppetActions, isValidTarget, isValidPuppetTarget, isValidMindControlTarget, isMelyssaLoneDuel, LONE_DUEL_EXCEPTIONS,
-  isChickenified, FOWL_PLAY_BOINGO_HIT_INTERVAL,
+  isChickenified, chickenPeckWouldLand,
 } from './turnEngine.js';
 import { isFrozenByChronox } from './damagePipeline.js';
 import { BEAST_ATTACK_HIGH_DAMAGE, BEAST_ATTACK_LOW_DAMAGE } from '../abilities/grimtal.js';
@@ -1847,22 +1847,22 @@ function chooseFallbackMove(character, game, usable) {
 // regardless of which hero they actually are (their own real chooser is
 // completely bypassed while chickenified - see chooseBotMove's own
 // interception below, since getLegalActions already only offers
-// chickenAttack in this state). Chicken Attack can only target another
-// living chicken or Boingo himself (turnEngine.js's own isValidTarget
-// case). Prefers attacking Boingo specifically on whichever hit would
-// actually land damage (the 2nd of every 2 cumulative hits on him, per
-// game.fowlPlayHitsOnBoingo - opportunistic rather than wasting attacks
-// on his guaranteed-miss beat), otherwise focuses the lowest-hearts
+// chickenAttack in this state). Chicken Attack can target another living
+// chicken or any human-form hero (Boingo, or anyone Fowl Play skipped -
+// turnEngine.js's own isValidTarget case). Prefers a human-form hero whose
+// next peck would actually land (every 2nd peck per target, see
+// chickenPeckWouldLand - Boingo first), otherwise focuses the lowest-hearts
 // fellow chicken same as the generic lowestHeartsTarget priority used
 // everywhere else in this file.
 function chooseChickenMove(character, game, usable) {
   const targets = validTargetsFor(game, character, 'chickenAttack');
   if (targets.length === 0) return null;
-  const boingoHitWouldLand = (game.fowlPlayHitsOnBoingo + 1) % FOWL_PLAY_BOINGO_HIT_INTERVAL === 0;
-  if (boingoHitWouldLand && targets.includes('boingo')) {
-    return { actionId: 'chickenAttack', targetId: 'boingo' };
+  const humans = targets.filter((tid) => !game.characters[tid]?.isChicken);
+  const landing = humans.filter((tid) => chickenPeckWouldLand(game, tid));
+  if (landing.length > 0) {
+    return { actionId: 'chickenAttack', targetId: landing.includes('boingo') ? 'boingo' : lowestHeartsTarget(game, landing) || landing[0] };
   }
-  const otherChickens = targets.filter((tid) => tid !== 'boingo');
+  const otherChickens = targets.filter((tid) => game.characters[tid]?.isChicken);
   const targetId = lowestHeartsTarget(game, otherChickens) || pickRandom(targets);
   return { actionId: 'chickenAttack', targetId };
 }

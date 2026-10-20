@@ -111,7 +111,7 @@ function baseSpecialFor(id) {
       // currently chickenified lives per-character on each victim's own
       // `isChicken` flag, and the shared countdown lives on `game`,
       // not here - see createCharacter's own comment and createGame's
-      // fowlPlayHitsOnBoingo counter.
+      // fowlPlayPecksByTarget counter.
       return { jesterBallsUsed: 0, usedFowlPlay: false };
     case 'blade':
       // hitCountByTarget: per-TARGET hit counter (confirmed redesign,
@@ -632,17 +632,12 @@ export function createGame(mode, playerPicks) {
     chronoxLockoutTickedFor: new Set(),
     turnInstanceFor: new Map(),
     jesterBall: null,
-    // Boingo's Fowl Play - GLOBAL cumulative hit counter for attacks
-    // chickens land specifically on Boingo (confirmed ruling: shared
-    // across every chicken, not tracked per-attacker). Every 2nd
-    // cumulative hit lands 1 damage; the alternating hit deals 0. Lives on
-    // `game` (not per-attacker state) for the same "one shared counter,
-    // not 16 separate ones" reasoning game.jesterBall's own shared state
-    // uses. Never reset mid-match - persists for as long as Fowl Play's
-    // chicken window is active, naturally becoming irrelevant again once
-    // every chicken has reverted (nothing left that can even target
-    // Boingo under the chicken-only-targets-chicken-or-Boingo rule).
-    fowlPlayHitsOnBoingo: 0,
+    // Boingo's Fowl Play - chicken pecks landed on each HUMAN-form hero
+    // (Boingo, or anyone Fowl Play skipped / who revived mid-window),
+    // keyed by target id and shared across every attacking chicken. Every
+    // 2nd peck on the same hero lands 1 damage; the odd one is half a heart
+    // (shown on the client). Reset each time Fowl Play is cast.
+    fowlPlayPecksByTarget: {},
     // Boingo's Fowl Play - true for the whole chicken window, cleared the
     // instant it ends. Duration is measured in BOINGO'S OWN turns, not raw
     // global move-count (confirmed ruling, 2026-09-03 - fixed a real gap
