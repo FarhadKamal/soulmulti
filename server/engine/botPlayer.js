@@ -2147,8 +2147,23 @@ function choosePuppetActionImpl(puppetCharacter, game, melyssaId) {
     && !isCurrentFriend(game, puppetCharacter.id);
   if (!isEnemyPuppet) puppetPath = (puppetPath ? `${puppetPath}+` : '') + 'ally-or-friend';
   if (isEnemyPuppet) {
+    // Her friend counts as her own side here (2026-10-20, live: she puppeted
+    // Rowan's Wild Lightning onto her friend Boingo, killed him and lost the
+    // bond and the match). Allowed by the rules, never a good bot choice -
+    // aim the same action at someone else when possible.
+    const friendId = melyssa.special?.friendCharacterId || null;
+    const isProtected = (tid) => tid === melyssa.id || (friendId && tid === friendId);
+    if (move.targetId && isProtected(move.targetId) && usableEntry?.needsTarget) {
+      const others = Object.keys(game.characters).filter((tid) => !isProtected(tid)
+        && game.characters[tid].ownerId !== melyssa.ownerId
+        && isValidPuppetTarget(game, puppetCharacter.id, move.actionId, tid));
+      if (others.length > 0) {
+        move = { actionId: move.actionId, targetId: lowestHeartsTarget(game, others) || others[0] };
+        puppetPath = 'retarget-off-friend';
+      }
+    }
     const chosenTarget = move.targetId ? game.characters[move.targetId] : null;
-    const hitsMelyssaSide = chosenTarget && chosenTarget.ownerId === melyssa.ownerId;
+    const hitsMelyssaSide = !!chosenTarget && (chosenTarget.ownerId === melyssa.ownerId || isProtected(chosenTarget.id));
     // A puppeted setup move (Zerathys's Charge Up, Tharox's Titan Toss -
     // anything with no target and no damage this turn) deals zero progress
     // right now, banking on a LATER puppeted turn to cash in a bigger hit -
@@ -2195,6 +2210,20 @@ function choosePuppetActionImpl(puppetCharacter, game, melyssaId) {
     const isLoneDuelStall = !LONE_DUEL_EXCEPTIONS.has(puppetCharacter.id)
       && isMelyssaLoneDuel(game, melyssaId)
       && move.actionId === 'curseStrike';
+    // Rowan with Mirror Reflect armed bounces a Self Choke straight back
+    // at Melyssa (2026-10-20, live: 3 back, her friend took it). Unless the
+    // choke kills him, spend his turn on anything that doesn't hit her or
+    // her friend instead - his own action on someone else doesn't trigger
+    // his mirror.
+    const chokeWouldBeReflected = puppetCharacter.id === 'rowan' && puppetCharacter.special.mirrorReflectActive && !selfChokeWouldKill;
+    if (chokeWouldBeReflected && (hitsMelyssaSide || dealsNoDamageThisTurn || isLoneDuelStall)) {
+      for (const a of usable) {
+        if (!a.needsTarget) { puppetPath = 'avoid-mirror'; return { kind: 'realAction', actionId: a.actionId, targetId: null }; }
+        const safe = Object.keys(game.characters).filter((tid) => !isProtected(tid)
+          && isValidPuppetTarget(game, puppetCharacter.id, a.actionId, tid));
+        if (safe.length > 0) { puppetPath = 'avoid-mirror'; return { kind: 'realAction', actionId: a.actionId, targetId: lowestHeartsTarget(game, safe) || safe[0] }; }
+      }
+    }
     if (selfChokeWouldKill || hitsMelyssaSide || dealsNoDamageThisTurn || isLoneDuelStall) {
       puppetPath = (puppetPath ? `${puppetPath}+` : '') + `choke(${[selfChokeWouldKill && 'kill', hitsMelyssaSide && 'hitsHer', dealsNoDamageThisTurn && 'noDamage', isLoneDuelStall && 'stall'].filter(Boolean).join(',')})`;
       return { kind: 'selfChoke' };

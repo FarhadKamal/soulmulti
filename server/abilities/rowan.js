@@ -51,7 +51,11 @@ registerOnHitLandedEarly('rowan', (character, game, log, ctx) => {
     mirrorReflectLogEntry: {
       type: 'mirror-reflect',
       fromCharacterId: character.id,
-      toCharacterId: ctx.sourceCharacterId,
+      // Who actually took it - Melyssa's friend if the reflect redirected
+      // (2026-10-20); targetId + redirectedToFriendId let the log say
+      // "(Boingo took it for Melyssa)" instead of "back to Melyssa".
+      toCharacterId: mirrorReflectResult.targetCharacterId || ctx.sourceCharacterId,
+      ...(mirrorReflectResult.redirectedToFriendId ? { redirectedToFriendId: mirrorReflectResult.redirectedToFriendId, targetId: ctx.sourceCharacterId } : {}),
       // Real damage that got through, not the flat 3 - the log used to
       // always say "3 damage" even when the attacker's shield absorbed
       // some or all of it.
