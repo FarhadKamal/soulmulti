@@ -2809,7 +2809,8 @@ function describeLogEntry(entry) {
         ? `${name(entry.characterId)} discovered a new spell: ${SPELL_NAMES[entry.spellId] || entry.spellId}!`
         : `${name(entry.characterId)}'s Arcane Study found nothing new.`;
     case 'poison-tick':
-      return `${name(entry.targetCharacterId)} takes ${entry.amountDealt} poison damage${entry.koTriggered ? ' - KO!' : ''}`;
+      // absorbedText (2026-10-20): "takes 0 poison damage" when a shield ate it.
+      return `${name(entry.targetCharacterId)} takes ${entry.amountDealt} poison damage${absorbedText(entry.absorbed)}${entry.koTriggered ? ' - KO!' : ''}`;
     case 'silence-end':
       return `${name(entry.targetCharacterId)}'s Silence Lock wears off`;
     case 'mirror-reflect':
