@@ -2697,6 +2697,11 @@ function describeLogEntry(entry) {
           : '';
         return `${name(entry.characterId)} unleashed World Stops - ${frozenText}${blockedText}`;
       }
+      if (entry.actionId === 'callAshka' && entry.healed != null) {
+        // The cast's own +2 heal (2026-10-20) - it was only visible in the
+        // hearts snapshot. Same wording as the follow-up ashka-heal ticks.
+        return `${name(entry.characterId)} used their SPECIAL: Call Ashka - ${entry.healed > 0 ? `heals +${entry.healed}` : 'already at full hearts'}`;
+      }
       if (entry.actionId === 'glorySmash') {
         // Confirmed gap: the generic SPECIAL fallback below only ever shows
         // "used their SPECIAL: Glory Smash on X" - it never mentions the
