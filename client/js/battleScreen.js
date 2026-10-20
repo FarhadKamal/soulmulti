@@ -2762,7 +2762,11 @@ function describeLogEntry(entry) {
     case 'world-stops-end':
       return `World Stops ends - time resumes for everyone`;
     case 'fowl-play-revert': {
-      const revertedNames = (entry.characterIds || []).map(name);
+      // Only the living turn back (2026-10-20) - a chicken killed during the
+      // window read "Velorya, Grimtal turn back into heroes!" while dead.
+      const koIds = entry.koIds || [];
+      const revertedNames = (entry.characterIds || []).filter((id) => !koIds.includes(id)).map(name);
+      if (revertedNames.length === 0) return 'Fowl Play ends';
       return `${revertedNames.join(', ')} turn${revertedNames.length === 1 ? 's' : ''} back into ${revertedNames.length === 1 ? 'a hero' : 'heroes'}!`;
     }
     case 'eclipse-end':

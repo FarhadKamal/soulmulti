@@ -785,7 +785,7 @@ function tickFowlPlayIfBoingoTurn(character, game, log) {
       }
     }
     if (revertedIds.length > 0) {
-      log.push({ type: 'fowl-play-revert', characterIds: revertedIds, hearts: heartsSnapshot(game) });
+      log.push({ type: 'fowl-play-revert', characterIds: revertedIds, koIds: revertedIds.filter((id) => game.characters[id].isKO), hearts: heartsSnapshot(game) });
     }
     // Resurrection Gamble (Draxus's Cheat Death, taxonomy #32) - a KO'd
     // Draxus who died WHILE chickenified never armed his eligibility (see

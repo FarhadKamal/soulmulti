@@ -116,7 +116,7 @@ registerOnOwnDeath('boingo', (character, game, log) => {
   }
   if (revertedIds.length === 0 && !prophecyOfDoomTriggerLogEntry) return undefined;
   return {
-    ...(revertedIds.length > 0 ? { fowlPlayRevertLogEntry: { type: 'fowl-play-revert', characterIds: revertedIds } } : {}),
+    ...(revertedIds.length > 0 ? { fowlPlayRevertLogEntry: { type: 'fowl-play-revert', characterIds: revertedIds, koIds: revertedIds.filter((id) => game.characters[id].isKO) } } : {}),
     ...(prophecyOfDoomTriggerLogEntry ? { prophecyOfDoomTriggerLogEntry } : {}),
     ...(friendshipEndLogEntry ? { friendshipEndLogEntry } : {}),
     ...(friendshipSpilloverLogEntry ? { friendshipSpilloverLogEntry } : {}),
