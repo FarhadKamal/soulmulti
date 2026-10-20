@@ -369,6 +369,7 @@ export function applyDamage(game, log, {
   ignoresDeepSeaSeal = false,
 }) {
   const target = game.characters[targetCharacterId];
+  let frogCurseEndEntry = null; // see the Frog Curse break below
   const result = {
     targetCharacterId,
     amountDealt: 0,
@@ -681,7 +682,12 @@ export function applyDamage(game, log, {
       return result;
     }
     target.isFrog = false;
-    log.push({ type: 'frog-curse-end', characterId: target.id, hearts: heartsSnapshot(game) });
+    // afterAction (2026-10-20, live: "Melyssa turns back into a hero!" sat
+    // above the Wild Lightning that hit her) - moved after the hit's own
+    // line by finalizeAction. No hearts snapshot of its own, so it reads
+    // the batch's final one. Dropped again below if this hit kills them.
+    frogCurseEndEntry = { type: 'frog-curse-end', characterId: target.id, afterAction: true };
+    log.push(frogCurseEndEntry);
   }
 
   // Dodge Defense (category-driven, see engine/categories/dodgeDefense.js):
@@ -950,6 +956,11 @@ export function applyDamage(game, log, {
   });
   if (hitLandedExtra) Object.assign(result, hitLandedExtra);
   liftNestedDeferred(result, hitLandedExtra?.mirrorResult);
+  // A frog killed by the hit that broke the curse never "turns back".
+  if (frogCurseEndEntry && target.isKO) {
+    const i = log.indexOf(frogCurseEndEntry);
+    if (i >= 0) log.splice(i, 1);
+  }
 
   return result;
 }

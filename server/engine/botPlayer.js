@@ -2158,8 +2158,8 @@ function choosePuppetActionImpl(puppetCharacter, game, melyssaId) {
         && game.characters[tid].ownerId !== melyssa.ownerId
         && isValidPuppetTarget(game, puppetCharacter.id, move.actionId, tid));
       if (others.length > 0) {
+        puppetPath = move.targetId === melyssa.id ? 'retarget-off-melyssa' : 'retarget-off-friend';
         move = { actionId: move.actionId, targetId: lowestHeartsTarget(game, others) || others[0] };
-        puppetPath = 'retarget-off-friend';
       }
     }
     const chosenTarget = move.targetId ? game.characters[move.targetId] : null;
