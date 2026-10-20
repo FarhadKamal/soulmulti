@@ -2714,7 +2714,7 @@ function describeLogEntry(entry) {
       return `Divine Judgment falls upon ${name(entry.toCharacterId)}${entry.koTriggered ? ' - KO!' : ''}`;
     case 'prophecy-of-doom-trigger': {
       const hitsText = (entry.hits || [])
-        .map((h) => `${name(h.targetId)} (${h.amountDealt} dmg${h.absorbed ? `, ${h.absorbed} absorbed by shield` : ''}${h.koTriggered ? ' - KO!' : ''})`)
+        .map((h) => `${name(h.targetId)} (${h.amountDealt} dmg${h.absorbed ? `, ${h.absorbed} absorbed by shield` : ''}${h.deathproofSave ? ', immortal - held at 1 heart' : ''}${h.koTriggered ? ' - KO!' : ''})`)
         .join(', ');
       // Rowan's Mirror Reflect fires on this hit and is used up, but Oraclus
       // is already dead, so the reflected damage does nothing (ruling
