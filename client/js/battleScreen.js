@@ -2699,7 +2699,11 @@ function describeLogEntry(entry) {
       const mirrorText = entry.mirrorReflect
         ? ` - ${name(entry.mirrorReflect.fromCharacterId)}'s Mirror Reflect fires back at the fallen ${name(entry.mirrorReflect.toCharacterId)} and is spent`
         : '';
-      return `Prophecy of Doom rains down - ${hitsText}${mirrorText}`;
+      const cm = entry.curseMirror;
+      const curseText = cm
+        ? `. Curse mirrors ${cm.amountDealt} damage to ${name(cm.toCharacterId)}${cm.absorbed ? ` (${cm.absorbed} absorbed by shield)` : ''}${cm.koTriggered ? ' - KO!' : ''}`
+        : '';
+      return `Prophecy of Doom rains down - ${hitsText}${mirrorText}${curseText}`;
     }
     case 'ashka-heal':
       // A tick at full hearts heals 0 - say that instead of "+0" (2026-10-17).

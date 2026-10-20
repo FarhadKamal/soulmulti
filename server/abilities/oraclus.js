@@ -40,6 +40,7 @@ function resolveProphecyOfDoomStrike(game, log) {
   // (same as redirectedToFriendId) rather than a separate deferred line,
   // so none of the 4 callers needs new forwarding code.
   let mirrorReflect = null;
+  let curseMirror = null;
   for (const target of Object.values(game.characters)) {
     if (target.id === 'oraclus' || target.isKO) continue;
     // Blade's Shark Hunt (taxonomy #41, Mutual Seal) - a sealed character
@@ -70,6 +71,13 @@ function resolveProphecyOfDoomStrike(game, log) {
     if (result.friendshipEndLogEntry && !friendshipEndLogEntry) friendshipEndLogEntry = result.friendshipEndLogEntry;
     if (result.friendshipSpilloverLogEntry && !friendshipSpilloverLogEntry) friendshipSpilloverLogEntry = result.friendshipSpilloverLogEntry;
     if (result.redirectedToFriendId && !redirectedToFriendId) redirectedToFriendId = result.redirectedToFriendId;
+    // Athena's curse mirror off a meteor - folded onto this entry like
+    // mirrorReflect (2026-10-20): live, the meteor on a cursed Athena moved
+    // 2 hearts off Kaelis with no log line at all.
+    if (result.mirrorLogEntry && !curseMirror) {
+      const m = result.mirrorLogEntry;
+      curseMirror = { toCharacterId: m.toCharacterId, amountDealt: m.amountDealt ?? m.amount, absorbed: m.absorbed || 0, koTriggered: !!m.koTriggered };
+    }
     if (result.mirrorReflectLogEntry && !mirrorReflect) {
       const m = result.mirrorReflectLogEntry;
       mirrorReflect = { fromCharacterId: m.fromCharacterId, toCharacterId: m.toCharacterId, amount: m.amount };
@@ -89,6 +97,7 @@ function resolveProphecyOfDoomStrike(game, log) {
       type: 'prophecy-of-doom-trigger', fromCharacterId: 'oraclus', hits,
       ...(redirectedToFriendId ? { redirectedToFriendId } : {}),
       ...(mirrorReflect ? { mirrorReflect } : {}),
+      ...(curseMirror ? { curseMirror } : {}),
     },
     friendshipEndLogEntry, friendshipSpilloverLogEntry,
   };
