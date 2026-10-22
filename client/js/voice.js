@@ -184,7 +184,7 @@ const ACTION_VOICE_LINES = {
   chronox: { timeFreeze: 'time_freeze', rewind: 'rewind', worldStops: 'world_stop' },
   velorya: { lunarEclipse: 'eclipse', moonlitTheft: 'moonlit_theft' },
   boingo: { jesterBall: 'jerster', fowlPlay: 'fowl_play' },
-  athena: { divineRestore: 'devine', divineSacrifice: 'sacrifice', divineJudgment: 'divine_judgment' },
+  athena: { divineRestore: 'devine', divineSacrifice: 'sacrifice', divineJudgment: 'divine_judgment', wakeDragon: 'dragon_wake', dragonStrike: 'dragon_strike' },
   zerathys: { chargeUp: 'charge', thunderWrath: 'release', soulSwap: 'soul_swap', soulStorm: 'soul_storm' },
   tharox: { titanToss: 'titan_toss', titanSmash: 'titan_smash', glorySmash: 'glory', earthshatter: 'earthshatter' },
   // shadowSeal: "Your heart... isn't yours anymore." - quiet/whispered

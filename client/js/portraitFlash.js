@@ -24,13 +24,11 @@ const FLASH_DURATION_MS = 1600;
 // rowan.js/index.js) - same "read directly off broadcast game state, never
 // infer client-side" pattern Fowl Play's isChicken, Melyssa's controlling,
 // and Draxus's deathproofActive already use. See isPetrifyActive below.
-// Athena's Dragon art (2026-10-22). PLACEHOLDERS - swap to
-// athena/dragon_wake.jpg, athena/dragon_strike.jpg and
-// <hero>/dragon_hit.jpg once those files exist in soulclash-assets.
+// Athena's Dragon art (2026-10-22).
 const DRAGON_ART = {
-  wake: 'assets/images/athena/judgment.jpg',
-  strike: 'assets/images/athena/sacrifice.jpg',
-  hit: (id) => `assets/images/${id}/sacrifice_hit.jpg`,
+  wake: 'assets/images/athena/dragon_wake.jpg',
+  strike: 'assets/images/athena/dragon_strike.jpg',
+  hit: (id) => `assets/images/${id}/dragon_hit.jpg`,
 };
 
 export function isPetrifyActive(game) {
@@ -1445,8 +1443,7 @@ export function handleLogEntryForFlash(entry, game) {
       break;
     case 'divineJudgment':
       setFlash(characterId, 'assets/images/athena/judgment.jpg'); break;
-    // Athena's Dragon (2026-10-22) - DRAGON_ART below; placeholders until
-    // the dedicated art lands.
+    // Athena's Dragon (2026-10-22) - see DRAGON_ART.
     case 'wakeDragon':
       setFlash(characterId, DRAGON_ART.wake); break;
     case 'dragonStrike':

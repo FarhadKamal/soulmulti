@@ -452,9 +452,9 @@ const ACTION_SOUND = {
   // spear-lunge sacrifice attack, per explicit request.
   divineSacrifice: 'athena/divine_sacrifice',
   divineJudgment: 'athena/divine_judgment',
-  // Athena's Dragon (2026-10-22) - placeholders until dragon_wake/dragon_strike sounds exist.
-  wakeDragon: 'athena/divine_judgment',
-  dragonStrike: 'athena/divine_sacrifice',
+  // Athena's Dragon (2026-10-22).
+  wakeDragon: 'athena/dragon_wake',
+  dragonStrike: 'athena/dragon_strike',
   mirageMark: 'illyra/mirage_mark',
   mirageBurst: 'illyra/mirage_burst',
   mirageOverload: 'illyra/mirage_overload',

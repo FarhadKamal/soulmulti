@@ -29,7 +29,7 @@ import { v } from './assetVersion.js';
 const SOUND_EFFECT_FILES = [
   'common/click.mp3', 'common/dodge.mp3', 'common/game-over.mp3', 'common/stabbing.mp3', 'common/victory.mp3',
   'akyros/shadow_seal.mp3', 'akyros/hidden_mark.mp3', 'akyros/shadow_toll.mp3', 'akyros/shadow_execution.mp3', 'akyros/fatal_slash.mp3',
-  'athena/curse_strike.mp3', 'athena/divine_judgment.mp3', 'athena/divine_judgment_strike.mp3', 'athena/divine_restore.mp3', 'athena/divine_sacrifice.mp3',
+  'athena/curse_strike.mp3', 'athena/divine_judgment.mp3', 'athena/divine_judgment_strike.mp3', 'athena/divine_restore.mp3', 'athena/divine_sacrifice.mp3', 'athena/dragon_wake.mp3', 'athena/dragon_strike.mp3',
   'blade/blood_drain.mp3', 'blade/shark_hunt.mp3', 'blade/shark_strike_dodge.mp3', 'blade/escape_seal_fail.mp3', 'blade/escape_seal_success.mp3', 'blade/shark_strike.mp3', 'blade/focus.mp3', 'blade/rebirth.mp3', 'blade/blood_hunt.mp3',
   'boingo/chicken_attack.mp3', 'boingo/fowl_play.mp3', 'boingo/chicken_hit.mp3', 'boingo/chicken_koed.mp3', 'boingo/jester_ball_checkpoint.mp3', 'boingo/jester_ball_explosion.mp3', 'boingo/jester_ball.mp3', 'boingo/jester_ball_pass.mp3', 'boingo/jester_ball_return.mp3', 'boingo/chaos_gamble_miss.mp3', 'boingo/chaos_gamble.mp3',
   'chronox/cyclone_punch.mp3', 'chronox/time_freeze.mp3', 'chronox/rewind.mp3', 'chronox/world_stops.mp3',
