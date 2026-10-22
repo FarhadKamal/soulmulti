@@ -329,6 +329,10 @@ export const actions = {
         selfCost,
         selfResult,
         ...result,
+        // Own snapshot: the self-cost entries below carry theirs, so the
+        // shared end-of-action one never reaches this line (it showed no
+        // hearts at all in a 2026-10-22 log).
+        hearts: heartsSnapshot(game),
       });
       // Deferred-log-entry handling for the SELF-hit, same reference
       // pattern as tickPoisonIfAny in turnEngine.js. finalizeAction already

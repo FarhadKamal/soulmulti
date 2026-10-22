@@ -515,9 +515,15 @@ function chooseZerathysMove(character, game, usable) {
 // heuristics run; a normal (non-puppeted) Soul Swap never passes this, so
 // its own behavior is completely unchanged.
 export function chooseSoulSwapWrathTarget(character, game, excludeOwnerId = null) {
-  const targets = validTargetsFor(game, character, 'soulSwapWrath')
+  let targets = validTargetsFor(game, character, 'soulSwapWrath')
     .filter((tid) => !excludeOwnerId || game.characters[tid].ownerId !== excludeOwnerId);
   if (targets.length === 0) return null;
+  // Live 2026-10-22: a cursed Zerathys aimed the free Wrath at Athena and
+  // the curse mirrored all 3 back (7 -> 4).
+  if (isCursedByLiveAthena(game, character)) {
+    const nonAthena = targets.filter((tid) => tid !== 'athena');
+    if (nonAthena.length > 0) targets = nonAthena;
+  }
   const securesKill = targets.find((tid) => {
     const t = game.characters[tid];
     return activeHearts(t) <= Math.max(0, 1 - t.shield);
