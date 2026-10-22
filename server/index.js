@@ -726,7 +726,8 @@ function isBotControlled(room, characterId) {
 // for the first 5s of their own turn too, so bots and humans share the
 // same "turn just started, nothing acts instantly" pacing throughout a
 // match, not just during bot-only stretches.
-const BOT_ACTION_DELAY_MS = 5000;
+// Overridable only for local test runs (fast all-bot matches); production keeps 5s.
+const BOT_ACTION_DELAY_MS = Number(process.env.BOT_ACTION_DELAY_MS) || 5000;
 
 function runBotTurnsIfAny(room) {
   // Guard against overlapping sequences: if a paced bot sequence is

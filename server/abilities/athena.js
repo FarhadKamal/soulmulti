@@ -7,6 +7,32 @@ import { registerOnAnyDeath } from '../engine/categories/onAnyDeath.js';
 
 const DIVINE_JUDGMENT_HEARTS_THRESHOLD = 3;
 
+// Athena's Dragon (designed 2026-10-22). Wake Dragon (one cast) wakes her
+// sacred dragon; it can't strike that turn. From her next turn Dragon Strike
+// is available - one use - for DRAGON_START_POWER damage, and every one of
+// her turns she lets it wait adds +1, up to DRAGON_MAX_POWER. Single target,
+// can't be dodged, shield still absorbs. Waiting costs nothing - she takes
+// her normal turn while it grows. The dragon dies with her.
+export const DRAGON_START_POWER = 2;
+export const DRAGON_MAX_POWER = 6;
+
+// Growth ticks at the start of her own turns. Skipped automatically while
+// she's a chicken/frog/sealed (turnEngine.js doesn't call onTurnStart then),
+// so the dragon waits with her.
+export function onTurnStart(character, game, log) {
+  const sp = character.special;
+  if (!sp.dragonAwake || sp.usedDragonStrike) return;
+  if (!sp.dragonReady) {
+    sp.dragonReady = true;
+    log.push({ type: 'dragon-ready', characterId: character.id, power: sp.dragonPower, hearts: heartsSnapshot(game) });
+    return;
+  }
+  if (sp.dragonPower < DRAGON_MAX_POWER) {
+    sp.dragonPower += 1;
+    log.push({ type: 'dragon-grows', characterId: character.id, power: sp.dragonPower, max: sp.dragonPower >= DRAGON_MAX_POWER, hearts: heartsSnapshot(game) });
+  }
+}
+
 // Revival cleanup (see engine/categories/onOtherRevived.js) - her curse
 // doesn't survive the cursed character's own revival (e.g. Blade's
 // Rebirth); they come back "fresh" with no negative energy carried over.
@@ -31,6 +57,10 @@ registerOnOtherRevived((revivedCharacterId, game) => {
 // killed a cursed Athena silently dropped its own mirror, since
 // curseTargetCharacterId was already null by the time the mirror check ran.
 registerOnOwnDeath('athena', (character) => {
+  // Her dragon dies with her - stored power is lost (2026-10-22).
+  character.special.dragonAwake = false;
+  character.special.dragonReady = false;
+  character.special.dragonPower = 0;
   if (!character.special.curseTargetCharacterId) return;
   const preClearCursedId = character.special.curseTargetCharacterId;
   character.special.curseTargetCharacterId = null;
@@ -358,6 +388,39 @@ export const actions = {
   // Rewind restoring his own whole character object wholesale if HE
   // happens to be the marked target, with no special-casing needed here
   // at all.
+  wakeDragon: {
+    label: 'Wake Dragon',
+    needsTarget: false,
+    special: true,
+    isLegal: (character) => !character.special.dragonAwake && !character.special.usedDragonStrike,
+    execute(character, targetId, game, log) {
+      character.special.dragonAwake = true;
+      character.special.dragonReady = false;
+      character.special.dragonPower = DRAGON_START_POWER;
+      log.push({ type: 'special', characterId: character.id, actionId: 'wakeDragon' });
+      return {};
+    },
+  },
+  dragonStrike: {
+    label: 'Dragon Strike',
+    needsTarget: true,
+    special: true,
+    isLegal: (character) => character.special.dragonAwake && character.special.dragonReady && !character.special.usedDragonStrike,
+    execute(character, targetId, game, log) {
+      const power = character.special.dragonPower;
+      character.special.usedDragonStrike = true;
+      character.special.dragonAwake = false;
+      character.special.dragonReady = false;
+      const result = applyDamage(game, log, {
+        sourceCharacterId: character.id,
+        targetCharacterId: targetId,
+        amount: power,
+        ignoresDodge: true,
+      });
+      log.push({ type: 'special', characterId: character.id, actionId: 'dragonStrike', targetId, power, ...result });
+      return result;
+    },
+  },
   divineJudgment: {
     label: 'Divine Judgment',
     needsTarget: true,

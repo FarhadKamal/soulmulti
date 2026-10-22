@@ -1493,6 +1493,18 @@ function statusBadges(character) {
     });
   }
   switch (character.id) {
+    case 'athena':
+      // Athena's Dragon (2026-10-22): its current Dragon Strike damage.
+      if (character.special?.dragonAwake && !character.special.usedDragonStrike) {
+        badges.push({
+          text: character.special.dragonReady ? `🐉 ${character.special.dragonPower}` : '🐉 waking',
+          cls: character.special.dragonReady ? 'good' : undefined,
+          title: character.special.dragonReady
+            ? `Dragon Strike ready: ${character.special.dragonPower} damage (+1 each turn it waits, max 6)`
+            : 'Dragon waking - ready next turn',
+        });
+      }
+      break;
     case 'chronox':
       badges.push({ icon: 'assets/badge/rewind.png', text: `${character.special.rewindUsesRemaining}/2`, title: 'Rewind uses remaining' });
       // World Stops has its own dedicated usedWorldStops flag (separate
@@ -2396,7 +2408,7 @@ const ACTION_LABELS = {
   sharkHunt: 'Shark Hunt', sharkStrike: 'Shark Strike', escapeSeal: 'Escape', focus: 'Focus',
   lunarStrike: 'Lunar Strike', moonstep: 'Moonstep', lunarEclipse: 'Lunar Eclipse', moonlitTheft: 'Moonlit Theft',
   chaosGamble: 'Chaos Gamble', jesterBall: 'Jester Ball', fowlPlay: 'Fowl Play', chickenAttack: 'Chicken Attack', bloodHunt: 'Blood Hunt',
-  curseStrike: 'Curse Strike', divineRestore: 'Divine Restore', divineSacrifice: 'Divine Sacrifice', divineJudgment: 'Divine Judgment',
+  curseStrike: 'Curse Strike', divineRestore: 'Divine Restore', divineSacrifice: 'Divine Sacrifice', divineJudgment: 'Divine Judgment', wakeDragon: 'Wake Dragon', dragonStrike: 'Dragon Strike',
   selfChoke: 'Self Choke',
   grudgeStrike: 'Grudge Strike', callAshka: 'Call Ashka', wingsOfAshka: 'Wings of Ashka', phoenixDive: 'Phoenix Dive',
   dyingBlow: 'Dying Blow', deathlessFury: 'Deathless Fury', cheatDeath: 'Cheat Death',
@@ -2682,6 +2694,13 @@ function describeLogEntry(entry) {
         // the friend's name is shown openly.
         return `${name(entry.characterId)} formed a bond of Friendship with ${name(entry.targetId)}!`;
       }
+      // Athena's Dragon (2026-10-22).
+      if (entry.actionId === 'wakeDragon') {
+        return `${name(entry.characterId)} wakes her dragon - it will be ready next turn`;
+      }
+      if (entry.actionId === 'dragonStrike') {
+        return `${name(entry.characterId)} unleashed Dragon Strike on ${name(actualAttackTargetId(entry))}${entry.amountDealt != null ? ` - ${entry.amountDealt} damage` : ''}${absorbedText(entry.absorbed)}${immortalFloorText(entry)}${entry.koTriggered ? ' - KO!' : ''}`;
+      }
       if (entry.actionId === 'divineJudgment') {
         // Deliberately vague about the CONSEQUENCE here (same "reveal the
         // setup, not the payoff" pattern as Oraclus's Rune Vision stage 1
@@ -2783,6 +2802,10 @@ function describeLogEntry(entry) {
         : `Rune Vision failed - the vision did not come to pass`;
     case 'prediction-replaced':
       return `The earlier vision fades - ${name(entry.predictedAttackerId)} never struck`;
+    case 'dragon-ready':
+      return `${name(entry.characterId)}'s dragon is ready - Dragon Strike: ${entry.power} damage`;
+    case 'dragon-grows':
+      return `${name(entry.characterId)}'s dragon grows stronger - Dragon Strike: ${entry.power} damage${entry.max ? ' (max)' : ''}`;
     case 'deathless-fury-end':
       return `${name(entry.characterId)}'s Deathless Fury ends - 3 strikes granted!`;
     case 'cheat-death': {

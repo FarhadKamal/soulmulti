@@ -6,7 +6,7 @@ import WebSocket from 'ws';
 
 const ALL_LABELS = {
   hiddenMark: 'Hidden Mark', fatalSlash: 'Fatal Slash', shadowExecution: 'Shadow Execution',
-  curseStrike: 'Curse Strike', divineRestore: 'Divine Restore',
+  curseStrike: 'Curse Strike', divineRestore: 'Divine Restore', wakeDragon: 'Wake Dragon', dragonStrike: 'Dragon Strike',
   bloodHunt: 'Blood Hunt',
   chaosGamble: 'Chaos Gamble', jesterBall: 'Jester Ball',
   cyclonePunch: 'Cyclone Punch', timeFreeze: 'Time Freeze',

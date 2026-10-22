@@ -165,7 +165,14 @@ function baseSpecialFor(id) {
       // usedDivineJudgment: separate one-time-use flag from usedSpecial,
       // since Divine Restore already occupies that slot - same reasoning
       // as every other multi-special character in the roster.
-      return { curseTargetCharacterId: null, divineJudgmentTargetId: null, usedDivineJudgment: false };
+      // Athena's Dragon (added 2026-10-22): dragonAwake once Wake Dragon is
+      // cast; dragonReady from her next turn on; dragonPower = Dragon
+      // Strike's damage (2, +1 each of her turns it waits, max 6);
+      // usedDragonStrike after the one strike. See athena.js.
+      return {
+        curseTargetCharacterId: null, divineJudgmentTargetId: null, usedDivineJudgment: false,
+        dragonAwake: false, dragonReady: false, dragonPower: 0, usedDragonStrike: false,
+      };
     case 'melyssa':
       // controlling: true for the entire duration of a Mind Control
       // sequence (from puppet selection through the puppeted action, and

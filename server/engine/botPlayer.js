@@ -7,6 +7,7 @@ import { BEAST_ATTACK_HIGH_DAMAGE, BEAST_ATTACK_LOW_DAMAGE } from '../abilities/
 import { soulStormParticipants } from '../abilities/zerathys.js';
 import { phoenixDiveDamage } from '../abilities/kaelis.js';
 import { isCurrentFriend, SELF_CHOKE_DAMAGE } from '../abilities/melyssa.js';
+import { DRAGON_MAX_POWER } from '../abilities/athena.js';
 
 // Pure decision logic for PC-controlled characters - no DOM, no side
 // effects. Given a character whose turn it is, returns the action+target
@@ -891,6 +892,22 @@ function chooseAthenaMove(character, game, usable) {
   if (byId.divineRestore && character.hearts <= LOW_HEARTS_THRESHOLD) {
     return { actionId: 'divineRestore', targetId: null };
   }
+  // Athena's Dragon (2026-10-22): strike when it kills, when it's maxed,
+  // or when she may not live to use it; otherwise let it keep growing.
+  if (byId.dragonStrike) {
+    const targets = avoidMirrorReflectRowan(game, validTargetsFor(game, character, 'dragonStrike'));
+    const power = character.special.dragonPower;
+    const kills = targets.filter((tid) => {
+      const t = game.characters[tid];
+      return activeHearts(t) + (t.shield || 0) <= power;
+    });
+    if (kills.length > 0) {
+      return { actionId: 'dragonStrike', targetId: lowestHeartsTarget(game, kills) || kills[0] };
+    }
+    if (targets.length > 0 && (power >= DRAGON_MAX_POWER || character.hearts <= LOW_HEARTS_THRESHOLD)) {
+      return { actionId: 'dragonStrike', targetId: biggestThreatTarget(game, character, targets) || lowestHeartsTarget(game, targets) || pickRandom(targets) };
+    }
+  }
   if (byId.divineSacrifice) {
     const allTargets = validTargetsFor(game, character, 'divineSacrifice');
     if (character.hearts > ATHENA_SACRIFICE_MAX_SELF_COST) {
@@ -900,12 +917,15 @@ function chooseAthenaMove(character, game, usable) {
         return { actionId: 'divineSacrifice', targetId };
       }
     }
+    // Wake the dragon early - it only pays off the longer it has to grow.
+    if (byId.wakeDragon) return { actionId: 'wakeDragon', targetId: null };
     if (character.hearts >= ATHENA_SACRIFICE_SAFE_HEARTS && allTargets.length > 0) {
       const safePool = avoidMirrorReflectRowan(game, allTargets);
       const targetId = biggestThreatTarget(game, character, safePool) || lowestHeartsTarget(game, safePool) || pickRandom(safePool);
       return { actionId: 'divineSacrifice', targetId };
     }
   }
+  if (byId.wakeDragon) return { actionId: 'wakeDragon', targetId: null };
   // Curse Strike may not actually be usable right now (no valid target -
   // e.g. everyone else is KO'd or the only remaining enemy is untargetable),
   // in which case fall back to Divine Restore if it's still available
