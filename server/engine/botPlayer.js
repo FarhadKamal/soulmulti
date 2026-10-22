@@ -2236,6 +2236,23 @@ function choosePuppetActionImpl(puppetCharacter, game, melyssaId) {
     // her friend instead - his own action on someone else doesn't trigger
     // his mirror.
     const chokeWouldBeReflected = puppetCharacter.id === 'rowan' && puppetCharacter.special.mirrorReflectActive && !selfChokeWouldKill;
+    // Athena's curse on Melyssa mirrors ANY damage Athena takes back onto
+    // Melyssa - a Self Choke on a puppeted Athena hurts Melyssa just as much,
+    // and Divine Sacrifice's self-cost does too (2026-10-20, live: she choked
+    // Athena while cursed and the 2-damage mirror killed her). Use a move
+    // that hurts neither of them instead.
+    const athenaCursesHer = puppetCharacter.id === 'athena' && puppetCharacter.special.curseTargetCharacterId === melyssa.id;
+    if (athenaCursesHer) {
+      const safeMove = usable.find((a) => a.actionId !== 'divineSacrifice' && (!a.needsTarget || a.actionId === 'curseStrike'
+        || Object.keys(game.characters).some((tid) => !isProtected(tid) && isValidPuppetTarget(game, puppetCharacter.id, a.actionId, tid))));
+      if (safeMove) {
+        puppetPath = (puppetPath ? `${puppetPath}+` : '') + 'avoid-curse-mirror';
+        if (!safeMove.needsTarget) return { kind: 'realAction', actionId: safeMove.actionId, targetId: null };
+        const others = Object.keys(game.characters).filter((tid) => !isProtected(tid) && isValidPuppetTarget(game, puppetCharacter.id, safeMove.actionId, tid));
+        const targetId = others.length > 0 ? (lowestHeartsTarget(game, others) || others[0]) : melyssa.id;
+        return { kind: 'realAction', actionId: safeMove.actionId, targetId };
+      }
+    }
     if (chokeWouldBeReflected && (hitsMelyssaSide || dealsNoDamageThisTurn || isLoneDuelStall)) {
       for (const a of usable) {
         if (!a.needsTarget) { puppetPath = 'avoid-mirror'; return { kind: 'realAction', actionId: a.actionId, targetId: null }; }
