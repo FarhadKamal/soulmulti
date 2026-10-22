@@ -1497,7 +1497,8 @@ function statusBadges(character) {
       // Athena's Dragon (2026-10-22): its current Dragon Strike damage.
       if (character.special?.dragonAwake && !character.special.usedDragonStrike) {
         badges.push({
-          text: character.special.dragonReady ? `🐉 ${character.special.dragonPower}` : '🐉 waking',
+          icon: 'assets/badge/dragon.png',
+          text: character.special.dragonReady ? `${character.special.dragonPower}` : 'waking',
           cls: character.special.dragonReady ? 'good' : undefined,
           title: character.special.dragonReady
             ? `Dragon Strike ready: ${character.special.dragonPower} damage (+1 each turn it waits, max 6)`

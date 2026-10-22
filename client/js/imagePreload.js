@@ -14,6 +14,7 @@ const BADGE_ICONS = [
   'assets/badge/beast.png',
   'assets/badge/blade_hit.png',
   'assets/badge/charge.png',
+  'assets/badge/dragon.png',
   'assets/badge/clean_slate.png',
   'assets/badge/everbloom.png',
   'assets/badge/friendship.png',
