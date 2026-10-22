@@ -104,6 +104,29 @@ function surelyDodges(game, attacker, tid) {
   return !!getDodgeDefenseProvider(tid)?.canDodge(t, game, attacker.id, {});
 }
 
+// Generous upper bound on what one use of `actionId` could deal. Most hits
+// cap at 3; Jester Ball is 4, and a few scale. Shields are ignored on
+// purpose (several hits pierce them), so this stays on the safe side.
+function maxHitDamage(game, character, actionId) {
+  const sp = character.special || {};
+  switch (actionId) {
+    case 'wildLightning': return 7;
+    case 'snakeStrike': return 5;
+    case 'dragonStrike': return sp.dragonPower || 6;
+    case 'grimStrike': return 1 + (sp.ownKillCount || 0) + (sp.claimedKillCount || 0);
+    case 'phoenixDive': return phoenixDiveDamage(character, game);
+    default: return 4;
+  }
+}
+
+// Judgment only bites if this hit could be the one that kills her. Live
+// 2026-10-22: a marked Marin skipped a 6+3sh Athena her 1-2 damage wand
+// couldn't kill and hit Rowan's armed Mirror Reflect instead (3 back).
+function judgmentBlocksHitOnAthena(game, character, actionId) {
+  if (!isAvoidingDivineJudgmentVictim(game, character, 'athena')) return false;
+  return activeHearts(game.characters.athena) <= maxHitDamage(game, character, actionId);
+}
+
 function validTargetsFor(game, character, actionId) {
   let all = Object.keys(game.characters).filter((tid) => isValidTarget(game, character.id, actionId, tid));
   // Live 2026-10-22: a revived 1-heart Draxus sat in his immortal window
@@ -114,7 +137,7 @@ function validTargetsFor(game, character, actionId) {
     const mortal = all.filter((tid) => !isImmortalDraxus(game.characters[tid]));
     if (mortal.length > 0) all = mortal;
   }
-  if (!isAvoidingDivineJudgmentVictim(game, character, 'athena')) return all;
+  if (!judgmentBlocksHitOnAthena(game, character, actionId)) return all;
   const withoutAthena = all.filter((tid) => tid !== 'athena');
   // Only fall back to including Athena if she's truly the sole legal
   // target left (no option available / a genuine 1v1) - otherwise the
@@ -2001,7 +2024,7 @@ export function chooseBotMove(character, game) {
   // Shadow-Executed her - killing himself via the pact - while Draxus was
   // alive and Fatal Slash could have hit him. If any other action can hit
   // someone else, use that instead.
-  if (move.targetId === 'athena' && isAvoidingDivineJudgmentVictim(game, character, 'athena')) {
+  if (move.targetId === 'athena' && judgmentBlocksHitOnAthena(game, character, move.actionId)) {
     for (const a of usable) {
       if (!a.needsTarget) continue;
       const others = Object.keys(game.characters)
