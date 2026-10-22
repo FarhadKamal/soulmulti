@@ -260,7 +260,9 @@ export function tryTriggerCleanSlate(target, game, log) {
   if (target.special?.cleanSlateArmed) {
     target.special.cleanSlateArmed = false;
     target.special.cleanSlateImmuneTurnsRemaining = 3;
-    log.push({ type: 'clean-slate-trigger', characterId: target.id });
+    // afterAction: print after the line of the move it blocked (2026-10-22
+    // it sat above "Chronox unleashed World Stops").
+    log.push({ type: 'clean-slate-trigger', characterId: target.id, afterAction: true });
     return true;
   }
   return false;
