@@ -273,7 +273,9 @@ export const actions = {
       // pushing its own 'clean-slate-trigger' log entry. A blocked Marin
       // is excluded from the chicken pool entirely - never chickenified
       // at all this cast, not chickenified-then-immediately-reverted.
-      const victims = candidates.filter((c) => !tryTriggerCleanSlate(c, game, log));
+      // Clean Slate's own line goes after the Fowl Play line, not before it.
+      const cleanSlateLog = [];
+      const victims = candidates.filter((c) => !tryTriggerCleanSlate(c, game, cleanSlateLog));
       for (const victim of victims) {
         victim.isChicken = true;
       }
@@ -294,6 +296,7 @@ export const actions = {
         game.fowlPlayPecksByTarget = {};
       }
       log.push({ type: 'special', characterId: character.id, actionId: 'fowlPlay', chickenIds: victims.map((v) => v.id) });
+      log.push(...cleanSlateLog);
       return {};
     },
   },

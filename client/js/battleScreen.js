@@ -2513,6 +2513,9 @@ function describeLogEntry(entry) {
     case 'special':
       if (entry.actionId === 'fowlPlay') {
         const victims = entry.chickenIds || [];
+        // Everyone blocked it (Marin's Clean Slate) - 2026-10-22 this read
+        // "Fowl Play -  turned into chickens!" with nobody named.
+        if (victims.length === 0) return `${name(entry.characterId)} unleashed Fowl Play - but nobody turned into a chicken!`;
         return `${name(entry.characterId)} unleashed Fowl Play - ${victims.map(name).join(', ')} turned into ${victims.length === 1 ? 'a chicken' : 'chickens'}!`;
       }
       if (entry.actionId === 'mirageBurst') {

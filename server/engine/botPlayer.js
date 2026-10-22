@@ -1071,7 +1071,13 @@ function chooseBoingoMove(character, game, usable) {
   // eagerly once legal" policy as every other one-time desperation special
   // in the roster (World Stops, Earthshatter, Grim Barrage). Checked ahead
   // of Jester Ball since it's free value with zero opportunity cost.
-  if (byId.fowlPlay) {
+  // ...unless Marin's Clean Slate (armed or immune) would block every
+  // possible victim - live 2026-10-22 he cast it on a lone Marin and
+  // chickened nobody.
+  const fowlVictimExists = Object.values(game.characters).some((c) => c.id !== character.id && !c.isKO
+    && !c.special?.beastFormActive && !c.isFrog && !c.deepSeaSealed
+    && !(c.id === 'marin' && (c.special?.cleanSlateArmed || c.special?.cleanSlateImmuneTurnsRemaining > 0)));
+  if (byId.fowlPlay && fowlVictimExists) {
     return { actionId: 'fowlPlay', targetId: null };
   }
   // Jester Ball is a coin-flip-shaped social weapon - throw it at the
