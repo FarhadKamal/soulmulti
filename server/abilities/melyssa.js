@@ -271,7 +271,11 @@ registerOnAnyDeath((diedCharacterId, sourceCharacterId, isMirror, game, log) => 
   const friendId = melyssa.special.friendCharacterId;
   if (friendId !== diedCharacterId) return undefined;
   melyssa.special.friendCharacterId = null;
-  const entry = { type: 'friendship-end', characterId: 'melyssa', friendCharacterId: friendId, hearts: heartsSnapshot(game) };
+  // No hearts here: callers that push it standalone stamp their own, and in
+  // an action batch a mid-action snapshot stopped the client from giving
+  // the killing blow's line the end-action one (2026-10-22: "Blood Hunt
+  // ... KO!" and the Judgment line showed no hearts).
+  const entry = { type: 'friendship-end', characterId: 'melyssa', friendCharacterId: friendId };
   return { friendshipEndLogEntry: entry };
 });
 
