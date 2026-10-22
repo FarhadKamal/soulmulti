@@ -178,8 +178,11 @@ export function onTurnStart(character, game, log) {
   if (isSilenced(character, game)) {
     character.shield = 0;
   } else {
+    // Only worth a log line when it actually changed something - an
+    // untouched 1 used to repeat the line every single turn (2026-10-22).
+    const before = character.shield;
     character.shield = 1;
-    log.push({ type: 'passive', characterId: character.id, text: "Chronox's shield resets to 1 (Chrono Guard)", hearts: heartsSnapshot(game) });
+    if (before !== 1) log.push({ type: 'passive', characterId: character.id, text: "Chronox's shield resets to 1 (Chrono Guard)", hearts: heartsSnapshot(game) });
   }
 }
 
