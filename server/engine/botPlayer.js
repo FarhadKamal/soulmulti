@@ -122,6 +122,13 @@ function maxHitDamage(game, character, actionId) {
 // Judgment only bites if this hit could be the one that kills her. Live
 // 2026-10-22: a marked Marin skipped a 6+3sh Athena her 1-2 damage wand
 // couldn't kill and hit Rowan's armed Mirror Reflect instead (3 back).
+// No-target moves that hurt nobody - safe to spend a turn on instead of a
+// hit that would trigger Athena's Judgment.
+const SAFE_IDLE_ACTIONS = new Set([
+  'chargeUp', 'arcaneStudy', 'titanToss', 'focus', 'claimKill', 'callAshka',
+  'divineRestore', 'deathlessFury', 'lunarEclipse', 'wingsOfAshka', 'beastForm',
+]);
+
 function judgmentBlocksHitOnAthena(game, character, actionId) {
   if (!isAvoidingDivineJudgmentVictim(game, character, 'athena')) return false;
   return activeHearts(game.characters.athena) <= maxHitDamage(game, character, actionId);
@@ -2039,6 +2046,12 @@ export function chooseBotMove(character, game) {
         return { actionId: a.actionId, targetId: lowestHeartsTarget(game, others) || others[0] };
       }
     }
+    // Nobody else to hit right now (live 2026-10-22: Blade and Grimtal both
+    // in the deep sea) - a harmless setup move beats killing her and dying
+    // to the pact. Only a real 1v1 still takes the trade.
+    const isOneVsOne = !Object.values(game.characters).some((c) => !c.isKO && c.id !== character.id && c.id !== 'athena');
+    const idle = !isOneVsOne && usable.find((a) => SAFE_IDLE_ACTIONS.has(a.actionId));
+    if (idle) return { actionId: idle.actionId, targetId: null };
   }
   if (move.targetId === null && usableEntry.needsTarget) {
     return { actionId: move.actionId, targetId: pickDefaultTarget(game, character, move.actionId) };
