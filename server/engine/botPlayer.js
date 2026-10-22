@@ -75,8 +75,32 @@ function untargetedHitRisksJudgment(game, character, maxDamage) {
   return Object.values(game.characters).some((c) => !c.isKO && c.id !== character.id && c.id !== 'athena');
 }
 
+// Pure-damage single-target actions - the ones that do nothing at all to an
+// immortal Draxus beyond chip damage the floor mostly eats. Status moves
+// (curse, freeze, seal, frog, marks...) still land on him, so they stay out.
+const PURE_DAMAGE_ACTIONS = new Set([
+  'fatalSlash', 'shadowExecution', 'dragonStrike', 'bloodHunt', 'sharkStrike', 'cyclonePunch',
+  'dyingBlow', 'grimStrike', 'skullCrack', 'beastAttack', 'grudgeStrike', 'phoenixDive',
+  'wandStrike', 'runeStrike', 'wildLightning', 'snakeStrike', 'smash', 'titanSmash',
+  'glorySmash', 'lunarStrike', 'thunderWrath', 'soulSwapWrath', 'chickenAttack',
+]);
+
+function isImmortalDraxus(c) {
+  // A chickenified Draxus can still be killed (applyDamage forces every
+  // ignores* flag on chickens).
+  return c?.id === 'draxus' && !c.isKO && !c.isChicken && !!(c.special?.deathproofActive || c.special?.reviveImmortalActive);
+}
+
 function validTargetsFor(game, character, actionId) {
-  const all = Object.keys(game.characters).filter((tid) => isValidTarget(game, character.id, actionId, tid));
+  let all = Object.keys(game.characters).filter((tid) => isValidTarget(game, character.id, actionId, tid));
+  // Live 2026-10-22: a revived 1-heart Draxus sat in his immortal window
+  // while Tharox "secured the kill" on him with Smash twice and Beast
+  // Grimtal mauled him twice - four wasted turns, every hit held at 1.
+  // Skip him for plain damage while he can't die, unless he's the only one.
+  if (PURE_DAMAGE_ACTIONS.has(actionId)) {
+    const mortal = all.filter((tid) => !isImmortalDraxus(game.characters[tid]));
+    if (mortal.length > 0) all = mortal;
+  }
   if (!isAvoidingDivineJudgmentVictim(game, character, 'athena')) return all;
   const withoutAthena = all.filter((tid) => tid !== 'athena');
   // Only fall back to including Athena if she's truly the sole legal
