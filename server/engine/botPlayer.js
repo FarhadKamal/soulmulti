@@ -3,6 +3,7 @@ import {
   isChickenified, chickenPeckWouldLand,
 } from './turnEngine.js';
 import { isFrozenByChronox } from './damagePipeline.js';
+import { getDodgeDefenseProvider } from './categories/dodgeDefenseRegistry.js';
 import { BEAST_ATTACK_HIGH_DAMAGE, BEAST_ATTACK_LOW_DAMAGE } from '../abilities/grimtal.js';
 import { soulStormParticipants } from '../abilities/zerathys.js';
 import { phoenixDiveDamage } from '../abilities/kaelis.js';
@@ -89,6 +90,18 @@ function isImmortalDraxus(c) {
   // A chickenified Draxus can still be killed (applyDamage forces every
   // ignores* flag on chickens).
   return c?.id === 'draxus' && !c.isKO && !c.isChicken && !!(c.special?.deathproofActive || c.special?.reviveImmortalActive);
+}
+
+// Dodges that are certain, not a coin flip: Marin's Threefold Veil, Akyros's
+// first hit from each attacker, Grimtal's Grim Ward. A "kill" on one of
+// these isn't a kill - live 2026-10-22 Grimtal swung at a veiled 1-heart
+// Marin three times (all dodged) instead of anyone else. Illyra's 50% is
+// left out on purpose.
+const DETERMINISTIC_DODGERS = new Set(['akyros', 'grimtal', 'marin']);
+function surelyDodges(game, attacker, tid) {
+  const t = game.characters[tid];
+  if (!t || !DETERMINISTIC_DODGERS.has(tid) || t.isChicken || isFrozenByChronox(t, game)) return false;
+  return !!getDodgeDefenseProvider(tid)?.canDodge(t, game, attacker.id, {});
 }
 
 function validTargetsFor(game, character, actionId) {
@@ -341,7 +354,7 @@ function chooseTharoxMove(character, game, usable) {
     const smashTargets = validTargetsFor(game, character, 'smash');
     const securesKill = smashTargets.find((tid) => {
       const t = game.characters[tid];
-      return activeHearts(t) <= Math.max(0, 1 - t.shield);
+      return !surelyDodges(game, character, tid) && activeHearts(t) <= Math.max(0, 1 - t.shield);
     });
     if (securesKill) {
       return { actionId: 'smash', targetId: securesKill };
@@ -385,7 +398,7 @@ function chooseZerathysMove(character, game, usable) {
     const wrathTargets = validTargetsFor(game, character, 'thunderWrath');
     const killableTargets = wrathTargets.filter((tid) => {
       const t = game.characters[tid];
-      return activeHearts(t) <= Math.max(0, wrathDamage - t.shield);
+      return !surelyDodges(game, character, tid) && activeHearts(t) <= Math.max(0, wrathDamage - t.shield);
     });
     if (killableTargets.length > 0) {
       // When multiple targets are all killable this turn, prefer one that
@@ -531,7 +544,7 @@ export function chooseSoulSwapWrathTarget(character, game, excludeOwnerId = null
   if (targets.length === 0) return null;
   const securesKill = targets.find((tid) => {
     const t = game.characters[tid];
-    return activeHearts(t) <= Math.max(0, 1 - t.shield);
+    return !surelyDodges(game, character, tid) && activeHearts(t) <= Math.max(0, 1 - t.shield);
   });
   if (securesKill) return securesKill;
   // Prefer an unshielded target so the hit actually lands instead of being
@@ -1546,7 +1559,7 @@ function chooseRowanMove(character, game, usable) {
     const wandTargets = validTargetsFor(game, character, 'wandStrike');
     const killTarget = wandTargets.find((tid) => {
       const t = game.characters[tid];
-      return activeHearts(t) <= Math.max(0, 1 - t.shield);
+      return !surelyDodges(game, character, tid) && activeHearts(t) <= Math.max(0, 1 - t.shield);
     });
     if (killTarget) {
       return { actionId: 'wandStrike', targetId: killTarget };
@@ -1593,7 +1606,7 @@ function chooseMarinMove(character, game, usable) {
     const wandTargets = validTargetsFor(game, character, 'wandStrike');
     const killTarget = wandTargets.find((tid) => {
       const t = game.characters[tid];
-      return activeHearts(t) <= Math.max(0, 1 - t.shield);
+      return !surelyDodges(game, character, tid) && activeHearts(t) <= Math.max(0, 1 - t.shield);
     });
     if (killTarget) {
       return { actionId: 'wandStrike', targetId: killTarget };
@@ -1672,10 +1685,10 @@ function chooseGrimtalMove(character, game, usable) {
       const tierFor = (tid) => (tid === highTierTargetId ? BEAST_ATTACK_HIGH_DAMAGE : BEAST_ATTACK_LOW_DAMAGE);
       const killTarget = targets.find((tid) => {
         const t = game.characters[tid];
-        return activeHearts(t) <= Math.max(0, tierFor(tid) - t.shield);
+        return !surelyDodges(game, character, tid) && activeHearts(t) <= Math.max(0, tierFor(tid) - t.shield);
       });
       const targetId = killTarget
-        || (highTierTargetId && targets.includes(highTierTargetId) ? highTierTargetId : null)
+        || (highTierTargetId && targets.includes(highTierTargetId) && !surelyDodges(game, character, highTierTargetId) ? highTierTargetId : null)
         || lowestHeartsTarget(game, targets)
         || pickRandom(targets);
       return { actionId: 'beastAttack', targetId };
@@ -1703,7 +1716,7 @@ function chooseGrimtalMove(character, game, usable) {
     const grimTargets = validTargetsFor(game, character, 'grimStrike');
     const killTarget = grimTargets.find((tid) => {
       const t = game.characters[tid];
-      return activeHearts(t) <= Math.max(0, 1 - t.shield);
+      return !surelyDodges(game, character, tid) && activeHearts(t) <= Math.max(0, 1 - t.shield);
     });
     if (killTarget) {
       return { actionId: 'grimStrike', targetId: killTarget };
