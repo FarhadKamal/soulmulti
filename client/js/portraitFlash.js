@@ -25,6 +25,11 @@ const FLASH_DURATION_MS = 1600;
 // infer client-side" pattern Fowl Play's isChicken, Melyssa's controlling,
 // and Draxus's deathproofActive already use. See isPetrifyActive below.
 // Athena's Dragon art (2026-10-22).
+// Held longer than the 1.6s default (2026-10-22, user: "very little image
+// animation"): the wake runs the 4.5s big-moment scale (covers her ~3.3s
+// voice line), the strike and its hit the 3s victim-reaction scale.
+const DRAGON_WAKE_FLASH_DURATION_MS = 4500;
+const DRAGON_STRIKE_FLASH_DURATION_MS = 3000;
 const DRAGON_ART = {
   wake: 'assets/images/athena/dragon_wake.jpg',
   strike: 'assets/images/athena/dragon_strike.jpg',
@@ -1445,10 +1450,10 @@ export function handleLogEntryForFlash(entry, game) {
       setFlash(characterId, 'assets/images/athena/judgment.jpg'); break;
     // Athena's Dragon (2026-10-22) - see DRAGON_ART.
     case 'wakeDragon':
-      setFlash(characterId, DRAGON_ART.wake); break;
+      setFlash(characterId, DRAGON_ART.wake, DRAGON_WAKE_FLASH_DURATION_MS); break;
     case 'dragonStrike':
-      if (!dodged) setFlash(characterId, DRAGON_ART.strike);
-      if (!dodged && targetCharacterId && amountDealt > 0) setFlash(targetCharacterId, DRAGON_ART.hit(targetCharacterId));
+      if (!dodged) setFlash(characterId, DRAGON_ART.strike, DRAGON_STRIKE_FLASH_DURATION_MS);
+      if (!dodged && targetCharacterId && amountDealt > 0) setFlash(targetCharacterId, DRAGON_ART.hit(targetCharacterId), DRAGON_STRIKE_FLASH_DURATION_MS);
       break;
     case 'glorySmash':
       setFlash(characterId, 'assets/images/tharox/glory.jpg');
