@@ -170,6 +170,17 @@ function isCursedByLiveAthena(game, character) {
   return !!athena;
 }
 
+// Drops Athena from a target pool while she's cursing this attacker (her
+// hits mirror back), unless she's the only option. For choosers that pick
+// targets themselves instead of through pickDefaultTarget - live 2026-10-22
+// a cursed Draxus, Boingo (Jester Ball) and Zerathys (free Wrath) all hit
+// her and ate the mirror.
+function avoidCursingAthena(game, character, pool) {
+  if (!isCursedByLiveAthena(game, character)) return pool;
+  const nonAthena = pool.filter((tid) => tid !== 'athena');
+  return nonAthena.length > 0 ? nonAthena : pool;
+}
+
 // True if Rowan is alive and his Mirror Reflect window is currently active -
 // landing any non-lethal direct hit on him while it's up deals 3 damage
 // straight back to the attacker. Same avoidance shape as
@@ -515,15 +526,9 @@ function chooseZerathysMove(character, game, usable) {
 // heuristics run; a normal (non-puppeted) Soul Swap never passes this, so
 // its own behavior is completely unchanged.
 export function chooseSoulSwapWrathTarget(character, game, excludeOwnerId = null) {
-  let targets = validTargetsFor(game, character, 'soulSwapWrath')
-    .filter((tid) => !excludeOwnerId || game.characters[tid].ownerId !== excludeOwnerId);
+  const targets = avoidCursingAthena(game, character, validTargetsFor(game, character, 'soulSwapWrath')
+    .filter((tid) => !excludeOwnerId || game.characters[tid].ownerId !== excludeOwnerId));
   if (targets.length === 0) return null;
-  // Live 2026-10-22: a cursed Zerathys aimed the free Wrath at Athena and
-  // the curse mirrored all 3 back (7 -> 4).
-  if (isCursedByLiveAthena(game, character)) {
-    const nonAthena = targets.filter((tid) => tid !== 'athena');
-    if (nonAthena.length > 0) targets = nonAthena;
-  }
   const securesKill = targets.find((tid) => {
     const t = game.characters[tid];
     return activeHearts(t) <= Math.max(0, 1 - t.shield);
@@ -1037,13 +1042,7 @@ function chooseBoingoMove(character, game, usable) {
   // biggest threat so either outcome (they eat -4, or they pass/return it
   // and burn a turn deciding) works in Boingo's favor.
   if (byId.jesterBall) {
-    let targets = validTargetsFor(game, character, 'jesterBall');
-    // Live 2026-10-22: a cursed Boingo threw it at Athena, she ate the 4 and
-    // the curse mirrored all 4 back onto him (7 -> 3).
-    if (isCursedByLiveAthena(game, character)) {
-      const nonAthena = targets.filter((tid) => tid !== 'athena');
-      if (nonAthena.length > 0) targets = nonAthena;
-    }
+    const targets = avoidCursingAthena(game, character, validTargetsFor(game, character, 'jesterBall'));
     const targetId = biggestThreatTarget(game, character, targets) || lowestHeartsTarget(game, targets);
     if (targetId) return { actionId: 'jesterBall', targetId };
   }
@@ -1186,7 +1185,7 @@ function chooseKaelisMove(character, game, usable) {
   // absorbs) can finish someone, else hit the biggest threat.
   if (byId.phoenixDive) {
     const diveDamage = phoenixDiveDamage(character, game);
-    const targets = avoidMirrorReflectRowan(game, validTargetsFor(game, character, 'phoenixDive'), diveDamage);
+    const targets = avoidMirrorReflectRowan(game, avoidCursingAthena(game, character, validTargetsFor(game, character, 'phoenixDive')), diveDamage);
     const killTarget = targets.find((tid) => {
       const t = game.characters[tid];
       return activeHearts(t) <= Math.max(0, diveDamage - t.shield);
@@ -1206,7 +1205,7 @@ function chooseKaelisMove(character, game, usable) {
   if (byId.callAshka && character.hearts <= KAELIS_ASHKA_THRESHOLD) {
     return { actionId: 'callAshka', targetId: null };
   }
-  const targets = validTargetsFor(game, character, 'grudgeStrike');
+  const targets = avoidCursingAthena(game, character, validTargetsFor(game, character, 'grudgeStrike'));
   // Cashing in a grudge (double damage) takes priority over the generic
   // threat/lowest-hearts chain, same "specific check before generic
   // fallback" ordering bladeStreakThreatAgainstMelyssa/
@@ -1235,13 +1234,7 @@ function chooseDraxusMove(character, game, usable) {
   if (byId.deathlessFury && character.hearts <= LOW_HEARTS_THRESHOLD) {
     return { actionId: 'deathlessFury', targetId: null };
   }
-  let targets = validTargetsFor(game, character, 'dyingBlow');
-  // Same curse avoidance as pickDefaultTarget - live 2026-10-22 a cursed
-  // Draxus hit Athena twice, ate both mirrors, then her death mirror KO'd him.
-  if (isCursedByLiveAthena(game, character)) {
-    const nonAthena = targets.filter((tid) => tid !== 'athena');
-    if (nonAthena.length > 0) targets = nonAthena;
-  }
+  const targets = avoidCursingAthena(game, character, validTargetsFor(game, character, 'dyingBlow'));
   const safeTargets = avoidMirrorReflectRowan(game, targets);
   const targetId = biggestThreatTarget(game, character, safeTargets)
     || lowestHeartsTarget(game, safeTargets)
@@ -1617,7 +1610,7 @@ function chooseMarinMove(character, game, usable) {
   if (byId.arcaneStudy) {
     return { actionId: 'arcaneStudy', targetId: null };
   }
-  const targets = validTargetsFor(game, character, 'wandStrike');
+  const targets = avoidCursingAthena(game, character, validTargetsFor(game, character, 'wandStrike'));
   const safeTargets = avoidMirrorReflectRowan(game, targets);
   const targetId = biggestThreatTarget(game, character, safeTargets)
     || lowestHeartsTarget(game, safeTargets) || pickRandom(safeTargets);
@@ -1648,7 +1641,7 @@ function chooseGrimtalMove(character, game, usable) {
   // "highest hearts" line already rewards), 3) lowest hearts as a generic
   // fallback.
   if (byId.beastAttack) {
-    const targets = validTargetsFor(game, character, 'beastAttack');
+    const targets = avoidCursingAthena(game, character, validTargetsFor(game, character, 'beastAttack'));
     if (targets.length > 0) {
       const living = Object.values(game.characters).filter((c) => c.id !== character.id && !c.isKO);
       const highestHearts = living.length > 0 ? Math.max(...living.map((c) => c.hearts)) : 0;
@@ -1709,11 +1702,11 @@ function chooseGrimtalMove(character, game, usable) {
     return { actionId: 'claimKill', targetId: null };
   }
   if (byId.skullCrack) {
-    const targets = avoidMirrorReflectRowan(game, validTargetsFor(game, character, 'skullCrack'));
+    const targets = avoidMirrorReflectRowan(game, avoidCursingAthena(game, character, validTargetsFor(game, character, 'skullCrack')));
     const targetId = biggestThreatTarget(game, character, targets) || lowestHeartsTarget(game, targets) || pickRandom(targets);
     return { actionId: 'skullCrack', targetId };
   }
-  const targets = avoidMirrorReflectRowan(game, validTargetsFor(game, character, 'grimStrike'));
+  const targets = avoidMirrorReflectRowan(game, avoidCursingAthena(game, character, validTargetsFor(game, character, 'grimStrike')));
   const targetId = biggestThreatTarget(game, character, targets) || lowestHeartsTarget(game, targets) || pickRandom(targets);
   return { actionId: 'grimStrike', targetId };
 }
@@ -1881,7 +1874,7 @@ function chooseOraclusMove(character, game, usable) {
     const attackerId = chooseRuneVisionAttackerPick(character, game);
     if (attackerId) return { actionId: 'runeVision', targetId: attackerId };
   }
-  const targets = avoidMirrorReflectRowan(game, validTargetsFor(game, character, 'runeStrike'));
+  const targets = avoidMirrorReflectRowan(game, avoidCursingAthena(game, character, validTargetsFor(game, character, 'runeStrike')));
   const targetId = lowestHeartsTarget(game, targets) || pickRandom(targets);
   return { actionId: 'runeStrike', targetId };
 }
@@ -1928,7 +1921,7 @@ function chooseFallbackMove(character, game, usable) {
 function chooseChickenMove(character, game, usable) {
   const targets = validTargetsFor(game, character, 'chickenAttack');
   if (targets.length === 0) return null;
-  const humans = targets.filter((tid) => !game.characters[tid]?.isChicken);
+  const humans = avoidCursingAthena(game, character, targets.filter((tid) => !game.characters[tid]?.isChicken));
   const landing = humans.filter((tid) => chickenPeckWouldLand(game, tid));
   if (landing.length > 0) {
     return { actionId: 'chickenAttack', targetId: landing.includes('boingo') ? 'boingo' : lowestHeartsTarget(game, landing) || landing[0] };
