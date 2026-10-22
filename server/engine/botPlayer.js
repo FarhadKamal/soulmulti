@@ -1446,10 +1446,19 @@ function chooseRowanMove(character, game, usable) {
   // reduced) damage to him, unlike Wand Strike, so there's no reason to
   // hold it back the same way.
   if (byId.wildLightning) {
-    const targets = validTargetsFor(game, character, 'wildLightning');
-    const targetId = biggestThreatTarget(game, character, targets)
-      || lowestHeartsTarget(game, targets) || pickRandom(targets);
-    return { actionId: 'wildLightning', targetId };
+    // Wild Lightning rolls 1-7, and Athena's curse mirrors every point back -
+    // never aim it at a cursing Athena unless his hearts outlast a full 7
+    // (2026-10-22, live: a cursed 2-heart Rowan rolled 7 on her and died to
+    // the mirror while Zerathys was still a valid target). If she's the only
+    // target, skip it this turn and use another move.
+    const cursed = isCursedByLiveAthena(game, character);
+    const targets = validTargetsFor(game, character, 'wildLightning')
+      .filter((tid) => !(cursed && tid === 'athena' && character.hearts + (character.shield || 0) <= 7));
+    if (targets.length > 0) {
+      const targetId = biggestThreatTarget(game, character, targets)
+        || lowestHeartsTarget(game, targets) || pickRandom(targets);
+      return { actionId: 'wildLightning', targetId };
+    }
   }
   // Poison Cloud on a fresh (not-yet-poisoned) target - no point stacking
   // it on someone already ticking. Same Chronox-reserve treatment as
