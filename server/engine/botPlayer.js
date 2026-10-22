@@ -1796,13 +1796,17 @@ function chooseIllyraMove(character, game, usable) {
     if (illyraUrgentBurstTarget(character, game)) {
       return { actionId: 'mirageBurst', targetId: null };
     }
+    // Counted as damage that gets past each target's shield - live
+    // 2026-10-22 she burst 3 stacks into Athena's 3 shield for 1 damage.
+    // Threshold is in stacks, so compare against the damage those would do.
     let total = 0;
     for (const [tid, count] of character.special.mirageMarks) {
-      if (isMirageMarkDetonatable(game.characters[tid])) total += count;
+      const t = game.characters[tid];
+      if (isMirageMarkDetonatable(t)) total += Math.max(0, Math.floor(count * 1.5) - (t.shield || 0));
     }
     const aliveCount = Object.values(game.characters).filter((c) => !c.isKO).length;
     const threshold = ILLYRA_BURST_THRESHOLD_BY_ALIVE[aliveCount] ?? 2;
-    if (total >= threshold) {
+    if (total >= Math.floor(threshold * 1.5)) {
       return { actionId: 'mirageBurst', targetId: null };
     }
   }
