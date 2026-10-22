@@ -2217,7 +2217,11 @@ function renderFullLogWithCopy(log) {
     if (!hearts) {
       for (let j = i + 1; j < log.length; j++) {
         if (log[j].type === 'end-action') { hearts = log[j].hearts; break; }
-        if (log[j].hearts) break; // hit the next STANDALONE entry's own snapshot first - stop, don't borrow past it
+        // Hit the next entry's own snapshot first - stop, don't borrow past
+        // it, but use that one rather than showing none (2026-10-22: a
+        // follow-up line with its own hearts left "Dragon Strike ... KO!",
+        // "Blood Hunt ... KO!" and Divine Sacrifice lines blank).
+        if (log[j].hearts) { hearts = log[j].hearts; break; }
       }
     }
     const snapshotText = formatHeartsSnapshot(hearts);
