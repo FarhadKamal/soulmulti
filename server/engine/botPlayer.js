@@ -1031,7 +1031,13 @@ function chooseBoingoMove(character, game, usable) {
   // biggest threat so either outcome (they eat -4, or they pass/return it
   // and burn a turn deciding) works in Boingo's favor.
   if (byId.jesterBall) {
-    const targets = validTargetsFor(game, character, 'jesterBall');
+    let targets = validTargetsFor(game, character, 'jesterBall');
+    // Live 2026-10-22: a cursed Boingo threw it at Athena, she ate the 4 and
+    // the curse mirrored all 4 back onto him (7 -> 3).
+    if (isCursedByLiveAthena(game, character)) {
+      const nonAthena = targets.filter((tid) => tid !== 'athena');
+      if (nonAthena.length > 0) targets = nonAthena;
+    }
     const targetId = biggestThreatTarget(game, character, targets) || lowestHeartsTarget(game, targets);
     if (targetId) return { actionId: 'jesterBall', targetId };
   }
