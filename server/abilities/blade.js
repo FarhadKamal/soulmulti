@@ -160,7 +160,10 @@ export const actions = {
         targetCharacterId: targetId,
         amount,
       });
-      log.push({ type: 'attack', characterId: character.id, actionId: 'bloodHunt', targetId, streak: amount, ...result });
+      // Own snapshot: the blood-drain line below carries one, which kept the
+      // end-action snapshot from reaching this line (2026-10-22: "Blood
+      // Hunt ... KO!" showed no hearts).
+      log.push({ type: 'attack', characterId: character.id, actionId: 'bloodHunt', targetId, streak: amount, ...result, hearts: heartsSnapshot(game) });
       // Blood Drain - pushed AFTER the attack's own line, same ordering
       // every other passive-heal-triggered-by-an-attack tick in this
       // codebase already uses (see Kaelis's Ashka's Vengeance, which pushes
@@ -286,7 +289,7 @@ export const actions = {
       // isLegal-adjacent check further up this block), not merely
       // attempted - matches "after that turn when attack finish, next
       // turn focus will again available."
-      log.push({ type: 'attack', characterId: character.id, actionId: 'sharkStrike', targetId: victim.id, streak: amount, ...result });
+      log.push({ type: 'attack', characterId: character.id, actionId: 'sharkStrike', targetId: victim.id, streak: amount, ...result, hearts: heartsSnapshot(game) });
       if (bloodDrainHealAmount(amount, result) > 0) {
         const bloodDrainHealed = applyHeal(game, character.id, 1);
         if (bloodDrainHealed > 0) {
