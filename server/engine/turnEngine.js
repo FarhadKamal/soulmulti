@@ -945,6 +945,9 @@ export function stampRewindAfterState(game, casterId) {
   record.chronoxAfter = { hearts: chronox.hearts, shield: chronox.shield || 0 };
   const caster = casterId ? game.characters[casterId] : null;
   if (caster) record.casterAfter = { hearts: caster.hearts, shield: caster.shield || 0 };
+  // Full after-state too, so Rewind can undo only the fields this action
+  // changed and keep the caster's later progress (see chronox.js).
+  if (caster) record.casterStateAfter = structuredClone(caster);
 }
 
 export function buildActionAgainstChronoxRecord(game, characterId, actionId, targetId) {

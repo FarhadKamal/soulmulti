@@ -15,6 +15,58 @@ function clampHearts(character, hearts) {
   return Math.min(character.maxHearts ?? 7, Math.max(1, hearts));
 }
 
+function sameValue(a, b) {
+  if (a === b) return true;
+  if (a instanceof Set && b instanceof Set) return a.size === b.size && [...a].every((v) => b.has(v));
+  if (a instanceof Map && b instanceof Map) return a.size === b.size && [...a].every(([k, v]) => b.has(k) && sameValue(v, b.get(k)));
+  if (a && b && typeof a === 'object' && typeof b === 'object' && !(a instanceof Set) && !(a instanceof Map)) {
+    const ka = Object.keys(a);
+    return ka.length === Object.keys(b).length && ka.every((k) => sameValue(a[k], b[k]));
+  }
+  return false;
+}
+
+// Undo just the recorded action's own change to one field: `before`/`after`
+// bracket the action, `live` is the value now. Untouched by the action ->
+// keep live. Sets/Maps -> take back only the entries the action added,
+// put back the ones it removed. Anything else it touched -> before.
+function undoFieldChange(before, after, live) {
+  if (sameValue(before, after)) return live;
+  if (before instanceof Set && after instanceof Set && live instanceof Set) {
+    const out = new Set([...live].filter((v) => before.has(v) || !after.has(v)));
+    for (const v of before) if (!after.has(v)) out.add(v);
+    return out;
+  }
+  if (before instanceof Map && after instanceof Map && live instanceof Map) {
+    const out = new Map(live);
+    for (const k of new Set([...before.keys(), ...after.keys()])) {
+      if (sameValue(before.get(k), after.get(k))) continue;
+      if (before.has(k)) out.set(k, structuredClone(before.get(k))); else out.delete(k);
+    }
+    return out;
+  }
+  return structuredClone(before);
+}
+
+// Live 2026-10-22: rewinding Rowan's first Poison Cloud restored his whole
+// pre-cast self - Petrify unspent, Purify unspent, 4 discovered spells
+// gone (he "discovered" them again). Policy is "Rewind undoes only what the
+// recorded action itself changed", so merge per field instead. Hearts and
+// shield are left to the caller's own diff.
+function undoOnlyRecordedAction(caster, live, before, after) {
+  for (const key of new Set([...Object.keys(before), ...Object.keys(live)])) {
+    if (key === 'hearts' || key === 'shield' || key === 'shieldDecaying' || key === 'special') continue;
+    caster[key] = undoFieldChange(before[key], after[key], live[key]);
+  }
+  const sb = before.special || {};
+  const sa = after.special || {};
+  const sl = live.special || {};
+  caster.special = {};
+  for (const key of new Set([...Object.keys(sb), ...Object.keys(sl)])) {
+    caster.special[key] = undoFieldChange(sb[key], sa[key], sl[key]);
+  }
+}
+
 // Revival cleanup (see engine/categories/onOtherRevived.js) - 3 separate
 // stale-reference risks, all against the now-revived character specifically.
 registerOnOtherRevived((revivedCharacterId, game) => {
@@ -610,7 +662,11 @@ export const actions = {
       const shieldAtCast = character.shield;
       const chronoxHeartsNow = character.hearts;
       const casterNow = { hearts: caster.hearts, shield: caster.shield || 0, shieldDecaying: caster.shieldDecaying };
-      Object.assign(caster, structuredClone(record.casterSnapshot));
+      if (record.casterStateAfter) {
+        undoOnlyRecordedAction(caster, structuredClone(caster), record.casterSnapshot, record.casterStateAfter);
+      } else {
+        Object.assign(caster, structuredClone(record.casterSnapshot));
+      }
       Object.assign(character, structuredClone(record.chronoxSnapshot));
       character.special.rewindUsesRemaining = rewindUsesRemaining; // re-assert past the restore
       // Never come out of a Rewind with LESS shield than he cast it with
