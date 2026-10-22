@@ -1223,7 +1223,13 @@ function chooseDraxusMove(character, game, usable) {
   if (byId.deathlessFury && character.hearts <= LOW_HEARTS_THRESHOLD) {
     return { actionId: 'deathlessFury', targetId: null };
   }
-  const targets = validTargetsFor(game, character, 'dyingBlow');
+  let targets = validTargetsFor(game, character, 'dyingBlow');
+  // Same curse avoidance as pickDefaultTarget - live 2026-10-22 a cursed
+  // Draxus hit Athena twice, ate both mirrors, then her death mirror KO'd him.
+  if (isCursedByLiveAthena(game, character)) {
+    const nonAthena = targets.filter((tid) => tid !== 'athena');
+    if (nonAthena.length > 0) targets = nonAthena;
+  }
   const safeTargets = avoidMirrorReflectRowan(game, targets);
   const targetId = biggestThreatTarget(game, character, safeTargets)
     || lowestHeartsTarget(game, safeTargets)
