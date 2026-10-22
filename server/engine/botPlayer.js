@@ -1146,8 +1146,17 @@ function chooseMelyssaMove(character, game, usable) {
   // than a genuine enemy puppet.
   const enemyIds = candidates.filter((tid) => game.characters[tid].ownerId !== character.ownerId);
   const allyIds = candidates.filter((tid) => game.characters[tid].ownerId === character.ownerId);
-  const pool = enemyIds.length > 0 ? enemyIds : allyIds;
-  const bladeThreatId = bladeStreakThreatAgainstMelyssa(game, character.id, pool);
+  let pool = enemyIds.length > 0 ? enemyIds : allyIds;
+  // Athena cursing her: anything her friend lands on Athena mirrors onto
+  // Melyssa herself (the friend can't take a hit he caused), so prefer
+  // another puppet (live 2026-10-22: friend Blade was puppeted into
+  // Athena, 3 -> 1).
+  if (athenaCursesMelyssa(game, character.id)) {
+    const notFriend = pool.filter((tid) => !isCurrentFriend(game, tid));
+    if (notFriend.length > 0) pool = notFriend;
+  }
+  // A friend can't attack her, so his streak on her is no threat.
+  const bladeThreatId = bladeStreakThreatAgainstMelyssa(game, character.id, pool.filter((tid) => !isCurrentFriend(game, tid)));
   const puppetId = bladeThreatId
     || biggestThreatTarget(game, character, pool)
     || lowestHeartsTarget(game, pool)
@@ -1162,6 +1171,13 @@ function chooseMelyssaMove(character, game, usable) {
 // above, which has to search for a THIRD character referencing
 // melyssaId). Prioritizing the biggest count cashes in the biggest
 // available revenge damage first, rather than any grudged target equally.
+// True when a live Athena's curse is on Melyssa - any damage Athena takes
+// mirrors onto her.
+function athenaCursesMelyssa(game, melyssaId) {
+  const athena = game.characters.athena;
+  return !!athena && !athena.isKO && athena.special?.curseTargetCharacterId === melyssaId;
+}
+
 function grudgedTarget(game, character, targetIds) {
   const counts = character.special.grudgeCounts;
   const grudged = targetIds.filter((tid) => (counts.get(tid) || 0) > 0);
@@ -2126,7 +2142,8 @@ function choosePuppetActionImpl(puppetCharacter, game, melyssaId) {
   if (puppetCharacter.id === 'blade' && melyssa
     && (puppetCharacter.special.hitCountByTarget?.[melyssa.id] || 0) >= BLADE_HITCOUNT_DANGER_THRESHOLD
     && usable.some((a) => a.actionId === 'bloodHunt')) {
-    const targets = validTargetsFor(game, puppetCharacter, 'bloodHunt').filter((tid) => tid !== melyssa.id);
+    const targets = validTargetsFor(game, puppetCharacter, 'bloodHunt')
+      .filter((tid) => tid !== melyssa.id && !(tid === 'athena' && athenaCursesMelyssa(game, melyssa.id)));
     if (targets.length > 0) {
       // Redirecting doesn't reset anything anymore (counts are per-target
       // and persistent) - it just means this turn's hit lands on someone
@@ -2216,7 +2233,10 @@ function choosePuppetActionImpl(puppetCharacter, game, melyssaId) {
     // bond and the match). Allowed by the rules, never a good bot choice -
     // aim the same action at someone else when possible.
     const friendId = melyssa.special?.friendCharacterId || null;
-    const isProtected = (tid) => tid === melyssa.id || (friendId && tid === friendId);
+    // A cursing Athena counts too: a hit on her mirrors onto Melyssa (or
+    // her friend).
+    const cursingAthena = puppetCharacter.id !== 'athena' && athenaCursesMelyssa(game, melyssa.id);
+    const isProtected = (tid) => tid === melyssa.id || (friendId && tid === friendId) || (cursingAthena && tid === 'athena');
     if (move.targetId && isProtected(move.targetId) && usableEntry?.needsTarget) {
       const others = Object.keys(game.characters).filter((tid) => !isProtected(tid)
         && game.characters[tid].ownerId !== melyssa.ownerId
