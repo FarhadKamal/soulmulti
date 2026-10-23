@@ -1828,7 +1828,9 @@ function illyraUrgentBurstTarget(character, game) {
   for (const [tid, count] of character.special.mirageMarks) {
     if (count <= 0) continue;
     const target = game.characters[tid];
-    if (isMirageMarkDetonatable(target) && activeHearts(target) <= count) return tid;
+    // An immortal Draxus can't lose his last heart - the stacks just burn
+    // for nothing (live 2026-10-23), so his marks wait.
+    if (isMirageMarkDetonatable(target) && !isImmortalDraxus(target) && activeHearts(target) <= count) return tid;
   }
   return null;
 }
@@ -1859,7 +1861,7 @@ function chooseIllyraMove(character, game, usable) {
     let total = 0;
     for (const [tid, count] of character.special.mirageMarks) {
       const t = game.characters[tid];
-      if (isMirageMarkDetonatable(t)) total += Math.max(0, Math.floor(count * 1.5) - (t.shield || 0));
+      if (isMirageMarkDetonatable(t) && !isImmortalDraxus(t)) total += Math.max(0, Math.floor(count * 1.5) - (t.shield || 0));
     }
     const aliveCount = Object.values(game.characters).filter((c) => !c.isKO).length;
     const threshold = ILLYRA_BURST_THRESHOLD_BY_ALIVE[aliveCount] ?? 2;

@@ -2545,7 +2545,7 @@ function describeLogEntry(entry) {
         // (markedCharacterId will always equal targetId in that case).
         const parts = entry.bursts.map((b) => {
           const stackText = `${b.stackCount} stack${b.stackCount > 1 ? 's' : ''}`;
-          const dmgText = `${b.amountDealt != null ? `, ${b.amountDealt} dmg` : ''}${b.absorbed ? `, ${b.absorbed} absorbed by shield` : ''}${b.koTriggered ? ' - KO!' : ''}`;
+          const dmgText = `${b.amountDealt != null ? `, ${b.amountDealt} dmg` : ''}${b.absorbed ? `, ${b.absorbed} absorbed by shield` : ''}${b.deathproofSave ? ', immortal - held at 1 heart' : ''}${b.koTriggered ? ' - KO!' : ''}`;
           if (b.markedCharacterId && b.markedCharacterId !== b.targetId) {
             return `${name(b.markedCharacterId)}'s mark (redirected to ${name(b.targetId)}) - ${stackText}${dmgText}`;
           }
