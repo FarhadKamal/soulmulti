@@ -1244,7 +1244,19 @@ function soulStormMayTargetChronox(game, characterId, actionId) {
 // caused it, both in the log AND in client-side voice arbitration.
 export function resolveOraclusPredictionIfPending(game, log, characterId, actionId, targetId, result) {
   const oraclusChar = game.characters.oraclus;
-  if (!oraclusChar || oraclusChar.isKO) return;
+  if (!oraclusChar) return;
+  // The foreseen strike was the one that killed him (2026-10-23: he
+  // predicted Zerathys -> himself and the vision just vanished). The reward
+  // comes after the hit, so a dead Oraclus gets nothing - but say so.
+  if (oraclusChar.isKO) {
+    if (oraclusChar.special.predictedAttackerId === characterId && targetId === 'oraclus'
+      && oraclusChar.special.predictedTargetId === 'oraclus') {
+      oraclusChar.special.predictedAttackerId = null;
+      oraclusChar.special.predictedTargetId = null;
+      log.push({ type: 'prediction-fatal', characterId: 'oraclus', predictedAttackerId: characterId });
+    }
+    return;
+  }
   if (!oraclusChar.special.predictedAttackerId) return;
   // Only ever resolves against the PREDICTED attacker's own action - any
   // other character acting in between (including Oraclus himself) is

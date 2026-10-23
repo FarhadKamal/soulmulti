@@ -2808,6 +2808,8 @@ function describeLogEntry(entry) {
       return entry.matched
         ? `Rune Vision confirmed! ${name(entry.predictedAttackerId)} struck ${name(entry.predictedTargetId)} exactly as foreseen - +${entry.healed ?? 3} heart${(entry.healed ?? 3) === 1 ? '' : 's'}, +3 shield, +1 damage (${entry.predictionWins}/2 wins)`
         : `Rune Vision failed - the vision did not come to pass`;
+    case 'prediction-fatal':
+      return `Rune Vision came true - but ${name(entry.predictedAttackerId)}'s strike was fatal, so Oraclus can't claim it`;
     case 'prediction-replaced':
       return `The earlier vision fades - ${name(entry.predictedAttackerId)} never struck`;
     case 'dragon-ready':
