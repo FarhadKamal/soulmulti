@@ -1953,7 +1953,12 @@ function chooseOraclusMove(character, game, usable) {
     const attackerId = chooseRuneVisionAttackerPick(character, game);
     if (attackerId) return { actionId: 'runeVision', targetId: attackerId };
   }
-  const targets = avoidMirrorReflectRowan(game, avoidCursingAthena(game, character, validTargetsFor(game, character, 'runeStrike')));
+  let targets = avoidMirrorReflectRowan(game, avoidCursingAthena(game, character, validTargetsFor(game, character, 'runeStrike')));
+  // His strike grows with each prediction win - don't feed it to a certain
+  // dodge while someone else can be hit (live 2026-10-23: three 3-damage
+  // Rune Strikes into Marin's Threefold Veil).
+  const landing = targets.filter((tid) => !surelyDodges(game, character, tid));
+  if (landing.length > 0) targets = landing;
   const targetId = lowestHeartsTarget(game, targets) || pickRandom(targets);
   return { actionId: 'runeStrike', targetId };
 }
