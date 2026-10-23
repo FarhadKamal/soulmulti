@@ -9,6 +9,7 @@ import { soulStormParticipants } from '../abilities/zerathys.js';
 import { phoenixDiveDamage } from '../abilities/kaelis.js';
 import { isCurrentFriend, SELF_CHOKE_DAMAGE } from '../abilities/melyssa.js';
 import { DRAGON_MAX_POWER } from '../abilities/athena.js';
+import { dyingBlowAmount } from '../abilities/draxus.js';
 
 // Pure decision logic for PC-controlled characters - no DOM, no side
 // effects. Given a character whose turn it is, returns the action+target
@@ -1299,7 +1300,12 @@ function chooseDraxusMove(character, game, usable) {
   if (byId.deathlessFury && character.hearts <= LOW_HEARTS_THRESHOLD) {
     return { actionId: 'deathlessFury', targetId: null };
   }
-  const targets = avoidCursingAthena(game, character, validTargetsFor(game, character, 'dyingBlow'));
+  let targets = avoidCursingAthena(game, character, validTargetsFor(game, character, 'dyingBlow'));
+  // Skip a target whose shield would eat the whole blow (live 2026-10-23:
+  // two Dying Blows for 0 into Tharox's Glory Smash shield).
+  const amount = dyingBlowAmount(character.hearts);
+  const landing = targets.filter((tid) => (game.characters[tid].shield || 0) < amount);
+  if (landing.length > 0) targets = landing;
   const safeTargets = avoidMirrorReflectRowan(game, targets);
   const targetId = biggestThreatTarget(game, character, safeTargets)
     || lowestHeartsTarget(game, safeTargets)

@@ -8,7 +8,7 @@ const DYING_BLOW_TIERS = [
   { min: 1, amount: 3 },
 ];
 
-function dyingBlowAmount(hearts) {
+export function dyingBlowAmount(hearts) {
   const tier = DYING_BLOW_TIERS.find((t) => hearts >= t.min);
   return tier ? tier.amount : 1;
 }
