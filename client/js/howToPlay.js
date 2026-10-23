@@ -20,7 +20,7 @@ const HERO_ABILITIES = {
     ['Divine Restore', 'One-time special: heals 4 hearts and grants 3 permanent shield.'],
     ['Divine Sacrifice', 'Repeatable: deals 3 damage to an enemy, but costs Athena a random 1-3 of her own hearts every cast — genuine risk, no cooldown.'],
     ['Wake Dragon', 'One-time: wakes her sacred dragon. It cannot strike this turn - from her next turn, Dragon Strike is ready.'],
-    ['Dragon Strike', 'One-time, single target: 2 damage, +1 for each of her turns she lets the dragon wait (max 6). Cannot be dodged; shield still absorbs it. The dragon dies if Athena does.'],
+    ['Dragon Strike', 'One-time, single target: 2 damage, +1 for each of her turns she lets the dragon wait (max 7). Cannot be dodged; shield still absorbs it. The dragon dies if Athena does.'],
     ['Divine Judgment', 'One-time special at hearts ≤ 3: marks a target. The instant Athena is KO’d by anything, the marked victim is also instantly, unblockably KO’d (bypasses shield, dodge, immortality, everything).'],
     ['Example', 'You Curse Strike an enemy, then take a 3-damage hit yourself — that same 3 damage also lands on the cursed player. Later, desperate at 2 hearts, you cast Divine Judgment on your likely killer. When you finally get KO’d, they go down with you — even if they’re at full health and untargetable.'],
   ],

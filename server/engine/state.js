@@ -167,7 +167,7 @@ function baseSpecialFor(id) {
       // as every other multi-special character in the roster.
       // Athena's Dragon (added 2026-10-22): dragonAwake once Wake Dragon is
       // cast; dragonReady from her next turn on; dragonPower = Dragon
-      // Strike's damage (2, +1 each of her turns it waits, max 6);
+      // Strike's damage (2, +1 each of her turns it waits, max 7);
       // usedDragonStrike after the one strike. See athena.js.
       return {
         curseTargetCharacterId: null, divineJudgmentTargetId: null, usedDivineJudgment: false,

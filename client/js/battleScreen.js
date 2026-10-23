@@ -1501,7 +1501,7 @@ function statusBadges(character) {
           text: character.special.dragonReady ? `${character.special.dragonPower}` : 'waking',
           cls: character.special.dragonReady ? 'good' : undefined,
           title: character.special.dragonReady
-            ? `Dragon Strike ready: ${character.special.dragonPower} damage (+1 each turn it waits, max 6)`
+            ? `Dragon Strike ready: ${character.special.dragonPower} damage (+1 each turn it waits, max 7)`
             : 'Dragon waking - ready next turn',
         });
       }

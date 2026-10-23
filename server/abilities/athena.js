@@ -14,7 +14,7 @@ const DIVINE_JUDGMENT_HEARTS_THRESHOLD = 3;
 // can't be dodged, shield still absorbs. Waiting costs nothing - she takes
 // her normal turn while it grows. The dragon dies with her.
 export const DRAGON_START_POWER = 2;
-export const DRAGON_MAX_POWER = 6;
+export const DRAGON_MAX_POWER = 7;
 
 // Growth ticks at the start of her own turns. Skipped automatically while
 // she's a chicken/frog/sealed (turnEngine.js doesn't call onTurnStart then),

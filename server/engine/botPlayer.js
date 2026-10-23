@@ -112,7 +112,7 @@ function maxHitDamage(game, character, actionId) {
   switch (actionId) {
     case 'wildLightning': return 7;
     case 'snakeStrike': return 5;
-    case 'dragonStrike': return sp.dragonPower || 6;
+    case 'dragonStrike': return sp.dragonPower || 7;
     case 'grimStrike': return 1 + (sp.ownKillCount || 0) + (sp.claimedKillCount || 0);
     case 'phoenixDive': return phoenixDiveDamage(character, game);
     default: return 4;
