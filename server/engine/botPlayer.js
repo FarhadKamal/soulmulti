@@ -891,7 +891,9 @@ function chooseBladeMove(character, game, usable) {
   // own frogCurse branch. No reason to delay a desperation move once
   // legal, matching every other hearts<=3 special's own bot priority.
   if (byId.sharkHunt) {
-    const huntTargets = validTargetsFor(game, character, 'sharkHunt');
+    // Sealing himself in with the Athena who curses him means every Shark
+    // Strike mirrors back (live 2026-10-23: he did, and the mirror killed him).
+    const huntTargets = avoidCursingAthena(game, character, validTargetsFor(game, character, 'sharkHunt'));
     if (huntTargets.length > 0) {
       const targetId = biggestThreatTarget(game, character, huntTargets) || pickRandom(huntTargets);
       return { actionId: 'sharkHunt', targetId };
