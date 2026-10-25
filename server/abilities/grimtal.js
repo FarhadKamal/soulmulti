@@ -277,7 +277,8 @@ registerDodgeDefense('grimtal', {
       applyShield(game, target.id, 1);
     }
     const shielded = target.shield - shieldBefore;
-    log.push({ type: 'grim-ward-reward', targetCharacterId: target.id, healed: 0, shielded });
+    // afterAction: print after the dodged attack's own line, not before it.
+    log.push({ type: 'grim-ward-reward', targetCharacterId: target.id, healed: 0, shielded, afterAction: true });
   },
 });
 

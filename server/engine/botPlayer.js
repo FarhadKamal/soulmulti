@@ -157,6 +157,11 @@ function validTargetsFor(game, character, actionId) {
   if (PURE_DAMAGE_ACTIONS.has(actionId)) {
     const mortal = all.filter((tid) => !isImmortalDraxus(game.characters[tid]));
     if (mortal.length > 0) all = mortal;
+    // Grim Ward: once someone else has hit Grimtal this round, every other
+    // attacker is dodged AND hands him shield (live 2026-10-25: Velorya
+    // swung into it, +2 shield for him). Pure loss - skip him if possible.
+    const wardOn = all.filter((tid) => tid !== 'grimtal' || !surelyDodges(game, character, tid));
+    if (wardOn.length > 0) all = wardOn;
   }
   if (!judgmentBlocksHitOnAthena(game, character, actionId)) return all;
   const withoutAthena = all.filter((tid) => tid !== 'athena');
@@ -1792,7 +1797,12 @@ function chooseGrimtalMove(character, game, usable) {
     const targetId = biggestThreatTarget(game, character, targets) || lowestHeartsTarget(game, targets) || pickRandom(targets);
     return { actionId: 'skullCrack', targetId };
   }
-  const targets = avoidMirrorReflectRowan(game, avoidCursingAthena(game, character, validTargetsFor(game, character, 'grimStrike')));
+  let targets = avoidMirrorReflectRowan(game, avoidCursingAthena(game, character, validTargetsFor(game, character, 'grimStrike')));
+  // Skip a target whose shield eats the whole strike (live 2026-10-25:
+  // Grim Strike for 0 into Velorya's stolen 2 shield).
+  const grimDamage = 1 + (character.special.ownKillCount || 0) + (character.special.claimedKillCount || 0);
+  const grimLanding = targets.filter((tid) => (game.characters[tid].shield || 0) < grimDamage);
+  if (grimLanding.length > 0) targets = grimLanding;
   const targetId = biggestThreatTarget(game, character, targets) || lowestHeartsTarget(game, targets) || pickRandom(targets);
   return { actionId: 'grimStrike', targetId };
 }
