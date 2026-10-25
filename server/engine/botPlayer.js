@@ -113,6 +113,10 @@ function hitRedirectedOffMelyssa(game, attacker, tid) {
 }
 function surelyDodges(game, attacker, tid) {
   if (hitRedirectedOffMelyssa(game, attacker, tid)) return true;
+  // Not a dodge, but the same "this hit can't finish them" for kill checks:
+  // an immortal Draxus is held at 1 (live 2026-10-25: Marin "killed" a
+  // revived 1-heart Draxus with Wand Strike instead of casting Lifebond).
+  if (isImmortalDraxus(game.characters[tid])) return true;
   const t = game.characters[tid];
   if (!t || !DETERMINISTIC_DODGERS.has(tid) || t.isChicken || isFrozenByChronox(t, game)) return false;
   return !!getDodgeDefenseProvider(tid)?.canDodge(t, game, attacker.id, {});
