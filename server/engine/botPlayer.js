@@ -99,7 +99,20 @@ function isImmortalDraxus(c) {
 // Marin three times (all dodged) instead of anyone else. Illyra's 50% is
 // left out on purpose.
 const DETERMINISTIC_DODGERS = new Set(['akyros', 'grimtal', 'marin']);
+
+// A hit on a befriended Melyssa lands on her friend instead (same
+// conditions as damagePipeline.js's redirect), so she's never the one it
+// kills - live 2026-10-23 a bot Athena "finished" a 3-heart Melyssa with
+// a 3-power Dragon Strike and it hit her 7-heart friend Akyros.
+function hitRedirectedOffMelyssa(game, attacker, tid) {
+  if (tid !== 'melyssa') return false;
+  const friendId = game.characters.melyssa?.special?.friendCharacterId;
+  if (!friendId || friendId === attacker.id) return false;
+  const f = game.characters[friendId];
+  return !!f && !f.isKO && !isFrozenByChronox(f, game) && !f.isFrog && !f.deepSeaSealed && !f.untargetable;
+}
 function surelyDodges(game, attacker, tid) {
+  if (hitRedirectedOffMelyssa(game, attacker, tid)) return true;
   const t = game.characters[tid];
   if (!t || !DETERMINISTIC_DODGERS.has(tid) || t.isChicken || isFrozenByChronox(t, game)) return false;
   return !!getDodgeDefenseProvider(tid)?.canDodge(t, game, attacker.id, {});
@@ -980,7 +993,7 @@ function chooseAthenaMove(character, game, usable) {
     const power = character.special.dragonPower;
     const kills = targets.filter((tid) => {
       const t = game.characters[tid];
-      return activeHearts(t) + (t.shield || 0) <= power;
+      return !hitRedirectedOffMelyssa(game, character, tid) && activeHearts(t) + (t.shield || 0) <= power;
     });
     if (kills.length > 0) {
       return { actionId: 'dragonStrike', targetId: lowestHeartsTarget(game, kills) || kills[0] };
