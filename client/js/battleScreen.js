@@ -2775,7 +2775,9 @@ function describeLogEntry(entry) {
       // "mirrors 0 damage" (2026-10-17).
       return `Curse mirrors ${entry.amountDealt ?? entry.amount} damage to ${name(entry.toCharacterId)}${entry.absorbed ? ` (${entry.absorbed} absorbed by shield)` : ''}${entry.koTriggered ? ' - KO!' : ''}`;
     case 'divine-judgment-trigger':
-      return `Divine Judgment falls upon ${name(entry.toCharacterId)}${entry.koTriggered ? ' - KO!' : ''}`;
+      // Not a KO means something stopped it (Beast Form is fully immune) -
+      // 2026-11-12 the line just read "falls upon Grimtal" with nothing after.
+      return `Divine Judgment falls upon ${name(entry.toCharacterId)}${entry.koTriggered ? ' - KO!' : ' - but it has no effect!'}`;
     case 'prophecy-of-doom-trigger': {
       const hitsText = (entry.hits || [])
         .map((h) => `${name(h.targetId)} (${h.amountDealt} dmg${h.absorbed ? `, ${h.absorbed} absorbed by shield` : ''}${h.deathproofSave ? ', immortal - held at 1 heart' : ''}${h.koTriggered ? ' - KO!' : ''})`)
